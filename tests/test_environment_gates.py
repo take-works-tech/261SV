@@ -268,29 +268,64 @@ class TestPrePushHook:
             cwd=cwd,
         )
 
-    def head(self, offset: int = 0) -> str:
-        ref = "HEAD" if offset == 0 else f"HEAD~{offset}"
-        return subprocess.run(
-            ["git", "rev-parse", ref], cwd=ROOT, capture_output=True, text=True, check=True
-        ).stdout.strip()
+    @pytest.fixture
+    def history(self, tmp_path: pathlib.Path) -> tuple[pathlib.Path, str, str]:
+        """A throwaway repository with two commits, and no gates to fail.
 
-    def test_a_fast_forward_with_green_gates_is_allowed(self) -> None:
-        result = self.push(self.head(), self.head(1))
+        The history checks were first written against this repository's own HEAD and HEAD~1, and CI
+        failed on the first push: `actions/checkout` clones one commit deep, so HEAD~1 does not exist
+        there. Raising fetch-depth would have made the failure go away and left the coupling - a test
+        of a hook's arithmetic has no business depending on the shape of the checkout it happens to run
+        in. It builds its own history instead.
+        """
+        shutil.copytree(ROOT / ".githooks", tmp_path / ".githooks")
+        (tmp_path / "validate").mkdir()  # empty: the gate loop finds nothing and passes
+        run_git = lambda *args: subprocess.run(  # noqa: E731
+            ["git", *args], cwd=tmp_path, check=True, capture_output=True, text=True
+        )
+        run_git("init", "-q", "-b", "main")
+        run_git("config", "user.email", "test@example.invalid")
+        run_git("config", "user.name", "test")
+        (tmp_path / "a.txt").write_text("one\n", encoding="utf-8")
+        run_git("add", "-A")
+        run_git("commit", "-q", "-m", "first")
+        first = run_git("rev-parse", "HEAD").stdout.strip()
+        (tmp_path / "a.txt").write_text("two\n", encoding="utf-8")
+        run_git("add", "-A")
+        run_git("commit", "-q", "-m", "second")
+        second = run_git("rev-parse", "HEAD").stdout.strip()
+        return tmp_path, first, second
+
+    def test_a_fast_forward_is_allowed(self, history: tuple[pathlib.Path, str, str]) -> None:
+        repo, first, second = history
+        result = self.push(second, first, cwd=repo)
         assert result.returncode == 0, result.stderr
 
-    def test_rewriting_published_history_is_refused(self) -> None:
-        result = self.push(self.head(1), self.head())
+    def test_rewriting_published_history_is_refused(self, history: tuple[pathlib.Path, str, str]) -> None:
+        repo, first, second = history
+        result = self.push(first, second, cwd=repo)
         assert result.returncode == 1
         assert "would not fast-forward" in result.stderr
 
-    def test_deleting_a_branch_by_push_is_refused(self) -> None:
-        result = self.push(ZERO, self.head())
+    def test_deleting_a_branch_by_push_is_refused(self, history: tuple[pathlib.Path, str, str]) -> None:
+        repo, _, second = history
+        result = self.push(ZERO, second, cwd=repo)
         assert result.returncode == 1
         assert "deleting" in result.stderr
 
-    def test_a_new_branch_is_allowed(self) -> None:
+    def test_a_new_branch_is_allowed(self, history: tuple[pathlib.Path, str, str]) -> None:
         """A first push has no remote side to fast-forward from, and must not be read as a rewrite."""
-        result = self.push(self.head(), ZERO)
+        repo, _, second = history
+        result = self.push(second, ZERO, cwd=repo)
+        assert result.returncode == 0, result.stderr
+
+    def test_this_repository_passes_its_own_hook(self) -> None:
+        """The gates half, against the real repository. Uses a new-branch refspec so that it says
+        nothing about how deeply the checkout was cloned."""
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True
+        ).stdout.strip()
+        result = self.push(head, ZERO)
         assert result.returncode == 0, result.stderr
 
     def test_a_red_gate_refuses_the_push(self, tmp_path: pathlib.Path) -> None:
