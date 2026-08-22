@@ -72,6 +72,46 @@ class TestConstantDuplication:
         assert result.returncode == 1
         assert "Contradicting" in result.stdout
 
+    def write_css(self, project: pathlib.Path, body: str) -> None:
+        (project / "app").mkdir(exist_ok=True)
+        (project / "app" / "styles.css").write_text(body, encoding="utf-8")
+
+    def test_one_name_holding_two_roles_fails(self, project: pathlib.Path) -> None:
+        """The defect this half was written for: `--muted` was a background and a text colour."""
+        self.write_css(project, ":root { --muted: #f1f4f6; --muted: #6f7e88; }\n")
+        result = run("check_constant_duplication.py", project)
+        assert result.returncode == 1
+        assert "--muted" in result.stdout
+        assert "the last one wins" in result.stdout
+
+    def test_a_responsive_override_is_not_a_duplicate(self, project: pathlib.Path) -> None:
+        """A media query redeclaring a token is correct, and an earlier version of this gate said it
+        was not. The false finding is the reason the block walker tracks nesting."""
+        self.write_css(
+            project,
+            ".tabs { --tab-width: 112px; }\n"
+            "@media (max-width: 900px) { .tabs { --tab-width: 96px; } }\n"
+            "@media (max-width: 600px) { .tabs { --tab-width: 38px; } }\n",
+        )
+        assert run("check_constant_duplication.py", project).returncode == 0
+
+    def test_two_spellings_of_one_colour_fail(self, project: pathlib.Path) -> None:
+        self.write_css(project, ".a { color: #fff; }\n.b { color: #ffffff; }\n")
+        result = run("check_constant_duplication.py", project)
+        assert result.returncode == 1
+        assert "#ffffff" in result.stdout
+
+    def test_one_spelling_passes(self, project: pathlib.Path) -> None:
+        self.write_css(project, ".a { color: #ffffff; }\n.b { color: #ffffff; }\n")
+        assert run("check_constant_duplication.py", project).returncode == 0
+
+    def test_different_colours_are_not_spellings_of_each_other(self, project: pathlib.Path) -> None:
+        self.write_css(project, ".a { color: #ffffff; }\n.b { color: #fefefe; }\n")
+        assert run("check_constant_duplication.py", project).returncode == 0
+
+    def test_it_states_what_it_did_not_check(self) -> None:
+        assert "NOT checked" in run("check_constant_duplication.py").stdout
+
     def test_generated_next_output_and_archive_are_not_source_definitions(self, project: pathlib.Path) -> None:
         for relative in ("mockups/ui/.next/server/chunk.js", "archive/legacy/src/old.js"):
             target = project / relative

@@ -2488,6 +2488,51 @@ model or the prompt, never in a description that quietly went stale.
 - resolve_by: the first study a customer runs that the limit refuses
 - decidedness: Open
 
+### XC-187 - A colour, a size or a duration has one definition, and roles are layered
+- decided: 2026-08-22
+- status: active
+- decision: every colour, spacing, radius, duration and z-index the interface uses is a **token**, and
+  tokens come in two layers that may not be collapsed. A **primitive** names a value once
+  (`--white`, `--blue-500`); a **semantic** token names a role and references a primitive
+  (`--card: var(--white)`). Component styles reference semantic tokens and never a raw literal. One
+  name carries one role, and one colour is written in one notation. Enforced by
+  `validate/check_constant_duplication.py`, which reads CSS as well as source files
+- decided_by: found on 2026-08-22 while incorporating the owner's design rules into the project
+- basis: E-001 (T1)
+- why_two_layers: a single flat layer forces a false choice the moment a literal has to be replaced.
+  `#ffffff` appearing in a component is either the card background or a label drawn on blue, and a
+  flat token set offers only `--card` - so the honest options are to guess a role or to leave the
+  literal. A primitive layer lets the value be centralised without asserting a meaning it may not have
+- measured_2026_08_22: `mockups/ui/app/globals.css` held 611 colour literals of 329 distinct colours
+  against 51 declared tokens. `--muted` was declared twice in one `:root` block - once as a light
+  background (`#f1f4f6`, the shadcn role) and once as grey body text (`#6f7e88`) - and the second won,
+  so every `bg-muted` rendered dark with nothing reporting it. White was written both `#fff` and
+  `#ffffff`, which defeats any count of either
+- alternatives: a linting rule that forbids literals outright fails on the cases where no token should
+  exist yet and teaches people to disable it; a single flat token layer produces the false-role guess
+  described above
+- affects: 11_ui.md, MOD-010, mockups/ui
+- decidedness: Fixed
+- reversal_trigger: the interface adopts a design-token toolchain that owns the layering itself, at
+  which point this states the contract that toolchain must satisfy rather than the mechanism
+
+### OPEN-021 - Which of the remaining colour literals should become tokens, and as which role
+- question: after the duplicate declaration and the two spellings of white were fixed,
+  **133 colour literals across 18 colours remain in `mockups/ui/app/globals.css` whose exact value is
+  already held by a declared token** - 100 of them white, where `--card`, `--background`, `--popover`,
+  `--primary-foreground` and `--destructive-foreground` all hold `#ffffff`. Which token each site
+  should reference is a question about what that pixel *means*
+- why_open: it cannot be answered mechanically, and answering it mechanically is the failure mode this
+  project spends most of its rules on. Replacing every `#ffffff` with `var(--card)` would centralise
+  the value and assert a role at 100 sites without checking one of them, producing a file that looks
+  disciplined and misleads the next reader about what each element is
+- blocks: nothing today. The catalogue is design states and never shipped code; XC-187 governs the
+  product interface, which does not exist yet and can be built with the layering from the first line
+- closes_when: the primitive layer of XC-187 exists, and each remaining literal is either replaced by
+  the semantic token whose role it actually has, or replaced by a primitive where no role is settled
+- affects: XC-187, mockups/ui
+- decidedness: Open
+
 ### OPEN-020 - How the append-only rule is enforced on the server, not only on this machine
 - question: XC-186 refuses force-push, hard reset and history rewriting, and `check_specs.py` and the
   other six gates decide whether a change may land. **None of that is enforced by GitHub.** Measured

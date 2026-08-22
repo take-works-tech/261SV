@@ -58,6 +58,26 @@ ran. Every gate in `validate/` runs in `.github/workflows/ci.yml`, and
 - **A spec change and the code it describes ship together.** The linter compares Fixed values against
   the code, so either order alone leaves the project red (spec model 6.5).
 
+## How a change is made here
+
+- **Fix the cause, not the symptom.** When something breaks, find the structure that allowed it and
+  change that. A patch at the point of failure leaves the same defect available everywhere else, and
+  the next occurrence looks unrelated. Recent examples, all fixed at the cause: a hook path relative to
+  the shell's cwd locked a whole session out (anchored, not retried); `--muted` named two roles so
+  `bg-muted` rendered dark (the name was split, not the one visible site patched); a version pinned in
+  a manifest was invisible to every gate (a gate was added, not the one file corrected).
+- **Plan the whole shape before writing any of it.** A feature's `plan.md` and `tasks.md` exist for
+  this: decide the structure, then implement it. Discovering the structure while typing produces one
+  that fits the order things were written in.
+- **Aim at the best available answer, not the first workable one** — and when two are defensible,
+  `specs/04_principles.md` is the tie-breaker rather than preference. Where a Bounded item has no
+  principle to judge it by, it is Delegated wearing a different word.
+- Structure and duplication are not advice here, they are gates. The vertical (capability) and
+  horizontal (layer) split, and the blast radius of a change, are in
+  [specs/01_boundaries.md](specs/01_boundaries.md) and checked by `check_boundaries.py`. One
+  definition per value - constants, and CSS tokens with their two layers (XC-187) - is checked by
+  `check_constant_duplication.py`; one implementation per shared component by `check_commands.py`.
+
 ## Working agreements
 
 - **One remote, named** (XC-186): `take-works-tech/202604-sim-analysis-visualization`, private. Pushing

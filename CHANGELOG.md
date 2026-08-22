@@ -37,8 +37,19 @@ itself — `pyproject.toml` reads 0.0.1 and will until there is something to ins
   missing file is the same code that means *block this tool call* — so every edit and every command in
   the session was refused, including the repair. Anchored to `$CLAUDE_PROJECT_DIR`, with a test.
 
+- **`--muted` named two roles at once.** Declared twice in one `:root` block — `#f1f4f6` for the
+  shadcn light-background role, then `#6f7e88` for this project's grey body text. The second won, so
+  every `bg-muted` rendered dark grey and nothing reported it. Split into `--muted` (background) and
+  `--muted-ink` (text); the 106 existing uses resolve to the same pixels as before, and the one broken
+  `bg-muted` is fixed. White was also written both `#fff` (95×) and `#ffffff` (5×); now one notation.
+
 ### Added
 
+- Style tokens are now inside the single-source gate. `check_constant_duplication.py` reads CSS as
+  well as source files, and its block walker tracks at-rule nesting — an earlier version reported a
+  media-query override of `--area-tab-width` as a duplicate, which is correct CSS and a false finding.
+  It states what it cannot judge: whether a literal *should* have been a token is a question about
+  meaning (XC-187, OPEN-021).
 - `validate/check_dependency_pins.py` — compares declared versions against the manifests that pin them,
   in both directions. Check 7 looks for `SYMBOL = literal` in source files, so a pin written
   `"vtk==9.5.2"` inside a TOML array was invisible to every gate here (XC-185).
