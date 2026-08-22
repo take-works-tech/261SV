@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 # Pinned, not ranged. The specification states that a rendering path must not change between two
 # figures in one report (XC-024), and a floating dependency is exactly how that happens.
 dependencies = [
-    "vtk==9.5.2",
+    "vtk==9.7.0",
     "numpy==2.3.4",
 ]
 
