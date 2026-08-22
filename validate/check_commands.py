@@ -94,28 +94,41 @@ def check_catalogue_matches_schema(findings: list[Finding]) -> bool:
     return True
 
 
+def screen_state_ids() -> set[str]:
+    """`screen.variant` ids from the required-screen-states table of the interface specification."""
+    if not UI_SPEC.exists():
+        return set()
+    text = UI_SPEC.read_text(encoding="utf-8")
+    marker = "### Required screen states"
+    if marker not in text:
+        return set()
+    section = text.split(marker, 1)[1]
+    ids: set[str] = set()
+    for line in section.splitlines():
+        if line.startswith("## ") or line.startswith("### "):
+            break
+        if line.startswith("|"):
+            ids.update(re.findall(r"`([a-z]+\.[a-z0-9-]+)`", line.split("|")[1]))
+    return ids
+
+
 def check_mentions_resolve(findings: list[Finding]) -> None:
     """An operation named in prose that does not exist is a reference to something nobody implements.
 
-    `screen.variant` and `family.operation` are the same shape, so the required-screen-states table of
-    `specs/11_ui.md` reads as thirteen unimplemented commands unless this check knows what it is
-    looking at. The section is skipped by name rather than by renaming the ids: those ids are the
-    catalogue keys and the mockup's URL parameters, and bending them to satisfy a gate would make the
-    gate the thing the design has to work around.
+    `screen.variant` and `family.operation` are the same shape, so a screen state reads as an
+    unimplemented command unless this check knows the other vocabulary. It learns it: the ids are read
+    from the required-screen-states table of `specs/11_ui.md` and are known everywhere, in any file.
+
+    Skipping that one section was the first attempt and was wrong in the ordinary way - it silenced
+    the table and nothing else, so the same ids named in `08_decisions.md`, where the decision about
+    them is recorded, still read as thirteen missing commands. A rule that holds only where the list
+    is written is not a rule about the list. The ids are not renamed to suit the gate either: they are
+    the catalogue keys and the mockup's URL parameters, and bending them here would make the gate the
+    thing the design works around.
     """
-    known = set(catalogue_operations())
+    known = set(catalogue_operations()) | screen_state_ids()
     for path in sorted((ROOT / "specs").rglob("*.md")):
-        in_screen_states = False
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-            if line.startswith("### Required screen states"):
-                in_screen_states = True
-                continue
-            if in_screen_states:
-                # The table ends at the next heading of the same level or above.
-                if line.startswith("## ") or line.startswith("### "):
-                    in_screen_states = False
-                else:
-                    continue
             for match in OPERATION_MENTION.finditer(line):
                 name = match.group(1)
                 if name in known or NOT_OPERATIONS.search(name):
