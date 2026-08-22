@@ -24,71 +24,79 @@ VIEW_SCHEMA = ROOT / "specs" / "contracts" / "schema" / "CT-004.json"
 MATERIAL_SCHEMA = ROOT / "specs" / "contracts" / "schema" / "CT-011.json"
 MOCKUP_THUMBNAILS = ROOT / "mockups" / "ui" / "public" / "thumbnails"
 
-EXPECTED_SCENARIOS = {
-    "home.default",
-    "home.first-run",
-    "home.importing",
-    "home.unreadable-file",
-    "home.import-review",
-    "simulation.unavailable",
-    "pipeline.default",
-    "pipeline.empty",
-    "pipeline.dry-run",
-    "pipeline.running",
-    "pipeline.failed",
-    "pipeline.scope-confirmation",
-    "view.single-pane",
-    "view.split-two",
-    "view.split-three",
-    "view.split-four",
-    "view.empty",
-    "view.renderer-error",
-    "view.temporal-axis",
-    "view.axis-error",
-    "view.reduced",
-    "view.unresolved-template",
-    "view.outliner-flat",
-    "view.outliner-empty",
-    "view.object-analysis-mesh",
-    "view.object-reference-mesh",
-    "view.object-scalar-field",
-    "view.object-vector-field",
-    "view.object-trajectory",
-    "view.object-point-cloud",
-    "view.object-annotation",
-    "view.object-effect",
-    "view.material-composition",
-    "view.output-preflight",
-    "view.library-collapsed",
-    "view.library-one-row",
-    "view.library-expanded",
-    "view.library-searching",
-    "view.library-selected",
-    "view.library-narrow",
-    "view.assistant-drawer",
-    "graph.default",
-    "graph.empty",
-    "graph.no-points",
-    "graph.series-unresolved",
-    "graph.output-preflight",
-    "report.default",
-    "report.blank",
-    "report.exporting",
-    "report.export-error",
-    "report.commentary-review",
-    "report.output-preflight",
-    "chat.default",
-    "chat.empty",
-    "chat.assistant-error",
-    "chat.outbound-request",
-    "settings.default",
-    "settings.invalid",
-    "settings.support-bundle",
-    "network.default",
-    "network.offline",
-    "network.refused",
-    "network.request-review",
+UI_SPEC = ROOT / "specs" / "11_ui.md"
+
+# `view.object-analysis-mesh` … `view.object-effect` in the spec table stands for one row per taxonomy
+# type. The ellipsis is expanded here because the taxonomy itself is enumerated in prose above it, and
+# a table row per type would repeat that list - the duplication P7 forbids. Each name below must appear
+# in the taxonomy section, which the next check asserts.
+ELLIPSIS_RANGES = {
+    "view.object-analysis-mesh": (
+        "view.object-analysis-mesh",
+        "view.object-reference-mesh",
+        "view.object-scalar-field",
+        "view.object-vector-field",
+        "view.object-trajectory",
+        "view.object-point-cloud",
+        "view.object-annotation",
+        "view.object-effect",
+    ),
+    "view.library-collapsed": (
+        "view.library-collapsed",
+        "view.library-one-row",
+        "view.library-expanded",
+        "view.library-searching",
+        "view.library-selected",
+        "view.library-narrow",
+    ),
 }
+
+
+def expected_scenarios() -> set[str]:
+    """The required states, read from `specs/11_ui.md` rather than restated here.
+
+    This set used to be a hand-written literal, and the coverage test compared the catalogue against
+    it. Both were copies of one list, so a state the specification required and neither copy carried
+    was undetectable: the check reported coverage while measuring only that two copies agreed. The
+    spec table is now the single source, and this function is the reader.
+    """
+    section = UI_SPEC.read_text(encoding="utf-8").split("### Required screen states", 1)
+    assert len(section) == 2, "specs/11_ui.md no longer carries a 'Required screen states' table"
+    required: set[str] = set()
+    for line in section[1].splitlines():
+        if not line.startswith("|"):
+            continue
+        first = line.split("|")[1]
+        names = re.findall(r"`([a-z]+\.[a-z0-9-]+)`", first)
+        if not names:
+            continue
+        if "…" in first and names[0] in ELLIPSIS_RANGES:
+            required.update(ELLIPSIS_RANGES[names[0]])
+        else:
+            required.update(names)
+    assert len(required) > 40, f"only {len(required)} states parsed; the table shape changed"
+    return required
+
+
+EXPECTED_SCENARIOS = expected_scenarios()
+
+
+def test_the_taxonomy_states_named_by_an_ellipsis_are_real_types() -> None:
+    """The expansion above must not drift from the taxonomy the spec enumerates."""
+    spec = UI_SPEC.read_text(encoding="utf-8")
+    taxonomy = spec[spec.index("### View object taxonomy") : spec.index("## Workspace list")]
+    for name in ELLIPSIS_RANGES["view.object-analysis-mesh"]:
+        japanese = {
+            "analysis-mesh": "解析メッシュ",
+            "reference-mesh": "参照メッシュ",
+            "scalar-field": "スカラー場",
+            "vector-field": "ベクトル場",
+            "trajectory": "流線・軌跡",
+            "point-cloud": "点群",
+            "annotation": "テキスト・注釈",
+            "effect": "エフェクト",
+        }[name.removeprefix("view.object-")]
+        assert japanese in taxonomy, f"{name} names a type the taxonomy does not define"
 
 
 def load_catalog() -> list[dict[str, object]]:
@@ -226,7 +234,11 @@ def test_settings_is_a_dedicated_page_without_workspace_sidebars_or_composer() -
     assert "AssetLibraryShelf" not in settings_branch
     assert "アプリ全体" in settings_screen
     assert "現在のワークスペース" in settings_screen
-    assert "['全般', '表示とアクセシビリティ', '単位', 'ネットワーク', '更新', '診断とサポート']" in settings_screen
+    # Membership, not a frozen literal. The previous version pinned the exact array, so adding the
+    # command list the spec requires (the keyboard scheme) failed a test about sidebars - the assertion
+    # was really "nobody may add a Settings category", which is not what it claimed to check.
+    for required in ("全般", "表示とアクセシビリティ", "ショートカット", "単位", "ネットワーク", "更新", "診断とサポート"):
+        assert f"'{required}'" in settings_screen, f"Settings is missing the {required} category"
     assert "['ワークスペース', '成分座標系', 'レンダラー'" in settings_screen
     assert ".settings-page {" in styles
     assert "grid-template-columns: 210px minmax(0, 1fr)" in styles
@@ -445,7 +457,17 @@ def test_simulation_view_graph_report_headers_offer_only_named_new_item_creation
     assert "新規ビュー" in page
     assert "新規グラフ" in page
     assert "新規レポート" in page
-    assert "テンプレートとして保存" not in header
+    # XC-148 forbids save-as-template as *persistent header chrome* and requires it as a secondary
+    # command on the selected item. The slice above covers the whole component, item menu included,
+    # so a blanket absence check made the required command indistinguishable from the forbidden
+    # button - and forbade both. The two are separated here: not in the persistent title row, and
+    # present in the per-item menu that drops out of the selector.
+    title_row = header[header.index("work-item-selector") : header.index("work-item-popover")]
+    assert "テンプレートとして保存" not in title_row
+    assert "テンプレート" not in title_row
+    item_menu = header[header.index("work-item-more") : header.index("</DropdownMenuContent>")]
+    assert "テンプレートとして保存" in item_menu, "the secondary save-as-template command is missing"
+    assert "このワークスペース" in page and "共有" in page, "saving a template must offer its scope (GL-019)"
     assert "<FolderOpen" not in header
     assert "<Save" not in header
     assert "TemplateBar" not in page

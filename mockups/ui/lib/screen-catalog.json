@@ -1,75 +1,556 @@
 {
   "scenarios": [
-    { "id": "home.default", "screen": "home", "variant": "default", "label": "ワークスペース一覧", "intent": "検索と絞り込みを使い、ワークスペースを開く・作る・再訪する。", "href": "?screen=home&variant=default" },
-    { "id": "home.first-run", "screen": "home", "variant": "first-run", "label": "初回起動", "intent": "同梱サンプルを先に提示し、次にドロップ領域付きの空ワークスペースを提示する。", "href": "?screen=home&variant=first-run" },
-    { "id": "home.importing", "screen": "home", "variant": "importing", "label": "取込中", "intent": "元ファイルを変更せず、いつでもキャンセルできる読み込みを表示する。", "href": "?screen=home&variant=importing" },
-    { "id": "home.unreadable-file", "screen": "home", "variant": "unreadable-file", "label": "読込不能ファイル", "intent": "不確かな部分ケースを作らず、拒否したファイルと理由を明示する。", "href": "?screen=home&variant=unreadable-file" },
-    { "id": "home.import-review", "screen": "home", "variant": "import-review", "label": "取込前確認", "intent": "対応レベル、フィールド関連、未宣言単位、座標フレームを確認してから読み込む。", "href": "?screen=home&variant=import-review" },
-
-    { "id": "simulation.unavailable", "screen": "simulation", "variant": "unavailable", "label": "シミュレーション・後続リリース", "intent": "r1ではソルバー実行が未提供であることと、代替となるパイプライン取込を案内する。", "href": "?screen=simulation&variant=unavailable" },
-
-    { "id": "pipeline.default", "screen": "pipeline", "variant": "default", "label": "自動化・パイプライン編集", "intent": "専用の自動化モードで明示的なユニットを編集し、各ユニットに累積対象ケース数を表示する。", "href": "?screen=pipeline&variant=default" },
-    { "id": "pipeline.empty", "screen": "pipeline", "variant": "empty", "label": "自動化・空のパイプライン", "intent": "右側のユニット追加から開始し、実行前のドライランへ案内する。", "href": "?screen=pipeline&variant=empty" },
-    { "id": "pipeline.dry-run", "screen": "pipeline", "variant": "dry-run", "label": "自動化・ドライラン結果", "intent": "実行前にケース、入れ子、生成物、スキップ対象をプレビューする。", "href": "?screen=pipeline&variant=dry-run" },
-    { "id": "pipeline.running", "screen": "pipeline", "variant": "running", "label": "自動化・実行中", "intent": "閲覧を許可したままワークスペース編集を止め、ユニット境界でキャンセルする。", "href": "?screen=pipeline&variant=running" },
-    { "id": "pipeline.failed", "screen": "pipeline", "variant": "failed", "label": "自動化・ケース失敗", "intent": "失敗をユニットとケース上に表示し、そのケースの依存ユニットだけをスキップする。", "href": "?screen=pipeline&variant=failed" },
-    { "id": "pipeline.scope-confirmation", "screen": "pipeline", "variant": "scope-confirmation", "label": "自動化・破壊操作の範囲確認", "intent": "破壊的ユニットを許可する前に、影響する対象セットを明示する。", "href": "?screen=pipeline&variant=scope-confirmation" },
-
-    { "id": "view.single-pane", "screen": "view", "variant": "single-pane", "label": "ビュー・1画面", "intent": "選択ケースを開いているビューで1画面に描画する。", "href": "?screen=view&variant=single-pane" },
-    { "id": "view.split-two", "screen": "view", "variant": "split-two", "label": "ビュー・2分割", "intent": "任意のカメラ同期を使って2画面を比較する。", "href": "?screen=view&variant=split-two" },
-    { "id": "view.split-three", "screen": "view", "variant": "split-three", "label": "ビュー・3分割", "intent": "非対称の3分割でも各画面のケース識別を見失わない。", "href": "?screen=view&variant=split-three" },
-    { "id": "view.split-four", "screen": "view", "variant": "split-four", "label": "ビュー・4分割", "intent": "各画面のケース識別を保ちながら上限の4画面を比較する。", "href": "?screen=view&variant=split-four" },
-    { "id": "view.empty", "screen": "view", "variant": "empty", "label": "ビュー・空状態", "intent": "開始プリセットとワークスペースのビュー一覧を提示する。", "href": "?screen=view&variant=empty" },
-    { "id": "view.renderer-error", "screen": "view", "variant": "renderer-error", "label": "レンダラー利用不能", "intent": "失敗したバックエンドと、引き続き利用できる描画経路を明示する。", "href": "?screen=view&variant=renderer-error" },
-    { "id": "view.temporal-axis", "screen": "view", "variant": "temporal-axis", "label": "結果軸", "intent": "名前付きの時間・モード・周波数軸を再生、移動、スクラブする。", "href": "?screen=view&variant=temporal-axis" },
-    { "id": "view.axis-error", "screen": "view", "variant": "axis-error", "label": "結果軸位置なし", "intent": "近傍結果へ丸めず、存在しない位置を明示する。", "href": "?screen=view&variant=axis-error" },
-    { "id": "view.reduced", "screen": "view", "variant": "reduced", "label": "縮退表示", "intent": "表示形状が縮退済みであると明示し、報告値は完全データから得る。", "href": "?screen=view&variant=reduced" },
-    { "id": "view.unresolved-template", "screen": "view", "variant": "unresolved-template", "label": "未解決テンプレート", "intent": "描画前に解決できた項目と未解決項目を一覧表示する。", "href": "?screen=view&variant=unresolved-template" },
-    { "id": "view.outliner-flat", "screen": "view", "variant": "outliner-flat", "label": "アウトライナー・平坦構造", "intent": "元ファイルに親子関係がなければ、推測せずデータセット直下の兄弟要素として表示する。", "href": "?screen=view&variant=outliner-flat" },
-    { "id": "view.outliner-empty", "screen": "view", "variant": "outliner-empty", "label": "アウトライナー・空状態", "intent": "データセット未読込ではサンプル構造を作らず、読込後に構成要素を表示すると案内する。", "href": "?screen=view&variant=outliner-empty" },
-    { "id": "view.object-analysis-mesh", "screen": "view", "variant": "object-analysis-mesh", "label": "オブジェクト・解析メッシュ", "intent": "解析メッシュの参照元、表現、可視性を編集し、元データや解析値を変更しない。", "href": "?screen=view&variant=object-analysis-mesh" },
-    { "id": "view.object-reference-mesh", "screen": "view", "variant": "object-reference-mesh", "label": "オブジェクト・参照メッシュ", "intent": "参照形状を解析メッシュと区別し、表示役割と外観だけを編集する。", "href": "?screen=view&variant=object-reference-mesh" },
-    { "id": "view.object-scalar-field", "screen": "view", "variant": "object-scalar-field", "label": "オブジェクト・スカラー場", "intent": "フィールド、位置、成分、単位、カラーマップ、範囲、凡例を一つの結果表現として確認する。", "href": "?screen=view&variant=object-scalar-field" },
-    { "id": "view.object-vector-field", "screen": "view", "variant": "object-vector-field", "label": "オブジェクト・ベクトル場", "intent": "ベクトルの参照元、成分座標系、グリフ、密度、スケールを明示する。", "href": "?screen=view&variant=object-vector-field" },
-    { "id": "view.object-trajectory", "screen": "view", "variant": "object-trajectory", "label": "オブジェクト・流線と軌跡", "intent": "未解決のフィールドやシードを既定値で補わず、積分と表示の定義を分離して示す。", "href": "?screen=view&variant=object-trajectory" },
-    { "id": "view.object-point-cloud", "screen": "view", "variant": "object-point-cloud", "label": "オブジェクト・点群", "intent": "点の参照元、サイズ、色の結び付け、可視性だけを点群向けに表示する。", "href": "?screen=view&variant=object-point-cloud" },
-    { "id": "view.object-annotation", "screen": "view", "variant": "object-annotation", "label": "オブジェクト・テキスト注釈", "intent": "オブジェクトで種類、アンカー、来歴を、条件付きテキストタブで内容と文字表現を編集する。", "href": "?screen=view&variant=object-annotation" },
-    { "id": "view.object-effect", "screen": "view", "variant": "object-effect", "label": "オブジェクト・エフェクト", "intent": "強調や装飾を表示専用として明記し、解析値を生成する機能に見せない。", "href": "?screen=view&variant=object-effect" },
-    { "id": "view.material-composition", "screen": "view", "variant": "material-composition", "label": "マテリアル・解析入力未解決", "intent": "複数Material Slot、MaterialXの必須解析入力、入力未解決時の診断マゼンタを同じマテリアル設定として表示する。", "href": "?screen=view&variant=material-composition" },
-    { "id": "view.output-preflight", "screen": "view", "variant": "output-preflight", "label": "ビュー出力前確認", "intent": "レンダラー、保存先、動画のカメラパスと時間対応を検査してから出力する。", "href": "?screen=view&variant=output-preflight" },
-    { "id": "view.library-collapsed", "screen": "view", "variant": "library-collapsed", "label": "素材ライブラリ・閉じた状態", "intent": "中央表示の縦幅を優先し、入力欄の直上に細いライブラリ見出しだけを残す。", "href": "?screen=view&variant=library-collapsed" },
-    { "id": "view.library-one-row", "screen": "view", "variant": "library-one-row", "label": "素材ライブラリ・1行表示", "intent": "サムネイルを途中で切らず、適用可能な素材を完全な1行で表示する。", "href": "?screen=view&variant=library-one-row" },
-    { "id": "view.library-expanded", "screen": "view", "variant": "library-expanded", "label": "素材ライブラリ・拡張表示", "intent": "ライブラリを縦に拡張して複数行を閲覧しながら、右側の編集領域の高さを維持する。", "href": "?screen=view&variant=library-expanded" },
-    { "id": "view.library-searching", "screen": "view", "variant": "library-searching", "label": "素材ライブラリ・検索中", "intent": "サンプルとオリジナル、文字列、タグ、並び順を分離して素材を絞り込む。", "href": "?screen=view&variant=library-searching" },
-    { "id": "view.library-selected", "screen": "view", "variant": "library-selected", "label": "素材ライブラリ・選択中", "intent": "クリックは選択と確認に使い、ドラッグまたは明示的な適用操作で現在の対象へ反映する。", "href": "?screen=view&variant=library-selected" },
-    { "id": "view.library-narrow", "screen": "view", "variant": "library-narrow", "label": "素材ライブラリ・狭幅表示", "intent": "狭い表示では中央画面を押し縮めず、入力欄の上に重なる下部ドロワーとして開く。", "href": "?screen=view&variant=library-narrow" },
-    { "id": "view.assistant-drawer", "screen": "view", "variant": "assistant-drawer", "label": "ビュー・会話ドロワー", "intent": "中央表示に重なる右側ドロワーで同じ会話を続け、右プロパティ欄と素材ライブラリを維持する。", "href": "?screen=view&variant=assistant-drawer" },
-
-    { "id": "graph.default", "screen": "graph", "variant": "default", "label": "グラフ作成", "intent": "単位、来歴、明示的ケース選択を伴う物理量から図を作る。", "href": "?screen=graph&variant=default" },
-    { "id": "graph.empty", "screen": "graph", "variant": "empty", "label": "グラフ開始方法", "intent": "手動、推奨、アシスタント提案を、勝手に適用せず提示する。", "href": "?screen=graph&variant=empty" },
-    { "id": "graph.no-points", "screen": "graph", "variant": "no-points", "label": "選択点なし", "intent": "空グラフを描かず、選択を空にした条件を明示する。", "href": "?screen=graph&variant=no-points" },
-    { "id": "graph.series-unresolved", "screen": "graph", "variant": "series-unresolved", "label": "系列の参照未解決", "intent": "系列ごとに数量、単位、来歴、式、欠損方針を編集し、未選択を明示する。", "href": "?screen=graph&variant=series-unresolved" },
-    { "id": "graph.output-preflight", "screen": "graph", "variant": "output-preflight", "label": "グラフ出力前確認", "intent": "系列と単位の未解決を出力前に拒否し、既存成果物を変更しない。", "href": "?screen=graph&variant=output-preflight" },
-
-    { "id": "report.default", "screen": "report", "variant": "default", "label": "レポート編集", "intent": "明示したケース、ビュー、グラフ、参考資料から成果物を構成する。", "href": "?screen=report&variant=default" },
-    { "id": "report.blank", "screen": "report", "variant": "blank", "label": "空のレポート", "intent": "同梱テンプレートと、意図的な空文書を提示する。", "href": "?screen=report&variant=blank" },
-    { "id": "report.exporting", "screen": "report", "variant": "exporting", "label": "出力中", "intent": "出力をキャンセル可能にし、同じ対象への二重出力を止める。", "href": "?screen=report&variant=exporting" },
-    { "id": "report.export-error", "screen": "report", "variant": "export-error", "label": "出力利用不能", "intent": "前回成果物を上書きせず、出力形式と失敗理由を明示する。", "href": "?screen=report&variant=export-error" },
-    { "id": "report.commentary-review", "screen": "report", "variant": "commentary-review", "label": "生成コメントの利用確認", "intent": "方向、深さ、モデル、検索許可、送信内容と費用を確定するまで生成を開始しない。", "href": "?screen=report&variant=commentary-review" },
-    { "id": "report.output-preflight", "screen": "report", "variant": "output-preflight", "label": "レポート出力前確認", "intent": "必須情報、字体、置換、未解決内容、保存先を一度に確認してから出力する。", "href": "?screen=report&variant=output-preflight" },
-
-    { "id": "chat.default", "screen": "chat", "variant": "default", "label": "チャット", "intent": "左右の吹き出しを使わず、同じ読み幅の縦方向の会話として質問と回答を続ける。", "href": "?screen=chat&variant=default" },
-    { "id": "chat.empty", "screen": "chat", "variant": "empty", "label": "新しい会話", "intent": "作業済みと誤解させず、回答可能な質問例を示す。", "href": "?screen=chat&variant=empty" },
-    { "id": "chat.assistant-error", "screen": "chat", "variant": "assistant-error", "label": "アシスタント失敗", "intent": "未実行の内容を明示し、ワークスペースを変更しない。", "href": "?screen=chat&variant=assistant-error" },
-    { "id": "chat.outbound-request", "screen": "chat", "variant": "outbound-request", "label": "外部送信確認", "intent": "端末外へ出す前に、正確な検索語と送信しないデータを表示する。", "href": "?screen=chat&variant=outbound-request" },
-
-    { "id": "settings.default", "screen": "settings", "variant": "default", "label": "設定", "intent": "宣言単位、表示単位、座標系、レンダラー、アシスタント、ライブラリを設定する。", "href": "?screen=settings&variant=default" },
-    { "id": "settings.invalid", "screen": "settings", "variant": "invalid", "label": "無効な設定", "intent": "無効値を入力時に拒否し、直前の値を維持する。", "href": "?screen=settings&variant=invalid" },
-    { "id": "settings.support-bundle", "screen": "settings", "variant": "support-bundle", "label": "サポートバンドル確認", "intent": "含める情報、要確認情報、除外する顧客データを作成前に列挙する。", "href": "?screen=settings&variant=support-bundle" },
-
-    { "id": "network.default", "screen": "network", "variant": "default", "label": "ネットワークと監査", "intent": "端末外へ出せる内容を表示し、ローカル監査履歴を保持する。", "href": "?screen=network&variant=default" },
-    { "id": "network.offline", "screen": "network", "variant": "offline", "label": "既定でオフライン", "intent": "検索が未許可であることと、許可方法を説明する。", "href": "?screen=network&variant=offline" },
-    { "id": "network.refused", "screen": "network", "variant": "refused", "label": "要求拒否", "intent": "送信せず、拒否したホストと要求を明示する。", "href": "?screen=network&variant=refused" },
-    { "id": "network.request-review", "screen": "network", "variant": "request-review", "label": "外部通信権限の確認", "intent": "要求ごとの内容確認、機密情報の追加許可、ローカル監査を示してから許可する。", "href": "?screen=network&variant=request-review" }
+    {
+      "id": "home.default",
+      "screen": "home",
+      "variant": "default",
+      "label": "ワークスペース一覧",
+      "intent": "検索と絞り込みを使い、ワークスペースを開く・作る・再訪する。",
+      "href": "?screen=home&variant=default"
+    },
+    {
+      "id": "home.first-run",
+      "screen": "home",
+      "variant": "first-run",
+      "label": "初回起動",
+      "intent": "同梱サンプルを先に提示し、次にドロップ領域付きの空ワークスペースを提示する。",
+      "href": "?screen=home&variant=first-run"
+    },
+    {
+      "id": "home.import-review",
+      "screen": "home",
+      "variant": "import-review",
+      "label": "取込前確認",
+      "intent": "対応レベル、フィールド関連、未宣言単位、座標フレームを確認してから読み込む。",
+      "href": "?screen=home&variant=import-review"
+    },
+    {
+      "id": "home.importing",
+      "screen": "home",
+      "variant": "importing",
+      "label": "取込中",
+      "intent": "元ファイルを変更せず、いつでもキャンセルできる読み込みを表示する。",
+      "href": "?screen=home&variant=importing"
+    },
+    {
+      "id": "home.unreadable-file",
+      "screen": "home",
+      "variant": "unreadable-file",
+      "label": "読込不能ファイル",
+      "intent": "不確かな部分ケースを作らず、拒否したファイルと理由を明示する。",
+      "href": "?screen=home&variant=unreadable-file"
+    },
+    {
+      "id": "simulation.default",
+      "screen": "simulation",
+      "variant": "default",
+      "label": "保存フロー",
+      "intent": "1回以上の外部ソルバー実行の条件をまとめた保存フローを、解決状態つきで確認する。",
+      "href": "?screen=simulation&variant=default"
+    },
+    {
+      "id": "simulation.empty",
+      "screen": "simulation",
+      "variant": "empty",
+      "label": "未作成",
+      "intent": "保存されたシミュレーションが無い状態と、新規作成の入口を提示する。",
+      "href": "?screen=simulation&variant=empty"
+    },
+    {
+      "id": "simulation.unavailable",
+      "screen": "simulation",
+      "variant": "unavailable",
+      "label": "シミュレーション・後続リリース",
+      "intent": "r1ではソルバー実行が未提供であることと、代替となるパイプライン取込を案内する。",
+      "href": "?screen=simulation&variant=unavailable"
+    },
+    {
+      "id": "simulation.unresolved",
+      "screen": "simulation",
+      "variant": "unresolved",
+      "label": "条件未解決",
+      "intent": "未宣言変数と未接続アダプターを名指しし、実行を拒否したまま定義を保持する。",
+      "href": "?screen=simulation&variant=unresolved"
+    },
+    {
+      "id": "pipeline.default",
+      "screen": "pipeline",
+      "variant": "default",
+      "label": "自動化・パイプライン編集",
+      "intent": "専用の自動化モードで明示的なユニットを編集し、各ユニットに累積対象ケース数を表示する。",
+      "href": "?screen=pipeline&variant=default"
+    },
+    {
+      "id": "pipeline.dry-run",
+      "screen": "pipeline",
+      "variant": "dry-run",
+      "label": "自動化・ドライラン結果",
+      "intent": "実行前にケース、入れ子、生成物、スキップ対象をプレビューする。",
+      "href": "?screen=pipeline&variant=dry-run"
+    },
+    {
+      "id": "pipeline.empty",
+      "screen": "pipeline",
+      "variant": "empty",
+      "label": "自動化・空のパイプライン",
+      "intent": "右側のユニット追加から開始し、実行前のドライランへ案内する。",
+      "href": "?screen=pipeline&variant=empty"
+    },
+    {
+      "id": "pipeline.failed",
+      "screen": "pipeline",
+      "variant": "failed",
+      "label": "自動化・ケース失敗",
+      "intent": "失敗をユニットとケース上に表示し、そのケースの依存ユニットだけをスキップする。",
+      "href": "?screen=pipeline&variant=failed"
+    },
+    {
+      "id": "pipeline.running",
+      "screen": "pipeline",
+      "variant": "running",
+      "label": "自動化・実行中",
+      "intent": "閲覧を許可したままワークスペース編集を止め、ユニット境界でキャンセルする。",
+      "href": "?screen=pipeline&variant=running"
+    },
+    {
+      "id": "pipeline.scope-confirmation",
+      "screen": "pipeline",
+      "variant": "scope-confirmation",
+      "label": "自動化・破壊操作の範囲確認",
+      "intent": "破壊的ユニットを許可する前に、影響する対象セットを明示する。",
+      "href": "?screen=pipeline&variant=scope-confirmation"
+    },
+    {
+      "id": "view.assistant-drawer",
+      "screen": "view",
+      "variant": "assistant-drawer",
+      "label": "ビュー・会話ドロワー",
+      "intent": "中央表示に重なる右側ドロワーで同じ会話を続け、右プロパティ欄と素材ライブラリを維持する。",
+      "href": "?screen=view&variant=assistant-drawer"
+    },
+    {
+      "id": "view.axis-error",
+      "screen": "view",
+      "variant": "axis-error",
+      "label": "結果軸位置なし",
+      "intent": "近傍結果へ丸めず、存在しない位置を明示する。",
+      "href": "?screen=view&variant=axis-error"
+    },
+    {
+      "id": "view.deformation",
+      "screen": "view",
+      "variant": "deformation",
+      "label": "変形表示",
+      "intent": "変形倍率を画面に描き込み、報告値は未変形形状から計算されることを明示する。",
+      "href": "?screen=view&variant=deformation"
+    },
+    {
+      "id": "view.empty",
+      "screen": "view",
+      "variant": "empty",
+      "label": "ビュー・空状態",
+      "intent": "開始プリセットとワークスペースのビュー一覧を提示する。",
+      "href": "?screen=view&variant=empty"
+    },
+    {
+      "id": "view.library-collapsed",
+      "screen": "view",
+      "variant": "library-collapsed",
+      "label": "素材ライブラリ・閉じた状態",
+      "intent": "中央表示の縦幅を優先し、入力欄の直上に細いライブラリ見出しだけを残す。",
+      "href": "?screen=view&variant=library-collapsed"
+    },
+    {
+      "id": "view.library-expanded",
+      "screen": "view",
+      "variant": "library-expanded",
+      "label": "素材ライブラリ・拡張表示",
+      "intent": "ライブラリを縦に拡張して複数行を閲覧しながら、右側の編集領域の高さを維持する。",
+      "href": "?screen=view&variant=library-expanded"
+    },
+    {
+      "id": "view.library-narrow",
+      "screen": "view",
+      "variant": "library-narrow",
+      "label": "素材ライブラリ・狭幅表示",
+      "intent": "狭い表示では中央画面を押し縮めず、入力欄の上に重なる下部ドロワーとして開く。",
+      "href": "?screen=view&variant=library-narrow"
+    },
+    {
+      "id": "view.library-one-row",
+      "screen": "view",
+      "variant": "library-one-row",
+      "label": "素材ライブラリ・1行表示",
+      "intent": "サムネイルを途中で切らず、適用可能な素材を完全な1行で表示する。",
+      "href": "?screen=view&variant=library-one-row"
+    },
+    {
+      "id": "view.library-searching",
+      "screen": "view",
+      "variant": "library-searching",
+      "label": "素材ライブラリ・検索中",
+      "intent": "サンプルとオリジナル、文字列、タグ、並び順を分離して素材を絞り込む。",
+      "href": "?screen=view&variant=library-searching"
+    },
+    {
+      "id": "view.library-selected",
+      "screen": "view",
+      "variant": "library-selected",
+      "label": "素材ライブラリ・選択中",
+      "intent": "クリックは選択と確認に使い、ドラッグまたは明示的な適用操作で現在の対象へ反映する。",
+      "href": "?screen=view&variant=library-selected"
+    },
+    {
+      "id": "view.material-composition",
+      "screen": "view",
+      "variant": "material-composition",
+      "label": "マテリアル・解析入力未解決",
+      "intent": "複数Material Slot、MaterialXの必須解析入力、入力未解決時の診断マゼンタを同じマテリアル設定として表示する。",
+      "href": "?screen=view&variant=material-composition"
+    },
+    {
+      "id": "view.object-analysis-mesh",
+      "screen": "view",
+      "variant": "object-analysis-mesh",
+      "label": "オブジェクト・解析メッシュ",
+      "intent": "解析メッシュの参照元、表現、可視性を編集し、元データや解析値を変更しない。",
+      "href": "?screen=view&variant=object-analysis-mesh"
+    },
+    {
+      "id": "view.object-annotation",
+      "screen": "view",
+      "variant": "object-annotation",
+      "label": "オブジェクト・テキスト注釈",
+      "intent": "オブジェクトで種類、アンカー、来歴を、条件付きテキストタブで内容と文字表現を編集する。",
+      "href": "?screen=view&variant=object-annotation"
+    },
+    {
+      "id": "view.object-effect",
+      "screen": "view",
+      "variant": "object-effect",
+      "label": "オブジェクト・エフェクト",
+      "intent": "強調や装飾を表示専用として明記し、解析値を生成する機能に見せない。",
+      "href": "?screen=view&variant=object-effect"
+    },
+    {
+      "id": "view.object-point-cloud",
+      "screen": "view",
+      "variant": "object-point-cloud",
+      "label": "オブジェクト・点群",
+      "intent": "点の参照元、サイズ、色の結び付け、可視性だけを点群向けに表示する。",
+      "href": "?screen=view&variant=object-point-cloud"
+    },
+    {
+      "id": "view.object-reference-mesh",
+      "screen": "view",
+      "variant": "object-reference-mesh",
+      "label": "オブジェクト・参照メッシュ",
+      "intent": "参照形状を解析メッシュと区別し、表示役割と外観だけを編集する。",
+      "href": "?screen=view&variant=object-reference-mesh"
+    },
+    {
+      "id": "view.object-scalar-field",
+      "screen": "view",
+      "variant": "object-scalar-field",
+      "label": "オブジェクト・スカラー場",
+      "intent": "フィールド、位置、成分、単位、カラーマップ、範囲、凡例を一つの結果表現として確認する。",
+      "href": "?screen=view&variant=object-scalar-field"
+    },
+    {
+      "id": "view.object-trajectory",
+      "screen": "view",
+      "variant": "object-trajectory",
+      "label": "オブジェクト・流線と軌跡",
+      "intent": "未解決のフィールドやシードを既定値で補わず、積分と表示の定義を分離して示す。",
+      "href": "?screen=view&variant=object-trajectory"
+    },
+    {
+      "id": "view.object-vector-field",
+      "screen": "view",
+      "variant": "object-vector-field",
+      "label": "オブジェクト・ベクトル場",
+      "intent": "ベクトルの参照元、成分座標系、グリフ、密度、スケールを明示する。",
+      "href": "?screen=view&variant=object-vector-field"
+    },
+    {
+      "id": "view.outliner-empty",
+      "screen": "view",
+      "variant": "outliner-empty",
+      "label": "アウトライナー・空状態",
+      "intent": "データセット未読込ではサンプル構造を作らず、読込後に構成要素を表示すると案内する。",
+      "href": "?screen=view&variant=outliner-empty"
+    },
+    {
+      "id": "view.outliner-flat",
+      "screen": "view",
+      "variant": "outliner-flat",
+      "label": "アウトライナー・平坦構造",
+      "intent": "元ファイルに親子関係がなければ、推測せずデータセット直下の兄弟要素として表示する。",
+      "href": "?screen=view&variant=outliner-flat"
+    },
+    {
+      "id": "view.output-preflight",
+      "screen": "view",
+      "variant": "output-preflight",
+      "label": "ビュー出力前確認",
+      "intent": "レンダラー、保存先、動画のカメラパスと時間対応を検査してから出力する。",
+      "href": "?screen=view&variant=output-preflight"
+    },
+    {
+      "id": "view.probe",
+      "screen": "view",
+      "variant": "probe",
+      "label": "プローブ",
+      "intent": "点の値を単位・有効数字・由来つきで表示し、明示操作で変数として保持する。",
+      "href": "?screen=view&variant=probe"
+    },
+    {
+      "id": "view.reduced",
+      "screen": "view",
+      "variant": "reduced",
+      "label": "縮退表示",
+      "intent": "表示形状が縮退済みであると明示し、報告値は完全データから得る。",
+      "href": "?screen=view&variant=reduced"
+    },
+    {
+      "id": "view.renderer-error",
+      "screen": "view",
+      "variant": "renderer-error",
+      "label": "レンダラー利用不能",
+      "intent": "失敗したバックエンドと、引き続き利用できる描画経路を明示する。",
+      "href": "?screen=view&variant=renderer-error"
+    },
+    {
+      "id": "view.single-pane",
+      "screen": "view",
+      "variant": "single-pane",
+      "label": "ビュー・1画面",
+      "intent": "選択ケースを開いているビューで1画面に描画する。",
+      "href": "?screen=view&variant=single-pane"
+    },
+    {
+      "id": "view.split-four",
+      "screen": "view",
+      "variant": "split-four",
+      "label": "ビュー・4分割",
+      "intent": "各画面のケース識別を保ちながら上限の4画面を比較する。",
+      "href": "?screen=view&variant=split-four"
+    },
+    {
+      "id": "view.split-three",
+      "screen": "view",
+      "variant": "split-three",
+      "label": "ビュー・3分割",
+      "intent": "非対称の3分割でも各画面のケース識別を見失わない。",
+      "href": "?screen=view&variant=split-three"
+    },
+    {
+      "id": "view.split-two",
+      "screen": "view",
+      "variant": "split-two",
+      "label": "ビュー・2分割",
+      "intent": "任意のカメラ同期を使って2画面を比較する。",
+      "href": "?screen=view&variant=split-two"
+    },
+    {
+      "id": "view.temporal-axis",
+      "screen": "view",
+      "variant": "temporal-axis",
+      "label": "結果軸",
+      "intent": "名前付きの時間・モード・周波数軸を再生、移動、スクラブする。",
+      "href": "?screen=view&variant=temporal-axis"
+    },
+    {
+      "id": "view.unresolved-template",
+      "screen": "view",
+      "variant": "unresolved-template",
+      "label": "未解決テンプレート",
+      "intent": "描画前に解決できた項目と未解決項目を一覧表示する。",
+      "href": "?screen=view&variant=unresolved-template"
+    },
+    {
+      "id": "graph.default",
+      "screen": "graph",
+      "variant": "default",
+      "label": "グラフ作成",
+      "intent": "単位、来歴、明示的ケース選択を伴う物理量から図を作る。",
+      "href": "?screen=graph&variant=default"
+    },
+    {
+      "id": "graph.empty",
+      "screen": "graph",
+      "variant": "empty",
+      "label": "グラフ開始方法",
+      "intent": "手動、推奨、アシスタント提案を、勝手に適用せず提示する。",
+      "href": "?screen=graph&variant=empty"
+    },
+    {
+      "id": "graph.no-points",
+      "screen": "graph",
+      "variant": "no-points",
+      "label": "選択点なし",
+      "intent": "空グラフを描かず、選択を空にした条件を明示する。",
+      "href": "?screen=graph&variant=no-points"
+    },
+    {
+      "id": "graph.output-preflight",
+      "screen": "graph",
+      "variant": "output-preflight",
+      "label": "グラフ出力前確認",
+      "intent": "系列と単位の未解決を出力前に拒否し、既存成果物を変更しない。",
+      "href": "?screen=graph&variant=output-preflight"
+    },
+    {
+      "id": "graph.series-unresolved",
+      "screen": "graph",
+      "variant": "series-unresolved",
+      "label": "系列の参照未解決",
+      "intent": "系列ごとに数量、単位、来歴、式、欠損方針を編集し、未選択を明示する。",
+      "href": "?screen=graph&variant=series-unresolved"
+    },
+    {
+      "id": "report.blank",
+      "screen": "report",
+      "variant": "blank",
+      "label": "空のレポート",
+      "intent": "同梱テンプレートと、意図的な空文書を提示する。",
+      "href": "?screen=report&variant=blank"
+    },
+    {
+      "id": "report.commentary-review",
+      "screen": "report",
+      "variant": "commentary-review",
+      "label": "生成コメントの利用確認",
+      "intent": "方向、深さ、モデル、検索許可、送信内容と費用を確定するまで生成を開始しない。",
+      "href": "?screen=report&variant=commentary-review"
+    },
+    {
+      "id": "report.default",
+      "screen": "report",
+      "variant": "default",
+      "label": "レポート編集",
+      "intent": "明示したケース、ビュー、グラフ、参考資料から成果物を構成する。",
+      "href": "?screen=report&variant=default"
+    },
+    {
+      "id": "report.export-error",
+      "screen": "report",
+      "variant": "export-error",
+      "label": "出力利用不能",
+      "intent": "前回成果物を上書きせず、出力形式と失敗理由を明示する。",
+      "href": "?screen=report&variant=export-error"
+    },
+    {
+      "id": "report.exporting",
+      "screen": "report",
+      "variant": "exporting",
+      "label": "出力中",
+      "intent": "出力をキャンセル可能にし、同じ対象への二重出力を止める。",
+      "href": "?screen=report&variant=exporting"
+    },
+    {
+      "id": "report.output-preflight",
+      "screen": "report",
+      "variant": "output-preflight",
+      "label": "レポート出力前確認",
+      "intent": "必須情報、字体、置換、未解決内容、保存先を一度に確認してから出力する。",
+      "href": "?screen=report&variant=output-preflight"
+    },
+    {
+      "id": "chat.assistant-error",
+      "screen": "chat",
+      "variant": "assistant-error",
+      "label": "アシスタント失敗",
+      "intent": "未実行の内容を明示し、ワークスペースを変更しない。",
+      "href": "?screen=chat&variant=assistant-error"
+    },
+    {
+      "id": "chat.default",
+      "screen": "chat",
+      "variant": "default",
+      "label": "チャット",
+      "intent": "左右の吹き出しを使わず、同じ読み幅の縦方向の会話として質問と回答を続ける。",
+      "href": "?screen=chat&variant=default"
+    },
+    {
+      "id": "chat.empty",
+      "screen": "chat",
+      "variant": "empty",
+      "label": "新しい会話",
+      "intent": "作業済みと誤解させず、回答可能な質問例を示す。",
+      "href": "?screen=chat&variant=empty"
+    },
+    {
+      "id": "chat.outbound-request",
+      "screen": "chat",
+      "variant": "outbound-request",
+      "label": "外部送信確認",
+      "intent": "端末外へ出す前に、正確な検索語と送信しないデータを表示する。",
+      "href": "?screen=chat&variant=outbound-request"
+    },
+    {
+      "id": "settings.default",
+      "screen": "settings",
+      "variant": "default",
+      "label": "設定",
+      "intent": "宣言単位、表示単位、座標系、レンダラー、アシスタント、ライブラリを設定する。",
+      "href": "?screen=settings&variant=default"
+    },
+    {
+      "id": "settings.invalid",
+      "screen": "settings",
+      "variant": "invalid",
+      "label": "無効な設定",
+      "intent": "無効値を入力時に拒否し、直前の値を維持する。",
+      "href": "?screen=settings&variant=invalid"
+    },
+    {
+      "id": "settings.shortcuts",
+      "screen": "settings",
+      "variant": "shortcuts",
+      "label": "ショートカット",
+      "intent": "コマンドとキーの一覧を示し、破壊的な操作が単一キーを持たないことを明示する。",
+      "href": "?screen=settings&variant=shortcuts"
+    },
+    {
+      "id": "settings.support-bundle",
+      "screen": "settings",
+      "variant": "support-bundle",
+      "label": "サポートバンドル確認",
+      "intent": "含める情報、要確認情報、除外する顧客データを作成前に列挙する。",
+      "href": "?screen=settings&variant=support-bundle"
+    },
+    {
+      "id": "network.default",
+      "screen": "network",
+      "variant": "default",
+      "label": "ネットワークと監査",
+      "intent": "端末外へ出せる内容を表示し、ローカル監査履歴を保持する。",
+      "href": "?screen=network&variant=default"
+    },
+    {
+      "id": "network.offline",
+      "screen": "network",
+      "variant": "offline",
+      "label": "既定でオフライン",
+      "intent": "検索が未許可であることと、許可方法を説明する。",
+      "href": "?screen=network&variant=offline"
+    },
+    {
+      "id": "network.refused",
+      "screen": "network",
+      "variant": "refused",
+      "label": "要求拒否",
+      "intent": "送信せず、拒否したホストと要求を明示する。",
+      "href": "?screen=network&variant=refused"
+    },
+    {
+      "id": "network.request-review",
+      "screen": "network",
+      "variant": "request-review",
+      "label": "外部通信権限の確認",
+      "intent": "要求ごとの内容確認、機密情報の追加許可、ローカル監査を示してから許可する。",
+      "href": "?screen=network&variant=request-review"
+    }
   ]
 }

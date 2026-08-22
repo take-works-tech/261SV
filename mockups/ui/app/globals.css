@@ -1078,3 +1078,86 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   .template-source-tabs button { min-width: 56px; }
   .library-category-rail button { padding: 0 7px; }
 }
+
+/* --- Quantity, provenance and the one missing-data treatment ------------------------------------
+   Shared components named in 11_ui.md. Every colour here is a token: no colour is written at a use
+   site (XC-098, XC-187), and none of these rules introduces a token that already exists. */
+
+.provenance-badge { border-radius: 3px; padding: 1px 4px; font-size: 7px; font-style: normal; font-weight: 800; letter-spacing: .04em; }
+.provenance-declared { background: var(--amber-soft); color: var(--amber); }
+.provenance-dataset { background: var(--blue-soft); color: var(--blue); }
+.provenance-computed { background: var(--green-soft); color: var(--green); }
+.provenance-reference { background: var(--soft); color: var(--muted-ink); }
+
+.number-cell { display: inline-flex; align-items: baseline; gap: 4px; }
+.number-cell b { font-variant-numeric: tabular-nums; font-size: 10px; }
+.number-cell small { color: var(--muted-ink); font-size: 8px; }
+/* One visual treatment for a missing value, everywhere it appears (XC-001). A missing value is never
+   drawn as a zero, a previous value or an interpolated neighbour, so it must not look like one. */
+.number-cell-missing b { color: var(--muted-ink); font-style: italic; }
+.number-cell-missing .missing-reason { color: var(--red); }
+.unit-undeclared { color: var(--amber); }
+
+.quantity-chip { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); padding: 2px 7px 2px 5px; cursor: grab; }
+.quantity-chip b { font-size: 9px; }
+.quantity-chip small { color: var(--muted-ink); font-size: 8px; }
+.quantity-chip:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+
+.case-tag-filter { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; padding: 2px 0 5px; color: var(--muted-ink); }
+.case-tag-filter button { border: 1px solid var(--line); border-radius: 9px; background: var(--card); padding: 1px 6px; color: var(--muted-ink); font-size: 8px; }
+.case-tag-filter button.active { border-color: var(--blue); background: var(--blue-soft); color: var(--blue); font-weight: 700; }
+.filter-note { margin: 4px 0 0; color: var(--muted-ink); font-size: 8px; line-height: 1.5; }
+
+/* --- The deformation factor, drawn into the picture (INV-024) ---------------------------------- */
+.deformation-stamp { position: absolute; bottom: 8px; left: 8px; z-index: 2; border-radius: 4px; background: var(--amber-soft); padding: 3px 7px; color: var(--amber); font-size: 9px; font-weight: 800; pointer-events: none; }
+
+/* --- Probe readout ----------------------------------------------------------------------------- */
+.probe-readout { position: absolute; right: 12px; bottom: 56px; z-index: 3; width: 232px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); box-shadow: var(--shadow); }
+.probe-readout header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); padding: 7px 9px; }
+.probe-readout header b { display: block; font-size: 10px; }
+.probe-readout header small { color: var(--muted-ink); font-size: 8px; }
+.probe-readout header button { border: 0; background: transparent; padding: 0; color: var(--muted-ink); }
+.probe-readout dl { margin: 0; padding: 7px 9px; }
+.probe-readout dl > div { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 2px 0; }
+.probe-readout dt { color: var(--muted-ink); font-size: 9px; }
+.probe-readout dd { margin: 0; }
+.probe-position { margin: 0; border-top: 1px solid var(--line); padding: 6px 9px; color: var(--muted-ink); font-size: 8px; }
+.probe-readout footer { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; border-top: 1px solid var(--line); padding: 7px 9px; }
+.probe-readout footer small { color: var(--muted-ink); font-size: 8px; }
+
+/* --- Simulation: a saved flow, its steps and their resolution ----------------------------------- */
+.simulation-canvas { display: flex; flex-direction: column; gap: 10px; overflow: auto; padding: 12px; }
+.simulation-steps { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.simulation-steps li { display: flex; align-items: center; gap: 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--card); padding: 8px 10px; }
+.simulation-steps li b { display: block; font-size: 10px; }
+.simulation-steps li small { color: var(--muted-ink); font-size: 8px; }
+.simulation-steps li span:nth-child(2) { flex: 1; }
+.simulation-steps li em { border-radius: 4px; padding: 2px 6px; font-size: 8px; font-style: normal; font-weight: 700; }
+.simulation-steps li.resolved em { background: var(--green-soft); color: var(--green); }
+.simulation-steps li.later em { background: var(--soft); color: var(--muted-ink); }
+.simulation-steps li.failed { border-color: var(--red); }
+.simulation-steps li.failed em { background: var(--red-soft); color: var(--red); }
+.simulation-step-index { display: grid; width: 18px; height: 18px; border-radius: 50%; background: var(--soft); color: var(--muted-ink); font-size: 9px; font-weight: 800; place-items: center; }
+
+/* --- The command list ---------------------------------------------------------------------------
+   A shortcut nobody can find is a shortcut nobody uses, so the scheme is shown beside the commands. */
+.shortcut-group { margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+.shortcut-group header { border-bottom: 1px solid var(--line); padding: 7px 10px; }
+.shortcut-group header b { display: block; font-size: 10px; }
+.shortcut-group header small { color: var(--muted-ink); font-size: 8px; }
+.shortcut-group ul { margin: 0; padding: 4px 0; list-style: none; }
+.shortcut-group li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 10px; font-size: 9px; }
+.shortcut-group kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; background: var(--soft); padding: 1px 5px; font-family: inherit; font-size: 8px; }
+.shortcut-group li.no-shortcut span { color: var(--muted-ink); }
+.shortcut-refused { display: flex; align-items: flex-end; flex-direction: column; color: var(--red); font-size: 8px; font-style: normal; font-weight: 700; }
+.shortcut-refused small { color: var(--muted-ink); font-weight: 400; }
+
+/* --- Script view: the reproducible artefact, reachable from every area (XC-046) ------------------ */
+.script-view { position: absolute; top: 32px; right: 0; z-index: 40; width: 380px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); box-shadow: var(--shadow); }
+.script-view header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); padding: 8px 10px; }
+.script-view header b { display: block; font-size: 10px; }
+.script-view header small { color: var(--muted-ink); font-size: 8px; }
+.script-view header button { border: 0; background: transparent; padding: 0; color: var(--muted-ink); }
+.script-view pre { overflow: auto; max-height: 190px; margin: 0; padding: 9px 10px; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 9px; line-height: 1.7; white-space: pre; }
+.script-view footer { display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--line); padding: 8px 10px; }
+.script-view footer small { color: var(--muted-ink); font-size: 8px; line-height: 1.5; }

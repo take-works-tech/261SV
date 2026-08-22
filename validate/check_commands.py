@@ -95,10 +95,27 @@ def check_catalogue_matches_schema(findings: list[Finding]) -> bool:
 
 
 def check_mentions_resolve(findings: list[Finding]) -> None:
-    """An operation named in prose that does not exist is a reference to something nobody implements."""
+    """An operation named in prose that does not exist is a reference to something nobody implements.
+
+    `screen.variant` and `family.operation` are the same shape, so the required-screen-states table of
+    `specs/11_ui.md` reads as thirteen unimplemented commands unless this check knows what it is
+    looking at. The section is skipped by name rather than by renaming the ids: those ids are the
+    catalogue keys and the mockup's URL parameters, and bending them to satisfy a gate would make the
+    gate the thing the design has to work around.
+    """
     known = set(catalogue_operations())
     for path in sorted((ROOT / "specs").rglob("*.md")):
+        in_screen_states = False
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+            if line.startswith("### Required screen states"):
+                in_screen_states = True
+                continue
+            if in_screen_states:
+                # The table ends at the next heading of the same level or above.
+                if line.startswith("## ") or line.startswith("### "):
+                    in_screen_states = False
+                else:
+                    continue
             for match in OPERATION_MENTION.finditer(line):
                 name = match.group(1)
                 if name in known or NOT_OPERATIONS.search(name):

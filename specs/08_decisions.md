@@ -2488,6 +2488,29 @@ model or the prompt, never in a description that quietly went stale.
 - resolve_by: the first study a customer runs that the limit refuses
 - decidedness: Open
 
+### XC-189 - The required screen states live in the specification, not in the test that checks them
+- decided: 2026-08-22
+- status: active
+- decision: `specs/11_ui.md` carries a **Required screen states** table, and
+  `tests/test_ui_mockup_catalog.py` reads it. The design catalogue in
+  `mockups/ui/lib/screen-catalog.json` must match that table exactly, in both directions
+- decided_by: found on 2026-08-22 while auditing the mockup against the interface specification
+- basis: E-001 (T1)
+- why: the test held the same list hand-copied into a Python set and compared the catalogue against
+  that copy. **A state this specification required, absent from both, was undetectable** - the check
+  reported coverage while measuring only that two copies of one list agreed. It is the defect of a gate
+  nothing invokes, one level up: the gate ran, and what it measured was not what it claimed
+- what_it_found_immediately: six states the specification requires and the catalogue never had -
+  `simulation.default`, `simulation.empty`, `simulation.unresolved`, `view.deformation`, `view.probe`
+  and `settings.shortcuts`. `view.deformation` and `view.probe` are the interface halves of INV-024 and
+  of the probe readout, both of which the specification has required throughout
+- alternatives: deriving the list from the catalogue makes the artefact its own contract; leaving it in
+  the test keeps two copies and the defect that produced this decision
+- affects: 11_ui.md, mockups/ui, tests/test_ui_mockup_catalog.py
+- decidedness: Fixed
+- reversal_trigger: the product interface exists and its own routing becomes the enumerable source, at
+  which point this table states what that routing must cover
+
 ### XC-188 - A check that cannot pass is turned off, never made to pass
 - decided: 2026-08-22
 - status: active

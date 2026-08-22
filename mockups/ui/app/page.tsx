@@ -387,6 +387,7 @@ function ProductShell({ scenario, onScreen, draft, onDraftChange }: { scenario: 
   const [assistantOpen, setAssistantOpen] = useState(scenario.variant === 'assistant-drawer')
   const [importOpen, setImportOpen] = useState(scenario.variant === 'import-review')
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [scriptOpen, setScriptOpen] = useState(false)
   const [itemListOpen, setItemListOpen] = useState(false)
   const [itemListQuery, setItemListQuery] = useState('')
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(220)
@@ -419,6 +420,13 @@ function ProductShell({ scenario, onScreen, draft, onDraftChange }: { scenario: 
             <div className="notification-anchor">
               <button aria-label="通知履歴" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((open) => !open)}><Clock3 size={16} /></button>
               {notificationsOpen && <NotificationHistory onClose={() => setNotificationsOpen(false)} />}
+            </div>
+            {/* Script view: what was just done, as script text, copyable. Reachable from every area
+                because reproducibility is a property of the recorded command log, not of the area the
+                command happened to be issued from (XC-046, 13_scripting.md). */}
+            <div className="notification-anchor">
+              <button aria-label="操作のスクリプトを表示" aria-expanded={scriptOpen} onClick={() => setScriptOpen((open) => !open)}><ScrollText size={16} /></button>
+              {scriptOpen && <ScriptView onClose={() => setScriptOpen(false)} />}
             </div>
             <button aria-label="設定" onClick={() => onScreen('settings')}><Settings size={16} /></button>
             <button aria-label="ヘルプ"><HelpCircle size={16} /></button>
@@ -472,6 +480,33 @@ function ProductShell({ scenario, onScreen, draft, onDraftChange }: { scenario: 
         </div>
       )}
       <ImportFlowDialog open={importOpen} onOpenChange={setImportOpen} initialStep={scenario.variant === 'import-review' ? 'review' : 'choose'} />
+    </section>
+  )
+}
+
+// The script for what was just done. It is the reproducible artefact - not the model, not the
+// screenshot - so it is copyable and reachable from wherever the operation was performed (XC-046).
+function ScriptView({ onClose }: { onClose: () => void }) {
+  const [copied, setCopied] = useState(false)
+  const script = [
+    "workspace = solvia.open_workspace()",
+    "case = workspace.cases['基準ケース']",
+    "view = workspace.views['標準ビュー']",
+    "view.deformation_scale = 50.0            # 表示のみ・報告値は未変形形状から計算",
+    "probe = view.probe(node_id=12345)        # 単位・有効数字・由来つき",
+    "workspace.variables.keep(probe, name='プローブ応力')",
+  ].join("\n")
+  return (
+    <section className="script-view" aria-label="操作のスクリプト">
+      <header>
+        <span><b>スクリプト</b><small>いま行った操作。これが再現可能な成果物です</small></span>
+        <button type="button" aria-label="スクリプトを閉じる" onClick={onClose}><X size={13} /></button>
+      </header>
+      <pre>{script}</pre>
+      <footer>
+        <button type="button" className="primary-button" onClick={() => setCopied(true)}><Copy size={12} />{copied ? 'コピーしました' : 'コピー'}</button>
+        <small>言語モデルはコマンドを生成し、結果は生成しません。再現性はこのログの性質です。</small>
+      </footer>
     </section>
   )
 }
@@ -613,14 +648,94 @@ function LeftSidebar({ screen, width, setWidth }: { screen: ScreenId; width: num
   )
 }
 
+// The four origins a quantity may have (GL-016). Provenance travels with the value from the moment it
+// exists, so it is a property of the row rather than a label applied at display time (INV-013).
+type Provenance = 'declared' | 'dataset' | 'computed' | 'reference'
+
+const provenanceLabels: Record<Provenance, { short: string; full: string }> = {
+  declared: { short: '宣言', full: '人が宣言した値' },
+  dataset: { short: 'データ', full: 'データセットから読み取った値' },
+  computed: { short: '計算', full: '式で計算した値' },
+  reference: { short: '資料', full: '参考資料から取得した値' },
+}
+
+function ProvenanceBadge({ kind }: { kind: Provenance }) {
+  const label = provenanceLabels[kind]
+  return <em className={`provenance-badge provenance-${kind}`} title={label.full} aria-label={label.full}>{label.short}</em>
+}
+
+// INV-014: a value is shown to the significant digits its stored precision supports, never padded.
+// INV-013: it carries its provenance. XC-003: an undeclared unit is a marker, never a guessed unit.
+function NumberCell({ value, unit, digits, provenance, expression }: { value: number | null; unit: string | null; digits: number; provenance: Provenance; expression?: string }) {
+  const shown = value === null ? '—' : value.toPrecision(digits)
+  return (
+    <span className={`number-cell${value === null ? ' number-cell-missing' : ''}`} title={expression}>
+      <b>{shown}</b>
+      <small className={unit === null ? 'unit-undeclared' : undefined}>{unit === null ? '単位未宣言' : unit}</small>
+      <ProvenanceBadge kind={provenance} />
+      {value === null && <small className="missing-reason">欠損・置換なし</small>}
+    </span>
+  )
+}
+
+// A reference to a variable, embeddable in any input that accepts a quantity. Dragging it is how a
+// quantity reaches a graph axis, a report table or an expression without retyping a value.
+function QuantityChip({ name, provenance, unit }: { name: string; provenance: Provenance; unit: string | null }) {
+  return (
+    <span className="quantity-chip" draggable role="button" tabIndex={0} aria-label={`${name}（${provenanceLabels[provenance].full}）をドラッグして入力へ挿入`}>
+      <Variable size={10} />
+      <b>{name}</b>
+      <small className={unit === null ? 'unit-undeclared' : undefined}>{unit ?? '単位未宣言'}</small>
+      <ProvenanceBadge kind={provenance} />
+    </span>
+  )
+}
+
+const workspaceCases = [
+  { name: '基準ケース', tags: ['基準'] },
+  { name: '板厚変更', tags: ['板厚', '要確認'] },
+  { name: '荷重変更', tags: ['荷重'] },
+]
+
+const workspaceVariables: { name: string; value: number | null; unit: string | null; digits: number; provenance: Provenance; expression?: string }[] = [
+  { name: '荷重', value: 1200, unit: null, digits: 4, provenance: 'declared' },
+  { name: '応力場', value: null, unit: null, digits: 7, provenance: 'dataset' },
+  { name: '安全率', value: 1.83, unit: '—', digits: 3, provenance: 'computed', expression: '= 降伏応力 / 最大応力' },
+  { name: '設計許容応力', value: 235, unit: 'MPa', digits: 3, provenance: 'reference', expression: '出典：設計ノート・数値根拠には使用しない' },
+]
+
 function WorkspaceSourceSections() {
+  const [tagFilter, setTagFilter] = useState<string | null>(null)
+  const tags = Array.from(new Set(workspaceCases.flatMap((item) => item.tags)))
+  const visibleCases = tagFilter ? workspaceCases.filter((item) => item.tags.includes(tagFilter)) : workspaceCases
   return (
     <>
       <SidebarSection title="ケース" icon={<FolderOpen size={13} />}>
-        <button className="tree-row active"><ChevronDown size={12} /><span><b>設計スタディ</b><small>3ケース</small></span></button>
-        {['基準ケース', '板厚変更', '荷重変更'].map((item) => <button className="tree-row nested" key={item}><Square size={10} /><span><b>{item}</b><small>単位未宣言</small></span></button>)}
+        {/* Tag filtering is a permanent control at this scale, not a dialogue (LIM-005). */}
+        <div className="case-tag-filter" role="group" aria-label="タグで絞り込む">
+          <Tag size={10} />
+          {tags.map((tag) => <button className={tagFilter === tag ? 'active' : ''} key={tag} type="button" aria-pressed={tagFilter === tag} onClick={() => setTagFilter((current) => (current === tag ? null : tag))}>{tag}</button>)}
+        </div>
+        <button className="tree-row active"><ChevronDown size={12} /><span><b>設計スタディ</b><small>{visibleCases.length}／{workspaceCases.length}ケース</small></span></button>
+        {visibleCases.map((item) => (
+          <button className="tree-row nested" key={item.name}>
+            <Square size={10} />
+            <span><b>{item.name}</b><small>{item.tags.join('・')}</small></span>
+          </button>
+        ))}
+        {tagFilter && <p className="filter-note">タグ「{tagFilter}」で絞り込み中。選択中のケースは範囲外でも表示されます。</p>}
       </SidebarSection>
-      <SidebarSection title="変数" icon={<Variable size={13} />}><button className="variable-row"><span>荷重</span><b>—</b><small>単位未宣言</small></button><button className="variable-row"><span>応力場</span><b>—</b><small>データセット</small></button></SidebarSection>
+      <SidebarSection title="変数" icon={<Variable size={13} />}>
+        {/* One list holding declared values, fields read from data, computed quantities and values
+            taken from reference material - each showing which it is (XC-088, INV-013). */}
+        {workspaceVariables.map((variable) => (
+          <div className="variable-row" key={variable.name} draggable aria-label={`${variable.name} をドラッグして入力へ挿入`}>
+            <span>{variable.name}</span>
+            <NumberCell value={variable.value} unit={variable.unit} digits={variable.digits} provenance={variable.provenance} expression={variable.expression} />
+          </div>
+        ))}
+        <p className="filter-note">行はそのまま入力へドラッグできます。値の由来は表示のたびに付け直すのではなく、値と一緒に運ばれます。</p>
+      </SidebarSection>
       <SidebarSection title="参考資料" icon={<FileText size={13} />}><button className="tree-row"><FileText size={11} /><span><b>設計ノート</b><small>数値根拠には使用しない</small></span></button></SidebarSection>
     </>
   )
@@ -655,6 +770,8 @@ function WorkAreaBar({ screen, itemListOpen, onItemListOpenChange, itemListQuery
   const [selectedByScreen, setSelectedByScreen] = useState<Partial<Record<ScreenId, string>>>({})
   const [createOpen, setCreateOpen] = useState(false)
   const [deleteItem, setDeleteItem] = useState<string | null>(null)
+  const [templateItem, setTemplateItem] = useState<string | null>(null)
+  const [templateScope, setTemplateScope] = useState<'workspace' | 'shared'>('workspace')
   const [itemNotice, setItemNotice] = useState('')
 
   if (!itemHeader) {
@@ -710,6 +827,10 @@ function WorkAreaBar({ screen, itemListOpen, onItemListOpenChange, itemListQuery
                   <DropdownMenu><DropdownMenuTrigger asChild><button type="button" className="work-item-more" aria-label={`${item}の操作`}><MoreHorizontal size={14} /></button></DropdownMenuTrigger><DropdownMenuContent align="end">
                     <DropdownMenuItem onSelect={() => setItemNotice(`${item}の名前編集を開始しました`)}><Pencil size={12} />名前を変更</DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => setItemNotice(`${item}を独立した複製として作成しました`)}><Copy size={12} />複製</DropdownMenuItem>
+                    {/* A secondary item command, never permanent header chrome (XC-148). Saving as a
+                        template copies the definition into a chosen scope; it creates no live link,
+                        so editing the template later never changes this item (XC-109). */}
+                    {screen !== 'simulation' && screen !== 'pipeline' && <DropdownMenuItem onSelect={() => setTemplateItem(item)}><LayoutTemplate size={12} />テンプレートとして保存</DropdownMenuItem>}
                     <DropdownMenuItem onSelect={() => setDeleteItem(item)}><Trash2 size={12} />削除</DropdownMenuItem>
                   </DropdownMenuContent></DropdownMenu>
                 </div>
@@ -727,6 +848,7 @@ function WorkAreaBar({ screen, itemListOpen, onItemListOpenChange, itemListQuery
       </div>}
       <Button className="primary-button" aria-label={`${itemHeader.createLabel}を作成`} onClick={() => setCreateOpen(true)}><Plus size={14} /> {itemHeader.createLabel}</Button>
       {itemNotice && <span className="work-item-notice" role="status">{itemNotice}</span>}
+      <Dialog open={templateItem !== null} onOpenChange={(open) => { if (!open) setTemplateItem(null) }}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog compact-workflow-dialog"><header><span><small>{itemHeader.itemLabel}</small><b>テンプレートとして保存</b></span><button type="button" aria-label="テンプレート保存を閉じる" onClick={() => setTemplateItem(null)}><X size={15} /></button></header><div className="settings-fields"><label><span>名前</span><input defaultValue={`${templateItem ?? ''}のテンプレート`} /></label><label><span>保存先スコープ</span><Select value={templateScope} onValueChange={(value) => setTemplateScope(value as 'workspace' | 'shared')}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="workspace">このワークスペース</SelectItem><SelectItem value="shared">共有</SelectItem></SelectContent></Select></label></div><p className="workflow-trust-note"><ShieldCheck size={13} />定義を新しいテンプレート版として複写します。生きたリンクは作られないため、後からテンプレートを編集しても「{templateItem}」は変わりません。</p><footer><button type="button" onClick={() => setTemplateItem(null)}>戻る</button><button type="button" className="primary-button" onClick={() => { setItemNotice(`${templateItem}を${templateScope === 'shared' ? '共有' : 'このワークスペース'}のテンプレートとして保存しました`); setTemplateItem(null) }}>保存</button></footer></DialogContent></Dialog>
       <Dialog open={createOpen} onOpenChange={setCreateOpen}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog compact-workflow-dialog"><header><span><small>{itemHeader.itemLabel}</small><b>{itemHeader.createLabel}</b></span><button type="button" aria-label="新規作成を閉じる" onClick={() => setCreateOpen(false)}><X size={15} /></button></header><div className="creation-options"><button type="button" onClick={() => { setItemNotice(`空の${itemHeader.itemLabel}を作成しました`); setCreateOpen(false) }}><Plus size={18} /><span><b>空から作成</b><small>独立したワークスペース項目</small></span></button>{screen !== 'simulation' && <button type="button" onClick={() => { setItemNotice('テンプレートの解決確認へ進みます'); setCreateOpen(false) }}><LayoutTemplate size={18} /><span><b>テンプレートから作成</b><small>解決結果を確認してから作成</small></span></button>}</div>{screen === 'simulation' && <p className="workflow-trust-note"><AlertTriangle size={13} />定義は保存できますが、r1では外部ソルバーを実行しません。</p>}</DialogContent></Dialog>
       <Dialog open={Boolean(deleteItem)} onOpenChange={(open) => !open && setDeleteItem(null)}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog compact-workflow-dialog"><header><span><small>削除の確認</small><b>{deleteItem}</b></span><button type="button" aria-label="削除確認を閉じる" onClick={() => setDeleteItem(null)}><X size={15} /></button></header><p>この{itemHeader.itemLabel}だけを削除します。テンプレートや出力済みファイルは削除しません。</p><footer><button type="button" onClick={() => setDeleteItem(null)}>キャンセル</button><button type="button" className="danger-button" onClick={() => { setItemNotice(`${deleteItem}を削除しました`); setDeleteItem(null) }}>削除</button></footer></DialogContent></Dialog>
     </div>
@@ -2051,7 +2173,7 @@ function OutlinerRow({ depth, expanded, onToggle, icon, name, visible, selected,
 
 function ScreenCanvas({ scenario, draft, onDraftChange, onViewObjectSelect, onScreen }: { scenario: Scenario; draft: string; onDraftChange: (draft: string) => void; onViewObjectSelect: (name: string, additive?: boolean) => void; onScreen: (screen: ScreenId) => void }) {
   switch (scenario.screen) {
-    case 'simulation': return <SimulationScreen onAutomation={() => onScreen('pipeline')} />
+    case 'simulation': return <SimulationScreen variant={scenario.variant} onAutomation={() => onScreen('pipeline')} />
     case 'pipeline': return <PipelineScreen variant={scenario.variant} />
     case 'view': return <ViewScreen variant={scenario.variant} onViewObjectSelect={onViewObjectSelect} />
     case 'graph': return <GraphScreen variant={scenario.variant} />
@@ -2063,8 +2185,47 @@ function ScreenCanvas({ scenario, draft, onDraftChange, onViewObjectSelect, onSc
   }
 }
 
-function SimulationScreen({ onAutomation }: { onAutomation: () => void }) {
-  return <div className="centred-state"><Gauge size={34} /><span className="eyebrow">後続リリース</span><h2>シミュレーション実行はr1に含まれません</h2><p>既存ソルバーの結果を取り込み、自動化モードでビュー、グラフ、レポートを生成できます。</p><button className="primary-button" onClick={onAutomation}>自動化を開く</button></div>
+// A saved Simulation is one flow grouping the conditions for one or more external-solver executions,
+// not one row per solver process (GL-043, XC-154). Execution is a later release (XC-091): the flow is
+// editable and savable now, and r1 never claims to produce a result Case from it.
+const simulationSteps = [
+  { name: 'メッシュ入力', detail: 'ケース「基準ケース」の入力ファイルを参照', state: 'resolved' as const },
+  { name: '材料条件', detail: '設計許容応力 235 MPa を変数から束縛', state: 'resolved' as const },
+  { name: '境界条件', detail: '固定面・荷重面をパートから指定', state: 'resolved' as const },
+  { name: 'ソルバー呼び出し', detail: '外部ソルバーのアダプターを指定', state: 'later' as const },
+]
+
+function SimulationScreen({ variant, onAutomation }: { variant: string; onAutomation: () => void }) {
+  if (variant === 'empty') {
+    return <div className="centred-state"><Gauge size={34} /><h2>保存されたシミュレーションがありません</h2><p>ヘッダーの「＋ 新規シミュレーション」で、外部ソルバー実行の条件をまとめた保存フローを作成します。r1では定義の保存までを行い、結果ケースは作成しません。</p><div className="button-row"><button className="primary-button">＋ 新規シミュレーション</button><button onClick={onAutomation}>自動化を開く</button></div></div>
+  }
+  if (variant === 'unavailable') {
+    return <div className="centred-state"><Gauge size={34} /><span className="eyebrow">後続リリース</span><h2>シミュレーション実行はr1に含まれません</h2><p>既存ソルバーの結果を取り込み、自動化モードでビュー、グラフ、レポートを生成できます。定義の保存と編集は現在も可能です。</p><button className="primary-button" onClick={onAutomation}>自動化を開く</button></div>
+  }
+  const unresolved = variant === 'unresolved'
+  return (
+    <div className="simulation-canvas">
+      {unresolved
+        ? <StatePanel tone="error" title="実行条件を解決できません" detail="材料条件が参照する変数「設計許容応力」が未宣言です。ソルバーアダプター「未接続」も解決していません。条件が揃うまで実行は拒否され、既存の定義は変更されていません。" />
+        : <StatePanel tone="progress" title="定義は保存できます・実行は後続リリース" detail="この保存フローは条件をまとめたものです。r1では外部ソルバーを呼び出さず、結果ケースを作成しません（XC-091）。" />}
+      <ol className="simulation-steps">
+        {simulationSteps.map((step, index) => {
+          const failed = unresolved && (step.name === '材料条件' || step.name === 'ソルバー呼び出し')
+          return (
+            <li className={failed ? 'failed' : step.state === 'later' ? 'later' : 'resolved'} key={step.name}>
+              <span className="simulation-step-index">{index + 1}</span>
+              <span>
+                <b>{step.name}</b>
+                <small>{failed && step.name === '材料条件' ? '変数「設計許容応力」が未宣言・代替値なし' : failed ? 'アダプター未接続・実行は拒否' : step.detail}</small>
+              </span>
+              <em>{failed ? '未解決' : step.state === 'later' ? '後続リリース' : '解決済み'}</em>
+            </li>
+          )
+        })}
+      </ol>
+      <p className="workflow-trust-note"><AlertTriangle size={13} />このフローは1回以上の外部ソルバー実行の条件をまとめた1件の保存対象です。ソルバープロセス1件につき1行ではありません。</p>
+    </div>
+  )
 }
 
 function PipelineScreen({ variant }: { variant: string }) {
@@ -2107,16 +2268,56 @@ function ViewScreen({ variant, onViewObjectSelect }: { variant: string; onViewOb
   if (variant === 'empty') return <div className="centred-state"><Boxes size={34} /><h2>表示するケースがありません</h2><p>開始プリセットを選ぶか、ワークスペースへ結果ファイルをドロップします。</p><div className="button-row"><button className="primary-button">開始プリセット</button><button>テンプレート</button></div></div>
   if (variant === 'renderer-error') return <div className="centred-state error-state"><AlertTriangle size={34} /><h2>Omniverseレンダラーを開始できません</h2><p>バックエンドを利用できません。VTK軽量レンダラーは利用できます。</p><button className="primary-button">VTKで続ける</button></div>
   const panes = variant === 'split-two' ? 2 : variant === 'split-three' ? 3 : variant === 'split-four' ? 4 : 1
+  const deformed = variant === 'deformation'
   return (
     <div className="view-canvas" onMouseEnter={() => setPlaybackVisible(true)} onMouseLeave={() => setPlaybackVisible(false)}>
       {variant === 'reduced' && <StatePanel tone="warning" title="表示形状を縮退しています" detail="画面は縮退形状を使用します。表示値とレポート計算は完全データを使用します。" />}
       {variant === 'unresolved-template' && <StatePanel tone="warning" title="テンプレートを一部解決できません" detail="形状とカメラは解決済みです。フィールド「応力」とマテリアル「スチールブルー」は未解決で、代替値を使用していません。" />}
       {variant === 'axis-error' && <StatePanel tone="error" title="指定した結果位置がありません" detail="要求されたモード8は存在しません。ビューはモード7のままで、近傍位置への丸めは行っていません。" />}
+      {deformed && <StatePanel tone="warning" title="変形を50倍に誇張して表示しています" detail="測定・プローブ・レポートの値は未変形形状から計算します。画面上の形状を定規で測ると誤った寸法になります。" />}
       <div className={`pane-grid panes-${panes}`}>
-        {Array.from({ length: panes }).map((_, index) => <div className="view-pane" key={index}><Viewport paneIndex={index} compact={panes > 1} onObjectSelect={onViewObjectSelect} /></div>)}
+        {Array.from({ length: panes }).map((_, index) => (
+          <div className="view-pane" key={index}>
+            <Viewport paneIndex={index} compact={panes > 1} onObjectSelect={onViewObjectSelect} />
+            {/* INV-024: the factor is drawn into the picture, not only into a toolbar. A reader
+                measuring the image never reads the toolbar, and an exported image has none. */}
+            {deformed && <span className="deformation-stamp">変形倍率 ×50</span>}
+          </div>
+        ))}
       </div>
+      {variant === 'probe' && <ProbeReadout />}
       {playbackVisible && <ViewPlaybackOverlay />}
     </div>
+  )
+}
+
+// The probe readout: a value at a point with its unit, digits, provenance and result position.
+// Keeping it as a @Variable is deliberate and never automatic (11_ui.md, keyboard scheme).
+function ProbeReadout() {
+  const [kept, setKept] = useState(false)
+  return (
+    <section className="probe-readout" aria-label="プローブ結果">
+      <header>
+        <span><b>プローブ</b><small>節点 12345・未変形座標</small></span>
+        <button type="button" aria-label="プローブを閉じる"><X size={13} /></button>
+      </header>
+      <dl>
+        <div><dt>応力</dt><dd><NumberCell value={182.4} unit="MPa" digits={4} provenance="dataset" /></dd></div>
+        <div><dt>変位</dt><dd><NumberCell value={0.00317} unit="m" digits={3} provenance="dataset" /></dd></div>
+        <div><dt>温度</dt><dd><NumberCell value={null} unit={null} digits={4} provenance="dataset" /></dd></div>
+      </dl>
+      <p className="probe-position">結果位置：時刻 12.0 s／点データ・セル平均なし</p>
+      <footer>
+        {kept ? (
+          <>
+            <QuantityChip name="プローブ応力" provenance="dataset" unit="MPa" />
+            <small>変数リストへ追加しました。以降はどの入力にもドラッグできます。</small>
+          </>
+        ) : (
+          <button className="primary-button" type="button" onClick={() => setKept(true)}>変数として保持</button>
+        )}
+      </footer>
+    </section>
   )
 }
 
@@ -2228,10 +2429,79 @@ function ChatComposer({ draft, onDraftChange }: { draft: string; onDraftChange: 
   </div>
 }
 
+// The keyboard scheme of 11_ui.md, shown where the commands are. "Every command is reachable from the
+// keyboard" was once a promise with nothing behind it; a scheme nobody can find is the same promise.
+// The exact key is a platform decision - what this table fixes is what has a shortcut and what may
+// never have one.
+const shortcutGroups: { group: string; note: string; commands: { name: string; key: string | null; reason?: string }[] }[] = [
+  { group: 'ワークスペース', note: 'プラットフォーム標準の修飾キーに従います', commands: [
+    { name: '新規', key: 'Ctrl + N' }, { name: '開く', key: 'Ctrl + O' }, { name: '保存', key: 'Ctrl + S' }, { name: '名前を付けて保存', key: 'Ctrl + Shift + S' },
+  ] },
+  { group: '取り消しとやり直し', note: '1つの指示は1ステップ。スクリプト全体でも同じです（XC-061）', commands: [
+    { name: '取り消し', key: 'Ctrl + Z' }, { name: 'やり直し', key: 'Ctrl + Y' },
+  ] },
+  { group: '作業モード', note: '6モードに6キー。対象は変わりません', commands: [
+    { name: 'シミュレーション', key: 'Ctrl + 1' }, { name: 'ビュー', key: 'Ctrl + 2' }, { name: 'グラフ', key: 'Ctrl + 3' },
+    { name: 'レポート', key: 'Ctrl + 4' }, { name: '自動化', key: 'Ctrl + 5' }, { name: 'チャット', key: 'Ctrl + 6' },
+  ] },
+  { group: '結果軸', note: '軸が時刻・モード・周波数のいずれでも同じキーです（XC-131）', commands: [
+    { name: '再生／一時停止', key: 'Space' }, { name: '前へ', key: '←' }, { name: '次へ', key: '→' },
+    { name: '先頭', key: 'Home' }, { name: '末尾', key: 'End' },
+  ] },
+  { group: 'ビュー', note: '変形の切り替えがあるからこそ、倍率は常に描き込まれます（INV-024）', commands: [
+    { name: '全体を表示', key: 'F' }, { name: '正投影方向', key: 'Numpad 1 / 3 / 7' }, { name: '変形倍率を1.0と設定値で切替', key: 'D' },
+  ] },
+  { group: '選択とプローブ', note: '保持は常に明示操作で、自動では行いません', commands: [
+    { name: 'カーソル位置をプローブ', key: 'P' }, { name: 'プローブ値を変数として保持', key: 'Ctrl + P' },
+  ] },
+  { group: '破壊的な操作', note: 'いずれも単一キーを持ちません。確認を経由してのみ到達します（XC-062、XC-094）', commands: [
+    { name: 'ケースを削除', key: null, reason: '影響するケース数を示す確認から実行' },
+    { name: '対象集合をクリア', key: null, reason: '対象範囲を示す確認から実行' },
+    { name: '破壊的パイプラインユニットを実行', key: null, reason: '影響範囲の確認から実行' },
+  ] },
+]
+
+function ShortcutSettings() {
+  const [query, setQuery] = useState('')
+  const needle = query.trim()
+  const groups = shortcutGroups
+    .map((group) => ({ ...group, commands: group.commands.filter((command) => command.name.includes(needle)) }))
+    .filter((group) => group.commands.length > 0)
+  return (
+    <>
+      <h2>コマンドとキー</h2>
+      <p>同じ操作はどのモードでも同じキーです。モードが変わるのは対象ではなく道具です。</p>
+      <div className="settings-fields">
+        <label>コマンドを検索<Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="コマンド名" /></label>
+      </div>
+      {groups.length === 0 ? (
+        <div className="setting-note"><Search size={15} />「{needle}」に一致するコマンドはありません。</div>
+      ) : (
+        groups.map((group) => (
+          <section className="shortcut-group" key={group.group}>
+            <header><b>{group.group}</b><small>{group.note}</small></header>
+            <ul>
+              {group.commands.map((command) => (
+                <li className={command.key === null ? 'no-shortcut' : undefined} key={command.name}>
+                  <span>{command.name}</span>
+                  {command.key === null
+                    ? <em className="shortcut-refused">キーなし<small>{command.reason}</small></em>
+                    : <kbd>{command.key}</kbd>}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))
+      )}
+      <div className="setting-note"><ShieldCheck size={15} />正確なキーはプラットフォームの慣習に従います。この一覧が固定するのは、何にショートカットがあり、何に与えてはならないかです。</div>
+    </>
+  )
+}
+
 function SettingsScreen({ variant }: { variant: string }) {
-  const applicationCategories = ['全般', '表示とアクセシビリティ', '単位', 'ネットワーク', '更新', '診断とサポート']
+  const applicationCategories = ['全般', '表示とアクセシビリティ', 'ショートカット', '単位', 'ネットワーク', '更新', '診断とサポート']
   const workspaceCategories = ['ワークスペース', '成分座標系', 'レンダラー', 'アートスタイル', 'アシスタント', 'ライブラリ']
-  const [category, setCategory] = useState(variant === 'support-bundle' ? '診断とサポート' : '単位')
+  const [category, setCategory] = useState(variant === 'support-bundle' ? '診断とサポート' : variant === 'shortcuts' ? 'ショートカット' : '単位')
   const [supportOpen, setSupportOpen] = useState(variant === 'support-bundle')
 
   return (
@@ -2263,6 +2533,7 @@ function SettingsScreen({ variant }: { variant: string }) {
 
 function SettingsCategoryPanel({ category, onSupportBundle }: { category: string; onSupportBundle: () => void }) {
   if (category === '単位') return <><h2>宣言単位と表示単位</h2><p>ファイル内容を信頼できる単位宣言として扱うことはありません。</p><div className="settings-fields"><label>物理量の種類<Select defaultValue="stress"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="stress">応力</SelectItem></SelectContent></Select></label><label>宣言単位<Select defaultValue="undeclared"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="undeclared">未宣言</SelectItem></SelectContent></Select></label><label>表示単位<Select defaultValue="same"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="same">宣言単位と同じ</SelectItem></SelectContent></Select></label></div><div className="setting-note"><ShieldCheck size={15} />単位を宣言するまで変換は無効です。</div><div className="setting-note"><ShieldCheck size={15} />大きさ、フィールド名、書き出したソルバーのいずれからも、ファイルから単位を推測しません。</div><Button className="primary-button">設定を保存</Button></>
+  if (category === 'ショートカット') return <ShortcutSettings />
   if (category === 'ネットワーク') return <><h2>既定でオフライン</h2><p>ワークスペースごとの許可がない通信は試行しません。</p><div className="settings-fields"><label>外部通信<Select defaultValue="off"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="off">拒否</SelectItem></SelectContent></Select></label><label>検索確認<Select defaultValue="each"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="each">要求ごとに確認</SelectItem></SelectContent></Select></label><label>許可ホスト<Input value="登録なし" readOnly /></label></div><div className="setting-note"><ShieldCheck size={15} />ケース名、値、ファイルパスを含む要求は個別確認します。</div></>
   if (category === '診断とサポート') return <><h2>ローカル診断</h2><p>ログにはフィールド値を含めません。バンドル作成前に収録内容を確認できます。</p><div className="settings-action-list"><button type="button" onClick={onSupportBundle}><FolderPlus size={16} /><span><b>サポートバンドルを作成</b><small>内容を確認してローカルに保存</small></span><ChevronRight size={14} /></button><button type="button"><ScrollText size={16} /><span><b>ローカルログを開く</b><small>外部送信なし</small></span><ChevronRight size={14} /></button></div></>
   if (category === '更新') return <><h2>更新とロールバック</h2><p>更新は署名と互換性を確認し、失敗時は直前の版を保持します。</p><div className="settings-fields"><label>更新確認<Select defaultValue="manual"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="manual">手動・ネットワーク未使用</SelectItem></SelectContent></Select></label><label>現在の状態<Input value="更新情報未取得" readOnly /></label></div><div className="setting-note"><ShieldCheck size={15} />許可なく更新サーバーへ接続しません。</div></>
