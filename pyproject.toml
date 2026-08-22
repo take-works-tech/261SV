@@ -1,0 +1,28 @@
+[project]
+name = "sim-viewer-engine"
+version = "0.0.1"
+description = "Reads CAE result files and answers questions about them, without guessing"
+requires-python = ">=3.12"
+
+# Pinned, not ranged. The specification states that a rendering path must not change between two
+# figures in one report (XC-024), and a floating dependency is exactly how that happens.
+dependencies = [
+    "vtk==9.5.2",
+    "numpy==2.3.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.4.2",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

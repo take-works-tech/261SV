@@ -1,0 +1,148 @@
+---
+status: draft
+updated: 2026-08-20
+---
+
+# Tasks: running the product
+
+### TASK-001 - Contract coverage gate
+- satisfies: AC-010
+- depends_on: -
+- done_when: an operation present in CT-003 and absent from CT-002, or the reverse, fails the gate,
+  proven by adding one in each direction
+
+### TASK-002 - The gate reports its own blind spots
+- satisfies: AC-012
+- depends_on: TASK-001
+- done_when: the output names what was checked and what could not be, and a run with no interface code
+  says so rather than reporting success
+
+### TASK-003 - Interface actions dispatch commands
+- satisfies: AC-011
+- depends_on: TASK-002
+- done_when: an interface action that mutates state without a command fails the gate
+
+### TASK-004 - Keyboard scheme
+- satisfies: AC-013
+- depends_on: TASK-001
+- done_when: every command has a keyboard route following the documented scheme
+
+### TASK-005 - Generated sample workspace
+- satisfies: AC-002
+- depends_on: ingest/TASK-001
+- done_when: the sample ships with data this project generated, carrying no third-party terms
+
+### TASK-006 - First run opens a View
+- satisfies: AC-001
+- depends_on: TASK-005
+- done_when: a first launch opens the View area with the sample offered first
+
+### TASK-007 - Empty workspace still opens a View
+- satisfies: AC-003
+- depends_on: TASK-006
+- done_when: choosing empty opens the View area with its empty state, not a dialogue
+
+### TASK-008 - Tutorial pointing at real controls
+- satisfies: AC-004
+- depends_on: TASK-006
+- done_when: steps point at live controls and advance on use
+
+### TASK-009 - Tutorial resume
+- satisfies: AC-005
+- depends_on: TASK-008
+- done_when: dismissing records the position and resuming continues from it
+
+### TASK-010 - Tutorial never blocks
+- satisfies: AC-006
+- depends_on: TASK-008
+- done_when: an unexpected action is allowed and the tutorial re-points
+
+### TASK-011 - Logs without field values
+- satisfies: AC-007
+- depends_on: -
+- done_when: a test asserts no field value appears in any log line
+
+### TASK-012 - Support bundle manifest
+- satisfies: AC-008
+- depends_on: TASK-011
+- done_when: the manifest lists case names and paths before the bundle is created
+
+### TASK-013 - Consent and audit for transfer
+- satisfies: AC-009
+- depends_on: TASK-012, assistant/TASK-018
+- done_when: sending requires consent and appears in the outbound audit
+
+### TASK-014 - Samples update alongside
+- satisfies: AC-018
+- depends_on: workspace/TASK-029
+- done_when: an updated sample is added without touching user copies
+
+### TASK-015 - Newer-version notice on copies
+- satisfies: AC-019
+- depends_on: TASK-014
+- done_when: a copy with a sample origin shows that a newer version exists
+
+### TASK-016 - Headless authentication
+- satisfies: AC-014
+- depends_on: pipeline/TASK-034
+- done_when: an unknown caller is refused by default
+
+### TASK-017 - Per-workspace authorisation
+- satisfies: AC-015
+- depends_on: TASK-016
+- done_when: authorisation is granted per workspace, not per installation
+
+### TASK-018 - Identity in the audit
+- satisfies: AC-016
+- depends_on: TASK-016
+- done_when: every operation records the identity that issued it
+
+### TASK-019 - Agents get no implicit trust
+- satisfies: AC-017
+- depends_on: TASK-018
+- done_when: an agent caller has exactly the rights of its authenticated identity
+
+### TASK-020 - Launch budget
+- satisfies: AC-020
+- depends_on: TASK-006
+- done_when: launch to first rendered result is measured on the E-063 class and recorded in LIM-010
+
+### TASK-021 - Selection budget
+- satisfies: AC-021
+- depends_on: TASK-020
+- done_when: selection to reflected change is measured and recorded in LIM-011
+
+### TASK-022 - Shared-component uniqueness gate
+- satisfies: AC-022
+- depends_on: TASK-002
+- done_when: each component of the shared table resolves to one implementation in its owning module
+
+### TASK-023 - A second implementation fails the gate
+- satisfies: AC-023
+- depends_on: TASK-022
+- done_when: a deliberate duplicate is reported with both locations named
+
+### TASK-024 - The gate admits when it cannot look
+- satisfies: AC-024
+- depends_on: TASK-022
+- done_when: with no interface code the output says so rather than claiming uniqueness
+
+### TASK-025 - The failure report type
+- satisfies: AC-025
+- depends_on: -
+- done_when: one type carries reason, subject, missing and changed, and validates against CT-010
+
+### TASK-026 - Nothing internal in what a person reads
+- satisfies: AC-026
+- depends_on: TASK-025
+- done_when: summaries carry no paths or stacks and logs carry no field values
+
+### TASK-027 - Refusals are distinguishable from failures
+- satisfies: AC-027
+- depends_on: TASK-025
+- done_when: a caller can branch on the group without reading the sentence
+
+### TASK-028 - Headless exit status follows the group
+- satisfies: AC-028
+- depends_on: TASK-025, pipeline/TASK-034
+- done_when: partial results exit zero and real failures do not

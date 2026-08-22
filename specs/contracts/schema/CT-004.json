@@ -1,0 +1,673 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CT-004 view definition",
+  "version": "3.1.0",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "id",
+    "datasetId",
+    "representation"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "representation": {
+      "type": "string",
+      "enum": [
+        "surface",
+        "surfaceWithEdges",
+        "wireframe",
+        "points",
+        "contour",
+        "slice"
+      ]
+    },
+    "colouring": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fieldName",
+        "association"
+      ],
+      "properties": {
+        "fieldName": {
+          "type": "string"
+        },
+        "association": {
+          "type": "string",
+          "enum": [
+            "point",
+            "cell"
+          ]
+        },
+        "colourMap": {
+          "type": "string"
+        },
+        "range": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "explicit numbers, or the rule that produced them - never numbers passed off as a choice",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "explicit",
+                "dataRange",
+                "dataRangeOverTime",
+                "symmetric"
+              ]
+            },
+            "min": {
+              "type": "number"
+            },
+            "max": {
+              "type": "number"
+            }
+          }
+        },
+        "outOfRange": {
+          "type": "string",
+          "enum": [
+            "clamp",
+            "hide",
+            "distinctColour"
+          ]
+        },
+        "missingValueStyle": {
+          "type": "string",
+          "description": "how NaN is drawn; never as a real value (XC-001)"
+        }
+      }
+    },
+    "camera": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "position_m": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "focalPoint_m": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "viewUp": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "parallelScale_m": {
+          "type": "number"
+        },
+        "projection": {
+          "type": "string",
+          "enum": [
+            "perspective",
+            "orthographic"
+          ]
+        }
+      }
+    },
+    "background": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "material": {
+      "type": "string",
+      "description": "Legacy whole-View appearance reference; new definitions use materialBindings"
+    },
+    "materialBindings": {
+      "type": "array",
+      "description": "Targeted instances of the single CT-011 Material Asset model (XC-174 to XC-176). Several bindings may target one object, but every surface element resolves to one root material.",
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["bindingId", "objectId", "target", "materialRef", "inputBindings"],
+        "properties": {
+          "bindingId": { "type": "string", "minLength": 1 },
+          "objectId": { "type": "string", "minLength": 1 },
+          "objectType": {
+            "type": "string",
+            "enum": ["analysisMesh", "referenceMesh", "scalarField", "vectorField", "trajectory", "pointCloud", "annotation", "effect"]
+          },
+          "target": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind"],
+            "properties": {
+              "kind": { "type": "string", "enum": ["wholeObject", "part", "elementSet"] },
+              "selectionId": { "type": "string", "minLength": 1 }
+            },
+            "allOf": [
+              {
+                "if": { "properties": { "kind": { "enum": ["part", "elementSet"] } } },
+                "then": { "required": ["selectionId"] }
+              }
+            ]
+          },
+          "materialRef": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["entryId", "revision"],
+            "properties": {
+              "entryId": { "type": "string", "minLength": 1 },
+              "revision": { "type": "integer", "minimum": 1 }
+            }
+          },
+          "variant": { "type": "string", "minLength": 1 },
+          "inputBindings": {
+            "type": "object",
+            "description": "MaterialX published-input name to a typed instance binding. solviaResult binds identifiers and rules, never copies result arrays into the View.",
+            "additionalProperties": { "$ref": "#/$defs/materialInputBinding" }
+          },
+          "enabled": { "type": "boolean", "default": true }
+        }
+      }
+    },
+    "objectAppearances": {
+      "type": "array",
+      "description": "Legacy 2.2 appearance entry retained for in-memory migration. New definitions use materialBindings and never write this member.",
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "objectId",
+          "objectType",
+          "displayMode"
+        ],
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "objectType": {
+            "type": "string",
+            "enum": [
+              "analysisMesh",
+              "referenceMesh",
+              "scalarField",
+              "vectorField",
+              "trajectory",
+              "pointCloud",
+              "annotation",
+              "effect"
+            ]
+          },
+          "pbrMaterialId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "resultColouring": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "fieldName",
+              "association",
+              "colourMap"
+            ],
+            "properties": {
+              "fieldName": {
+                "type": "string",
+                "minLength": 1
+              },
+              "association": {
+                "type": "string",
+                "enum": [
+                  "point",
+                  "cell"
+                ]
+              },
+              "colourMap": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "displayMode": {
+            "type": "string",
+            "enum": [
+              "analysis",
+              "appearance",
+              "analysisWithSurfaceDetail"
+            ]
+          }
+        }
+      }
+    },
+    "objectPresentations": {
+      "type": "array",
+      "description": "Per-object presentation overrides. displayOpacity multiplies the resolved MaterialX surface opacity after graph evaluation; edgeSettings are an object-level topology overlay and never a Material Slot property.",
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["objectId", "representation", "visible", "displayOpacity"],
+        "properties": {
+          "objectId": { "type": "string", "minLength": 1 },
+          "representation": {
+            "type": "string",
+            "enum": ["surface", "surfaceWithEdges", "wireframe", "points", "contour", "slice"]
+          },
+          "visible": { "type": "boolean" },
+          "displayOpacity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Object-instance display multiplier; it does not edit the Material Asset or any analysis value."
+          },
+          "edgeSettings": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["colourSrgb", "widthPx", "opacity"],
+            "properties": {
+              "colourSrgb": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": { "type": "number", "minimum": 0, "maximum": 1 }
+              },
+              "widthPx": { "type": "number", "exclusiveMinimum": 0 },
+              "opacity": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": { "representation": { "enum": ["surfaceWithEdges", "wireframe"] } },
+              "required": ["representation"]
+            },
+            "then": { "required": ["edgeSettings"] }
+          }
+        ]
+      }
+    },
+    "textureMappings": {
+      "type": "array",
+      "description": "Per-View-object texture-coordinate mapping choices (XC-167). Absence uses the Material Asset profile; a legacy Material without a profile resolves to none, never implicit UV generation.",
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "objectId",
+          "mode"
+        ],
+        "properties": {
+          "objectId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "bindingId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Material Binding using this mapping when one object has several targeted materials; absence means the object-level mapping"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "none",
+              "authoredUv",
+              "objectTriplanar",
+              "generatedAtlas",
+              "planar",
+              "cylindrical",
+              "spherical"
+            ]
+          },
+          "sourceUvSet": {
+            "type": "string",
+            "minLength": 1
+          },
+          "outputUvSet": {
+            "type": "string",
+            "minLength": 1,
+            "default": "st"
+          },
+          "scale_m": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "rotationDegrees": {
+            "type": "number",
+            "default": 0
+          },
+          "generator": {
+            "type": "string",
+            "minLength": 1
+          },
+          "generatorVersion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "fallbackMode": {
+            "type": "string",
+            "enum": [
+              "none",
+              "objectTriplanar",
+              "planar",
+              "cylindrical",
+              "spherical"
+            ]
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "mode": {
+                  "const": "authoredUv"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "sourceUvSet"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "mode": {
+                  "const": "generatedAtlas"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "generator",
+                "generatorVersion"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "mode": {
+                  "enum": [
+                    "objectTriplanar",
+                    "generatedAtlas",
+                    "planar",
+                    "cylindrical",
+                    "spherical"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "scale_m",
+                "rotationDegrees"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "annotations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "text"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "text",
+              "pointLabel",
+              "scaleBar",
+              "dimension"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "anchor_m": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3
+          }
+        }
+      }
+    },
+    "rendererBackend": {
+      "type": "string",
+      "enum": [
+        "web",
+        "native",
+        "webExperimental",
+        "photoreal"
+      ]
+    },
+    "requiredFields": {
+      "type": "array",
+      "description": "field names this view needs. The workspace view or reusable template names requirements and resolves against the case in scope, reporting what it could not (XC-090, XC-109)",
+      "items": {
+        "type": "string"
+      }
+    },
+    "resultPosition": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "position on the case's result axis (XC-131). Which member is present follows the axis kind",
+      "properties": {
+        "timeStep": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "modeNumber": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "frequencyHz": {
+          "type": "number"
+        },
+        "phaseDegrees": {
+          "type": "number"
+        },
+        "sweeping": {
+          "type": "string",
+          "enum": [
+            "frequency",
+            "phase"
+          ],
+          "description": "which axis advances while the other is held (E-076)"
+        }
+      }
+    },
+    "deformation": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "how displacement is drawn. 1.0 is the real shape and is the default (XC-132)",
+      "properties": {
+        "fieldName": {
+          "type": "string"
+        },
+        "scale": {
+          "type": "number",
+          "default": 1.0
+        },
+        "auto": {
+          "type": "boolean",
+          "default": false,
+          "description": "recompute the factor from the model extent; the factor used is still recorded and drawn"
+        }
+      }
+    },
+    "componentFrame": {
+      "type": "string",
+      "description": "the named frame components are reported in; absent means global Cartesian (XC-122)"
+    },
+    "derivedVisualisations": {
+      "type": "array",
+      "description": "seeded, integrated pictures. Every parameter that changes the geometry is stored, so the picture regenerates identically (INV-025)",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "seed",
+          "integrator"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "streamline",
+              "particleTrace",
+              "pathLine"
+            ]
+          },
+          "seed": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "integrator": {
+            "type": "string",
+            "enum": [
+              "rungeKutta2",
+              "rungeKutta4",
+              "rungeKutta45"
+            ]
+          },
+          "initialStepSize": {
+            "type": "number"
+          },
+          "maximumSteps": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "terminalSpeed": {
+            "type": "number"
+          },
+          "maximumLength": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "partVisibility": {
+      "type": "object",
+      "description": "which named parts are shown (GL-029, INV-019)",
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    },
+    "panes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4,
+      "default": 1,
+      "description": "split layout, with camera synchronisation recorded on any export from it (view/AC-025)"
+    },
+    "cameraSynchronised": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "$defs": {
+    "resultPositionBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "useViewPosition": { "type": "boolean", "const": true },
+        "timeStep": { "type": "integer", "minimum": 0 },
+        "modeNumber": { "type": "integer", "minimum": 1 },
+        "frequencyHz": { "type": "number" },
+        "phaseDegrees": { "type": "number" }
+      },
+      "minProperties": 1
+    },
+    "materialInputBinding": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": { "const": "literal" },
+            "value": {},
+            "unit": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "fieldId", "association", "resultPosition"],
+          "properties": {
+            "kind": { "const": "solviaResult" },
+            "datasetId": {
+              "type": "string",
+              "description": "Optional explicit Case/Dataset binding; absence resolves against the View's Case in scope"
+            },
+            "fieldId": { "type": "string", "minLength": 1 },
+            "component": { "type": "string", "minLength": 1 },
+            "association": { "type": "string", "enum": ["point", "cell"] },
+            "resultPosition": { "$ref": "#/$defs/resultPositionBinding" },
+            "declaredUnit": { "type": ["string", "null"] },
+            "range": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["mode"],
+              "properties": {
+                "mode": { "type": "string", "enum": ["explicit", "dataRange", "dataRangeOverTime", "symmetric"] },
+                "min": { "type": "number" },
+                "max": { "type": "number" }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "entryId", "revision"],
+          "properties": {
+            "kind": { "const": "materialReference" },
+            "entryId": { "type": "string", "minLength": 1 },
+            "revision": { "type": "integer", "minimum": 1 },
+            "variant": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "name"],
+          "properties": {
+            "kind": { "const": "geometryProperty" },
+            "name": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,16 @@
+# One reviewer, because there is one maintainer. This file exists so that the branch ruleset can
+# require a review at all, and so that the paths where a wrong change is most expensive are named
+# rather than assumed.
+
+*                       @take-works-tech
+
+# The specification set is the contract. A change here changes what the product is.
+/specs/                 @take-works-tech
+/evidence/              @take-works-tech
+
+# The gates, and the environment that runs them. A change here can make every other check stop
+# meaning anything while continuing to report success.
+/validate/              @take-works-tech
+/.github/workflows/     @take-works-tech
+/.claude/               @take-works-tech
+/.codex/                @take-works-tech

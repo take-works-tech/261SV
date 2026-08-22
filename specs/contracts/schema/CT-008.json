@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CT-008 library entry",
+  "version": "2.2.0",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["id", "name", "kind", "scope", "revision", "definition"],
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "kind": {
+      "type": "string",
+      "enum": ["view", "graph", "report", "viewObject", "material", "colourMap", "font", "background", "displayStyle", "cameraPath"]
+    },
+    "scope": { "type": "string", "enum": ["sample", "workspace", "shared"] },
+    "revision": { "type": "integer", "minimum": 1, "description": "immutable revision referenced by pipelines and source provenance; editing creates the next revision under the same id" },
+    "arity": {
+      "type": "string",
+      "enum": ["oneCase", "manyCases", "either"],
+      "default": "oneCase",
+      "description": "whether this entry applies to one case, across a set of cases, or either - stated so a pipeline does not guess (CT-009)"
+    },
+    "requires": {
+      "type": "array",
+      "description": "what the target must provide for this entry to resolve: field names, units, variable names, part names. Written down on promotion or export, where it stops being implicit",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "name"],
+        "properties": {
+          "kind": { "type": "string", "enum": ["field", "unit", "variable", "part", "timeStep", "entry"] },
+          "name": { "type": "string" },
+          "optional": { "type": "boolean", "default": false }
+        }
+      }
+    },
+    "bundledAssets": {
+      "type": "array",
+      "description": "assets embedded in an exported file. An asset whose licence forbids redistribution is listed in `requires` instead of being embedded (XC-025)",
+      "items": { "type": "object", "additionalProperties": true }
+    },
+    "definition": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["contract", "version"],
+      "description": "the definition itself, naming the contract it conforms to (CT-004, CT-005, CT-006, CT-011 or another asset shape)",
+      "properties": {
+        "contract": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "set when this entry was copied from another, including from a sample",
+      "properties": {
+        "entryId": { "type": "string" },
+        "scope": { "type": "string", "enum": ["sample", "workspace", "shared"] },
+        "copiedIso": { "type": "string" }
+      }
+    },
+    "imported": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "provenance and terms for anything brought in from outside, needed before it can be embedded in an export (XC-025)",
+      "properties": {
+        "sourcePath": { "type": "string" },
+        "sourceUrl": { "type": "string" },
+        "licence": { "type": "string" },
+        "redistributable": { "type": "boolean" },
+        "importedIso": { "type": "string" }
+      }
+    },
+    "updatedIso": { "type": "string" },
+    "appliesTo": {
+      "type": "array",
+      "description": "what this entry can be applied to; a graph template does not apply to a view",
+      "items": { "type": "string", "enum": ["case", "view", "graph", "report", "dataset"] }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "kind": { "const": "material" } },
+        "required": ["kind"]
+      },
+      "then": {
+        "properties": {
+          "definition": {
+            "properties": { "contract": { "const": "CT-011" } }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "applicationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applied", "unresolved"],
+      "description": "the preview/outcome of resolving an entry. Accepting a template outcome creates an independent workspace item (XC-090, XC-109)",
+      "properties": {
+        "applied": { "type": "array", "items": { "type": "string" } },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["reference", "reason"],
+            "properties": {
+              "reference": { "type": "string" },
+              "reason": { "type": "string", "enum": ["fieldMissing", "unitUndeclared", "timeStepMissing", "assetMissing", "associationMismatch"] }
+            }
+          }
+        }
+      }
+    }
+  }
+}

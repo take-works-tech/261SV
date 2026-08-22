@@ -1,0 +1,17 @@
+.venv/
+.venv-spike/
+__pycache__/
+node_modules/
+.next/
+dist/
+build/
+archive/
+spike/artifacts/
+*.lock
+*.log
+*.map
+*.snap
+.coverage
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/

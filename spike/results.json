@@ -1,0 +1,57 @@
+{
+  "measured_on": "local workstation, Windows",
+  "mesh": {
+    "points": 1127844,
+    "cells": 2251442
+  },
+  "vtk_build": {
+    "vtk_version": "9.5.2",
+    "library_count": 429,
+    "wheel_bytes": 488473370,
+    "found": {
+      "gl2ps": [
+        "vtkIOExportGL2PS-9.5.2.dll",
+        "vtkIOExportGL2PS.cp312-win_amd64.pyd",
+        "vtkRenderingGL2PSOpenGL2-9.5.2.dll",
+        "vtkRenderingGL2PSOpenGL2.cp312-win_amd64.pyd",
+        "vtkgl2ps-9.5.2.dll"
+      ],
+      "freetype": [
+        "vtkRenderingFreeType-9.5.2.dll",
+        "vtkRenderingFreeType.cp312-win_amd64.pyd",
+        "vtkfreetype-9.5.2.dll"
+      ],
+      "jpeg": [
+        "vtkjpeg-9.5.2.dll"
+      ],
+      "hdf5": [
+        "vtkhdf5-9.5.2.dll",
+        "vtkhdf5_hl-9.5.2.dll"
+      ],
+      "proj": [
+        "vtklibproj-9.5.2.dll"
+      ]
+    }
+  },
+  "geometry_floor": {
+    "points": 1127844,
+    "triangles": 2251442,
+    "raw_bytes": 45062808,
+    "gzip_bytes": 16149246,
+    "base64_bytes": 21532328,
+    "seconds": 5.79
+  },
+  "free_path": {
+    "artifact": "free_path.html",
+    "bytes": 34398358,
+    "seconds": 21.44,
+    "annotation_survives": false,
+    "scalar_bar_present": true
+  },
+  "decimated_10pct": {
+    "kept_fraction": 0.1,
+    "points": 113106,
+    "gzip_bytes": 1579984,
+    "seconds": 22.34
+  }
+}

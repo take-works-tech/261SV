@@ -1,0 +1,44 @@
+# Environments and build output
+.venv/
+.venv-spike/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.benchmarks/
+dist/
+build/
+*.egg-info/
+.coverage
+coverage.xml
+node_modules/
+.next/
+*.tsbuildinfo
+
+# Measurements produce artefacts; `spike/results.json` is the record and is committed, the megabytes
+# it was derived from are not.
+spike/artifacts/
+
+# Legacy and private local material. `archive/private/` holds the owner's own records - tax filings
+# among them - and `archive/legacy-root-*/` holds superseded snapshots kept for reference. None of it
+# is a source of truth and none of it is published. This line is why the repository can be private and
+# still not carry them.
+archive/
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Machine-local agent configuration. `settings.json` is shared and reviewed; `settings.local.json` is
+# one developer's overrides and would otherwise change everyone's session.
+.claude/settings.local.json
+CLAUDE.local.md
+
+# Operating-system leavings
+.DS_Store
+Thumbs.db
+desktop.ini

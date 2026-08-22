@@ -1,0 +1,46 @@
+{
+  "vtk_version": "9.5.2",
+  "memory": [
+    {
+      "points": 40000,
+      "cells": 79202,
+      "dataset_bytes": 4130816,
+      "bytes_per_point": 103.3
+    },
+    {
+      "points": 250000,
+      "cells": 498002,
+      "dataset_bytes": 25922560,
+      "bytes_per_point": 103.7
+    },
+    {
+      "points": 810000,
+      "cells": 1616402,
+      "dataset_bytes": 84101120,
+      "bytes_per_point": 103.8
+    }
+  ],
+  "render": [
+    {
+      "triangles": 79202,
+      "seconds_per_frame_including_readback": 0.0068,
+      "triangles_per_second": 11582690,
+      "triangles_at_30fps": 386089,
+      "renderer": "OpenGL renderer string:  Intel(R) Iris(R) Xe Graphics"
+    },
+    {
+      "triangles": 498002,
+      "seconds_per_frame_including_readback": 0.0071,
+      "triangles_per_second": 70018963,
+      "triangles_at_30fps": 2333965,
+      "renderer": "OpenGL renderer string:  Intel(R) Iris(R) Xe Graphics"
+    },
+    {
+      "triangles": 1616402,
+      "seconds_per_frame_including_readback": 0.0053,
+      "triangles_per_second": 305054175,
+      "triangles_at_30fps": 10168472,
+      "renderer": "OpenGL renderer string:  Intel(R) Iris(R) Xe Graphics"
+    }
+  ]
+}

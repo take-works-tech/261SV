@@ -1,0 +1,125 @@
+"""The dataset as this product holds it: geometry in the canonical frame, fields that know what they
+are attached to, and units that are declared or absent.
+
+Two properties here exist because the toolkit underneath does not provide them. A field remembers
+whether it came from points or from cells and refuses to be read as the other (INV-003). And a value
+that could not be computed is missing rather than zero, everywhere, including after a transfer between
+meshes (INV-011).
+
+A field also knows how precise it is. The number of digits it may be shown to follows from the type
+it was stored as, not from the width of the column it is displayed in (INV-014).
+
+Specification: GL-005, GL-006, GL-007, GL-021, GL-023, INV-001, INV-003, INV-011, INV-014.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field as dataclass_field
+from enum import Enum
+
+import numpy as np
+
+from domain_core.precision import format_value, significant_digits
+
+
+class Association(str, Enum):
+    """Where a field lives. Converting between these changes values, so it is never implicit."""
+
+    POINT = "point"
+    CELL = "cell"
+
+
+class AssociationError(Exception):
+    """Raised when a field is read as the association it does not have (INV-003)."""
+
+
+@dataclass(frozen=True, slots=True)
+class Field:
+    """One physical quantity on a dataset, with its association and its declared unit.
+
+    `unit` is None until a person declares one. Nothing in this product fills it in (XC-003).
+    """
+
+    name: str
+    association: Association
+    values: np.ndarray
+    unit: str | None = None
+
+    def as_point_data(self) -> np.ndarray:
+        if self.association is not Association.POINT:
+            raise AssociationError(
+                f"'{self.name}' is cell data; converting it to point data changes its values and must be asked for"
+            )
+        return self.values
+
+    def as_cell_data(self) -> np.ndarray:
+        if self.association is not Association.CELL:
+            raise AssociationError(
+                f"'{self.name}' is point data; converting it to cell data changes its values and must be asked for"
+            )
+        return self.values
+
+    @property
+    def missing_count(self) -> int:
+        """How many entries are missing. Missing is NaN, never zero (INV-011)."""
+        return int(np.count_nonzero(np.isnan(self.values)))
+
+    @property
+    def significant_digits(self) -> int:
+        """Digits this field may be displayed to, from the type it was stored as (INV-014)."""
+        return significant_digits(self.values.dtype)
+
+    def formatted(self, index: int, *, missing: str = "-") -> str:
+        """One entry, written to the precision the storage supports and no further."""
+        return format_value(float(self.values[index]), self.significant_digits, missing=missing)
+
+    def declared(self, symbol: str) -> "Field":
+        """Return the same field with a unit the user declared."""
+        return Field(self.name, self.association, self.values, symbol)
+
+
+@dataclass(frozen=True, slots=True)
+class SourceFrame:
+    """What the reader found, and what was done to it to reach the canonical frame.
+
+    Kept so that a converted coordinate can be explained rather than merely trusted (ingest/AC-028).
+    """
+
+    up_axis: str
+    scale_to_metres: float
+    reader: str
+
+
+@dataclass(slots=True)
+class Dataset:
+    """Geometry and fields in the canonical frame: right-handed, Z up, metres (GL-021)."""
+
+    points_m: np.ndarray
+    cells: np.ndarray
+    fields: dict[str, Field] = dataclass_field(default_factory=dict)
+    source: SourceFrame | None = None
+    partial: bool = False
+    partial_reason: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.points_m.ndim != 2 or self.points_m.shape[1] != 3:
+            raise ValueError("points must be an (n, 3) array of metres in the canonical frame")
+
+    @property
+    def point_count(self) -> int:
+        return int(self.points_m.shape[0])
+
+    @property
+    def cell_count(self) -> int:
+        return int(self.cells.shape[0])
+
+    def field(self, name: str) -> Field:
+        try:
+            return self.fields[name]
+        except KeyError:
+            raise KeyError(f"no field named '{name}'; this dataset has {sorted(self.fields)}") from None
+
+    def mark_partial(self, reason: str) -> None:
+        """Record that this dataset is incomplete, so every derived number can say so (XC-002)."""
+        self.partial = True
+        self.partial_reason = reason

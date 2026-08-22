@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CT-007 case selection",
+  "version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "description": "Declarative by default; the code form is a separate opt-in (XC-089)",
+  "oneOf": [
+    {
+      "required": [
+        "all"
+      ]
+    },
+    {
+      "required": [
+        "any"
+      ]
+    },
+    {
+      "required": [
+        "not"
+      ]
+    },
+    {
+      "required": [
+        "tag"
+      ]
+    },
+    {
+      "required": [
+        "name"
+      ]
+    },
+    {
+      "required": [
+        "variable"
+      ]
+    },
+    {
+      "required": [
+        "caseIds"
+      ]
+    },
+    {
+      "required": [
+        "code"
+      ]
+    }
+  ],
+  "properties": {
+    "all": {
+      "type": "array",
+      "items": {
+        "$ref": "#"
+      }
+    },
+    "any": {
+      "type": "array",
+      "items": {
+        "$ref": "#"
+      }
+    },
+    "not": {
+      "$ref": "#"
+    },
+    "tag": {
+      "type": "string"
+    },
+    "caseIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "name": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "equals": {
+          "type": "string"
+        },
+        "startsWith": {
+          "type": "string"
+        },
+        "contains": {
+          "type": "string"
+        },
+        "matches": {
+          "type": "string",
+          "description": "a pattern, not an expression: no capture, no evaluation"
+        }
+      }
+    },
+    "variable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string",
+          "description": "required when comparing a quantity; an undeclared unit is refused"
+        },
+        "equals": {},
+        "greaterThan": {
+          "type": "number"
+        },
+        "lessThan": {
+          "type": "number"
+        },
+        "inSet": {
+          "type": "array"
+        },
+        "exists": {
+          "type": "boolean"
+        }
+      }
+    },
+    "code": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "language",
+        "source",
+        "authoredBy"
+      ],
+      "description": "the opt-in form; runs isolated, receives metadata only, returns identifiers (XC-089)",
+      "properties": {
+        "language": {
+          "type": "string",
+          "enum": [
+            "python"
+          ]
+        },
+        "source": {
+          "type": "string"
+        },
+        "authoredBy": {
+          "type": "string",
+          "enum": [
+            "person"
+          ],
+          "description": "only a person may author this; a model-authored selection is refused (XC-080)"
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60,
+          "default": 5
+        },
+        "memoryLimitBytes": {
+          "type": "integer",
+          "minimum": 1048576
+        }
+      }
+    },
+    "state": {
+      "type": "array",
+      "description": "select by case state (GL-039) - what the product observed, as against a tag, which is what a person decided",
+      "items": {
+        "type": "string",
+        "enum": [
+          "unresolved",
+          "unloaded",
+          "loading",
+          "loaded",
+          "partial",
+          "failed"
+        ]
+      }
+    }
+  }
+}

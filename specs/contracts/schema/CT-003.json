@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CT-003 engine API",
+  "version": "2.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol",
+    "operation",
+    "parameters"
+  ],
+  "properties": {
+    "protocol": {
+      "type": "string",
+      "description": "protocol version the caller speaks, e.g. 1.0.0"
+    },
+    "operation": {
+      "type": "string",
+      "description": "an operation from the catalogue in CT-003; meanings never change once shipped",
+      "enum": [
+        "workspace.open",
+        "workspace.save",
+        "workspace.close",
+        "case.create",
+        "case.delete",
+        "case.move",
+        "case.tag",
+        "dataset.load",
+        "dataset.describe",
+        "field.declareUnit",
+        "field.statistics",
+        "variable.declare",
+        "variable.set",
+        "variable.detach",
+        "view.create",
+        "view.update",
+        "view.duplicate",
+        "view.rename",
+        "view.delete",
+        "view.render",
+        "graph.create",
+        "graph.update",
+        "graph.duplicate",
+        "graph.rename",
+        "graph.delete",
+        "graph.data",
+        "diff.create",
+        "report.create",
+        "report.update",
+        "report.duplicate",
+        "report.rename",
+        "report.delete",
+        "report.export",
+        "system.capabilities",
+        "system.protocols",
+        "history.undo",
+        "history.list",
+        "dataset.probe",
+        "dataset.parts",
+        "field.derive",
+        "field.setDisplayUnit",
+        "frame.declare",
+        "measurement.import",
+        "case.proposeTags",
+        "template.createFromItem",
+        "template.apply",
+        "template.promote",
+        "template.export",
+        "template.import",
+        "library.list",
+        "pipeline.create",
+        "pipeline.update",
+        "pipeline.dryRun",
+        "pipeline.run",
+        "pipeline.cancel",
+        "script.run",
+        "report.provenance",
+        "system.audit",
+        "system.supportBundle",
+        "workspace.pack",
+        "output.prune"
+      ]
+    },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "targets": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "groupId": {
+      "type": "string",
+      "description": "commands sharing this apply and undo together"
+    },
+    "authorisation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowDestructive": {
+          "type": "boolean",
+          "default": false
+        },
+        "allowOverwrite": {
+          "type": "boolean",
+          "default": false
+        },
+        "allowNetwork": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "dryRun": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "$defs": {
+    "response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "applied",
+            "answered",
+            "refused",
+            "failed"
+          ]
+        },
+        "changed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "effectSummary": {
+          "type": "string"
+        },
+        "undoId": {
+          "type": "string"
+        },
+        "result": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/reason"
+          }
+        },
+        "reason": {
+          "$ref": "#/$defs/reason"
+        }
+      }
+    },
+    "reason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "message"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "stable identifier from the message catalogue; never changes once shipped"
+        },
+        "message": {
+          "type": "string",
+          "description": "resolved text, translated; for people not for matching"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "handle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "bytes",
+        "expiresAfterSeconds"
+      ],
+      "description": "large payloads are fetched separately rather than carried in a response",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "encoding": {
+          "type": "string"
+        },
+        "expiresAfterSeconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

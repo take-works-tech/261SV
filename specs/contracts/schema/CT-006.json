@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CT-006 report definition",
+  "version": "2.0.0",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "id",
+    "blocks",
+    "targets"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "artStyleId": {
+      "type": "string"
+    },
+    "locale": {
+      "type": "string",
+      "description": "the deliverable's language, independent of the interface language"
+    },
+    "blocks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "view",
+              "graph",
+              "valueTable",
+              "text",
+              "pageBreak"
+            ]
+          },
+          "viewId": {
+            "type": "string"
+          },
+          "graphId": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "text": {
+            "type": "string"
+          },
+          "authorship": {
+            "type": "string",
+            "enum": [
+              "person",
+              "generated"
+            ],
+            "description": "a generated passage is marked as such in the document (report/AC-011)"
+          },
+          "derivedFrom": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "value identifiers a generated passage was derived from"
+          }
+        }
+      }
+    },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "enum": [
+          "html",
+          "pptx",
+          "docx",
+          "xlsx",
+          "csv",
+          "png",
+          "mp4",
+          "txt",
+          "md"
+        ]
+      }
+    },
+    "sources": {
+      "type": "array",
+      "description": "the workspaces this report draws on. Several are allowed; every value records which one it came from (XC-118)",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "workspaceId"
+        ],
+        "properties": {
+          "workspaceId": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "commentary": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "generated commentary settings. Depth costs tokens and is stated before it is spent (report/AC-017)",
+      "properties": {
+        "depth": {
+          "type": "string",
+          "enum": [
+            "none",
+            "brief",
+            "standard",
+            "thorough"
+          ],
+          "default": "none"
+        },
+        "direction": {
+          "type": "string",
+          "description": "words shaping what is discussed; never what a value is (report/AC-018)"
+        },
+        "referenceMaterialIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "model": {
+          "type": "string",
+          "description": "overrides the product-wide model for this report (XC-116)"
+        },
+        "effort": {
+          "type": "string"
+        },
+        "budget": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "producedFrom": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "written into an export so a delivered document can be told from one whose inputs have changed (INV-027)",
+      "properties": {
+        "workspaceVersion": {
+          "type": "string"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "caseId",
+              "contentId"
+            ],
+            "properties": {
+              "caseId": {
+                "type": "string"
+              },
+              "contentId": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "producedIso": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

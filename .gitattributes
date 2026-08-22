@@ -1,0 +1,41 @@
+# Line endings are normalised to LF, in the repository and in the working tree.
+#
+# This is not a style preference. Several gates here compare literals: `check_specs.py` compares a
+# Fixed value against the constant in the code, `check_constant_duplication.py` compares one definition
+# against another, and `check_context_budget.py` counts characters against a ceiling. A working tree
+# that is CRLF on one machine and LF on another makes those comparisons machine-dependent, and the
+# failure shows up as a diff nobody made.
+#
+# `eol=lf` overrides `core.autocrlf` per file, so the answer does not depend on how a developer's git
+# happens to be configured.
+
+* text=auto eol=lf
+
+# Binary, byte for byte.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.zip   binary
+*.gz    binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.vtu   binary
+*.vtp   binary
+*.vtk   binary
+*.cgns  binary
+*.exo   binary
+*.vdb   binary
+*.usdc  binary
+
+# Generated, and noise in a review. The catalogue's lock file is committed - `npm ci` needs it - but a
+# diff of it says nothing a reader can act on.
+mockups/ui/package-lock.json linguist-generated=true -diff
+
+# The specification set is the product of this repository, not a supporting document; count it.
+specs/**      linguist-documentation=false
+evidence/**   linguist-documentation=false

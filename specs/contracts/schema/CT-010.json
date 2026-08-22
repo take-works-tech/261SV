@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CT-010 failure report",
+  "version": "1.1.0",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["reason", "summary", "changed"],
+  "properties": {
+    "reason": {
+      "type": "string",
+      "description": "a stable code. A refusal and a failure share this shape so a caller can tell 'you may not' from 'it broke' without reading prose",
+      "enum": [
+        "unitUndeclared",
+        "frameUnresolved",
+        "referenceUnbound",
+        "fileMissing",
+        "fileChanged",
+        "workspaceItemMissing",
+        "templateMissing",
+        "definitionRevisionMissing",
+        "caseUnresolved",
+        "formatUnsupported",
+        "operationUnknown",
+        "arityMismatch",
+        "permissionDenied",
+        "authorisationDeclined",
+        "hostNotAllowed",
+        "nameInUse",
+        "limitExceeded",
+        "readFailed",
+        "computeFailed",
+        "renderFailed",
+        "materialInputMissing",
+        "materialResourceMissing",
+        "materialHashMismatch",
+        "unitDimensionMismatch",
+        "materialFeatureUnsupported",
+        "materialCompileFailed",
+        "materialBindingOverlap",
+        "exportFailed",
+        "partialData",
+        "unresolvedReferences"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "description": "one sentence in the user's language. No internal path, stack or identifier belongs here"
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "what it happened to, by identifier and by the name a person would recognise",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["workspace", "case", "field", "variable", "workspaceItem", "template", "pipelineUnit", "file", "host", "command", "materialAsset", "materialBinding", "renderer"]
+        },
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      }
+    },
+    "missing": {
+      "type": "array",
+      "description": "for a refusal, exactly what was absent - the undeclared unit, the unresolvable frame, the field the template wanted",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "name"],
+        "properties": {
+          "kind": { "type": "string", "enum": ["unit", "frame", "field", "component", "association", "resultPosition", "variable", "part", "timeStep", "entry", "file", "materialInput", "resource", "rendererFeature"] },
+          "name": { "type": "string" }
+        }
+      }
+    },
+    "changed": {
+      "type": "boolean",
+      "default": false,
+      "description": "whether anything was written or altered. Almost always false (XC-005), and a reader should not have to assume it"
+    },
+    "remedy": { "type": "string", "description": "what the user can do, where there is something" },
+    "detail": { "type": "string", "description": "technical text for a support bundle; never required to understand the summary" },
+    "occurredIso": { "type": "string" }
+  }
+}

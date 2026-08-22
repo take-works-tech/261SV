@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CT-011 Material Asset definition",
+  "version": "1.0.0",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "contract",
+    "version",
+    "materialX",
+    "requirements",
+    "resources",
+    "traceability",
+    "provenance"
+  ],
+  "properties": {
+    "contract": { "const": "CT-011" },
+    "version": { "const": "1.0.0" },
+    "materialX": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "documentUri",
+        "documentSha256",
+        "materialElement",
+        "documentVersion",
+        "sourceBytesPreserved"
+      ],
+      "properties": {
+        "documentUri": { "type": "string", "minLength": 1 },
+        "documentSha256": { "$ref": "#/$defs/sha256" },
+        "materialElement": { "type": "string", "minLength": 1 },
+        "documentVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+        "implementationVersion": { "type": "string" },
+        "standardLibraryVersion": { "type": "string" },
+        "surfaceModel": { "type": "string" },
+        "surfaceModelVersion": { "type": "string" },
+        "workingColorSpace": { "type": "string", "minLength": 1 },
+        "sourceBytesPreserved": { "const": true },
+        "variants": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "terminals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["kind", "element"],
+            "properties": {
+              "kind": { "type": "string", "enum": ["surface", "volume", "displacement"] },
+              "element": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "backlink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assetId", "assetRevision", "manifestUri"],
+      "properties": {
+        "assetId": { "type": "string", "minLength": 1 },
+        "assetRevision": { "type": "integer", "minimum": 1 },
+        "manifestUri": { "type": "string", "pattern": "^solvia:asset/.+\\?revision=[1-9][0-9]*$" },
+        "contractAttribute": { "const": "solvia_contract" },
+        "contractVersionAttribute": { "const": "solvia_contract_version" }
+      }
+    },
+    "requirements": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/requirement" }
+    },
+    "resources": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/resource" }
+    },
+    "mappingRequirements": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "coordinateSource": {
+          "type": "string",
+          "enum": ["none", "authoredUv", "objectTriplanar", "generatedAtlas", "planar", "cylindrical", "spherical"]
+        },
+        "primaryUvSet": { "type": "string", "default": "st" },
+        "normalSpace": { "type": "string", "enum": ["object", "world", "tangent"] },
+        "normalConvention": { "type": "string", "enum": ["openGlPositiveY", "directXNegativeY", "notApplicable", "unknown"] },
+        "requiresTangents": { "type": "boolean" },
+        "tangentGenerator": { "type": "string" },
+        "tangentGeneratorVersion": { "type": "string" },
+        "scale_m": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "traceability": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["reportable", "resultEffects"],
+      "properties": {
+        "reportable": { "type": "boolean" },
+        "reason": { "type": "string" },
+        "resultEffects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["requirementId", "outputs"],
+            "properties": {
+              "requirementId": { "type": "string", "minLength": 1 },
+              "outputs": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/visibleEffect" },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "transferFunctionElement": { "type": "string" },
+              "legendOutput": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "capabilityRequirements": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "standardNodes": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "customNodes": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "geometryProperties": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "shaderTargets": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "terminals": { "type": "array", "items": { "type": "string", "enum": ["surface", "volume", "displacement"] }, "uniqueItems": true }
+      }
+    },
+    "thumbnail": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["uri", "sha256", "geometry", "renderer", "environmentSha256", "sampleData"],
+      "properties": {
+        "uri": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "geometry": { "type": "string", "enum": ["sphere", "cube", "plane", "cylinder", "custom"] },
+        "renderer": { "type": "string", "minLength": 1 },
+        "rendererVersion": { "type": "string" },
+        "environmentSha256": { "$ref": "#/$defs/sha256" },
+        "colorConfigurationSha256": { "$ref": "#/$defs/sha256" },
+        "sampleData": { "type": "boolean" },
+        "sampleFixtureSha256": { "$ref": "#/$defs/sha256" },
+        "generatedIso": { "type": "string", "format": "date-time" }
+      }
+    },
+    "licence": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "spdxExpression": { "type": "string" },
+        "terms": { "type": "string" },
+        "attribution": { "type": "string" },
+        "redistributable": { "type": ["boolean", "null"] },
+        "derivativesAllowed": { "type": ["boolean", "null"] }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["createdBy", "createdIso"],
+      "properties": {
+        "createdBy": { "type": "string", "minLength": 1 },
+        "createdIso": { "type": "string", "format": "date-time" },
+        "sourceUri": { "type": "string" },
+        "sourceSha256": { "$ref": "#/$defs/sha256" },
+        "importer": { "type": "string" },
+        "importerVersion": { "type": "string" },
+        "importedIso": { "type": "string", "format": "date-time" },
+        "author": { "type": "string" },
+        "authoringTool": { "type": "string" },
+        "authoringToolVersion": { "type": "string" }
+      }
+    },
+    "conversionHistory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["tool", "toolVersion", "target", "features"],
+        "properties": {
+          "tool": { "type": "string", "minLength": 1 },
+          "toolVersion": { "type": "string", "minLength": 1 },
+          "target": { "type": "string", "minLength": 1 },
+          "targetVersion": { "type": "string" },
+          "sourceGraphSha256": { "$ref": "#/$defs/sha256" },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["feature", "status"],
+              "properties": {
+                "feature": { "type": "string", "minLength": 1 },
+                "status": { "type": "string", "enum": ["exact", "baked", "unsupported"] },
+                "detail": { "type": "string" }
+              }
+            }
+          },
+          "bake": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "width": { "type": "integer", "minimum": 1 },
+              "height": { "type": "integer", "minimum": 1 },
+              "colorSpace": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "visibleEffect": {
+      "type": "string",
+      "enum": ["baseColor", "emission", "opacity", "roughness", "normal", "metallic", "displacement", "volume", "mask", "other"]
+    },
+    "requirement": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "input", "kind", "valueType", "required", "visibleEffects"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "input": { "type": "string", "minLength": 1 },
+        "kind": {
+          "type": "string",
+          "enum": ["literal", "texture", "geometryProperty", "solviaResult", "materialReference", "environment"]
+        },
+        "valueType": {
+          "type": "string",
+          "enum": ["integer", "boolean", "float", "color3", "color4", "vector2", "vector3", "vector4", "matrix33", "matrix44", "string", "filename"]
+        },
+        "required": { "type": "boolean" },
+        "allowedAssociations": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["point", "cell"] },
+          "uniqueItems": true
+        },
+        "unitDimension": { "type": "string" },
+        "visibleEffects": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/visibleEffect" },
+          "uniqueItems": true
+        },
+        "fallback": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Only an explicitly authored fallback may be used for an optional requirement"
+        }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["uri", "packagePath", "sha256", "byteLength", "mimeType", "required", "role"],
+      "properties": {
+        "uri": { "type": "string", "minLength": 1 },
+        "packagePath": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "byteLength": { "type": "integer", "minimum": 0 },
+        "mimeType": { "type": "string", "minLength": 1 },
+        "required": { "type": "boolean" },
+        "role": { "type": "string", "enum": ["document", "include", "texture", "lut", "nodeLibrary", "implementation", "colorConfiguration", "other"] },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "channels": { "type": "integer", "minimum": 1 },
+        "bitDepth": { "type": "integer", "minimum": 1 },
+        "colorSpace": { "type": "string" },
+        "alphaMode": { "type": "string", "enum": ["none", "straight", "premultiplied", "unknown"] },
+        "normalConvention": { "type": "string", "enum": ["openGlPositiveY", "directXNegativeY", "notApplicable", "unknown"] },
+        "channelPacking": { "type": "object", "additionalProperties": { "type": "string" } },
+        "sampler": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "wrapU": { "type": "string" },
+            "wrapV": { "type": "string" },
+            "wrapW": { "type": "string" },
+            "minFilter": { "type": "string" },
+            "magFilter": { "type": "string" },
+            "mipFilter": { "type": "string" }
+          }
+        },
+        "udim": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["token", "tiles"],
+          "properties": {
+            "token": { "const": "<UDIM>" },
+            "tiles": {
+              "type": "array",
+              "items": { "type": "integer", "minimum": 1001 },
+              "uniqueItems": true
+            }
+          }
+        },
+        "licence": { "type": "string" }
+      }
+    }
+  }
+}

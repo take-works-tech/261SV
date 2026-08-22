@@ -1,0 +1,42 @@
+{
+  "note": "includes framebuffer readback per frame, so frame cost is an upper bound",
+  "rows": [
+    {
+      "triangles": 320000,
+      "frames": 12,
+      "distinct_frames": 12,
+      "seconds_per_frame": 0.0261,
+      "frames_per_second": 38.3,
+      "triangles_per_second": 12244609,
+      "triangles_at_30fps": 408153
+    },
+    {
+      "triangles": 1620000,
+      "frames": 12,
+      "distinct_frames": 12,
+      "seconds_per_frame": 0.0337,
+      "frames_per_second": 29.7,
+      "triangles_per_second": 48094288,
+      "triangles_at_30fps": 1603142
+    },
+    {
+      "triangles": 5120000,
+      "frames": 12,
+      "distinct_frames": 12,
+      "seconds_per_frame": 0.0309,
+      "frames_per_second": 32.3,
+      "triangles_per_second": 165623924,
+      "triangles_at_30fps": 5520797
+    },
+    {
+      "triangles": 11520000,
+      "frames": 12,
+      "distinct_frames": 12,
+      "seconds_per_frame": 0.0485,
+      "frames_per_second": 20.6,
+      "triangles_per_second": 237426886,
+      "triangles_at_30fps": 7914229
+    }
+  ],
+  "usable": true
+}

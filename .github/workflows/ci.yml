@@ -1,0 +1,87 @@
+name: ci
+
+# One workflow, because a project with two of them acquires a check that runs in neither. Everything
+# that decides whether this repository is in a shippable state runs here, and the branch ruleset names
+# these jobs as required.
+#
+# This replaces the earlier `specs.yml`, which ran the six validators and **never ran the test suite**
+# - so `python -m pytest tests` was documented in AGENTS.md as a command and was not covered by
+# anything. `check_gates_wired.py` reported green throughout, correctly: it checks that validators are
+# invoked, and says nothing about tests.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: repository gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Run every gate even when an earlier one fails: the work list is more useful whole than
+      # truncated at the first finding, and each of these prints what it could not check.
+      - run: python validate/check_specs.py
+        if: '!cancelled()'
+      - run: python validate/check_boundaries.py
+        if: '!cancelled()'
+      - run: python validate/check_commands.py
+        if: '!cancelled()'
+      - run: python validate/check_constant_duplication.py
+        if: '!cancelled()'
+      - run: python validate/check_context_budget.py
+        if: '!cancelled()'
+      - run: python validate/check_dependency_pins.py
+        if: '!cancelled()'
+      - run: python validate/check_gates_wired.py
+        if: '!cancelled()'
+
+  tests:
+    name: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      # The engine's dependencies are installed rather than mocked, because the tests that matter most
+      # here assert what VTK actually does - that it fills unsampled points with zero (INV-011), that
+      # it copies cell values into points (INV-012). A stub would assert what we believe it does.
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e ".[dev]"
+      # SIM_VIEWER_REQUIRE_VTK turns the local "VTK is not installed, skipping" into a failure. A skip
+      # is a reasonable answer on a laptop and never a reasonable answer here, and a suite that is
+      # allowed to skip in CI reports success for tests that did not run.
+      - run: python -m pytest tests -q
+        env:
+          SIM_VIEWER_REQUIRE_VTK: "1"
+
+  mockups:
+    name: mockup catalogue typecheck
+    runs-on: ubuntu-latest
+    # The catalogue is design states, never shipped code - but it is executable, and a reference to a
+    # component that does not exist is how a screen state silently stops being demonstrable.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: mockups/ui/package-lock.json
+      - run: npm ci
+        working-directory: mockups/ui
+      - run: npm run typecheck
+        working-directory: mockups/ui

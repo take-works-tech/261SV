@@ -1,0 +1,36 @@
+# A dependency update here is never only a version bump.
+#
+# `validate/check_dependency_pins.py` compares every version this specification set declares against
+# the manifest that pins it, so a Dependabot pull request that moves `vtk==` or `numpy==` and does not
+# also move `specs/06_external.md` fails CI by construction. That is the intended behaviour: the two
+# ship together or neither does (spec model 6.5). The pull request is then a prompt to do the rest -
+# re-read the module licence set, and re-run any spike whose measured value described the old version
+# (OPEN-019).
+
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    labels: [dependencies, needs-spec-change]
+    commit-message:
+      prefix: deps
+
+  - package-ecosystem: npm
+    directory: /mockups/ui
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    labels: [dependencies, mockups]
+    commit-message:
+      prefix: deps(mockups)
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels: [dependencies, ci]
+    commit-message:
+      prefix: deps(ci)

@@ -1,0 +1,71 @@
+# Codex wiring for SOLVIA CAE Visualization.
+#
+# Codex reads AGENTS.md natively, merging every AGENTS.md from the repository root down to the working
+# directory with the deepest file winning. Claude Code reaches the same file through the `@AGENTS.md`
+# import in CLAUDE.md. One source, two tools, no drift - so anything that belongs to the project rather
+# than to the tool goes in AGENTS.md, and only the wiring differs here.
+#
+# Skills use the Agent Skills `SKILL.md` format, which both tools read. The body lives in
+# `.agents/skills/spec-authoring/` where Codex looks, and `.claude/skills/spec-authoring/SKILL.md` is a
+# pointer to it rather than a second copy. Codex resolves project skills from ~/.codex/skills, so link
+# it once per machine:
+#
+#   ln -s "$PWD/.agents/skills/spec-authoring" ~/.codex/skills/spec-authoring              # macOS, Linux
+#   New-Item -ItemType SymbolicLink ~\.codex\skills\spec-authoring `
+#            -Target .agents\skills\spec-authoring                                          # Windows
+#
+# `model` is deliberately not pinned: Codex ships its own current default, and a stale pin silently
+# downgrades every session.
+
+model_reasoning_effort = "high"
+
+# Execution posture, mirroring the deny-by-default permission model in .claude/settings.json: the agent
+# may edit its own workspace, and anything outside it needs a human. This is the same rule
+# `.claude/hooks/local_only_guard.py` enforces on the Claude side - stated twice because the two tools
+# have no shared mechanism for it, not because the rule differs.
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[sandbox_workspace_write]
+# Network egress is off for ordinary work. It was `false` unconditionally while this repository was
+# local-only; XC-186 authorised publication to one named repository, so `git push` and `gh` now need a
+# route out. They run under approval rather than inside the sandbox: an approval prompt for a push is
+# cheap and correct, while opening the sandbox to the network would also open it to everything else.
+network_access = false
+writable_roots = []
+
+# Web search is available and off by default. The product itself is offline-by-default as a *product*
+# property (XC-014, INV-007); that is a statement about what the shipped software does, not about what
+# a developer may look up. Turning this on is a per-session decision, not a project one.
+[tools]
+web_search = false
+
+# --- Lifecycle hooks --------------------------------------------------------------------------
+#
+# Codex uses the same event names as Claude Code, so the scripts in `.claude/hooks/` are reused verbatim
+# rather than forked: one script, one behaviour, one place to fix.
+#
+# `$CLAUDE_PROJECT_DIR` is not set for Codex, so these use a repository-relative path. That is safe here
+# only because Codex runs hooks from the repository root; the Claude side must use the absolute form,
+# for the reason recorded in the guard's own docstring - a cwd-relative hook path locked an entire
+# session out of its own tools, including the repair.
+
+[[hooks.SessionStart]]
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = "python .claude/hooks/spec_gate.py"
+commandWindows = "python .claude/hooks/spec_gate.py"
+
+# A tool-matched PreToolUse hook needs a matcher whose exact TOML key cannot be confirmed from the
+# published reference offline. It ships commented out rather than guessed: a hook wired wrong is worse
+# than one not wired, because it looks enforced and is not - and the guard it would carry is the one
+# that decides which repository this project may push to.
+#
+# TODO: confirm the matcher key against the current Codex config reference, uncomment, then verify by
+#       running Codex once and checking the guard actually fires on an Edit outside the project.
+#
+# [[hooks.PreToolUse]]
+# matcher = "Edit|Write|Bash"
+# [[hooks.PreToolUse.hooks]]
+# type = "command"
+# command = "python .claude/hooks/local_only_guard.py"

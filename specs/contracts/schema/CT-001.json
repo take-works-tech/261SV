@@ -1,0 +1,408 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CT-001 workspace document",
+  "version": "4.0.0",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "formatVersion",
+    "id",
+    "cases",
+    "variables",
+    "workspaceItems"
+  ],
+  "properties": {
+    "formatVersion": {
+      "type": "string",
+      "const": "4.0.0"
+    },
+    "id": {
+      "type": "string",
+      "description": "stable identity of this workspace, never reused"
+    },
+    "name": {
+      "type": "string"
+    },
+    "createdBy": {
+      "type": "string",
+      "description": "product version that created the document"
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "name",
+          "children",
+          "sources",
+          "variableOverrides"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/properties/cases/items"
+            }
+          },
+          "sources": {
+            "type": "array",
+            "description": "references to result files, never their contents",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": [
+                "pathRelative",
+                "sizeBytes",
+                "modifiedIso"
+              ],
+              "properties": {
+                "pathRelative": {
+                  "type": "string"
+                },
+                "pathAbsolute": {
+                  "type": "string"
+                },
+                "sizeBytes": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "modifiedIso": {
+                  "type": "string"
+                },
+                "declaredUnits": {
+                  "type": "object",
+                  "description": "field name to declared unit; absent means undeclared, never guessed",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "variableStates": {
+            "type": "object",
+            "description": "variable id to its state on this case. `inherited` follows the parent and cannot be edited here; `independent` holds its own value (XC-117). Absent means inherited",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "state"
+              ],
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "inherited",
+                    "independent"
+                  ]
+                },
+                "value": {
+                  "description": "present only when independent"
+                },
+                "detachedIso": {
+                  "type": "string",
+                  "description": "when it stopped following the parent"
+                }
+              }
+            }
+          },
+          "order": {
+            "type": "integer",
+            "description": "explicit ordering, not implied by array position"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "unresolved",
+              "unloaded",
+              "loading",
+              "loaded",
+              "partial",
+              "failed"
+            ],
+            "default": "unloaded",
+            "description": "where the case is in its lifecycle. Transitions are the ones in XC-136, and the pipeline decides what to skip from this rather than from a separate check"
+          },
+          "stateReason": {
+            "type": "string",
+            "description": "why it is in that state - the missing file, the gap, the failure"
+          },
+          "resultAxis": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "what indexes this case's results (GL-036). A mode index is not a time (XC-131)",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "steady",
+                  "transient",
+                  "modal",
+                  "harmonic",
+                  "unknown"
+                ]
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "eigenfrequenciesHz": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              "frequenciesHz": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              "timesS": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "measurements": {
+            "type": "array",
+            "description": "measured values imported against this case, each able to carry its own uncertainty. Measurement data is a source of numbers; reference material is not (XC-125)",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "value"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "value": {},
+                "unit": {
+                  "type": "string",
+                  "description": "absent means undeclared, never guessed (XC-003)"
+                },
+                "uncertainty": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "value": {
+                      "type": "number"
+                    },
+                    "coverageFactor": {
+                      "type": "number"
+                    },
+                    "confidencePercent": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "source": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "declaredUnits": {
+            "type": "object",
+            "description": "field name to its declared unit. A string is the unit symbol and means an absolute quantity; the object form additionally says whether the field holds a point on the scale or an interval, which changes how it converts (INV-028, GL-041). Absent means undeclared, never guessed",
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "symbol"
+                  ],
+                  "properties": {
+                    "symbol": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "absolute",
+                        "difference"
+                      ],
+                      "default": "absolute"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "workspaceItems": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "concrete editable artefacts belonging to the workspace, distinct from reusable templates and never owned by a case (XC-109)",
+      "required": ["views", "graphs", "reports", "simulations"],
+      "properties": {
+        "views": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/workspaceItem" }
+        },
+        "graphs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/workspaceItem" }
+        },
+        "reports": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/workspaceItem" }
+        },
+        "simulations": {
+          "type": "array",
+          "description": "saved Simulation flows owned by this workspace; each groups one or more explicitly ordered external-solver execution conditions (GL-043, XC-154)",
+          "items": { "$ref": "#/$defs/workspaceItem" }
+        }
+      }
+    },
+    "templates": {
+      "type": "array",
+      "description": "workspace-scoped reusable library entries (Templates and Assets under CT-008). The property name is retained for version-4 compatibility. Working views, graphs, reports and simulations belong in workspaceItems (XC-109)",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "variables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "name",
+          "value"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "value": {},
+          "unit": {
+            "type": "string"
+          },
+          "inheritable": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    "referenceMaterial": {
+      "type": "array",
+      "description": "documents consulted for commentary; never a source of numbers",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "displayUnits": {
+      "type": "object",
+      "description": "quantity name to the unit it is shown in - length in millimetres, stress in megapascals. Presentation only: storage and computation stay canonical (INV-026)",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "componentFrames": {
+      "type": "array",
+      "description": "named frames components may be reported in. Absent means only global Cartesian exists (XC-122)",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "kind",
+          "origin"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "cartesian",
+              "cylindrical",
+              "spherical"
+            ]
+          },
+          "origin": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "axis": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3
+          }
+        }
+      }
+    },
+    "pipelines": {
+      "type": "array",
+      "description": "the workspace's registered flows (CT-009). They stand above the cases they produce and act on (XC-093)",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    }
+  },
+  "$defs": {
+    "workspaceItem": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "name", "revision", "definition"],
+      "properties": {
+        "id": { "type": "string", "description": "stable workspace-local identity, never reused" },
+        "name": { "type": "string" },
+        "revision": { "type": "integer", "minimum": 1, "description": "increments when the item definition changes" },
+        "order": { "type": "integer", "description": "explicit display order within its kind" },
+        "definition": { "type": "object", "additionalProperties": true },
+        "sourceTemplate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "revision"],
+          "description": "provenance only; not a live link and never causes silent propagation (XC-109)",
+          "properties": {
+            "id": { "type": "string" },
+            "revision": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    }
+  }
+}

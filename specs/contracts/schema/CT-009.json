@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CT-009 pipeline",
+  "version": "3.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "units"],
+  "properties": {
+    "id": { "type": "string", "description": "stable identifier; stored references use this, never the name (XC-103)" },
+    "name": { "type": "string", "description": "unique among pipelines of this workspace (XC-103)" },
+    "onFailure": {
+      "type": "string",
+      "enum": ["continueOtherCases", "stopRun"],
+      "default": "continueOtherCases",
+      "description": "per-case isolation by default; stopping is chosen, never assumed (CT-009)"
+    },
+    "units": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/unit" }
+    }
+  },
+  "$defs": {
+    "unit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "addCases",
+            "clear",
+            "view",
+            "graph",
+            "report",
+            "export",
+            "tag",
+            "loop",
+            "variable",
+            "formula",
+            "condition",
+            "simulation"
+          ],
+          "description": "addCases adds to the target set, clear empties it, and the artefact kinds act on all of it (XC-099)"
+        },
+        "label": { "type": "string", "description": "what the editor shows; not an identifier" },
+        "caseIds": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "addCases: the explicit cases a drag produced. One unit holds a whole multiple selection"
+        },
+        "selection": {
+          "type": "object",
+          "description": "addCases: cases resolved when the run starts, through CT-007. Present instead of caseIds, never as well"
+        },
+        "definitionRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source", "id", "revision"],
+          "description": "view, graph or report: a pinned workspace item or reusable template; simulation: a pinned saved Simulation workspace item unless a future contract explicitly introduces Simulation templates; never both (XC-109, XC-154)",
+          "properties": {
+            "source": { "type": "string", "enum": ["workspaceItem", "template"] },
+            "id": { "type": "string" },
+            "revision": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "appliesTo": {
+          "type": "string",
+          "enum": ["eachCase", "allCasesTogether"],
+          "default": "eachCase",
+          "description": "once per case in the target set, or once across the whole set - stated, never inferred"
+        },
+        "loopOver": {
+          "description": "loop: what fixes the iteration count before the loop starts (XC-100)",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "count": { "type": "integer", "minimum": 0, "maximum": 1000 },
+            "variableName": { "type": "string", "description": "one iteration per value of this variable" },
+            "eachCaseInTargetSet": { "type": "boolean" },
+            "indexName": { "type": "string", "default": "index", "description": "the name the iteration index is bound to inside" }
+          }
+        },
+        "variableName": { "type": "string", "description": "variable and formula: the name bound for the units below" },
+        "expression": {
+          "type": "string",
+          "description": "formula and condition: this product's restricted expression language, evaluated without a Python interpreter (XC-101)"
+        },
+        "value": { "description": "variable: a literal value, with its unit stated separately" },
+        "unitSymbol": { "type": "string", "description": "variable: the declared unit, or absent for undeclared (XC-003)" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "parameters": { "type": "object", "additionalProperties": true },
+        "units": {
+          "type": "array",
+          "description": "contained units, permitted inside loop, condition and simulation, limited to LIM-007 levels",
+          "items": { "$ref": "#/$defs/unit" }
+        },
+        "continueOnFailure": {
+          "type": "boolean",
+          "default": false,
+          "description": "when true, later units for a failed case still run; the default skips them rather than running on a broken state"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["kind"],
+            "properties": { "kind": { "enum": ["view", "graph", "report", "simulation"] } }
+          },
+          "then": { "required": ["definitionRef"] }
+        },
+        {
+          "if": {
+            "required": ["kind"],
+            "properties": { "kind": { "not": { "enum": ["view", "graph", "report", "simulation"] } } }
+          },
+          "then": { "not": { "required": ["definitionRef"] } }
+        }
+      ]
+    },
+    "runRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pipelineId", "startedIso", "cases", "outcomes"],
+      "description": "what a run recorded, so it can be reproduced and reviewed",
+      "properties": {
+        "pipelineId": { "type": "string" },
+        "pipelineVersion": { "type": "string" },
+        "startedIso": { "type": "string" },
+        "authorisation": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "destructive units are authorised once for the run, naming what they cover",
+          "properties": {
+            "allowDestructive": { "type": "boolean" },
+            "unitIds": { "type": "array", "items": { "type": "string" } },
+            "caseCount": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "cases": { "type": "array", "items": { "type": "string" } },
+        "outcomes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["caseId", "unitId", "status"],
+            "properties": {
+              "caseId": { "type": "string" },
+              "unitId": { "type": "string" },
+              "iteration": { "type": "integer", "minimum": 0, "description": "which loop repetition, when inside one" },
+              "status": { "type": "string", "enum": ["applied", "skipped", "failed", "refused"] },
+              "reason": { "type": "string", "description": "for a skipped condition, the value the expression evaluated to" },
+              "targetSetSize": { "type": "integer", "minimum": 0, "description": "how many cases this unit acted on" },
+              "artefacts": { "type": "array", "items": { "type": "string" } },
+              "definitionRef": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["source", "id", "revision"],
+                "description": "the exact definition revision resolved for this outcome",
+                "properties": {
+                  "source": { "type": "string", "enum": ["workspaceItem", "template"] },
+                  "id": { "type": "string" },
+                  "revision": { "type": "integer", "minimum": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

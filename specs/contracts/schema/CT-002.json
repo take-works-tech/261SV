@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CT-002 command surface",
+  "version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["command", "parameters"],
+  "properties": {
+    "command": { "type": "string", "description": "operation name; meaning never changes once shipped" },
+    "parameters": { "type": "object", "additionalProperties": true },
+    "targets": {
+      "type": "array",
+      "description": "identifiers this command acts on, from CT-001",
+      "items": { "type": "string" }
+    },
+    "groupId": {
+      "type": "string",
+      "description": "commands sharing a groupId apply and undo as one step"
+    },
+    "authorisation": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "explicit consent for classes of operation that would otherwise be refused headless",
+      "properties": {
+        "allowDestructive": { "type": "boolean", "default": false },
+        "allowOverwrite": { "type": "boolean", "default": false },
+        "allowNetwork": { "type": "boolean", "default": false }
+      }
+    },
+    "dryRun": {
+      "type": "boolean",
+      "default": false,
+      "description": "return the effect summary without applying it"
+    }
+  },
+  "$defs": {
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "type": "string", "enum": ["applied", "refused", "failed"] },
+        "changed": { "type": "array", "items": { "type": "string" } },
+        "effectSummary": { "type": "string" },
+        "reason": { "type": "string", "description": "required when status is refused or failed" },
+        "undoId": { "type": "string" }
+      }
+    }
+  }
+}
