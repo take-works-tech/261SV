@@ -13,6 +13,7 @@ gates rather than in `src/`.
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -237,6 +238,117 @@ class TestDependencyPins:
 
     def test_it_always_states_what_it_did_not_check(self) -> None:
         assert "NOT checked" in run("check_dependency_pins.py").stdout
+
+
+ZERO = "0" * 40
+PRE_PUSH = ROOT / ".githooks" / "pre-push"
+
+
+class TestPrePushHook:
+    """The only guard that runs in a plain terminal.
+
+    `.claude/hooks/local_only_guard.py` refuses a force-push inside an agent session and is silent
+    everywhere else, and GitHub refuses nothing at all on this plan (OPEN-020). A `git push --force`
+    typed from muscle memory meets neither. This hook is what stands there instead - client-side, and
+    skippable with `--no-verify`, which is the honest limit of it.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _needs_sh(self) -> None:
+        if shutil.which("sh") is None:
+            pytest.skip("no POSIX shell on PATH, so the pre-push hook could not be exercised")
+
+    def push(self, local: str, remote: str, cwd: pathlib.Path = ROOT) -> subprocess.CompletedProcess[str]:
+        """Drive the hook the way git drives it: refspec lines on stdin, remote name in argv."""
+        return subprocess.run(
+            ["sh", str(PRE_PUSH), "origin", "https://example.invalid/repo.git"],
+            input=f"refs/heads/main {local} refs/heads/main {remote}\n",
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+        )
+
+    def head(self, offset: int = 0) -> str:
+        ref = "HEAD" if offset == 0 else f"HEAD~{offset}"
+        return subprocess.run(
+            ["git", "rev-parse", ref], cwd=ROOT, capture_output=True, text=True, check=True
+        ).stdout.strip()
+
+    def test_a_fast_forward_with_green_gates_is_allowed(self) -> None:
+        result = self.push(self.head(), self.head(1))
+        assert result.returncode == 0, result.stderr
+
+    def test_rewriting_published_history_is_refused(self) -> None:
+        result = self.push(self.head(1), self.head())
+        assert result.returncode == 1
+        assert "would not fast-forward" in result.stderr
+
+    def test_deleting_a_branch_by_push_is_refused(self) -> None:
+        result = self.push(ZERO, self.head())
+        assert result.returncode == 1
+        assert "deleting" in result.stderr
+
+    def test_a_new_branch_is_allowed(self) -> None:
+        """A first push has no remote side to fast-forward from, and must not be read as a rewrite."""
+        result = self.push(self.head(), ZERO)
+        assert result.returncode == 0, result.stderr
+
+    def test_a_red_gate_refuses_the_push(self, tmp_path: pathlib.Path) -> None:
+        """Proven by breaking a gate, not by trusting the branch that reads its exit code."""
+        shutil.copytree(ROOT / ".githooks", tmp_path / ".githooks")
+        (tmp_path / "validate").mkdir()
+        (tmp_path / "validate" / "check_always_red.py").write_text(
+            "print('this gate is deliberately red')\nraise SystemExit(1)\n", encoding="utf-8"
+        )
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp_path, check=True)
+        # A new branch: no remote side, so the history checks pass and the gates are what decide.
+        result = self.push("a" * 40, ZERO, cwd=tmp_path)
+        assert result.returncode == 1
+        assert "check_always_red.py" in result.stderr
+        assert "the repository gates are red" in result.stderr
+
+    def test_a_missing_interpreter_says_so_rather_than_refusing(self, tmp_path: pathlib.Path) -> None:
+        """On Windows `python3` is a Store stub that resolves, prints and exits non-zero. Taking the
+        first name on PATH made every gate look red for a reason unrelated to the change - which is
+        how a hook teaches people to reach for --no-verify. Found by running it, not by reading it."""
+        shutil.copytree(ROOT / ".githooks", tmp_path / ".githooks")
+        (tmp_path / "validate").mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp_path, check=True)
+        stub = tmp_path / "bin"
+        stub.mkdir()
+        for name in ("python", "python3", "py"):
+            (stub / name).write_text("#!/bin/sh\necho 'Python was not found' >&2\nexit 9009\n", encoding="utf-8")
+            (stub / name).chmod(0o755)
+        # The stub directory goes in front of the real PATH, not instead of it: the hook needs `git`
+        # and `tr` to get as far as choosing an interpreter at all.
+        environment = dict(os.environ, PATH=os.pathsep.join([str(stub), os.environ.get("PATH", "")]))
+        result = subprocess.run(
+            ["sh", str(tmp_path / ".githooks" / "pre-push"), "origin"],
+            input=f"refs/heads/main {'a' * 40} refs/heads/main {ZERO}\n",
+            capture_output=True,
+            text=True,
+            cwd=tmp_path,
+            env=environment,
+        )
+        assert result.returncode == 0
+        assert "NOT checked" in result.stderr
+
+    def test_the_repository_points_git_at_the_versioned_hooks(self) -> None:
+        """A working-copy setting, so CI legitimately does not have it - and never pushes anyway.
+
+        This is a skip that is defensible where the reader tests' skip is not: there the thing under
+        test is the product, and CI forbids the skip with SIM_VIEWER_REQUIRE_VTK. Here the thing under
+        test is one developer's clone, which a fresh checkout on a runner is not.
+        """
+        if os.environ.get("CI"):
+            pytest.skip("a fresh CI checkout has no local git config, and CI does not push")
+        configured = subprocess.run(
+            ["git", "config", "core.hooksPath"], cwd=ROOT, capture_output=True, text=True
+        ).stdout.strip()
+        assert configured == ".githooks", (
+            "run `git config core.hooksPath .githooks` - the hook is versioned so it travels with the "
+            "repository, but git will not use it until each clone is pointed at it"
+        )
 
 
 def guard(tool: str, **tool_input: str) -> subprocess.CompletedProcess[str]:

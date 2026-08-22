@@ -2569,10 +2569,15 @@ model or the prompt, never in a description that quietly went stale.
   public, and each is a decision about the business rather than about the code. Making it public is the
   one that must not be taken casually: `specs/12_business_model.md` carries pricing, revenue model and
   competitor analysis, and XC-082 publishes the **source** under FSL-1.1-MIT without publishing that
-- what_is_in_force_meanwhile: the pre-tool-use hook, which runs only inside an agent session on this
-  machine and is silent in a plain terminal; rebase merges disabled at the repository level, which the
-  free plan does permit; Dependabot alerts and automated security fixes enabled. CI runs on every push
-  and pull request and reports honestly - it simply cannot **block** a merge
+- what_is_in_force_meanwhile: `.githooks/pre-push`, versioned and installed with
+  `git config core.hooksPath .githooks`, which refuses a non-fast-forward push, a branch deletion by
+  push, and a push whose gates are red - **the only one of these guards that runs in a plain
+  terminal**, which is where a force-push typed from muscle memory actually happens. Client-side, and
+  skippable with `--no-verify`: it catches the push nobody meant to make, not the one somebody
+  insists on. Beside it: the pre-tool-use hook, which runs only inside an agent session; rebase merges
+  disabled at the repository level, which the free plan does permit; Dependabot alerts and automated
+  security fixes enabled. CI runs on every push and pull request and reports honestly - it simply
+  cannot **block** a merge
 - blocks: nothing today, with one maintainer and no other contributors. It becomes urgent the moment a
   second person can push, because at that point the rule exists only in a document
 - closes_when: a plan or account type is chosen that permits a ruleset, and the ruleset requires the

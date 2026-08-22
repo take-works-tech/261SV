@@ -9,9 +9,16 @@ session. This file adds only what a human needs that an agent already has.
 python -m venv .venv                       # Python 3.12 or later; pyproject.toml requires it
 .venv/Scripts/activate                     # Windows;  source .venv/bin/activate elsewhere
 python -m pip install -e ".[dev]"          # engine dependencies, pinned
-python -m pytest tests                     # 105 tests
+git config core.hooksPath .githooks        # once per clone - see below
+python -m pytest tests                     # the suite, including the repository gates
 python validate/check_specs.py             # the work list, in its own order
 ```
+
+**`core.hooksPath` is not optional here.** The hook is versioned so it travels with the repository,
+but git ignores it until each clone is pointed at it, and this is the only guard that runs in a plain
+terminal: it refuses a push that rewrites published history and a push whose gates are red. GitHub
+refuses neither, because branch protection is unavailable on this plan (OPEN-020). A test fails if you
+skip this line.
 
 Without VTK the reader tests skip and say why. That is a reasonable answer on a laptop and not one in
 CI, which sets `SIM_VIEWER_REQUIRE_VTK=1` and turns the skip into a failure. A suite allowed to skip
