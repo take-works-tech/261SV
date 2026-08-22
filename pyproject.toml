@@ -18,7 +18,7 @@ dev = [
     # was measured before the pin moved rather than after: all 105 tests pass under 9.0.3 in a clean
     # environment. pytest is a development requirement and is not in the distribution closure, so no
     # notice obligation attaches to it (XC-025).
-    "pytest==9.0.3",
+    "pytest==9.1.1",
 ]
 
 [build-system]
