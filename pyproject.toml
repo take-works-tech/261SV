@@ -13,11 +13,13 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    # 9.0.3 is the first release carrying the fix for "pytest has vulnerable tmpdir handling"
-    # (affects < 9.0.3, moderate), reported by Dependabot on 2026-08-22. A major version step, so it
-    # was measured before the pin moved rather than after: all 105 tests pass under 9.0.3 in a clean
-    # environment. pytest is a development requirement and is not in the distribution closure, so no
-    # notice obligation attaches to it (XC-025).
+    # Must stay >= 9.0.3: that is the first release carrying the fix for "pytest has vulnerable tmpdir
+    # handling" (affects < 9.0.3, moderate), reported by Dependabot on 2026-08-22. The 8.4.2 -> 9.0.3
+    # step was a major one and was measured before the pin moved rather than after - the whole suite
+    # passed in a clean environment built for the purpose. 9.1.1 arrived as Dependabot #4 and was
+    # verified the same way, by CI running the suite against it before the pull request merged.
+    # pytest is a development requirement and is not in the distribution closure, so no notice
+    # obligation attaches to it (XC-025).
     "pytest==9.1.1",
 ]
 
