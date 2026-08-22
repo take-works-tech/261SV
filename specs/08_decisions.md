@@ -2457,6 +2457,14 @@ model or the prompt, never in a description that quietly went stale.
   and history rewriting are refused, because the record of a correction is part of this project's
   deliverable. `.claude/hooks/local_only_guard.py` enforces the remote name, and
   `tests/test_environment_gates.py` proves the guard can still fail
+- enforcement: **client-side only, and this is a real gap rather than a design choice.** Measured
+  2026-08-22: both the rulesets API and the classic branch-protection API return HTTP 403,
+  "Upgrade to GitHub Pro or make this repository public", because the repository is private under a
+  free personal account. So there is no server-side required-status-check, no protected branch and no
+  server-side refusal of a force-push. What is in force instead: the hook, which runs only in an agent
+  session on this machine; rebase merges disabled at the repository level, which the free plan does
+  allow; Dependabot alerts and automated security fixes enabled. A developer typing `git push --force`
+  in a plain terminal is refused by nothing. Tracked as OPEN-020
 - decided_by: the product owner, 2026-08-22, explicitly authorising GitHub integration
 - basis: E-001 (T1)
 - supersedes: the working agreement recorded in AGENTS.md that this repository is local only and
@@ -2478,6 +2486,29 @@ model or the prompt, never in a description that quietly went stale.
 - blocks: nothing - the limit is enforced and reported, so the cost of it being wrong is a refusal a
   user can report rather than a study that silently truncated
 - resolve_by: the first study a customer runs that the limit refuses
+- decidedness: Open
+
+### OPEN-020 - How the append-only rule is enforced on the server, not only on this machine
+- question: XC-186 refuses force-push, hard reset and history rewriting, and `check_specs.py` and the
+  other six gates decide whether a change may land. **None of that is enforced by GitHub.** Measured
+  2026-08-22: `POST /repos/{owner}/{repo}/rulesets` and
+  `PUT /repos/{owner}/{repo}/branches/main/protection` both return HTTP 403 with
+  "Upgrade to GitHub Pro or make this repository public" - branch protection is not available for a
+  private repository on a free personal account
+- why_open: the three ways out are a paid plan, an organisation account, or making the repository
+  public, and each is a decision about the business rather than about the code. Making it public is the
+  one that must not be taken casually: `specs/12_business_model.md` carries pricing, revenue model and
+  competitor analysis, and XC-082 publishes the **source** under FSL-1.1-MIT without publishing that
+- what_is_in_force_meanwhile: the pre-tool-use hook, which runs only inside an agent session on this
+  machine and is silent in a plain terminal; rebase merges disabled at the repository level, which the
+  free plan does permit; Dependabot alerts and automated security fixes enabled. CI runs on every push
+  and pull request and reports honestly - it simply cannot **block** a merge
+- blocks: nothing today, with one maintainer and no other contributors. It becomes urgent the moment a
+  second person can push, because at that point the rule exists only in a document
+- closes_when: a plan or account type is chosen that permits a ruleset, and the ruleset requires the
+  three CI jobs by name - `repository gates`, `tests`, `mockup catalogue typecheck` - with
+  non-fast-forward and deletion refused. The ruleset JSON is written and was rejected only by the plan
+- affects: XC-186, CONTRIBUTING.md
 - decidedness: Open
 
 ### OPEN-019 - Whether to move the engine from VTK 9.5.2 to 9.7.x, and what it costs to do so

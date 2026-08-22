@@ -72,7 +72,15 @@ decision rather than deleting it, and several entries carry an explicit `correct
 was believed before and why it was wrong. Those lines are part of the deliverable.
 
 This is also why history here is append-only: force-push, hard reset and rebase are refused by
-`.claude/hooks/local_only_guard.py` and by the branch ruleset.
+`.claude/hooks/local_only_guard.py`.
+
+**That refusal is client-side only, and you should know it.** Branch protection is not available for a
+private repository on a free personal account — measured 2026-08-22, both the rulesets API and the
+classic branch-protection API answer HTTP 403 with "Upgrade to GitHub Pro or make this repository
+public". So CI runs on every push and pull request and reports honestly, and it cannot block a merge;
+the hook runs only inside an agent session on this machine and is silent in a plain terminal. Rebase
+merges are disabled at the repository level, which the free plan does allow. The gap is tracked as
+OPEN-020, with the ruleset already written and rejected only by the plan.
 
 ## Publishing
 

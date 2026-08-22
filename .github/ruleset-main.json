@@ -1,0 +1,54 @@
+{
+  "_comment": [
+    "The branch ruleset for main, written and NOT APPLIED. Measured 2026-08-22: POST",
+    "/repos/{owner}/{repo}/rulesets returns HTTP 403, 'Upgrade to GitHub Pro or make this repository",
+    "public' - branch protection is not available for a private repository on a free personal account.",
+    "OPEN-020 tracks the gap; this file exists so that closing it is one command rather than a design",
+    "session, and so that the claim 'the ruleset is written' can be checked rather than believed.",
+    "",
+    "Apply with:",
+    "  gh api -X POST repos/take-works-tech/202604-sim-analysis-visualization/rulesets \\",
+    "         --input .github/ruleset-main.json",
+    "",
+    "required_approving_review_count is 0 deliberately. There is one maintainer, and GitHub does not",
+    "permit approving your own pull request - requiring an approval would deadlock every change the",
+    "maintainer makes, and the usual escape is to disable the ruleset, which protects nothing. The",
+    "checks are what gate a merge here; raise this to 1 on the day there is a second person who can",
+    "approve.",
+    "",
+    "The three contexts are the job names in .github/workflows/ci.yml. Renaming a job there without",
+    "renaming it here is how a required check quietly stops being required."
+  ],
+  "name": "main",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] }
+  },
+  "rules": [
+    { "type": "deletion" },
+    { "type": "non_fast_forward" },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 0,
+        "dismiss_stale_reviews_on_push": true,
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": true,
+        "allowed_merge_methods": ["squash", "merge"]
+      }
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "required_status_checks": [
+          { "context": "repository gates" },
+          { "context": "tests" },
+          { "context": "mockup catalogue typecheck" }
+        ]
+      }
+    }
+  ]
+}

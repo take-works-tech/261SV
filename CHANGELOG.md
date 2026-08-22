@@ -51,7 +51,23 @@ itself — `pyproject.toml` reads 0.0.1 and will until there is something to ins
   pull-request and issue templates, Dependabot.
 - `.claude/agents/code-reviewer-ci.md` — the defects this repository has actually shipped, by name.
 
+- `.github/ruleset-main.json` — the branch ruleset, written and rejected by the plan rather than by a
+  decision (OPEN-020). Applying it is one command on the day the account permits it.
+- `.gitattributes` — LF everywhere, in the repository and the working tree. Several gates here compare
+  literals, and a working tree that is CRLF on one machine makes those comparisons machine-dependent.
+
 ### Changed
 
 - **This repository is no longer local-only** (XC-186). It publishes to one named private repository;
   every other remote is refused by name, and history rewriting stays refused.
+
+### Known gaps
+
+- **Branch protection is not in force** (OPEN-020). Measured 2026-08-22: both the rulesets API and the
+  classic branch-protection API return HTTP 403 — "Upgrade to GitHub Pro or make this repository
+  public" — for a private repository on a free personal account. CI runs on every push and pull request
+  and reports honestly; it cannot block a merge. The pre-tool-use hook runs only inside an agent session
+  on this machine and is silent in a plain terminal.
+- **The Claude review workflows have no token.** `CLAUDE_CODE_OAUTH_TOKEN` is not set as a repository
+  secret, so `claude-review` fails rather than passing quietly — which is the intended failure mode, and
+  still a failure.
