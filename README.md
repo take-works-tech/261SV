@@ -11,7 +11,7 @@ FEA/CFD resultファイルを読み込み、形状、単位付き数値、グラ
 - `src/`: 現在のwalking-skeleton実装
 - `tests/`: 実装と開発環境ゲートのテスト
 - `mockups/ui/`: 新仕様の全画面状態を切り替えて確認するNext.js UIモックアップ
-- `validate/`: 仕様、境界、重複、コンテキスト予算、ゲート配線の検査
+- `validate/`: 仕様、境界、重複、依存バージョン、コンテキスト予算、ゲート配線の検査
 - `spike/`: 技術判断のための測定コードと記録
 - `archive/`: 旧ルート実装と非公開ローカル資料（Git対象外）
 
@@ -32,9 +32,14 @@ python -m venv .venv
 .\.venv\Scripts\python.exe validate\check_commands.py
 .\.venv\Scripts\python.exe validate\check_constant_duplication.py
 .\.venv\Scripts\python.exe validate\check_context_budget.py
+.\.venv\Scripts\python.exe validate\check_dependency_pins.py
 .\.venv\Scripts\python.exe validate\check_gates_wired.py
 .\.venv\Scripts\python.exe -m pytest tests
 ```
+
+同じ7つのゲートとテストが `.github/workflows/ci.yml` で走ります。VTKが入っていない環境では
+readerテストはスキップされ、その理由を表示します。CIは `SIM_VIEWER_REQUIRE_VTK=1` を設定するため、
+そこではスキップが失敗になります — 走らなかったテストを成功として数えないためです。
 
 UIモックアップは次のコマンドで起動します。
 

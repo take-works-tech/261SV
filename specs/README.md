@@ -33,7 +33,7 @@ Index. The always-loaded layer points here and nowhere else; every body below is
 
 ## Gates
 
-Six run in the build, and each says what it could **not** check rather than letting silence read as
+Seven run in the build, and each says what it could **not** check rather than letting silence read as
 coverage:
 
 | Gate | Checks |
@@ -43,6 +43,7 @@ coverage:
 | `validate/check_commands.py` | the operation catalogue against its schema, prose references, and shared-component uniqueness (XC-127) |
 | `validate/check_constant_duplication.py` | the same constant defined in two files: contradictions, and copies that will become contradictions |
 | `validate/check_context_budget.py` | the instruction layer paid on every turn - CLAUDE.md and what it imports, AGENTS.md, rules, output styles - and the path-scoped layer, both charged |
+| `validate/check_dependency_pins.py` | declared dependency versions against the manifests that pin them, in both directions - check 7 compares `SYMBOL = literal` in source files, and a pin inside a TOML array matches nothing it looks at (XC-185) |
 | `validate/check_gates_wired.py` | every validator here is invoked by something that runs it |
 
 ## Format
