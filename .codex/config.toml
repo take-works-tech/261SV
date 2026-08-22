@@ -8,11 +8,18 @@
 # Skills use the Agent Skills `SKILL.md` format, which both tools read. The body lives in
 # `.agents/skills/spec-authoring/` where Codex looks, and `.claude/skills/spec-authoring/SKILL.md` is a
 # pointer to it rather than a second copy. Codex resolves project skills from ~/.codex/skills, so link
-# it once per machine:
+# it once per machine - and check afterwards that what you made is a link:
 #
 #   ln -s "$PWD/.agents/skills/spec-authoring" ~/.codex/skills/spec-authoring              # macOS, Linux
-#   New-Item -ItemType SymbolicLink ~\.codex\skills\spec-authoring `
-#            -Target .agents\skills\spec-authoring                                          # Windows
+#
+#   cmd /c mklink /J "$HOME\.codex\skills\spec-authoring" ^
+#          "<repo>\.agents\skills\spec-authoring"                                           # Windows
+#
+# On Windows use the junction. `ln -s` under Git Bash **silently copies the directory** when symlink
+# creation is not permitted, and a copy is the exact failure D-25 exists to prevent: two sets of the
+# same instructions that agree today and tell the two agents different things later. Verify with
+# `test -L`, or `(Get-Item <path>).LinkType`, which must read `Junction` or `SymbolicLink` - not a
+# plain directory. A junction needs no administrator rights.
 #
 # `model` is deliberately not pinned: Codex ships its own current default, and a stale pin silently
 # downgrades every session.
