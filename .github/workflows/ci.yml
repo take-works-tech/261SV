@@ -76,7 +76,7 @@ jobs:
     # component that does not exist is how a screen state silently stops being demonstrable.
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
