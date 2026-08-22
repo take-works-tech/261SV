@@ -101,3 +101,33 @@ OPEN-020, with the ruleset already written and rejected only by the plan.
 This repository publishes to `take-works-tech/202604-sim-analysis-visualization`, private, and nowhere
 else (XC-186). The guard enforces the remote by name, and `tests/test_environment_gates.py` proves the
 guard can still fail — a guard nobody has watched fail is a guard nobody should trust.
+
+### If a push is rejected only when it touches `.github/workflows/`
+
+```
+! [remote rejected] main -> main (refusing to allow a Personal Access Token to create or
+  update workflow .github/workflows/... without `workflow` scope)
+```
+
+The cause is not the repository. **A `GITHUB_TOKEN` in the environment overrides whatever `gh auth
+login` stored**, and a personal access token issued with only `repo` scope cannot write a workflow
+file. Everything else keeps working, so the mismatch stays invisible until the day a workflow changes
+— which is why it reads as a sudden permissions failure rather than as a setting somebody chose.
+
+Check which credential is actually in use, and what it can do:
+
+```bash
+gh auth status          # the account marked "Active account: true" is the one git will use
+```
+
+If the active row says `(GITHUB_TOKEN)` and its scopes lack `workflow`, the fix is to stop injecting
+it, not to weaken the push. `gh auth refresh` cannot help: it will not modify a token supplied through
+the environment. On Windows the variable is usually at User scope:
+
+```powershell
+[Environment]::SetEnvironmentVariable('GITHUB_TOKEN', $null, 'User')   # then open a new terminal
+```
+
+`gh` then falls back to the credential it stored itself, which `gh auth login` gives the `workflow`
+and `read:org` scopes this repository needs. For a single command without changing anything:
+`env -u GITHUB_TOKEN git push`.
