@@ -2488,6 +2488,31 @@ model or the prompt, never in a description that quietly went stale.
 - resolve_by: the first study a customer runs that the limit refuses
 - decidedness: Open
 
+### XC-188 - A check that cannot pass is turned off, never made to pass
+- decided: 2026-08-22
+- status: active
+- decision: the automated Claude review and the `@claude` interaction workflow do not trigger on a
+  pull request. Both keep their files, their prompts and their guards, and both remain runnable by
+  hand through `workflow_dispatch`. A pull request is therefore judged by CI alone: `repository gates`,
+  `tests` and `mockup catalogue typecheck`
+- decided_by: the product owner, 2026-08-22, deferring CLAUDE_CODE_OAUTH_TOKEN
+- basis: E-001 (T1)
+- why: with no token the review job failed on every pull request. That is the correct failure mode -
+  a review that did not happen must not report success - and it is the wrong thing to leave on a
+  screen. **A check that is red for a reason unrelated to the change teaches everyone to read red as
+  normal**, which is precisely how the next real failure gets waved through. The same argument the
+  spec model makes about a linter that is normally red (6.5)
+- what_was_not_done: the job was not given a "skip when the secret is absent" branch. That version
+  reports success for a review nobody received, which is the one outcome worse than a visible failure
+- alternatives: deleting the workflows loses the review prompt, the model policy and the
+  silent-success guard, and re-creating them later is a design session rather than a two-line change;
+  `gh workflow disable` turns them off invisibly, so a reader of the repository would believe reviews
+  run - the "looks enforced and is not" state this project keeps finding and refusing
+- affects: .github/workflows/claude-code-review.yml, .github/workflows/claude.yml, CONTRIBUTING.md
+- decidedness: Fixed
+- reversal_trigger: `CLAUDE_CODE_OAUTH_TOKEN` is set as a repository secret, at which point the
+  commented triggers in both files are restored and this decision is superseded rather than deleted
+
 ### XC-187 - A colour, a size or a duration has one definition, and roles are layered
 - decided: 2026-08-22
 - status: active

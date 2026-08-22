@@ -79,6 +79,9 @@ itself — `pyproject.toml` reads 0.0.1 and will until there is something to ins
   public" — for a private repository on a free personal account. CI runs on every push and pull request
   and reports honestly; it cannot block a merge. The pre-tool-use hook runs only inside an agent session
   on this machine and is silent in a plain terminal.
-- **The Claude review workflows have no token.** `CLAUDE_CODE_OAUTH_TOKEN` is not set as a repository
-  secret, so `claude-review` fails rather than passing quietly — which is the intended failure mode, and
-  still a failure.
+- **A pull request is judged by CI alone** (XC-188). `CLAUDE_CODE_OAUTH_TOKEN` is deferred, so the
+  Claude review and `@claude` workflows no longer trigger on a pull request — they keep their prompts
+  and guards and run only by hand. They were not given a skip-when-absent branch: that reports success
+  for a review nobody received. Merging still depends on a person, because branch protection is
+  unavailable (OPEN-020); what changed is that the three CI checks are now the only ones shown, and a
+  red check again means something about the change.

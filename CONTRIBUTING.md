@@ -53,6 +53,20 @@ What none of them can see is a **semantic contradiction between two prose statem
 disagree in words remain a job for a reader. Saying so is better than implying the gate set is
 complete.
 
+## What decides whether a pull request can merge
+
+The three CI jobs — `repository gates`, `tests`, `mockup catalogue typecheck` — and nothing else.
+The automated Claude review does not run on a pull request (XC-188): with no token it failed on every
+one, and a check that is red for a reason unrelated to the change teaches everyone to read red as
+normal. It still runs by hand:
+
+```bash
+gh workflow run claude-code-review.yml -f pull_request_number=<n>
+```
+
+**Nothing enforces this.** Branch protection is unavailable on this plan (OPEN-020), so a red pull
+request can still be merged by anyone who chooses to. The checks tell you; they do not stop you.
+
 ## Evidence
 
 A number without a source is not a finding. Every Fixed value cites an entry in `evidence/sources.md`

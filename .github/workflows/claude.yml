@@ -2,23 +2,37 @@ name: claude
 # Interactive workflow, triggered by an @claude mention in an issue, a pull-request comment or a
 # review. Uses the same subscription token as the review workflow.
 
+# --- CURRENTLY OFF (XC-188) --------------------------------------------------------------------
+# Off for the same reason as the review workflow: CLAUDE_CODE_OAUTH_TOKEN is not set, so an @claude
+# mention would start a run that cannot authenticate. This one never posted a pull-request check, so
+# it was not making anything look red - but a mention that silently does nothing is its own kind of
+# broken, and leaving it armed means the first person to try it learns that the wrong way.
+#
+# To turn it back on, set the secret and restore the commented triggers below.
+#
+#  on:
+#    issue_comment:
+#      types: [created]
+#    pull_request_review_comment:
+#      types: [created]
+#    issues:
+#      types: [opened, assigned]
+#    pull_request_review:
+#      types: [submitted]
+
 on:
-  issue_comment:
-    types: [created]
-  pull_request_review_comment:
-    types: [created]
-  issues:
-    types: [opened, assigned]
-  pull_request_review:
-    types: [submitted]
+  workflow_dispatch:
 
 jobs:
   claude:
-    if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+    # The @claude mention filter belongs to the comment and issue triggers above. Kept with them,
+    # commented out, rather than left here evaluating against an event that no longer fires:
+    #
+    #   if: |
+    #     (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+    #     (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+    #     (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+    #     (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
