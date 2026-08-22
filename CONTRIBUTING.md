@@ -105,7 +105,7 @@ OPEN-020, with the ruleset already written and rejected only by the plan.
 
 ## Publishing
 
-This repository publishes to `take-works-tech/202604-sim-analysis-visualization`, private, and nowhere
+This repository publishes to `take-works-tech/261SV`, private, and nowhere
 else (XC-186). The guard enforces the remote by name, and `tests/test_environment_gates.py` proves the
 guard can still fail — a guard nobody has watched fail is a guard nobody should trust.
 

@@ -2452,11 +2452,19 @@ model or the prompt, never in a description that quietly went stale.
 - decided: 2026-08-22
 - status: active
 - decision: the repository is published to
-  `take-works-tech/202604-sim-analysis-visualization`, private, and to nowhere else. Pushing, adding a
+  `take-works-tech/261SV`, private, and to nowhere else. Pushing, adding a
   remote and creating a repository are permitted for that one target; force-push, hard reset, rebase
   and history rewriting are refused, because the record of a correction is part of this project's
   deliverable. `.claude/hooks/local_only_guard.py` enforces the remote name, and
   `tests/test_environment_gates.py` proves the guard can still fail
+- renamed: 2026-08-22, from `take-works-tech/202604-sim-analysis-visualization`, by the product owner.
+  The decision is unchanged - one named repository, private, and nowhere else - and only the name it
+  names has moved. **The old name is not an alias.** GitHub serves a redirect from it, and the guard
+  deliberately does not accept it: a redirect is a convenience GitHub may withdraw, and the old name is
+  now free for anyone to claim, at which point a push aimed at it would reach a stranger's repository
+  rather than failing. The remote was repointed explicitly for the same reason. The local working
+  directory is renamed separately and by hand, because a session cannot rename the directory it is
+  running inside
 - enforcement: **client-side only, and this is a real gap rather than a design choice.** Measured
   2026-08-22: both the rulesets API and the classic branch-protection API return HTTP 403,
   "Upgrade to GitHub Pro or make this repository public", because the repository is private under a

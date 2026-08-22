@@ -35,7 +35,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 # The one repository this project publishes to (XC-181). Written here rather than read from
 # `git remote` so that a wrong remote is refused instead of being adopted as the definition.
-AUTHORISED_REMOTE = "take-works-tech/202604-sim-analysis-visualization"
+AUTHORISED_REMOTE = "take-works-tech/261SV"
 
 FORBIDDEN_COMMANDS = (
     (

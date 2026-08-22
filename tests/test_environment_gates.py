@@ -421,7 +421,7 @@ class TestLocalOnlyGuard:
             guard(
                 "Bash",
                 command="git remote add origin "
-                "https://github.com/take-works-tech/202604-sim-analysis-visualization.git",
+                "https://github.com/take-works-tech/261SV.git",
             ).returncode
             == 0
         )
@@ -445,7 +445,7 @@ class TestLocalOnlyGuard:
             "git push " + "-f origin main",
             "git re" + "set --hard HEAD~3",
             "git filter-" + "branch --tree-filter true HEAD",
-            "gh repo dele" + "te take-works-tech/202604-sim-analysis-visualization",
+            "gh repo dele" + "te take-works-tech/261SV",
         ],
     )
     def test_history_destroying_commands_are_refused(self, command: str) -> None:

@@ -80,7 +80,7 @@ ran. Every gate in `validate/` runs in `.github/workflows/ci.yml`, and
 
 ## Working agreements
 
-- **One remote, named** (XC-186): `take-works-tech/202604-sim-analysis-visualization`, private. Pushing
+- **One remote, named** (XC-186): `take-works-tech/261SV`, private. Pushing
   there is authorised; any other repository is not. Force-push, hard reset, rebase and history rewriting
   are refused - the record of a correction is part of what this project ships.
 - Edits stay inside this directory.

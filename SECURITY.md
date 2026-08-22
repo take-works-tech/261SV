@@ -3,7 +3,7 @@
 ## Reporting
 
 Open a private advisory:
-<https://github.com/take-works-tech/202604-sim-analysis-visualization/security/advisories/new>
+<https://github.com/take-works-tech/261SV/security/advisories/new>
 
 Never open a public issue for a vulnerability, and **never attach a result file**. If a defect depends
 on the contents of a customer's data, describe its shape instead — counts, field names, associations,

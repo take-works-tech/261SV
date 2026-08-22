@@ -7,7 +7,7 @@
     "session, and so that the claim 'the ruleset is written' can be checked rather than believed.",
     "",
     "Apply with:",
-    "  gh api -X POST repos/take-works-tech/202604-sim-analysis-visualization/rulesets \\",
+    "  gh api -X POST repos/take-works-tech/261SV/rulesets \\",
     "         --input .github/ruleset-main.json",
     "",
     "required_approving_review_count is 0 deliberately. There is one maintainer, and GitHub does not",
