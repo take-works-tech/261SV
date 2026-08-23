@@ -1469,20 +1469,24 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
    picture cannot be searched, read aloud or quoted in a specification. */
 .visual-options-field { display: flex; flex-direction: column; gap: 5px; }
 .visual-options-label { color: var(--muted-ink); font-size: var(--text-body); }
-.visual-options { display: grid; grid-template-columns: repeat(var(--visual-option-columns, 3), minmax(0, 1fr)); gap: 5px; }
-.visual-option { display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-width: 0; border: 1px solid var(--line); border-radius: 7px; background: var(--card); padding: 5px; color: var(--muted-ink); font-size: var(--text-caption); text-align: center; }
+/* XC-223: the picture is the content, so nothing between it and the tile edge. The tile used to carry
+   5px of padding on every side plus a 1px border - at four columns in a 286px rail that is a fifth of
+   the sample's width spent on air. The label is padded; the sample is not. */
+.visual-options { display: grid; grid-template-columns: repeat(var(--visual-option-columns, 3), minmax(0, 1fr)); gap: 4px; }
+.visual-option { display: flex; flex-direction: column; align-items: stretch; min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--card); padding: 0; color: var(--muted-ink); font-size: var(--text-caption); text-align: center; }
 .visual-option:hover { border-color: #b7c6cf; }
 .visual-option.active { border-color: var(--blue); background: var(--blue-soft); color: var(--blue); }
-.visual-option small { overflow: hidden; font-size: var(--text-caption); font-weight: var(--weight-bold); text-overflow: ellipsis; white-space: nowrap; }
-.visual-option-sample { display: block; overflow: hidden; border-radius: 4px; background: #f2f6f8; }
+.visual-option small { overflow: hidden; padding: 3px 3px 4px; font-size: var(--text-caption); font-weight: var(--weight-bold); text-overflow: ellipsis; white-space: nowrap; }
+.visual-option-sample { display: block; overflow: hidden; background: #f2f6f8; }
 .visual-option.active .visual-option-sample { background: #ffffff; }
 .option-sample-svg { width: 100%; height: auto; display: block; aspect-ratio: 48 / 32; fill: #3f5866; stroke: #3f5866; }
 .option-sample-svg [fill="none"] { fill: none; }
 .visual-option.active .option-sample-svg { fill: var(--blue); stroke: var(--blue); }
-.option-sample-band { display: block; width: 100%; aspect-ratio: 48 / 32; border-radius: 4px; }
-.option-sample-strip { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; overflow: hidden; width: 100%; aspect-ratio: 48 / 32; border-radius: 4px; }
+.option-sample-band { display: block; width: 100%; aspect-ratio: 48 / 32; }
+.option-sample-strip { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; overflow: hidden; width: 100%; aspect-ratio: 48 / 32; }
 .option-sample-strip i { display: block; }
 .palette-readout { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.palette-readout .option-sample-strip, .palette-readout .option-sample-band { border-radius: 4px; }
 .palette-readout .option-sample-strip { width: 54px; flex: 0 0 54px; }
 .palette-readout small { overflow: hidden; color: var(--muted-ink); font-size: var(--text-caption); text-overflow: ellipsis; }
 .font-specimen { overflow: hidden; border: 1px solid var(--line); border-radius: 5px; background: var(--card); padding: 5px 7px; color: var(--ink); font-size: var(--text-emphasis); text-overflow: ellipsis; white-space: nowrap; }
