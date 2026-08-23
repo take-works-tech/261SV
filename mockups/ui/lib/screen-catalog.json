@@ -537,6 +537,14 @@
       "href": "?screen=graph&variant=output-preflight"
     },
     {
+      "id": "graph.series",
+      "screen": "graph",
+      "variant": "series",
+      "label": "グラフ・系列",
+      "intent": "11_ui.md・XC-221。系列ごとに、描く数量と見え方を1行で設定する。見え方の既定はテーマにあり、系列はテーマの見本を第一選択として持つ。",
+      "href": "?screen=graph&variant=series"
+    },
+    {
       "id": "graph.series-unresolved",
       "screen": "graph",
       "variant": "series-unresolved",
