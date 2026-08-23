@@ -3197,3 +3197,32 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a fourth editing area whose first section is not an item, which would make the
   shared icon a claim about something it is not
+
+### XC-209 - The canvas carries no split chrome at all; the split's own two facts are in its menu
+- decided: 2026-08-23
+- status: active
+- decision: the 3D canvas shows no split control or caption at **any** pane count. The strip that used
+  to appear once the canvas was divided is removed, and the two things in it that existed nowhere else
+  move into the work area bar's layout menu, shown only while `panes > 1`: the statement that the split
+  is session state and is not saved, and the action `この比較を保存`. The dialogue that action opens is
+  unchanged; only its trigger and its open state move
+- decided_by: the product owner, 2026-08-23
+- rationale: of the strip's parts, `3画面` repeated the bar's own button, `1画面に戻す` repeated the
+  menu's first item, `カメラ同期はオンです` repeated a checked item in the same menu, and the sentence
+  telling the reader to click a pane's badge described a dropdown trigger that already draws a chevron.
+  Four of six parts were a second rendering of a control one row above, and the two that were not are
+  the ones worth keeping. A caption band over the picture is the most expensive place in this product to
+  restate something
+- correction: XC-204 removed the strip at one pane and kept it once split, on the reasoning that what it
+  said only made sense once divided. That was true of two of its parts and false of the other four -
+  they made sense at any pane count and were already on screen. The placement rule XC-204 established,
+  that the layout belongs to the area bar and the picture to the canvas, is unchanged; this carries it
+  the rest of the way
+- alternatives: keeping a one-line `保存されません` caption on the canvas keeps the warning in view
+  without a click, at the cost of a permanent band over the picture for a state the bar already shows by
+  reading `3画面`; the export path states the same thing where it decides something (XC-202)
+- basis: E-121 (T1)
+- affects: 11_ui.md
+- decidedness: Fixed
+- reversal_trigger: a user exporting a split believing it reproducible, which would mean the statement
+  needs to be in view rather than in the menu that sets it

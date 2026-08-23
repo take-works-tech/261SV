@@ -474,7 +474,10 @@ def test_simulation_view_graph_report_headers_offer_only_named_new_item_creation
     assert "テンプレートとして保存" in item_menu, "the secondary save-as-template command is missing"
     assert "このワークスペース" in page and "共有" in page, "saving a template must offer its scope (GL-019)"
     assert "<FolderOpen" not in header
-    assert "<Save" not in header
+    # XC-148 bars a save action as *persistent chrome*; inside a dropdown it is a secondary command,
+    # which is where both テンプレートとして保存 and この比較を保存 (XC-209) live
+    chrome = re.sub(r"<DropdownMenuContent[\s\S]*?</DropdownMenuContent>", "", header)
+    assert "<Save" not in chrome
     assert "TemplateBar" not in page
     assert 'className="work-area-bar"' in header
     assert ".work-area-bar" in styles
@@ -1316,7 +1319,9 @@ def test_split_view_names_the_case_in_each_pane_and_offers_camera_synchronisatio
     assert 'className="view-pane-subject"' in page
     assert 'className="view-pane-camera"' not in page
     assert "カメラ同期" in page
-    assert "各画面のケースとカメラは、画面上部の表示をクリックして選びます。" in page
+    # the pane badge is the control, and it is a dropdown trigger rather than a label, so no sentence
+    # on the canvas has to say it can be clicked (XC-209)
+    assert "各画面のケースとカメラは、画面上部の表示をクリックして選びます。" not in page
 
 
 def test_the_three_viewport_carries_one_mock_label_and_shares_names_with_the_outliner() -> None:
@@ -1431,7 +1436,7 @@ def test_a_view_holds_several_named_cameras_each_storing_its_rule() -> None:
     # a pane's camera is session state, chosen on the canvas, so it is not a member of the saved item
     assert "paneCameraIds" not in page
     assert "const [paneBindings, setPaneBindings] = useState" in page
-    assert "各画面のケースとカメラは、画面上部の表示をクリックして選びます。" in page
+    assert 'className="view-pane-subject"' in page
 
 
 def test_result_bookmarks_resolve_per_case_snap_to_a_stored_position_and_say_so() -> None:
@@ -1633,11 +1638,10 @@ def test_the_layout_control_sets_the_arrangement_and_nothing_else_does() -> None
     assert page.count("onSplitPanesChange(count)") == 1
     assert 'aria-label="画面レイアウト"' in page
     assert "work-area-split" in page
-    assert page.count("カメラ同期") == 2  # the menu item, and the canvas note that states its state
-    # the canvas says only what makes sense once split
-    assert "{!isComparisonItem && panes > 1 && <div className=\"pane-grid-controls\">" in page
-    assert "この分割は保存されません" in page
-    assert "1画面に戻す" in page
+    assert page.count("カメラ同期") == 1  # the menu item; the canvas states nothing (XC-209)
+    # what only makes sense once split is in the same menu, behind a guard, not on the canvas (XC-209)
+    assert "{splitPanes > 1 && <>" in page
+    assert "この分割はセッションの状態で、保存されません。" in page
 
 
 def test_the_layout_control_does_not_vanish_between_the_two_kinds_of_view_item() -> None:
@@ -1756,17 +1760,24 @@ def test_a_saved_result_position_can_be_created_on_the_axis_it_indexes() -> None
     assert "onBookmarksChange" in page
 
 
-def test_the_canvas_carries_no_split_chrome_until_it_is_split() -> None:
-    """XC-204: a permanent strip of buttons over the 3D picture is chrome for something rarely used;
-    at one pane the canvas shows the picture and nothing else."""
+def test_the_canvas_carries_no_split_chrome_at_any_pane_count() -> None:
+    """XC-209: the strip that appeared once split repeated the area bar four ways - the pane count, the
+    camera sync, the way back to one pane, and a sentence teaching that a dropdown trigger can be
+    clicked. Only two of its parts were unique, and they are in the bar's menu."""
     page = CHAT_PAGE.read_text(encoding="utf-8")
+    styles = CHAT_STYLES.read_text(encoding="utf-8")
 
+    assert "pane-grid-controls" not in page and "pane-grid-controls" not in styles
+    assert "pane-session-note" not in page and "pane-session-note" not in styles
+    assert "1画面に戻す" not in page
     assert "panes === 1 ? 'compact' : ''" not in page
-    assert "画面を分けると、ケースとカメラを画面ごとに選べます。" not in page
-    # every split element on the canvas sits behind the same `panes > 1` guard
-    canvas = page[page.index("{!isComparisonItem && panes > 1"):page.index("{comparisonGrid && <div")]
-    assert "この分割は保存されません" in canvas
-    assert "この比較を保存" in canvas
+    # the two facts unique to a split are in the layout menu, behind the same guard
+    menu = page[page.index("{splitPanes > 1 && <>"):page.index("</> : <>")]
+    assert "onSelect={onPromoteSplit}" in menu
+    assert "この分割はセッションの状態で、保存されません。" in menu
+    # the dialogue it opens is the canvas's, so its open state is the shell's
+    assert "const [splitPromoteOpen, setSplitPromoteOpen] = useState(false)" in page
+    assert "{promoteOpen && <Dialog open onOpenChange={onPromoteOpenChange}>" in page
 
 
 def test_a_comparison_grid_sets_its_columns_and_derives_its_rows() -> None:

@@ -1314,12 +1314,10 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .run-outcome-refused b { color: var(--amber); }
 
 /* --- View: per-pane case identity and camera synchronisation ------------------------------------- */
-.pane-grid-controls { display: flex; align-items: center; gap: 8px; min-width: 0; padding-right: 2px; }
+.comparison-bar { display: flex; align-items: center; gap: 8px; min-width: 0; padding-right: 2px; }
 /* The instruction takes the slack so the "not saved" note keeps its place at the end of the bar. */
-.pane-grid-controls > small:first-of-type { overflow: hidden; flex: 1 1 auto; min-width: 0; text-overflow: ellipsis; white-space: nowrap; }
-.pane-grid-controls button { display: flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); padding: 4px 8px; color: var(--muted-ink); font-size: var(--text-body); font-weight: var(--weight-bold); }
-.pane-grid-controls button.active { border-color: var(--blue); background: var(--blue-soft); color: var(--blue); }
-.pane-grid-controls small { color: var(--muted-ink); font-size: var(--text-body); }
+.comparison-bar > small:first-of-type { overflow: hidden; flex: 1 1 auto; min-width: 0; text-overflow: ellipsis; white-space: nowrap; }
+.comparison-bar small { color: var(--muted-ink); font-size: var(--text-body); }
 .view-pane-subject { max-width: calc(100% - 210px); position: absolute; z-index: 4; top: 8px; left: 50%; display: flex; align-items: center; gap: 6px; overflow: hidden; border: 1px solid rgb(255 255 255 / 14%); border-radius: 5px; background: rgb(9 17 22 / 72%); padding: 3px 8px; color: rgb(255 255 255 / 88%); font-size: var(--text-body); font-weight: var(--weight-bold); transform: translateX(-50%); backdrop-filter: blur(5px); }
 .view-pane-subject > span { display: flex; align-items: center; gap: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .view-pane-subject > span:last-child { color: rgb(255 255 255 / 70%); font-weight: var(--weight-regular); }
@@ -1454,9 +1452,6 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .comparison-member b { flex: 1; min-width: 0; overflow: hidden; font-size: var(--text-body); text-overflow: ellipsis; white-space: nowrap; }
 .comparison-member button { display: grid; place-items: center; flex: 0 0 auto; border: 0; border-radius: 4px; background: transparent; padding: 2px; color: var(--muted-ink); }
 .comparison-member button:disabled { opacity: .35; }
-.pane-promote { flex: 0 0 auto; }
-.pane-session-note { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; white-space: nowrap; border: 1px solid var(--line); border-radius: 6px; background: var(--soft); padding: 3px 8px; color: var(--muted-ink); font-size: var(--text-caption); font-weight: var(--weight-bold); }
-.pane-close-split { flex: 0 0 auto; }
 /* XC-204: the split control sits in the area bar, at the size of the other session controls there. */
 .work-area-split { display: flex; align-items: center; gap: 5px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 7px; background: var(--card); padding: 5px 8px; color: var(--muted-ink); font-size: var(--text-body); font-weight: var(--weight-bold); }
 .work-area-split.active { border-color: var(--blue); background: var(--blue-soft); color: var(--blue); }
