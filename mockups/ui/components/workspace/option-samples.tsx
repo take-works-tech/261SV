@@ -22,6 +22,9 @@ export type SampleKind =
   | 'background'
   | 'representation'
   | 'grade'
+  | 'colormap'
+  | 'viewdir'
+  | 'glyph'
 
 const palettes: Record<string, string[]> = {
   accessible: ['#2f6df6', '#e8710a', '#12876f', '#8c4bd8', '#c62b5b'],
@@ -37,6 +40,47 @@ const gradeStops: Record<string, string> = {
   technicalDocument: 'linear-gradient(90deg, #1b242b, #8497a2, #ffffff)',
   presentation: 'linear-gradient(90deg, #0b1116, #6d8494, #f6fbfd)',
   photoreal: 'linear-gradient(90deg, #14100d, #86776a, #fdf7ee)',
+}
+
+// XC-223: a colour map named by a word is the case the measurement is most pointed about - ParaView
+// ships `pqPresetToPixmap` for exactly this, and a wrong colour map is a wrong picture rather than an
+// ugly one. The stops are the mockup's samples of well-known maps, not a shipped table.
+const colourMaps: Record<string, string> = {
+  technical: 'linear-gradient(90deg, #2166ac, #67a9cf, #f7f7f7, #ef8a62, #b2182b)',
+  viridis: 'linear-gradient(90deg, #440154, #3b528b, #21918c, #5ec962, #fde725)',
+  grayscale: 'linear-gradient(90deg, #000000, #808080, #ffffff)',
+  coolwarm: 'linear-gradient(90deg, #3b4cc0, #dddddd, #b40426)',
+  inferno: 'linear-gradient(90deg, #000004, #781c6d, #ed6925, #fcffa4)',
+}
+
+function ViewDirectionSample({ value }: { value: string }) {
+  // A cube seen from the named direction: the face that is toward the reader is filled.
+  const front = <path d="M14 10 L34 10 L34 24 L14 24 Z" />
+  const top = <path d="M14 10 L20 5 L40 5 L34 10 Z" />
+  const side = <path d="M34 10 L40 5 L40 19 L34 24 Z" />
+  const outline = <path d="M14 10 L20 5 L40 5 L40 19 L34 24 L14 24 Z M14 10 L34 10 L34 24 M34 10 L40 5" fill="none" strokeWidth="1.2" />
+  const dim = (node: React.ReactNode) => <g opacity=".18">{node}</g>
+  if (value === 'top') return <Frame>{dim(front)}{dim(side)}{top}{outline}</Frame>
+  if (value === 'right' || value === 'side') return <Frame>{dim(front)}{dim(top)}{side}{outline}</Frame>
+  if (value === 'isometric' || value === 'saved') return <Frame><g opacity=".5">{front}{top}{side}</g>{outline}</Frame>
+  return <Frame>{dim(top)}{dim(side)}{front}{outline}</Frame>
+}
+
+function GlyphSample({ value }: { value: string }) {
+  const at = [[10, 22], [22, 16], [34, 10]]
+  if (value === 'line') {
+    return <Frame>{at.map(([x, y]) => <path key={x} d={`M${x} ${y + 5} L${x + 8} ${y - 5}`} fill="none" strokeWidth="1.8" strokeLinecap="round" />)}</Frame>
+  }
+  return (
+    <Frame>
+      {at.map(([x, y]) => (
+        <g key={x}>
+          <path d={`M${x} ${y + 5} L${x + 6} ${y - 3}`} fill="none" strokeWidth="1.6" strokeLinecap="round" />
+          <path d={`M${x + 8} ${y - 5} L${x + 3.4} ${y - 3.2} L${x + 5.6} ${y + 0.4} Z`} />
+        </g>
+      ))}
+    </Frame>
+  )
 }
 
 function Frame({ children, tone = 'light' }: { children: React.ReactNode; tone?: 'light' | 'dark' }) {
@@ -206,6 +250,11 @@ export function OptionSample({ kind, value }: { kind: SampleKind; value: string 
     }
     return <span className="option-sample-band" aria-hidden="true" style={{ background: fills[value] ?? fills.light }} />
   }
+  if (kind === 'colormap') {
+    return <span className="option-sample-band" aria-hidden="true" style={{ background: colourMaps[value] ?? colourMaps.technical }} />
+  }
+  if (kind === 'viewdir') return <ViewDirectionSample value={value} />
+  if (kind === 'glyph') return <GlyphSample value={value} />
   if (kind === 'chart' || kind === 'surface') return <ChartSample value={value} />
   if (kind === 'line') return <LineSample value={value} />
   if (kind === 'marker') return <MarkerSample value={value} />

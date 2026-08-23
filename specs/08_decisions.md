@@ -3632,3 +3632,31 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a third meaning for one of these names, which would mean the rail has outgrown a
   flat set of labels
+
+### XC-223 - The picture is the content, so nothing is spent on air around it
+- decided: 2026-08-23
+- status: active
+- decision: two rules, both about making the visible thing visible.
+  **Anything the product can show, it shows.** XC-215 covered choices about appearance; this extends it
+  to every subject that has a picture, whether or not the setting is about styling. A **colour map** is
+  chosen from its gradient, wherever one is chosen - the scalar object's map and the material editor's
+  preset alike. A **view direction** is a cube seen from that direction. A **glyph** is its shape. A
+  **typeface** is rendered in itself, in Graph as it already was in Report. An **applied style asset**
+  shows the palette and background it applies. Non-visual settings stay as text (XC-215).
+  **No chrome between the sample and the tile edge.** A sample fills its tile: the tile carries no
+  padding, only the label beneath it does, and the tile clips the sample to its own radius. At four
+  columns in a 286-pixel rail the old five pixels of padding on each side, plus the border, spent about
+  a fifth of every sample's width on air
+- decided_by: the product owner, 2026-08-23
+- rationale: the owner asked for both together, and they are one point: a picture that is drawn small
+  teaches less than a picture, and the padding was not protecting anything - the tile already has a
+  border and a gap between tiles. The colour map is the case the measurement is most pointed about:
+  ParaView ships `pqPresetToPixmap` whose only purpose is rendering a map into an image for the chooser
+  (E-128), and in this product a wrong colour map is a wrong picture rather than an ugly one
+- alternatives: keeping a little padding reads as tidier at rest and costs the sample the width it is
+  there to use; the border and the four-pixel gap already separate one tile from the next
+- basis: E-128 (T1), E-120 (T1), E-121 (T1)
+- affects: 11_ui.md
+- decidedness: Fixed
+- reversal_trigger: a sample whose own edges are meaningful and read as clipped against the tile, which
+  would need padding on that kind alone rather than on all of them

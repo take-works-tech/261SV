@@ -2464,6 +2464,8 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
   const [chartKind, setChartKind] = useState('line')
   const [palette, setPalette] = useState('accessible')
   const [chartBackground, setChartBackground] = useState('light')
+  const [graphFont, setGraphFont] = useState('workspace')
+  const [viewDirection, setViewDirection] = useState('saved')
   const [defaultMarker, setDefaultMarker] = useState('circle')
   const [defaultWidth, setDefaultWidth] = useState('2')
   const [seriesLine, setSeriesLine] = useState('solid')
@@ -2505,7 +2507,8 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
     </PropertyGroup>
     {dimension === '3d' && <PropertyGroup title="投影">
       <label><span>投影</span><select defaultValue="perspective"><option value="perspective">透視投影</option><option value="orthographic">平行投影</option></select></label>
-      <label><span>視線</span><select defaultValue="saved"><option value="saved">保存済み</option><option value="isometric">等角</option><option value="front">正面</option><option value="top">上</option></select></label>
+      <VisualOptions label="視線" kind="viewdir" columns={4} value={viewDirection} onChange={setViewDirection}
+        options={[{ value: 'saved', label: '保存済み' }, { value: 'isometric', label: '等角' }, { value: 'front', label: '正面' }, { value: 'top', label: '上' }]} />
     </PropertyGroup>}
     <p className="property-editor-note"><ChartNoAxesCombined size={12} />種類を変えても数量の参照と単位互換性の検証は維持されます。</p>
     <PropertyGroup title="構成">
@@ -2600,6 +2603,7 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
       {/* XC-216: the rail says which library resource is in effect; the shelf is where one is chosen.
           The field was called アセット here and スタイル in Report - one name for one thing. */}
       <label><span>適用中</span><select defaultValue="technical"><option value="technical">技術資料・標準</option><option value="workspace">ワークスペース設定</option></select></label>
+      <label><span>見本</span><span className="palette-readout"><OptionSample kind="palette" value={palette} /><OptionSample kind="background" value={chartBackground} /></span></label>
       <VisualOptions label="配色" kind="palette" columns={3} value={palette} onChange={setPalette}
         options={[{ value: 'accessible', label: '識別性優先' }, { value: 'monochrome', label: 'モノクロ' }, { value: 'print', label: '印刷向け' }]} />
       <VisualOptions label="背景" kind="background" columns={3} value={chartBackground} onChange={setChartBackground}
@@ -2618,7 +2622,8 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
       <p className="property-editor-note"><ShieldCheck size={12} />各系列は既定のまま描かれ、系列タブで「テーマ」以外を選んだ系列だけがそこを上書きします。</p>
     </PropertyGroup>
     <PropertyGroup title="書体">
-      <label><span>フォント</span><select defaultValue="workspace"><option value="workspace">ワークスペース設定</option><option value="noto-sans">Noto Sans</option><option value="source-serif">Source Serif</option></select></label>
+      <label><span>フォント</span><select value={graphFont} onChange={(event) => setGraphFont(event.target.value)} style={{ fontFamily: fontStacks[graphFont] }}>{Object.entries(fontLabels).map(([value, name]) => <option value={value} key={value} style={{ fontFamily: fontStacks[value] }}>{name}</option>)}</select></label>
+      <label><span>見本</span><span className="font-specimen" style={{ fontFamily: fontStacks[graphFont] }}>最大応力 235 MPa</span></label>
       <label><span>タイトル</span><select defaultValue="14"><option value="12">12 pt</option><option value="14">14 pt</option><option value="16">16 pt</option></select></label>
       <label><span>軸ラベル</span><select defaultValue="10"><option value="9">9 pt</option><option value="10">10 pt</option><option value="11">11 pt</option></select></label>
       <label><span>凡例</span><select defaultValue="9"><option value="8">8 pt</option><option value="9">9 pt</option><option value="10">10 pt</option></select></label>
@@ -2884,6 +2889,8 @@ function ViewObjectPropertyEditor({ activeObject }: { activeObject: ActiveViewOb
 }
 
 function ObjectTypeProperties({ kind }: { kind: ViewObjectKind }) {
+  const [scalarColourMap, setScalarColourMap] = useState('technical')
+  const [glyphShape, setGlyphShape] = useState('arrow')
   const [meshRepresentation, setMeshRepresentation] = useState<MeshRepresentation>('surface-edges')
   const showsMeshEdges = meshRepresentation === 'surface-edges' || meshRepresentation === 'wireframe'
 
@@ -2916,7 +2923,10 @@ function ObjectTypeProperties({ kind }: { kind: ViewObjectKind }) {
         <label><span>単位</span><input value="未宣言" readOnly /></label>
       </div></details>
       <details className="property-group" open><summary><ChevronRight size={12} /><b>色と範囲</b></summary><div className="property-fields">
-        <label><span>カラーマップ</span><select defaultValue="technical"><option value="technical">技術表示</option></select></label>
+        {/* XC-223: the reference renders every colour-map preset to an image for exactly this chooser
+                (E-128), and here a wrong map is a wrong picture rather than an ugly one. */}
+            <VisualOptions label="カラーマップ" kind="colormap" columns={3} value={scalarColourMap} onChange={setScalarColourMap}
+              options={[{ value: 'technical', label: '技術表示' }, { value: 'viridis', label: 'Viridis' }, { value: 'coolwarm', label: 'Cool/Warm' }]} />
         <label><span>範囲</span><select defaultValue="unresolved"><option value="unresolved">データ未接続</option></select></label>
         <label className="property-toggle"><span>凡例</span><input type="checkbox" defaultChecked /></label>
       </div></details>
@@ -2928,7 +2938,8 @@ function ObjectTypeProperties({ kind }: { kind: ViewObjectKind }) {
       <details className="property-group" open><summary><ChevronRight size={12} /><b>ベクトル場</b></summary><div className="property-fields">
         <label><span>フィールド</span><select defaultValue="unresolved"><option value="unresolved">未接続</option></select></label>
         <label><span>座標系</span><select defaultValue="global"><option value="global">グローバル直交</option></select></label>
-        <label><span>グリフ</span><select defaultValue="arrow"><option value="arrow">矢印</option><option value="line">線</option></select></label>
+        <VisualOptions label="グリフ" kind="glyph" columns={2} value={glyphShape} onChange={setGlyphShape}
+          options={[{ value: 'arrow', label: '矢印' }, { value: 'line', label: '線' }]} />
         <label><span>密度</span><div className="property-range"><input type="range" min="1" max="10" defaultValue="4" /><output>低</output></div></label>
         <label><span>スケール</span><select defaultValue="explicit"><option value="explicit">明示指定</option><option value="auto">自動</option></select></label>
       </div></details>
@@ -2993,6 +3004,7 @@ function MaterialNodeGraph({ expanded = false, resultBinding = false }: { expand
 }
 
 function ViewMaterialPropertyEditor({ variant, activeObject }: { variant: string; activeObject: ActiveViewObject }) {
+  const [colourMapPreset, setColourMapPreset] = useState('technical')
   const meta = activeObject.kind === 'container' ? null : viewObjectKinds[activeObject.kind]
   const showFailedBinding = variant === 'material-composition'
   const [materialSlots, setMaterialSlots] = useState([
@@ -3272,7 +3284,8 @@ function ViewMaterialPropertyEditor({ variant, activeObject }: { variant: string
           <header><span><small>Base Color</small><b>カラーマップを編集</b></span><button type="button" aria-label="カラーマップエディターを閉じる" onClick={() => setColorMapEditorOpen(false)}><X size={15} /></button></header>
           <div className="material-colormap-dialog-toolbar">
             <label><span>入力</span><select value={colorMapVariable} onChange={(event) => setColorMapVariable(event.target.value as ColorMapVariable)}><option value="stress">応力 / von Mises</option><option value="displacement">変位 / magnitude</option><option value="temperature">温度</option><option value="position-x">位置 / X</option><option value="position-y">位置 / Y</option></select></label>
-            <label><span>プリセット</span><select defaultValue="technical"><option value="technical">Technical</option><option value="viridis">Viridis</option><option value="grayscale">Grayscale</option></select></label>
+            <VisualOptions label="プリセット" kind="colormap" columns={3} value={colourMapPreset} onChange={setColourMapPreset}
+              options={[{ value: 'technical', label: 'Technical' }, { value: 'viridis', label: 'Viridis' }, { value: 'grayscale', label: 'Grayscale' }, { value: 'coolwarm', label: 'Cool/Warm' }, { value: 'inferno', label: 'Inferno' }]} />
             <label><span>補間</span><select defaultValue="linear"><option value="linear">Linear RGB</option><option value="diverging">Diverging</option><option value="constant">Constant</option></select></label>
             <span className="material-colormap-outside">範囲外 α 0</span>
           </div>

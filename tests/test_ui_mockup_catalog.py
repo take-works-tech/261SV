@@ -2213,3 +2213,46 @@ def test_the_output_tab_shows_one_format_field_at_a_time() -> None:
     assert output.count("<span>形式</span>") == 4
     for kind in ("image", "vector", "data", "animation"):
         assert f"outputKind === '{kind}'" in output
+
+
+def test_a_colour_map_is_chosen_by_its_gradient_wherever_one_is_chosen() -> None:
+    """XC-223: the reference ships `pqPresetToPixmap` for exactly this chooser (E-128), and in this
+    product a wrong colour map is a wrong picture rather than an ugly one. Both places named one by a
+    word: the scalar object's map, and the material editor's preset."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    samples = OPTION_SAMPLES.read_text(encoding="utf-8")
+
+    assert page.count('kind="colormap"') == 2
+    assert "const colourMaps: Record<string, string> = {" in samples
+    for name in ("technical", "viridis", "grayscale", "coolwarm", "inferno"):
+        assert f"  {name}:" in samples
+    assert '<select defaultValue="technical"><option value="technical">技術表示</option></select>' not in page
+
+
+def test_the_other_subjects_that_have_a_picture_show_it() -> None:
+    """XC-223 extends XC-215 past appearance settings: a view direction, a glyph and a typeface all have
+    pictures, and were words."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert 'kind="viewdir"' in page
+    assert 'kind="glyph"' in page
+    # the graph's typeface is rendered in itself, as the report's already was
+    assert page.count("fontFamily: fontStacks[") >= 4
+    assert page.count("font-specimen") == 2  # the graph's and the report's
+    # and the applied style asset shows what it applies
+    assert '<span>見本</span><span className="palette-readout"><OptionSample kind="palette" value={palette} /><OptionSample kind="background"' in page
+
+
+def test_a_sample_fills_its_tile() -> None:
+    """XC-223: at four columns in a 286px rail, 5px of padding a side plus the border spent about a
+    fifth of every sample's width on air. The label is padded; the sample is not."""
+    styles = CHAT_STYLES.read_text(encoding="utf-8")
+
+    tile = styles.split(".visual-option {")[1].split("}")[0]
+    assert "padding: 0" in tile
+    assert "overflow: hidden" in tile  # the tile clips the sample to its own radius
+    label = styles.split(".visual-option small {")[1].split("}")[0]
+    assert "padding:" in label
+    # the samples themselves no longer round their own corners inside a clipping tile
+    band = styles.split(".option-sample-band {")[1].split("}")[0]
+    assert "border-radius" not in band
