@@ -169,6 +169,14 @@
       "href": "?screen=view&variant=comparison-borrowed"
     },
     {
+      "id": "view.comparison-columns",
+      "screen": "view",
+      "variant": "comparison-columns",
+      "label": "比較・列数を指定",
+      "intent": "11_ui.md「Comparing」・XC-205。6メンバーを3列2行に折り返します。行数はメンバー数から決まるため、どの列数でも絵に出ないメンバーは生まれません。",
+      "href": "?screen=view&variant=comparison-columns"
+    },
+    {
       "id": "view.comparison-overlay",
       "screen": "view",
       "variant": "comparison-overlay",

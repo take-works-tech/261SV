@@ -1458,7 +1458,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .comparison-overlay-note small { color: var(--muted-ink); font-size: var(--text-caption); line-height: var(--leading-normal); }
 
 
-.pane-grid.comparison-grid { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); grid-template-rows: 1fr; grid-template-areas: none; }
+.pane-grid.comparison-grid { grid-template-columns: repeat(var(--comparison-columns, 1), minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: none; }
 .pane-grid.comparison-grid .view-pane { grid-area: auto; }
 
 /* --- Two kinds of View item: the badge, and the tabs a comparison borrows (XC-202) -------------- */

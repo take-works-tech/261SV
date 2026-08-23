@@ -1696,7 +1696,7 @@ def test_an_ordered_comparison_axis_can_divide_a_range_instead_of_listing_member
     # and the canvas draws the generated members, not the enumerated list
     assert "rangeMembers(comparison.rangeCount).map((member) => member.label)" in page
     # the grid figures are derived from the same member list the canvas draws, so they cannot disagree
-    assert "const comparisonColumns = Math.min(effectiveMembers.length, 4)" in page
+    assert "const comparisonColumns = comparisonGridColumns(effectiveMembers.length, comparison.columns)" in page
     assert "rows: number" not in page.split("type ComparisonModel")[1].split("}")[0]
 
 
@@ -1756,3 +1756,24 @@ def test_the_canvas_carries_no_split_chrome_until_it_is_split() -> None:
     canvas = page[page.index("{!isComparisonItem && panes > 1"):page.index("{comparisonGrid && <div")]
     assert "この分割は保存されません" in canvas
     assert "この比較を保存" in canvas
+
+
+def test_a_comparison_grid_sets_its_columns_and_derives_its_rows() -> None:
+    """XC-205: the rows absorb the remainder, so no column count can leave a member undrawn - which is
+    the only reason the arrangement had been made read-only. The area bar's split control stays absent
+    here because a comparison's panes are its members."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    styles = CHAT_STYLES.read_text(encoding="utf-8")
+
+    assert "columns: 'auto' | number" in page
+    assert "const comparisonGridColumns = (members: number, columns: 'auto' | number) =>" in page
+    # the rows are computed, never stored and never set
+    assert "rows:" not in page.split("type ComparisonModel")[1].split("}")[0]
+    assert 'aria-label="行数" ' in page and "readOnly" in page
+    assert 'aria-label="列数"' in page
+    assert "自動（" in page
+    # one rule feeds both the panel and the canvas, so they cannot state different grids
+    assert page.count("comparisonGridColumns(") == 3
+    assert "'--comparison-columns': comparisonGridColumns(comparisonMembers.length, comparison.columns)" in page
+    assert "repeat(var(--comparison-columns, 1), minmax(0, 1fr))" in styles
+    assert "grid-template-rows: 1fr; grid-template-areas: none; }" not in styles

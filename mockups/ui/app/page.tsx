@@ -558,11 +558,12 @@ function ProductShell({ scenario, onScreen, draft, onDraftChange, settings, onSe
   const openViewItem = workItemHeaderByScreen.view?.items.find((item) => item.name === (openItems.view ?? workItemHeaderByScreen.view?.items[0].name)) ?? null
   const isComparisonItem = openViewItem?.kind === 'comparison'
   const [comparison, setComparison] = useState<ComparisonModel>({
-    axis: scenario.variant === 'comparison-range' ? 'resultPosition' : 'case',
+    axis: scenario.variant === 'comparison-range' || scenario.variant === 'comparison-columns' ? 'resultPosition' : 'case',
     members: workspaceCases.map((item) => item.name),
-    memberMode: scenario.variant === 'comparison-range' ? 'range' : 'enumerate',
-    rangeCount: 4,
+    memberMode: scenario.variant === 'comparison-range' || scenario.variant === 'comparison-columns' ? 'range' : 'enumerate',
+    rangeCount: scenario.variant === 'comparison-columns' ? 6 : 4,
     arrangement: scenario.variant === 'comparison-overlay' ? 'overlay' : 'grid',
+    columns: scenario.variant === 'comparison-columns' ? 3 : 'auto',
     sharedColourMap: true,
   })
   // Session state, held by the shell rather than the canvas: the control that sets it is in the work
@@ -1975,10 +1976,19 @@ type ComparisonModel = {
   memberMode: 'enumerate' | 'range'
   rangeCount: number
   arrangement: 'grid' | 'overlay'
+  // The columns only. Rows are always derived from the member count, so no setting can produce a grid
+  // that omits a member - which is what a free rows-and-columns pair does (XC-205).
+  columns: 'auto' | number
   sharedColourMap: boolean
 }
 
 const orderedAxes: ComparisonAxis[] = ['resultPosition', 'deformation']
+
+// A comparison varies one ordered axis, so `auto` keeps the members on one line and wraps only when
+// they no longer fit - reading order is the axis. A chosen column count never exceeds the member count,
+// and the rows follow from it, so every member has a pane (XC-205).
+const comparisonGridColumns = (members: number, columns: 'auto' | number) =>
+  Math.max(1, Math.min(columns === 'auto' ? 4 : columns, Math.max(1, members)))
 
 // Generated members land on positions that exist, and say when they snapped (view/AC-033). Two that
 // snap to the same stored position are reported rather than drawn as two identical panes.
@@ -2051,7 +2061,7 @@ function ViewPropertyEditor({ tab, variant, viewItem, onViewItemChange, selected
   const effectiveMembers = comparison.memberMode === 'range' && orderedAxes.includes(comparison.axis)
     ? rangeMembers(comparison.rangeCount).map((member) => member.label)
     : comparison.members
-  const comparisonColumns = Math.min(effectiveMembers.length, 4)
+  const comparisonColumns = comparisonGridColumns(effectiveMembers.length, comparison.columns)
   const comparisonRows = Math.max(1, Math.ceil(effectiveMembers.length / Math.max(1, comparisonColumns)))
   const [backgroundMode, setBackgroundMode] = useState<'solid' | 'gradient' | 'image' | 'environment'>('gradient')
   const [outputMode, setOutputMode] = useState<'image' | 'video'>('image')
@@ -2163,8 +2173,14 @@ function ViewPropertyEditor({ tab, variant, viewItem, onViewItemChange, selected
       </div>
       <label><span>配置</span><select value={comparison.arrangement} onChange={(event) => setComparison({ ...comparison, arrangement: event.target.value as ComparisonModel['arrangement'] })}><option value="grid">グリッド</option><option value="overlay">重ね合わせ</option></select></label>
       {comparison.arrangement === 'grid'
-        ? <><label><span>行×列</span><div className="property-pair"><input value={`${comparisonRows} 行`} readOnly aria-label="行数" /><input value={`${comparisonColumns} 列`} readOnly aria-label="列数" /></div></label>
-            <p className="property-editor-note"><ShieldCheck size={12} />格子はメンバー数から決まります（{effectiveMembers.length}件）。手で決めると、メンバーを増やしたときに絵に出ないペインが生まれます。</p></>
+        ? <><label><span>列数</span><div className="property-pair">
+              <Select value={String(comparison.columns)} onValueChange={(value) => setComparison({ ...comparison, columns: value === 'auto' ? 'auto' : Number(value) })}>
+                <SelectTrigger aria-label="列数"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="auto">自動（{comparisonGridColumns(effectiveMembers.length, 'auto')} 列）</SelectItem>{[1, 2, 3, 4].map((count) => <SelectItem value={String(count)} key={count}>{count} 列</SelectItem>)}</SelectContent>
+              </Select>
+              <input value={`${comparisonRows} 行`} readOnly aria-label="行数" />
+            </div></label>
+            <p className="property-editor-note"><ShieldCheck size={12} />行数はメンバー数（{effectiveMembers.length}件）から決まるため、どの列数でも絵に出ないメンバーは生まれません。自動は1行に並べ、収まらなくなったときだけ折り返します。</p></>
         : <div className="property-unresolved"><AlertTriangle size={13} /><span><b>結果色を持てるのは1メンバーだけです</b><small>「{comparison.members[0]}」に結果色を割り当て、残りは参照形状として描きます。2つのコンターを重ねた画は値を符号化しません。</small></span></div>}
       <label className="property-toggle"><span>ラベル</span><input type="checkbox" checked disabled readOnly /></label>
       <label className="property-toggle"><span>カラーマップを共有</span><input type="checkbox" checked={comparison.sharedColourMap} onChange={(event) => setComparison({ ...comparison, sharedColourMap: event.target.checked })} /></label>
@@ -3678,7 +3694,9 @@ function ViewScreen({ variant, onViewObjectSelect, selectedCase, viewItem, onVie
         <small>{comparison.sharedColourMap ? '全ペインが同じカラーマップと同じ範囲で描かれます。' : 'ペインごとに範囲が異なります。図にその旨を記載します。'}基準ビュー「{baseViewName}」の設定を共有します。</small>
       </div>}
       {comparisonOverlay && <div className="comparison-overlay-note"><Layers3 size={13} /><span><b>重ね合わせ・結果色は1メンバーのみ</b><small>「{comparisonMembers[0]}」が結果色を持ち、{comparisonMembers.slice(1).join('と')}は参照形状として描かれます。カラーマップと範囲は共有です。基準ビュー「{baseViewName}」の設定を使います。</small></span></div>}
-      <div className={`pane-grid panes-${comparisonOverlay ? 1 : panes} ${comparisonGrid ? 'comparison-grid' : ''}`}>
+      {/* The canvas is laid out from the same rule the rail states, so the two cannot disagree - a
+          panel reading "2行3列" over a canvas drawing one row of six is the defect XC-205 closes. */}
+      <div className={`pane-grid panes-${comparisonOverlay ? 1 : panes} ${comparisonGrid ? 'comparison-grid' : ''}`} style={comparisonGrid ? { '--comparison-columns': comparisonGridColumns(comparisonMembers.length, comparison.columns) } as React.CSSProperties : undefined}>
         {paneCases.map((paneCase, index) => (
           <div className="view-pane" key={index}>
             {/* The badge is the pane's subject picker: the split bar tells the reader to click it, so

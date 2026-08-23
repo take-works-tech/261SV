@@ -3069,3 +3069,33 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a measurement showing users hunt for the split, which would make an on-canvas
   affordance worth its permanent cost
+
+### XC-205 - A comparison's grid sets its columns only, and its rows follow from the member count
+- decided: 2026-08-23
+- status: active
+- decision: a @Comparison arranged as a grid exposes **one** arrangement control in the property rail:
+  the **column count**, either `自動` or one to four. **The row count is always derived** as
+  `ceil(members / columns)`, so no setting can produce a grid that leaves a member undrawn. `自動` places
+  the members on one line and wraps only when they no longer fit. The canvas is laid out from that same
+  computed value rather than from a rule of its own. The area bar's split control stays absent on a
+  comparison: a comparison's panes are its members, and a session control that overrode them would be a
+  second source for one number
+- decided_by: the product owner, 2026-08-23
+- rationale: the measured reference carries the grid dimension as a real property of a comparative view
+  (E-123), and the reason this product had removed it - that a hand-set grid hides members - applies
+  only to setting **both** dimensions. Setting the columns alone cannot hide anything, because the rows
+  are what absorbs the remainder. `自動` wraps rather than squares because the members are an ordered
+  axis and one line is the reading order
+- correction: the grid was made read-only and derived as `min(members, 4)` columns after a defect where
+  the panel stated a grid the canvas did not draw. That fixed the disagreement by removing the user's
+  say, and left two further faults: six members drew as four and two rather than the three and three a
+  reader would ask for, and the canvas stylesheet still forced **one row** whatever the panel said, so
+  the disagreement it was meant to end was still present above four members
+- alternatives: keeping it derived costs nothing to build and leaves no way to produce a 3x2 contact
+  sheet, which is an ordinary figure. A free rows-and-columns pair is what the reference offers and is
+  the thing that can hide a member
+- basis: E-123 (T1)
+- affects: 11_ui.md
+- decidedness: Fixed
+- reversal_trigger: a comparison whose members should be read down the columns rather than along the
+  rows, which would make the row count the chosen one
