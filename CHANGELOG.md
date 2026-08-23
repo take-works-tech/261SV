@@ -45,6 +45,32 @@ itself — `pyproject.toml` reads 0.0.1 and will until there is something to ins
 
 ### Added
 
+- **A pull request with every check green now merges itself, until the first working prototype**
+  (XC-218). This repository cannot use the usual mechanism: measured 2026-08-23, branch protection and
+  rulesets answer 403 on this plan, `allow_auto_merge` is accepted by the API and stays false, and there
+  is no merge queue (E-129, re-measuring OPEN-020). So the gate is `.github/workflows/auto-merge.yml`,
+  which waits on every workflow that can check a pull request and merges only when nineteen conditions
+  hold, each of them leaving without merging rather than guessing. It is a substitute for a repository
+  that cannot have required checks, not an improvement on them.
+  What it accepts is written down rather than left to be discovered: everything outside `.github/`,
+  `validate/` and `.claude/` merges **unread**, including `specs/` and this file, and nothing enforces
+  that work arrives by pull request at all. Stop one with the `no-auto-merge` label; stop all of them
+  with `gh variable set AUTO_MERGE_ENABLED --body false`, one command and no diff, because a temporary
+  measure that needs a pull request to end becomes a permanent one.
+- **The automated review becomes a merge condition when it can authenticate** (XC-219). Until
+  `CLAUDE_CODE_OAUTH_TOKEN` exists, XC-188 holds and the review stays off pull requests. The day the
+  secret appears is not left to memory: a `ci` job fails when the secret is present and the trigger is
+  not, and equally when the trigger is present and the secret is not.
+- **`check_mockup_states.py`**, which renders every catalogue state through a browser rather than
+  typechecking it. CI became the only thing between a change and `main`, and it had never rendered
+  anything. Two versions of this gate were wrong in ways only running them showed: an HTTP fetch returns
+  the same 6 KB shell for all 88 states, and Chrome's own network-error page is 187 KB, so a size floor
+  alone reported a dead server as 88 green states.
+- **`check_automerge_policy.py`**, which reads the merge workflow against the decision that authorises
+  it. A condition dropped from that file fails nothing on its own; the workflow simply merges on less.
+- **The labels the automation names are checked to exist.** `no-auto-merge` is read by exact name, and
+  the repository held only GitHub's nine defaults - so the brake could not have been applied.
+
 - Style tokens are now inside the single-source gate. `check_constant_duplication.py` reads CSS as
   well as source files, and its block walker tracks at-rule nesting — an earlier version reported a
   media-query override of `--area-tab-width` as a duplicate, which is correct CSS and a false finding.
@@ -68,6 +94,13 @@ itself — `pyproject.toml` reads 0.0.1 and will until there is something to ins
   literals, and a working tree that is CRLF on one machine makes those comparisons machine-dependent.
 
 ### Changed
+
+- **Dependabot no longer proposes `vtk` or `numpy`** (XC-220). Both are declared in
+  `specs/06_external.md`, so a pull request moving only the manifest fails `check_dependency_pins.py`
+  by construction, and the bot cannot add the other half. Two such pull requests had been open and red
+  for a day, which is the state XC-188 refused elsewhere: red for a reason unrelated to the change.
+  Security advisories are unaffected - they arrive through Dependabot alerts, not through
+  `dependabot.yml`.
 
 - **This repository is no longer local-only** (XC-186). It publishes to one named private repository;
   every other remote is refused by name, and history rewriting stays refused.
