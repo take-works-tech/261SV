@@ -1702,7 +1702,7 @@ function RightSidebar({ screen, variant, width, setWidth, selectedViewObjects, o
   const borrowedTabIds = ['camera', 'rendering', 'background', 'objects', 'text', 'materials']
   const isBorrowed = (tabId: string) => screen === 'view' && isComparisonItem && borrowedTabIds.includes(tabId)
   const [selectedByScreen, setSelectedByScreen] = useState<Partial<Record<ScreenId, string>>>({})
-  const variantTab = variant.startsWith('object-') ? 'objects' : variant.startsWith('material-') ? 'materials' : variant === 'steady-result' ? 'output' : variant === 'comparison-borrowed' ? 'materials' : variant === 'cameras' || variant.startsWith('camera-') ? 'camera' : variant === 'unit-reference' ? 'settings' : variant === 'commentary-review' || variant === 'drafting' ? 'drafting' : variant === 'axes' ? 'axes' : variant === 'style' || variant === 'theme' ? 'style' : variant === 'background' ? 'background' : variant === 'output-motion' || variant === 'split-output' || variant === 'comparison-output' ? 'output' : variant === 'develop-grade' ? 'rendering' : variant.includes('output-preflight') ? 'output' : variant === 'series-unresolved' || variant === 'series' ? 'series' : undefined
+  const variantTab = variant.startsWith('object-') ? 'objects' : variant.startsWith('material-') ? 'materials' : variant === 'steady-result' ? 'output' : variant === 'comparison-borrowed' ? 'materials' : variant === 'cameras' || variant.startsWith('camera-') ? 'camera' : variant === 'unit-reference' ? 'settings' : variant === 'commentary-review' || variant === 'drafting' ? 'drafting' : variant === 'axes' || variant === 'axis-unit-conflict' ? 'axes' : variant === 'style' || variant === 'theme' ? 'style' : variant === 'background' ? 'background' : variant === 'output-motion' || variant === 'split-output' || variant === 'comparison-output' ? 'output' : variant === 'develop-grade' ? 'rendering' : variant.includes('output-preflight') ? 'output' : variant === 'series-unresolved' || variant === 'series' ? 'series' : undefined
   const selectedTab = tabs.find((tab) => tab.id === (selectedByScreen[screen] ?? variantTab)) ?? tabs[0]
 
   if (!selectedTab) return null
@@ -2494,6 +2494,9 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
   // the same fields serve all of them, which is the same information in one twentieth of the panel.
   const [axis, setAxis] = useState<'x' | 'y' | 'y2'>('x')
   const [axisAuto, setAxisAuto] = useState(true)
+  const [axisUnit, setAxisUnit] = useState('declared')
+  // Two series on one axis declaring different units - the state the rule exists for.
+  const unitConflict = variant === 'axis-unit-conflict'
   const axisNames: Record<'x' | 'y' | 'y2', string> = { x: 'X（横）', y: 'Y（左）', y2: '第2Y（右）' }
 
   if (tab.id === 'overall') return <div className="property-editor">
@@ -2538,7 +2541,7 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
     </PropertyGroup>
     <PropertyGroup title="集約" open={false}>
       <label><span>方法</span><select defaultValue="none"><option value="none">集約しない</option><option value="weighted">関連量で重み付け</option><option value="unweighted">単純平均・重みなし</option></select></label>
-      <label><span>範囲</span><select defaultValue="whole"><option value="whole">全体</option><option value="selection">選択範囲</option></select></label>
+      <label><span>集約範囲</span><select defaultValue="whole"><option value="whole">全体</option><option value="selection">選択範囲</option></select></label>
     </PropertyGroup>
     <p className="property-editor-note"><ShieldCheck size={12} />グラフは値のコピーではなく、数量・単位・来歴を参照する定義として保存します。</p>
   </div>
@@ -2553,7 +2556,7 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
         {/* XC-213: colour, line and marker belong to the series, not to the chart - the measured
             reference keys all three to the series (E-124), and splitting them across two tabs meant
             changing one series' look and its quantity in two places. */}
-        <label><span>使用する軸</span><select defaultValue="left"><option value="left">左（Y）</option><option value="right">右（第2Y）</option></select></label>
+        <label><span>使用する軸</span><select defaultValue="y"><option value="y">Y（左）</option><option value="y2">第2Y（右）</option></select></label>
         <label><span>来歴</span><input value={activeSeries.quantity === 'unresolved' ? '数量の選択後に表示' : activeSeries.quantity === 'computed' || activeSeries.quantity === 'expression' ? '計算・式を表示' : activeSeries.quantity === 'reference' ? '参考資料・数値根拠には未使用' : activeSeries.quantity === 'measurement' ? '測定データ' : 'データセット'} readOnly /></label>
         <label><span>欠損</span><select defaultValue="gap"><option value="gap">欠損として表示・凡例に残す</option></select></label></>}
     </PropertyGroup>
@@ -2561,6 +2564,9 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
   </div>
 
   if (tab.id === 'axes') return <div className="property-editor">
+    {/* XC-228: this chooses which axis you are *editing*. Which axis a series is *drawn against* is on
+        that series, in 系列. Both are "pick an axis", so this one carries its purpose visibly. */}
+    <span className="axis-picker-caption">設定する軸</span>
     <div className="axis-picker" role="tablist" aria-label="設定する軸">
       {(['x', 'y', 'y2'] as const).map((value) => (
         <button type="button" role="tab" aria-selected={axis === value} className={axis === value ? 'active' : ''} key={value} onClick={() => setAxis(value)}>{axisNames[value]}</button>
@@ -2568,7 +2574,13 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
     </div>
     <PropertyGroup title="表題">
       <label><span>表題</span><input placeholder={`${axisNames[axis]}の表題`} /></label>
-      <label><span>単位の併記</span><select defaultValue="declared"><option value="declared">宣言済みのとき付ける</option><option value="never">付けない</option></select></label>
+      <label><span>単位の併記</span><select value={axisUnit} onChange={(event) => setAxisUnit(event.target.value)}><option value="declared">宣言済みのとき付ける</option><option value="never">付けない</option></select></label>
+      {/* XC-228: the axis prints the unit its series declare - not one this product chose. Two series on
+          one axis declaring different units is a figure whose scale means two things, so the axis says
+          that instead of printing either (XC-003). */}
+      {axisUnit === 'declared' && (unitConflict
+        ? <div className="property-unresolved"><AlertTriangle size={13} /><span><b>この軸の系列が異なる単位を宣言しています</b><small>「応力」は MPa、「たわみ」は mm です。どちらかを軸に書くと、もう一方の目盛が誤って読まれます。軸には「単位混在」と表示し、系列ごとの単位は凡例に出します。</small></span></div>
+        : <p className="property-editor-note"><ShieldCheck size={12} />この軸に置かれた系列が宣言した単位を書きます。単位が未宣言なら書きません。推測はしません。</p>)}
     </PropertyGroup>
     <PropertyGroup title="範囲">
       <label className="property-toggle"><span>自動</span><input type="checkbox" checked={axisAuto} onChange={(event) => setAxisAuto(event.target.checked)} /></label>

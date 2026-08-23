@@ -1464,6 +1464,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .work-area-split { display: flex; align-items: center; gap: 5px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 7px; background: var(--card); padding: 5px 8px; color: var(--muted-ink); font-size: var(--text-body); font-weight: var(--weight-bold); }
 .work-area-split.active { border-color: var(--blue); background: var(--blue-soft); color: var(--blue); }
 .menu-check-space { display: inline-block; width: 12px; }
+.axis-picker-caption { display: block; margin-bottom: 4px; color: var(--muted-ink); font-size: var(--text-body); }
 /* XC-213: one axis is chosen, then edited - the fields below belong to that choice. */
 /* XC-215: a visual choice is shown as a picture with its name beneath - the name stays because a
    picture cannot be searched, read aloud or quoted in a specification. */

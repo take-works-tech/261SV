@@ -3780,3 +3780,31 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: an object type whose appearance is one field, where a group of its own is heavier
   than the field
+
+### XC-228 - The axis prints the unit its series declare, and says so when they disagree
+- decided: 2026-08-24
+- status: active
+- decision: three seams between `系列` and `軸`, which hold no duplicated function and did not say how
+  they relate.
+  **The axis's unit is the series' unit.** `単位の併記` writes what the series **on that axis** declared,
+  and nothing else - an undeclared unit is not written, and no unit is inferred (XC-003). **Two series
+  on one axis declaring different units is not resolved by choosing one**: the axis states that the
+  units are mixed, and the units go to the legend beside each series. A scale labelled `MPa` under a
+  series measured in `mm` is a figure that reads wrongly and looks right.
+  **Choosing an axis means two things, so each says which.** The `軸` tab's picker chooses the axis you
+  are **editing** and now carries that as a visible caption; `使用する軸` on a series chooses the axis it
+  is **drawn against**. Both tabs name the axes identically - `Y（左）`, `第2Y（右）` - where the series
+  said `左（Y）` and the axis tab said `Y（左）`.
+  **`範囲` named two things in one rail**: the reduction's range and the axis's. The reduction's is
+  `集約範囲`
+- decided_by: the product owner, 2026-08-24
+- rationale: asked whether `系列` and `軸` overlap. They do not overlap in function - one says what is
+  drawn, the other how the scale reads - but the unit crosses between them and nothing said in which
+  direction, which is the kind of gap that produces a confidently wrong figure rather than a confusing
+  one. The mixed-unit case has no correct silent answer: printing either unit mislabels the other
+  series, and printing neither without saying so leaves a reader to assume
+- basis: E-124 (T1), E-001 (T1)
+- affects: 11_ui.md
+- decidedness: Fixed
+- reversal_trigger: a chart form where two units on one axis is meaningful and conventional, which would
+  need the axis to carry both rather than to report the conflict
