@@ -1493,6 +1493,10 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .drafting-actions { display: flex; gap: 6px; margin-top: 2px; }
 .drafting-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; flex: 1 1 0; border: 1px solid var(--line); border-radius: 7px; background: var(--card); padding: 6px 8px; color: var(--ink); font-size: var(--text-body); font-weight: var(--weight-bold); white-space: nowrap; }
 .drafting-actions button:disabled { opacity: .45; }
+/* XC-226: the same series the 系列 tab has selected, picked here without repeating that tab's list. */
+.series-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 2px; }
+.series-chips button { border: 1px solid var(--line); border-radius: 20px; background: var(--card); padding: 3px 10px; color: var(--muted-ink); font-size: var(--text-caption); font-weight: var(--weight-bold); white-space: nowrap; }
+.series-chips button.active { border-color: var(--blue); background: var(--blue-soft); color: var(--blue); }
 .axis-picker { display: flex; gap: 3px; margin: 0 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--soft); padding: 3px; }
 .axis-picker button { flex: 1 1 0; min-width: 0; border: 0; border-radius: 5px; background: transparent; padding: 5px 4px; color: var(--muted-ink); font-size: var(--text-body); font-weight: var(--weight-bold); white-space: nowrap; }
 .axis-picker button.active { background: var(--card); color: var(--blue); box-shadow: 0 1px 2px #2c414d1f; }
