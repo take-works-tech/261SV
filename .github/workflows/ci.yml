@@ -47,6 +47,8 @@ jobs:
         if: '!cancelled()'
       - run: python validate/check_gates_wired.py
         if: '!cancelled()'
+      - run: python validate/check_automerge_policy.py
+        if: '!cancelled()'
 
   tests:
     name: tests
@@ -70,7 +72,7 @@ jobs:
           SIM_VIEWER_REQUIRE_VTK: "1"
 
   mockups:
-    name: mockup catalogue typecheck
+    name: mockup catalogue typecheck and render
     runs-on: ubuntu-latest
     # The catalogue is design states, never shipped code - but it is executable, and a reference to a
     # component that does not exist is how a screen state silently stops being demonstrable.
@@ -81,7 +83,23 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: mockups/ui/package-lock.json
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
       - run: npm ci
         working-directory: mockups/ui
       - run: npm run typecheck
         working-directory: mockups/ui
+      # XC-218: a typecheck catches a reference to a component that does not exist and catches nothing
+      # about a state that throws while rendering. That gap was covered by a person sweeping the
+      # catalogue before every push; once a workflow may merge on CI's word, CI has to do the sweep.
+      - run: npm run build
+        working-directory: mockups/ui
+      - name: serve the built catalogue
+        run: npm run start -- --port 3000 &
+        working-directory: mockups/ui
+      - name: wait for it
+        run: for i in $(seq 1 30); do curl -sf http://localhost:3000/ >/dev/null && exit 0; sleep 2; done; echo "the mockup did not start"; exit 1
+      - run: python validate/check_mockup_states.py
+        env:
+          MOCKUP_BASE_URL: http://localhost:3000

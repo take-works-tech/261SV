@@ -477,3 +477,96 @@ class TestLocalOnlyGuard:
         assert commands, "no hooks are wired at all"
         for command in commands:
             assert "$CLAUDE_PROJECT_DIR" in command, command
+
+
+class TestAutoMergePolicy:
+    """XC-218 lets a workflow merge to `main` with nobody reading the change, so the conditions in that
+    workflow are the whole line. A condition dropped from it fails nothing on its own - it just merges
+    on less - which is why the record and the implementation are checked against each other."""
+
+    def test_this_repository_is_consistent(self) -> None:
+        result = run("check_automerge_policy.py")
+        assert result.returncode == 0, result.stdout
+
+    def automerge_project(self, tmp_path: pathlib.Path) -> pathlib.Path:
+        (tmp_path / "validate").mkdir()
+        shutil.copy2(ROOT / "validate" / "check_automerge_policy.py", tmp_path / "validate")
+        (tmp_path / "specs").mkdir()
+        shutil.copy2(ROOT / "specs" / "08_decisions.md", tmp_path / "specs")
+        (tmp_path / ".claude").mkdir()
+        shutil.copy2(ROOT / ".claude" / "settings.json", tmp_path / ".claude")
+        (tmp_path / ".github" / "workflows").mkdir(parents=True)
+        for workflow in (ROOT / ".github" / "workflows").glob("*.yml"):
+            shutil.copy2(workflow, tmp_path / ".github" / "workflows")
+        return tmp_path
+
+    def test_a_dropped_condition_fails(self, tmp_path: pathlib.Path) -> None:
+        project = self.automerge_project(tmp_path)
+        workflow = project / ".github" / "workflows" / "auto-merge.yml"
+        # the deny-list is the one that matters most: without it the gate can merge a change to itself
+        text = workflow.read_text(encoding="utf-8").replace("^(\.github/|validate/|\.claude/)", "^(nothing/)")
+        workflow.write_text(text, encoding="utf-8")
+
+        result = run("check_automerge_policy.py", cwd=project)
+        assert result.returncode == 1
+        assert "not merged by the gate" in result.stdout
+
+    def test_a_workflow_that_no_longer_fails_closed_fails(self, tmp_path: pathlib.Path) -> None:
+        project = self.automerge_project(tmp_path)
+        workflow = project / ".github" / "workflows" / "auto-merge.yml"
+        text = workflow.read_text(encoding="utf-8").replace('exit 0; }', 'exit 1; }')
+        workflow.write_text(text, encoding="utf-8")
+
+        result = run("check_automerge_policy.py", cwd=project)
+        assert result.returncode == 1
+        assert "fail-closed" in result.stdout
+
+    def test_the_workflow_surviving_the_decision_fails(self, tmp_path: pathlib.Path) -> None:
+        """The end of the time box is two edits, and doing one of them is the failure worth catching:
+        the record says the period is over while the workflow still merges."""
+        project = self.automerge_project(tmp_path)
+        decisions = project / "specs" / "08_decisions.md"
+        text = decisions.read_text(encoding="utf-8").replace(
+            "- decided: 2026-08-23\n- status: active\n- decision: until the first working prototype",
+            "- decided: 2026-08-23\n- status: superseded\n- decision: until the first working prototype",
+        )
+        decisions.write_text(text, encoding="utf-8")
+
+        result = run("check_automerge_policy.py", cwd=project)
+        assert result.returncode == 1
+        assert "superseded" in result.stdout
+
+    def test_the_decision_surviving_the_workflow_fails(self, tmp_path: pathlib.Path) -> None:
+        project = self.automerge_project(tmp_path)
+        (project / ".github" / "workflows" / "auto-merge.yml").unlink()
+
+        result = run("check_automerge_policy.py", cwd=project)
+        assert result.returncode == 1
+        assert "missing while XC-218 is active" in result.stdout
+
+
+class TestMockupStateSweep:
+    """XC-218 made CI the whole evidence set, and CI only typechecked the catalogue. A sweep that
+    reports success without having run is the failure this gate exists to avoid."""
+
+    def test_an_unset_base_url_refuses_rather_than_passing(self) -> None:
+        environment = {**os.environ}
+        environment.pop("MOCKUP_BASE_URL", None)
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "validate" / "check_mockup_states.py")],
+            cwd=ROOT, capture_output=True, text=True, env=environment,
+        )
+        # 3, not 1: it did not fail, it could not run, and the pre-push hook reports that as skipped
+        assert result.returncode == 3
+        assert "Refusing to report success" in result.stdout
+
+    def test_a_server_that_never_started_is_not_reported_green(self) -> None:
+        """Measured: Chrome's own network-error page is 187 KB, so the size floor alone passed all 88
+        states against a dead server. The document has to be this application's, not any document."""
+        environment = {**os.environ, "MOCKUP_BASE_URL": "http://localhost:1"}
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "validate" / "check_mockup_states.py")],
+            cwd=ROOT, capture_output=True, text=True, env=environment,
+        )
+        assert result.returncode == 1
+        assert "not this application" in result.stdout

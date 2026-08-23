@@ -83,6 +83,21 @@ ran. Every gate in `validate/` runs in `.github/workflows/ci.yml`, and
 - **One remote, named** (XC-186): `take-works-tech/261SV`, private. Pushing
   there is authorised; any other repository is not. Force-push, hard reset, rebase and history rewriting
   are refused - the record of a correction is part of what this project ships.
+- **Automatic merge is on, and it ends at the first working prototype** (XC-218). Work lands through a
+  branch and a pull request; `.github/workflows/auto-merge.yml` squash-merges it once **every** check on
+  that commit has finished green, and **no person reads it first**. Say what that means rather than
+  implying otherwise: a change to `specs/`, to this file, or to `evidence/` merges unread. Only three
+  directories are held back - `.github/`, `validate/`, `.claude/` - because they decide whether anything
+  else may merge. **Nothing enforces any of this**: there is no branch protection on this plan (E-129,
+  OPEN-020), so a direct push to `main` skips every check. Judgement is still required and nothing
+  compels it.
+  To stop one pull request: the `no-auto-merge` label. To stop all of them:
+  `gh variable set AUTO_MERGE_ENABLED --body false` - one command, no diff, no pull request, because a
+  temporary measure that needs a pull request to end becomes a permanent one. An agent may open a pull
+  request and may not land it: `gh pr merge` is denied in `.claude/settings.json`, and that deny is what
+  keeps the workflow the only thing that merges. At the prototype boundary the variable goes to `false`,
+  the workflow file is deleted, and XC-218 becomes `superseded` - `check_automerge_policy.py` fails if
+  those disagree, so the period cannot end in the document alone.
 - Edits stay inside this directory.
 - Evidence is first-hand or it is not evidence. Vendor marketing is tier T3 and cannot justify a Fixed
   value; the linter enforces it.

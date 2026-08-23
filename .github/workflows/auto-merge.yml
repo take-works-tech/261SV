@@ -1,0 +1,135 @@
+name: auto-merge
+
+# TIME-LIMITED. Automatic merge is on until the first working prototype and off at that boundary
+# (XC-218). Turning it off is one command and no diff:
+#
+#     gh variable set AUTO_MERGE_ENABLED --body false --repo take-works-tech/261SV
+#
+# and after the boundary this file is deleted and XC-218 is marked superseded. `check_automerge_policy.py`
+# fails if the record and the repository disagree in either direction, so the period cannot end in the
+# document alone.
+#
+# WHY IT EXISTS HERE RATHER THAN ON GITHUB'S SIDE. Measured 2026-08-23 (E-129, OPEN-020): this
+# repository is private on a plan where `repos/.../rulesets` and `.../branches/main/protection` both
+# answer 403 "Upgrade to GitHub Pro", `allow_auto_merge` is accepted by the API and stays false, and
+# there is no merge queue. Required checks and `gh pr merge --auto` are therefore unavailable. This
+# workflow is a substitute for a repository that cannot have them, **not** an improvement on them: where
+# branch protection is available it is structurally safer, because a pull request cannot edit it.
+#
+# WHAT THIS ACCEPTS, STATED RATHER THAN DISCOVERED LATER.
+#   * A pull request touching `.github/`, `validate/` or `.claude/` is refused below, because those
+#     decide whether anything else may merge and a gate that merges its own weakening is not a gate.
+#   * Everything else merges with **nobody reading it**. That includes `specs/`, `AGENTS.md` and
+#     `evidence/` - the documents that authorise all of this. A change that rewrites the rules is
+#     stopped only if it also touches one of the three directories above. That is the hole this
+#     arrangement has, it is open on purpose for the length of the prototype, and the brake on any one
+#     pull request is the `no-auto-merge` label.
+#   * Nothing here enforces that work arrives by pull request at all: a direct push to `main` skips
+#     every condition below. Only the agreement in AGENTS.md says otherwise.
+#
+# The agent does not merge. `.claude/settings.json` denies `gh pr merge`, so an agent may open a pull
+# request and may not land it; landing it is this workflow's decision alone. Keep that deny.
+
+on:
+  workflow_run:
+    # Every workflow that can produce a check on a pull request. Waiting only on the one that triggered
+    # this run would merge while another is still going.
+    workflows: [ci, claude, claude code review]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+  actions: read
+
+concurrency:
+  group: auto-merge-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  auto-merge:
+    # The job name is also the check-run name, and the query below excludes it by this exact string.
+    name: auto-merge
+    if: ${{ vars.AUTO_MERGE_ENABLED == 'true' && github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge only if every check on this commit has finished green
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+          TRIGGERING_EVENT: ${{ github.event.workflow_run.event }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          OWN_CHECK_NAME: auto-merge
+        run: |
+          set -euo pipefail
+
+          # Every branch below leaves without merging. Nothing is treated as probably fine: an answer
+          # this job cannot read is a reason to stop, and an error in the job merges nothing at all.
+          stop() { echo "auto-merge stopped: $1"; exit 0; }
+
+          [ "$TRIGGERING_EVENT" = "pull_request" ] || stop "the run was for '$TRIGGERING_EVENT', not a pull request"
+          [ "$HEAD_REPO" = "$REPO" ] || stop "the head is on '$HEAD_REPO', a fork"
+
+          # 1. Exactly one open pull request whose head is this commit. Zero means nothing to merge;
+          #    more than one means this job cannot tell which was verified.
+          prs=$(gh api "repos/$REPO/commits/$SHA/pulls" --jq '.[] | select(.state == "open") | .number')
+          pr_count=$(printf '%s' "$prs" | grep -c . || true)
+          [ "$pr_count" = "1" ] || stop "$pr_count open pull requests have $SHA as their head"
+          pr=$(printf '%s' "$prs" | head -1)
+
+          pr_json=$(gh pr view "$pr" --repo "$REPO" --json isDraft,baseRefName,labels,headRefOid,state,mergeStateStatus)
+          echo "$pr_json"
+
+          [ "$(echo "$pr_json" | jq -r .state)" = "OPEN" ] || stop "PR #$pr is not open"
+          [ "$(echo "$pr_json" | jq -r .isDraft)" = "false" ] || stop "PR #$pr is a draft"
+          [ "$(echo "$pr_json" | jq -r .baseRefName)" = "main" ] || stop "PR #$pr is not based on main"
+          [ "$(echo "$pr_json" | jq -r .headRefOid)" = "$SHA" ] || stop "PR #$pr moved since these checks ran"
+
+          # 2. The per-pull-request brake.
+          if echo "$pr_json" | jq -r '.labels[].name' | grep -qx 'no-auto-merge'; then
+            stop "PR #$pr carries the no-auto-merge label"
+          fi
+
+          # 3. Git-level state. DIRTY is a conflict, BLOCKED is a rule refusing it, UNKNOWN is GitHub
+          #    still deciding - and an undecided answer is not a green one.
+          state=$(echo "$pr_json" | jq -r .mergeStateStatus)
+          case "$state" in
+            DIRTY|BLOCKED|UNKNOWN) stop "PR #$pr is $state" ;;
+          esac
+
+          # 4. Every check on the commit, not only the workflow that woke this job. Workflows finish
+          #    independently, so the trigger's own green says nothing about the others.
+          runs=$(gh api "repos/$REPO/commits/$SHA/check-runs" --paginate \
+            --jq '.check_runs[] | [.name, .status, (.conclusion // "none")] | @tsv')
+          others=$(printf '%s\n' "$runs" | awk -F'\t' -v own="$OWN_CHECK_NAME" 'NF && $1 != own')
+          other_count=$(printf '%s' "$others" | grep -c . || true)
+          [ "$other_count" -gt 0 ] || stop "no check runs on $SHA besides this job, so nothing verified it"
+
+          pending=$(printf '%s\n' "$others" | awk -F'\t' '$2 != "completed"')
+          if [ -n "$pending" ]; then
+            stop "still running: $(printf '%s' "$pending" | awk -F'\t' '{print $1}' | tr '\n' ' ')"
+          fi
+
+          bad=$(printf '%s\n' "$others" | awk -F'\t' '$3 != "success" && $3 != "skipped" && $3 != "neutral"')
+          if [ -n "$bad" ]; then
+            stop "not green: $(printf '%s' "$bad" | awk -F'\t' '{print $1 "=" $3}' | tr '\n' ' ')"
+          fi
+
+          # 5. A change to the gate is not merged by the gate.
+          files=$(gh pr view "$pr" --repo "$REPO" --json files --jq '.files[].path')
+          file_count=$(printf '%s' "$files" | grep -c . || true)
+          # The list is paginated; at the page size this job cannot see the whole change, and a
+          # deny-list checked against part of a change is not a check.
+          [ "$file_count" -lt 100 ] || stop "PR #$pr changes $file_count files, too many to read here"
+          denied=$(printf '%s\n' "$files" | grep -E '^(\.github/|validate/|\.claude/)' || true)
+          if [ -n "$denied" ]; then
+            stop "PR #$pr changes the gate itself: $(printf '%s' "$denied" | tr '\n' ' ')"
+          fi
+
+          echo "PR #$pr: $other_count checks completed green, merging."
+          body="Merged automatically under XC-218, a measure that ends at the first working prototype. Evidence: $RUN_URL"
+          gh pr merge "$pr" --repo "$REPO" --squash --delete-branch --body "$body"
+          gh pr comment "$pr" --repo "$REPO" --body "$body"

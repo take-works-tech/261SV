@@ -1278,6 +1278,30 @@ can be repeated.
   them. The names are still shown beside the pictures in both
 - justifies: XC-215
 
+### E-129 - What this repository's plan actually permits, measured against the API
+- tier: T1
+- url: `gh api` against `take-works-tech/261SV` on 2026-08-23, and the reference design at
+  `D:\dev\claude-agent-env-design\specsutonomous-dev-env-spec.md`
+- verified: 2026-08-23
+- says: **the three mechanisms a normal auto-merge is built on are unavailable here.**
+  `GET /repos/.../rulesets` and `GET /repos/.../branches/main/protection` both answer **403 "Upgrade to
+  GitHub Pro or make this repository public to enable this feature"**, re-measuring what OPEN-020
+  recorded on 2026-08-22 for the write endpoints. New here: `PATCH /repos/...` with
+  `allow_auto_merge=true` is **accepted and has no effect**: a subsequent read still returns `allow_auto_merge: false`, so GitHub's own auto-merge
+  cannot be turned on. The GraphQL `repository.mergeQueue` is **null**. `gh secret list` and
+  `gh variable list` are **both empty**, so `claude.yml` and `claude-code-review.yml` - which read
+  `secrets.CLAUDE_CODE_OAUTH_TOKEN` - cannot run as written. Repository settings that *are* in effect:
+  default branch `main`, squash merge allowed, merge commit allowed, rebase merge disallowed, delete
+  branch on merge enabled.
+  The reference design reaches the opposite conclusion about scope from the same problem: it defines
+  autonomy levels **A0 propose-only, A1 auto-implement and open a ready pull request, A2 auto-merge
+  limited to an allowlist of low-risk domains, A3 broad automation**, adopts **A0 to A2 only**, states
+  **"A3 is never adopted"**, and gives as its central principle **"separate the freedom to create a PR
+  from the authority to change main"**. Its stated reasons are goal drift over long horizons, the
+  vendor's own "the action is powerful and occasionally wrong", and that a scheduled run reporting green
+  means the session ended, not that the task succeeded
+- justifies: XC-218
+
 ## Not verified here
 
 Recorded so that nothing silently depends on them:

@@ -3001,8 +3001,12 @@ model or the prompt, never in a description that quietly went stale.
   disabled at the repository level, which the free plan does permit; Dependabot alerts and automated
   security fixes enabled. CI runs on every push and pull request and reports honestly - it simply
   cannot **block** a merge
-- blocks: nothing today, with one maintainer and no other contributors. It becomes urgent the moment a
-  second person can push, because at that point the rule exists only in a document
+- blocks: **XC-218, as of 2026-08-23.** Automatic merge needs a gate that a change cannot walk past,
+  and with no server-side enforcement the gate is a workflow in the same repository the change is
+  editing - which is why that workflow refuses to merge anything touching `.github/` or `validate/`, and
+  why the reference design keeps merge authority off the agent entirely (E-129). Before that it blocked
+  nothing, with one maintainer and no other contributors; it becomes urgent the moment a second person
+  can push, because at that point the rule exists only in a document
 - closes_when: a plan or account type is chosen that permits a ruleset, and the ruleset requires the
   three CI jobs by name - `repository gates`, `tests`, `mockup catalogue typecheck` - with
   non-fast-forward and deletion refused. The ruleset JSON is written and was rejected only by the plan
@@ -3442,3 +3446,56 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a search that genuinely spans the sidebar's sections, which would belong above them
   and would have to say so in its own label rather than its placeholder
+
+### XC-218 - Automatic merge until the first working prototype, and what that period accepts
+- decided: 2026-08-23
+- status: active
+- decision: until the first working prototype exists, a change reaches `main` **without a person reading
+  it**. `.github/workflows/auto-merge.yml` squash-merges a pull request when, and only when, every one
+  of these holds: the repository variable `AUTO_MERGE_ENABLED` is `true`; the run that woke it concluded
+  success and was for a pull request; the head is not on a fork; exactly one open pull request has that
+  commit as its head; that pull request is open, not a draft, based on `main`, and still at that commit;
+  it does not carry `no-auto-merge`; its merge state is not dirty, blocked or undecided; **every check
+  run on the commit** - not only the workflow that triggered this one - has completed with success,
+  skipped or neutral; and it touches nothing under `.github/`, `validate/` or `.claude/`.
+  **Every branch leaves without merging.** An answer the job cannot read, a check still running, a count
+  it did not expect: each ends the run having merged nothing. An error in the job merges nothing at all.
+  **What this accepts, stated rather than discovered later.** Everything outside those three directories
+  merges unread - including `specs/`, `AGENTS.md` and `evidence/`, the documents that authorise the
+  arrangement. And nothing enforces that work arrives by pull request: a direct push to `main` skips
+  every condition above, because there is no branch protection to prevent it (E-129, OPEN-020). Both are
+  open on purpose for the length of the prototype.
+  **The agent does not merge.** `.claude/settings.json` denies `gh pr merge` - `ask` was not that rule,
+  because an unattended run has nobody to answer a prompt. An agent opens the pull request; the workflow
+  lands it.
+  **The switch is a repository variable, not a file.** `gh variable set AUTO_MERGE_ENABLED --body false`
+  is one command with no diff and no pull request. A temporary measure that needs a pull request to end
+  becomes a permanent one. `no-auto-merge` stops a single pull request without touching the switch.
+  **How the period ends**: the variable goes to `false`, `.github/workflows/auto-merge.yml` is deleted,
+  and this decision becomes `superseded`. `check_automerge_policy.py` fails if the workflow is present
+  while the decision is superseded, or absent while it is active, so the period cannot end in the record
+  alone. After it, the arrangement is the reference design's A1: the agent opens a ready pull request
+  with its evidence attached, and a person merges
+- decided_by: the product owner, 2026-08-23
+- rationale: the reference design separates "the freedom to create a pull request" from "the authority to
+  change `main`" and never grants the second, on evidence of goal drift over long horizons and the
+  vendor's own "powerful and occasionally wrong" (E-129). The argument holds for a product whose claim is
+  trustworthy numbers, and the product owner has asked for the authority anyway, bounded to the period
+  before a prototype exists - when the cost of a bad merge is a revert rather than a wrong number in
+  someone's report. The honest way to grant it is to make the automatic decision **narrower and more
+  explicit** than a human one, to write down what it lets through rather than only what it stops, and to
+  make switching it off cheaper than leaving it on by accident
+- correction: the catalogue sweep ran by hand before every push while CI only typechecked. Defensible
+  while a person decided each merge; not defensible when a workflow decides on CI's word. `ci` now
+  renders all 88 states through a browser (`check_mockup_states.py`) - an HTTP fetch returns the same
+  6 KB shell for every state and would have passed while all of them threw
+- alternatives: staying at A1 is safer and is what this becomes at the boundary. A path **allowlist**
+  rather than a deny-list would stop the unread merge of `specs/` too, and would refuse most ordinary
+  work, which is the throughput this measure exists to buy. Making the repository public would restore
+  branch protection and the merge queue and is refused by XC-186; upgrading the plan would put the gate
+  where a pull request cannot edit it, and remains the better arrangement if this period lasts
+- basis: E-129 (T1)
+- affects: AGENTS.md, 08_decisions.md
+- decidedness: Fixed
+- reversal_trigger: the first working prototype. Also any merge that reaches `main` in a state a person
+  would have stopped, which ends the period early

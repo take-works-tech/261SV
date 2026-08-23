@@ -47,6 +47,8 @@ coverage:
 | `validate/check_context_budget.py` | the instruction layer paid on every turn - CLAUDE.md and what it imports, AGENTS.md, rules, output styles - and the path-scoped layer, both charged |
 | `validate/check_dependency_pins.py` | declared dependency versions against the manifests that pin them, in both directions - check 7 compares `SYMBOL = literal` in source files, and a pin inside a TOML array matches nothing it looks at (XC-185) |
 | `validate/check_gates_wired.py` | every validator here is invoked by something that runs it |
+| `validate/check_automerge_policy.py` | the automatic-merge workflow still checks every condition XC-218 names, still fails closed, and is present or absent in step with that decision's status |
+| `validate/check_mockup_states.py` | every catalogue state renders, not only typechecks - needs `MOCKUP_BASE_URL` and refuses to report success without it |
 
 ## Format
 

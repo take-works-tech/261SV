@@ -76,14 +76,26 @@ if [ -z "$python" ]; then
     exit 0
 fi
 
+# Exit 3 means "this gate needs something this machine has not started" - the catalogue sweep needs a
+# served build (XC-218). It is reported, never hidden: a gate that skips quietly here is read as a gate
+# that passed.
 failed=""
+skipped=""
 for gate in validate/check_*.py; do
     [ -f "$gate" ] || continue
     case "$gate" in *test_*) continue ;; esac
-    if ! $python "$gate" >/dev/null 2>&1; then
+    $python "$gate" >/dev/null 2>&1 && continue
+    if [ $? -eq 3 ]; then
+        skipped="$skipped $gate"
+    else
         failed="$failed $gate"
     fi
 done
+
+if [ -n "$skipped" ]; then
+    printf 'pre-push: not run here (needs a running service), left to CI:%s
+' "$skipped" >&2
+fi
 
 if [ -n "$failed" ]; then
     printf '\nGates failing:%s\n' "$failed" >&2
