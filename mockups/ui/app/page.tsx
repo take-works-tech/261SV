@@ -50,6 +50,10 @@ import {
   Eye,
   EyeOff,
   Image as ImageIcon,
+  Database,
+  Globe,
+  IdCard,
+  ListChecks,
   Layers3,
   LayoutTemplate,
   LayoutGrid,
@@ -220,29 +224,29 @@ const rightSidebarTabs: Record<ScreenId, SidebarTab[]> = {
     { id: 'history', label: '履歴', description: '実行結果と再現可能な処理履歴を確認します。', icon: Clock3 },
   ],
   view: [
-    { id: 'overall', label: 'ビュー', description: '開いている項目そのもの（名前・定義）と、キャンバスに重ねるガイドを設定します。', icon: LayoutTemplate, scope: 'view' },
+    { id: 'overall', label: 'ビュー', description: '開いている項目そのもの（名前・定義）と、キャンバスに重ねるガイドを設定します。', icon: IdCard, scope: 'view' },
     { id: 'camera', label: 'カメラ', description: 'このビューが持つカメラを追加し、ポーズとレンズ、被写界深度を設定します。', icon: Camera, scope: 'view' },
     { id: 'rendering', label: '描画', description: 'レンダラー、照明、現像を設定します。', icon: MonitorCog, scope: 'view' },
-    { id: 'background', label: '背景', description: 'ビューの背景と周辺表現を設定します。', icon: ImageIcon, scope: 'view' },
+    { id: 'background', label: '背景', description: 'ビューの背景と周辺環境を設定します。', icon: Globe, scope: 'view' },
     { id: 'output', label: '出力', description: '画像と動画の作成条件を設定します。', icon: FileOutput, scope: 'view' },
     { id: 'objects', label: 'オブジェクト', description: '選択中の表示オブジェクトを設定します。', icon: Shapes, scope: 'selection' },
     { id: 'text', label: 'テキスト', description: '選択中のテキスト・注釈の内容と文字表現を設定します。', icon: Type, scope: 'selection' },
     { id: 'materials', label: 'マテリアル', description: '選択中の形状と結果表示に使う外観を設定します。', icon: MaterialSphereIcon, scope: 'selection' },
   ],
   graph: [
-    { id: 'overall', label: '全体', description: '現在のグラフ全体に関わる表示と操作を設定します。', icon: LayoutTemplate },
+    { id: 'overall', label: 'グラフ', description: '開いているグラフそのもの（名前・タイトル・構成）を設定します。', icon: IdCard },
     { id: 'kind', label: '種類', description: 'データに合うグラフ形式を選択します。', icon: ChartNoAxesCombined },
     { id: 'style', label: 'スタイル', description: '線、マーカー、配色の表現を調整します。', icon: Paintbrush },
     { id: 'fonts', label: 'テキスト', description: 'タイトル、軸、凡例、注釈の文字表現を設定します。', icon: Type },
-    { id: 'detail', label: '詳細', description: 'ケース、変数、参照情報などの詳細を設定します。', icon: SlidersHorizontal },
+    { id: 'data', label: 'データ', description: 'このグラフが描くケースと系列、その数量・単位・来歴を設定します。', icon: Database },
     { id: 'output', label: '出力', description: '画像、ベクター形式、表データの出力条件を設定します。', icon: FileOutput },
   ],
   report: [
-    { id: 'overall', label: '全体', description: '現在のレポート全体に関わる表示と操作を設定します。', icon: LayoutTemplate },
+    { id: 'overall', label: 'レポート', description: '開いているレポートそのもの（名前・タイトル・構成）を設定します。', icon: IdCard },
     { id: 'layout', label: 'レイアウト', description: 'ページとコンテンツの配置を整えます。', icon: LayoutGrid },
     { id: 'style', label: 'スタイル', description: '文書全体の視覚表現を調整します。', icon: Paintbrush },
     { id: 'fonts', label: 'テキスト', description: '見出し、本文、注記の文字表現を設定します。', icon: Type },
-    { id: 'detail', label: '詳細', description: '参照ケースと収録内容の詳細を設定します。', icon: SlidersHorizontal },
+    { id: 'contents', label: '内容', description: '参照するケースの範囲、収録するブロック、コメントの方式を設定します。', icon: ListChecks },
     { id: 'output', label: '出力', description: '文書形式と出力条件を設定します。', icon: FileOutput },
   ],
   chat: [],
@@ -1687,7 +1691,7 @@ function RightSidebar({ screen, variant, width, setWidth, selectedViewObjects, o
   const borrowedTabIds = ['camera', 'rendering', 'background', 'objects', 'text', 'materials']
   const isBorrowed = (tabId: string) => screen === 'view' && isComparisonItem && borrowedTabIds.includes(tabId)
   const [selectedByScreen, setSelectedByScreen] = useState<Partial<Record<ScreenId, string>>>({})
-  const variantTab = variant.startsWith('object-') ? 'objects' : variant.startsWith('material-') ? 'materials' : variant === 'steady-result' ? 'output' : variant === 'comparison-borrowed' ? 'materials' : variant === 'cameras' || variant.startsWith('camera-') ? 'camera' : variant === 'output-motion' ? 'output' : variant === 'develop-grade' ? 'rendering' : variant.includes('output-preflight') ? 'output' : variant === 'series-unresolved' || variant === 'commentary-review' ? 'detail' : undefined
+  const variantTab = variant.startsWith('object-') ? 'objects' : variant.startsWith('material-') ? 'materials' : variant === 'steady-result' ? 'output' : variant === 'comparison-borrowed' ? 'materials' : variant === 'cameras' || variant.startsWith('camera-') ? 'camera' : variant === 'output-motion' ? 'output' : variant === 'develop-grade' ? 'rendering' : variant.includes('output-preflight') ? 'output' : variant === 'series-unresolved' ? 'data' : variant === 'commentary-review' ? 'contents' : undefined
   const selectedTab = tabs.find((tab) => tab.id === (selectedByScreen[screen] ?? variantTab)) ?? tabs[0]
 
   if (!selectedTab) return null
@@ -2474,7 +2478,7 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
     <p className="property-editor-note"><ShieldCheck size={12} />出力では使用文字を検査し、必要な字体をライセンス条件に従って埋め込みます。</p>
   </div>
 
-  if (tab.id === 'detail') return <div className="property-editor">
+  if (tab.id === 'data') return <div className="property-editor">
     <PropertyGroup title="ケース選択">
       <label><span>対象</span><select value={caseSelectionMode} onChange={(event) => setCaseSelectionMode(event.target.value as typeof caseSelectionMode)}><option value="selected">選択中のケース</option><option value="saved">保存済み選択</option><option value="tag">宣言的な条件</option><option value="code">Python選択</option></select></label>
       {caseSelectionMode === 'saved' && <label><span>選択</span><select defaultValue="unresolved"><option value="unresolved">選択を指定</option></select></label>}
@@ -2592,7 +2596,7 @@ function ReportPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: stri
     <p className="property-editor-note"><ShieldCheck size={12} />表示できない文字は、空の四角で出力せず要素と文字を特定して報告します。</p>
   </div>
 
-  if (tab.id === 'detail') return <div className="property-editor">
+  if (tab.id === 'contents') return <div className="property-editor">
     <PropertyGroup title="参照範囲">
       <label><span>ワークスペース</span><select defaultValue="current"><option value="current">現在のワークスペース</option><option value="multiple">複数を選択</option></select></label>
       <label><span>ケース</span><select defaultValue="selected"><option value="selected">選択中のケース</option><option value="selection">保存済み選択</option></select></label>

@@ -592,7 +592,7 @@ def test_graph_and_report_output_tabs_are_last_without_detaching_from_the_tab_se
     report_tabs = page[page.index("  report: [") : page.index("  chat: [")]
     for tabs in (graph_tabs, report_tabs):
         assert "id: 'output'" in tabs
-        assert tabs.rindex("id: 'output'") > tabs.rindex("id: 'detail'")
+        assert tabs.rindex("id: 'output'") > tabs.rindex("label: 'スタイル'")
     assert "bottomDocked" not in page
     assert "bottom-docked" not in page
     assert ".sidebar-tab-button.bottom-docked" not in styles
@@ -643,7 +643,7 @@ def test_right_sidebar_is_context_editing_only_and_template_is_renamed_overall()
     for screen in ("view", "graph", "report"):
         block_start = page.index(f"  {screen}: [")
         next_block = page.index(f"  {next_screen_by_screen[screen]}: [", block_start)
-        expected = "'ビュー'" if screen == "view" else "'全体'"
+        expected = {"view": "'ビュー'", "graph": "'グラフ'", "report": "'レポート'"}[screen]
         assert f"id: 'overall', label: {expected}" in page[block_start:next_block]
     sidebar = page[page.index("function RightSidebar") : page.index("function OutlinerPanel")]
     assert "<LibraryPanel" not in sidebar
@@ -1850,6 +1850,63 @@ def test_the_first_view_tab_is_named_after_the_item_it_edits() -> None:
     page = CHAT_PAGE.read_text(encoding="utf-8")
 
     assert "{ id: 'overall', label: 'ビュー'" in page
-    assert page.count("{ id: 'overall', label: '全体'") == 2
+    assert "{ id: 'overall', label: 'グラフ'" in page
+    assert "{ id: 'overall', label: 'レポート'" in page
+    assert "label: '全体'" not in page
     assert "tab.id === 'overall' && screen === 'view' && isComparisonItem ? '比較' : tab.label" in page
     assert "selectedTab.id === 'overall' && screen === 'view' && isComparisonItem ? '比較' : selectedTab.label" in page
+
+
+def test_the_first_tab_of_every_editing_area_names_its_item_and_shares_one_icon() -> None:
+    """XC-208: `全体` said nothing in a rail where every other tab is the whole item too, and it wore
+    LayoutTemplate - the icon of the one concept XC-149 renamed it away from."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    for label in ["'ビュー'", "'グラフ'", "'レポート'"]:
+        assert f"{{ id: 'overall', label: {label}" in page
+    assert page.count("id: 'overall', label: '") == 3
+    assert page.count("icon: IdCard") == 3
+    # LayoutTemplate now stands for one concept only
+    for site in ["template: { label: 'テンプレート', icon: LayoutTemplate }", "<LayoutTemplate size={12} />テンプレートとして保存"]:
+        assert site in page
+    assert "icon: LayoutTemplate" not in page.split("const rightSidebarTabs")[1].split("\n}\n")[0]
+
+
+def test_no_rail_icon_stands_for_two_unrelated_concepts() -> None:
+    """11_ui.md asks a repeated concept to keep one icon; the inverse has to hold too, or the rail
+    teaches a symbol and then contradicts it. SlidersHorizontal stood for pipeline 設定 and for the two
+    `詳細` buckets at once."""
+    import re
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    block = page[page.index("const rightSidebarTabs"):page.index("\n}\n", page.index("const rightSidebarTabs"))]
+    by_icon: dict[str, list[tuple[str, str]]] = {}
+    for tab_id, label, icon in re.findall(r"id: '([\w-]+)', label: '([^']+)'.*?icon: (\w+)", block):
+        by_icon.setdefault(icon, []).append((tab_id, label))
+    for icon, tabs in by_icon.items():
+        ids = {tab_id for tab_id, _ in tabs}
+        labels = {label for _, label in tabs}
+        # one icon may cover several tabs only when they are the same concept: one shared id (the open
+        # item, named per area) or one shared label (出力, テキスト).
+        assert len(ids) == 1 or len(labels) == 1, f"{icon} stands for {sorted(tabs)}"
+
+
+def test_the_data_and_contents_tabs_are_named_for_what_they_hold() -> None:
+    """XC-208: `詳細` named a bucket. The graph tab holds the cases and series the graph is drawn from;
+    the report tab holds the reference scope, the blocks and the commentary."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "{ id: 'data', label: 'データ'" in page
+    assert "{ id: 'contents', label: '内容'" in page
+    assert "label: '詳細'" not in page
+    assert "if (tab.id === 'data') return" in page
+    assert "if (tab.id === 'contents') return" in page
+    assert "variant === 'series-unresolved' ? 'data' : variant === 'commentary-review' ? 'contents'" in page
+
+
+def test_the_background_tab_uses_a_world_icon_rather_than_a_picture() -> None:
+    """XC-208: the panel is solid, gradient, image or environment, so a picture icon names one of its
+    four cases. The measured reference calls this tab World (E-120)."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "{ id: 'background', label: '背景'" in page
+    assert "icon: Globe, scope: 'view' }" in page

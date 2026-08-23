@@ -3164,3 +3164,36 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: usage showing the assistant is the first thing reached in the View area, which would
   make the drawer the resting state rather than an opened one
+
+### XC-208 - Every rail section is named for what it holds, and no icon stands for two of them
+- decided: 2026-08-23
+- status: active
+- decision: **the first section of View, Graph and Report is named after the item it edits** - `ビュー`
+  (`比較` when a @Comparison is open), `グラフ`, `レポート` - not `全体`, and the three share one icon
+  because they are one concept. **`詳細` is replaced by what the section actually holds**: Graph
+  `データ`, which is the cases and series the graph is drawn from with their quantity, unit and
+  provenance; Report `内容`, which is the reference scope, the blocks collected and the commentary
+  method. **`LayoutTemplate` is reserved for @Template** and appears on no rail tab. **The background
+  tab uses a world icon**, not a picture. And **no icon stands for two unrelated sections**: one icon
+  may cover several tabs only where they are the same concept, either one shared id named per area or
+  one shared label
+- decided_by: the product owner, 2026-08-23
+- rationale: `全体` and `詳細` are both bucket names - they say where something was put, not what it is,
+  and a reader cannot predict either from the rail. The icons were worse than the names: the section
+  XC-149 renamed away from `テンプレート` was wearing the Template icon, so the rail said the word the
+  name was chosen to avoid, and in Report it sat next to `LayoutGrid` as a second grid glyph meaning
+  something else. `SlidersHorizontal` stood for Pipeline `設定` and for both `詳細` buckets at once,
+  which is a symbol taught and then contradicted. The measured reference names the background tab World
+  and the panel is solid, gradient, image or environment, so a picture icon names one of its four cases
+  (E-120)
+- correction: XC-149 renamed the former Template section to `全体`, which fixed the confusion with the
+  material library and left a name that says nothing. The rename it needed was to the item, not to a
+  word for "not one of the others"
+- alternatives: `定義` for all three avoids repeating the area's own word in its rail, and gives up
+  telling the reader which kind of item is open - which View needs, having two. `項目` is the same
+  trade with a vaguer word
+- basis: E-120 (T1)
+- affects: 11_ui.md
+- decidedness: Fixed
+- reversal_trigger: a fourth editing area whose first section is not an item, which would make the
+  shared icon a claim about something it is not
