@@ -579,7 +579,7 @@ function ProductShell({ scenario, onScreen, draft, onDraftChange, settings, onSe
   })
   // Session state, held by the shell rather than the canvas: the control that sets it is in the work
   // area bar, and a value edited from the bar cannot live inside the thing the bar sits above (XC-204).
-  const [splitPanes, setSplitPanes] = useState(scenario.variant === 'split-two' ? 2 : scenario.variant === 'split-three' ? 3 : scenario.variant === 'split-four' ? 4 : 1)
+  const [splitPanes, setSplitPanes] = useState(scenario.variant === 'split-two' || scenario.variant === 'split-output' ? 2 : scenario.variant === 'split-three' ? 3 : scenario.variant === 'split-four' ? 4 : 1)
   const [cameraSync, setCameraSync] = useState(true)
   const [splitPromoteOpen, setSplitPromoteOpen] = useState(false)
   const layoutControl: { kind: 'split' } | { kind: 'comparison'; members: number } | null = scenario.screen !== 'view'
@@ -693,7 +693,7 @@ function ProductShell({ scenario, onScreen, draft, onDraftChange, settings, onSe
             {scenario.screen !== 'chat' && !itemListOpen && <AssetLibraryShelf screen={scenario.screen} variant={scenario.variant} />}
             {scenario.screen !== 'chat' && (assistantOpen ? null : <InstructionBar draft={draft} onDraftChange={onDraftChange} onOpen={() => setAssistantOpen(true)} />)}
           </section>
-          {!isChat && rightOpen && !itemListOpen && <RightSidebar screen={scenario.screen} variant={scenario.variant} width={rightSidebarWidth} setWidth={setRightSidebarWidth} selectedViewObjects={selectedViewObjects} onViewObjectSelect={selectViewObject} pipelineUnits={pipelineUnits} onPipelineUnitsChange={setPipelineUnits} selectedUnitId={selectedUnitId} onSelectUnit={setSelectedUnitId} viewItem={viewItem} onViewItemChange={setViewItem} selectedCase={selectedCase} isComparisonItem={isComparisonItem} baseViewName={openViewItem?.baseViewName ?? '標準ビュー'} comparison={comparison} onComparisonChange={setComparison} />}
+          {!isChat && rightOpen && !itemListOpen && <RightSidebar screen={scenario.screen} variant={scenario.variant} width={rightSidebarWidth} setWidth={setRightSidebarWidth} selectedViewObjects={selectedViewObjects} onViewObjectSelect={selectViewObject} pipelineUnits={pipelineUnits} onPipelineUnitsChange={setPipelineUnits} selectedUnitId={selectedUnitId} onSelectUnit={setSelectedUnitId} viewItem={viewItem} onViewItemChange={setViewItem} selectedCase={selectedCase} isComparisonItem={isComparisonItem} baseViewName={openViewItem?.baseViewName ?? '標準ビュー'} comparison={comparison} onComparisonChange={setComparison} splitPanes={splitPanes} />}
         </div>
       )}
       <ImportFlowDialog open={importOpen} onOpenChange={setImportOpen} initialStep={scenario.variant === 'import-review' ? 'review' : 'choose'} />
@@ -1329,7 +1329,7 @@ function WorkAreaBar({ screen, itemListOpen, onItemListOpenChange, itemListQuery
             {splitPanes > 1 && <>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={onPromoteSplit}><Save size={12} />この比較を保存</DropdownMenuItem>
-              <div className="menu-note">この分割はセッションの状態で、保存されません。書き出すとレイアウトの記録として扱われます。</div>
+              <div className="menu-note">この分割は見ながら比べるための一時的な状態です。保存も書き出しもされません。並べた図を成果物にする場合は「この比較を保存」から比較項目を作ります。</div>
             </>}
           </> : <>
             <div className="menu-note">ペイン数はメンバー数（{layoutControl.members}件）です。列数だけを選び、行数はそこから決まります。</div>
@@ -1691,7 +1691,7 @@ function AssetLibraryShelf({ screen, variant }: { screen: ScreenId; variant: str
   )
 }
 
-function RightSidebar({ screen, variant, width, setWidth, selectedViewObjects, onViewObjectSelect, pipelineUnits, onPipelineUnitsChange, selectedUnitId, onSelectUnit, viewItem, onViewItemChange, selectedCase, isComparisonItem, baseViewName, comparison, onComparisonChange }: { screen: ScreenId; variant: string; width: number; setWidth: React.Dispatch<React.SetStateAction<number>>; selectedViewObjects: string[]; onViewObjectSelect: (name: string, additive?: boolean) => void; pipelineUnits: PipelineUnitModel[]; onPipelineUnitsChange: (units: PipelineUnitModel[]) => void; selectedUnitId: string | null; onSelectUnit: (id: string) => void; viewItem: ViewItemState; onViewItemChange: (next: ViewItemState) => void; selectedCase: string; isComparisonItem: boolean; baseViewName: string; comparison: ComparisonModel; onComparisonChange: (next: ComparisonModel) => void }) {
+function RightSidebar({ screen, variant, width, setWidth, selectedViewObjects, onViewObjectSelect, pipelineUnits, onPipelineUnitsChange, selectedUnitId, onSelectUnit, viewItem, onViewItemChange, selectedCase, isComparisonItem, baseViewName, comparison, onComparisonChange, splitPanes }: { screen: ScreenId; variant: string; width: number; setWidth: React.Dispatch<React.SetStateAction<number>>; selectedViewObjects: string[]; onViewObjectSelect: (name: string, additive?: boolean) => void; pipelineUnits: PipelineUnitModel[]; onPipelineUnitsChange: (units: PipelineUnitModel[]) => void; selectedUnitId: string | null; onSelectUnit: (id: string) => void; viewItem: ViewItemState; onViewItemChange: (next: ViewItemState) => void; selectedCase: string; isComparisonItem: boolean; baseViewName: string; comparison: ComparisonModel; onComparisonChange: (next: ComparisonModel) => void; splitPanes: number }) {
   const active = activeViewObject(variant, selectedViewObjects)
   const tabs = rightSidebarTabs[screen].filter((tab) => screen !== 'view' || tab.id !== 'text' || (active.kind !== 'container' && viewObjectKinds[active.kind].textProperties))
   // XC-202: a comparison owns 全体 and 出力. The others stay in the rail - removing them leaves "where
@@ -1699,7 +1699,7 @@ function RightSidebar({ screen, variant, width, setWidth, selectedViewObjects, o
   const borrowedTabIds = ['camera', 'rendering', 'background', 'objects', 'text', 'materials']
   const isBorrowed = (tabId: string) => screen === 'view' && isComparisonItem && borrowedTabIds.includes(tabId)
   const [selectedByScreen, setSelectedByScreen] = useState<Partial<Record<ScreenId, string>>>({})
-  const variantTab = variant.startsWith('object-') ? 'objects' : variant.startsWith('material-') ? 'materials' : variant === 'steady-result' ? 'output' : variant === 'comparison-borrowed' ? 'materials' : variant === 'cameras' || variant.startsWith('camera-') ? 'camera' : variant === 'output-motion' ? 'output' : variant === 'develop-grade' ? 'rendering' : variant.includes('output-preflight') ? 'output' : variant === 'series-unresolved' ? 'data' : variant === 'commentary-review' ? 'contents' : undefined
+  const variantTab = variant.startsWith('object-') ? 'objects' : variant.startsWith('material-') ? 'materials' : variant === 'steady-result' ? 'output' : variant === 'comparison-borrowed' ? 'materials' : variant === 'cameras' || variant.startsWith('camera-') ? 'camera' : variant === 'output-motion' || variant === 'split-output' ? 'output' : variant === 'develop-grade' ? 'rendering' : variant.includes('output-preflight') ? 'output' : variant === 'series-unresolved' ? 'data' : variant === 'commentary-review' ? 'contents' : undefined
   const selectedTab = tabs.find((tab) => tab.id === (selectedByScreen[screen] ?? variantTab)) ?? tabs[0]
 
   if (!selectedTab) return null
@@ -1770,7 +1770,7 @@ function RightSidebar({ screen, variant, width, setWidth, selectedViewObjects, o
             {isBorrowed(selectedTab.id) && <em className="sidebar-tab-borrowed-mark">基準ビューの設定</em>}
           </header>
           <p className="sidebar-tab-summary">{selectedTab.description}</p>
-          <PropertyEditor key={`${screen}-${selectedTab.id}`} screen={screen} tab={selectedTab} variant={variant} activeObject={active} pipelineUnits={pipelineUnits} onPipelineUnitsChange={onPipelineUnitsChange} selectedUnitId={selectedUnitId} onSelectUnit={onSelectUnit} viewItem={viewItem} onViewItemChange={onViewItemChange} selectedCase={selectedCase} isComparisonItem={isComparisonItem} baseViewName={baseViewName} comparison={comparison} onComparisonChange={onComparisonChange} />
+          <PropertyEditor key={`${screen}-${selectedTab.id}`} screen={screen} tab={selectedTab} variant={variant} activeObject={active} pipelineUnits={pipelineUnits} onPipelineUnitsChange={onPipelineUnitsChange} selectedUnitId={selectedUnitId} onSelectUnit={onSelectUnit} viewItem={viewItem} onViewItemChange={onViewItemChange} selectedCase={selectedCase} isComparisonItem={isComparisonItem} baseViewName={baseViewName} comparison={comparison} onComparisonChange={onComparisonChange} splitPanes={splitPanes} />
         </section>
       </div>
       <button
@@ -1790,7 +1790,7 @@ function RightSidebar({ screen, variant, width, setWidth, selectedViewObjects, o
   )
 }
 
-function PropertyEditor({ screen, tab, variant, activeObject, pipelineUnits, onPipelineUnitsChange, selectedUnitId, onSelectUnit, viewItem, onViewItemChange, selectedCase, isComparisonItem, baseViewName, comparison, onComparisonChange }: { screen: ScreenId; tab: SidebarTab; variant: string; activeObject: ActiveViewObject; pipelineUnits: PipelineUnitModel[]; onPipelineUnitsChange: (units: PipelineUnitModel[]) => void; selectedUnitId: string | null; onSelectUnit: (id: string) => void; viewItem: ViewItemState; onViewItemChange: (next: ViewItemState) => void; selectedCase: string; isComparisonItem: boolean; baseViewName: string; comparison: ComparisonModel; onComparisonChange: (next: ComparisonModel) => void }) {
+function PropertyEditor({ screen, tab, variant, activeObject, pipelineUnits, onPipelineUnitsChange, selectedUnitId, onSelectUnit, viewItem, onViewItemChange, selectedCase, isComparisonItem, baseViewName, comparison, onComparisonChange, splitPanes }: { screen: ScreenId; tab: SidebarTab; variant: string; activeObject: ActiveViewObject; pipelineUnits: PipelineUnitModel[]; onPipelineUnitsChange: (units: PipelineUnitModel[]) => void; selectedUnitId: string | null; onSelectUnit: (id: string) => void; viewItem: ViewItemState; onViewItemChange: (next: ViewItemState) => void; selectedCase: string; isComparisonItem: boolean; baseViewName: string; comparison: ComparisonModel; onComparisonChange: (next: ComparisonModel) => void; splitPanes: number }) {
   if (screen === 'pipeline') return <AutomationPropertyEditor tab={tab} variant={variant} units={pipelineUnits} onUnitsChange={onPipelineUnitsChange} selectedUnitId={selectedUnitId} onSelectUnit={onSelectUnit} />
   // XC-202: a comparison owns 全体 and 出力 only. Every other tab belongs to its base View, and is
   // named as borrowed rather than shown as an editable copy - a copy would let a user change one pane's
@@ -1801,7 +1801,7 @@ function PropertyEditor({ screen, tab, variant, activeObject, pipelineUnits, onP
   if (screen === 'view' && tab.id === 'objects') return <ViewObjectPropertyEditor activeObject={activeObject} />
   if (screen === 'view' && tab.id === 'materials') return <ViewMaterialPropertyEditor variant={variant} activeObject={activeObject} />
   if (screen === 'view' && tab.id === 'text') return <ViewTextPropertyEditor activeObject={activeObject} />
-  if (screen === 'view') return <ViewPropertyEditor tab={tab} variant={variant} viewItem={viewItem} onViewItemChange={onViewItemChange} selectedCase={selectedCase} isComparisonItem={isComparisonItem} baseViewName={baseViewName} comparison={comparison} onComparisonChange={onComparisonChange} />
+  if (screen === 'view') return <ViewPropertyEditor tab={tab} variant={variant} viewItem={viewItem} onViewItemChange={onViewItemChange} selectedCase={selectedCase} isComparisonItem={isComparisonItem} baseViewName={baseViewName} comparison={comparison} onComparisonChange={onComparisonChange} splitPanes={splitPanes} />
   if (screen === 'graph') return <GraphPropertyEditor tab={tab} variant={variant} />
   if (screen === 'report') return <ReportPropertyEditor tab={tab} variant={variant} />
   if (screen === 'simulation') return <SimulationPropertyEditor />
@@ -2093,7 +2093,7 @@ const initialViewItem: ViewItemState = {
   bookmarks: seedResultBookmarks,
 }
 
-function ViewPropertyEditor({ tab, variant, viewItem, onViewItemChange, selectedCase, isComparisonItem, baseViewName, comparison, onComparisonChange }: { tab: SidebarTab; variant: string; viewItem: ViewItemState; onViewItemChange: (next: ViewItemState) => void; selectedCase: string; isComparisonItem: boolean; baseViewName: string; comparison: ComparisonModel; onComparisonChange: (next: ComparisonModel) => void }) {
+function ViewPropertyEditor({ tab, variant, viewItem, onViewItemChange, selectedCase, isComparisonItem, baseViewName, comparison, onComparisonChange, splitPanes }: { tab: SidebarTab; variant: string; viewItem: ViewItemState; onViewItemChange: (next: ViewItemState) => void; selectedCase: string; isComparisonItem: boolean; baseViewName: string; comparison: ComparisonModel; onComparisonChange: (next: ComparisonModel) => void; splitPanes: number }) {
   const cameraUnresolved = variant === 'camera-unresolved'
   const [selectedCameraId, setSelectedCameraId] = useState(viewItem.activeCameraId)
   const [selectedTimelineId, setSelectedTimelineId] = useState(viewItem.activeTimelineId)
@@ -2369,6 +2369,9 @@ function ViewPropertyEditor({ tab, variant, viewItem, onViewItemChange, selected
 
   return <div className="property-editor">
     <PropertyGroup title="成果物">
+      {/* XC-210: a split is not an export path. Saying so here is the point - this is the tab a user
+          opens expecting the side-by-side they are looking at. */}
+      {splitPanes > 1 && !isComparisonItem && <div className="property-unresolved"><AlertTriangle size={13} /><span><b>画面分割は書き出しに含まれません</b><small>いま{splitPanes}画面に分けていますが、出力は下で選ぶカメラ1つの絵です。並べた図が必要な場合は、画面上部の「画面レイアウト」から「この比較を保存」で比較項目にします。</small></span></div>}
       <label><span>種類</span><select value={outputMode} onChange={(event) => setOutputMode(event.target.value as typeof outputMode)}><option value="image">画像</option><option value="video" disabled={!hasResultAxis}>動画{hasResultAxis ? '' : '・この結果には軸がありません'}</option></select></label>
       {!hasResultAxis && <div className="property-unresolved"><AlertTriangle size={13} /><span><b>ケース「{selectedCase}」は定常結果です</b><small>再生する軸がないため、動画とその再生プリセットは選べません。画像とインタラクティブは通常どおり出力できます。</small></span></div>}
       {outputMode === 'image' ? <>

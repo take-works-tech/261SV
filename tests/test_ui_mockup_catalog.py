@@ -1641,7 +1641,7 @@ def test_the_layout_control_sets_the_arrangement_and_nothing_else_does() -> None
     assert page.count("カメラ同期") == 1  # the menu item; the canvas states nothing (XC-209)
     # what only makes sense once split is in the same menu, behind a guard, not on the canvas (XC-209)
     assert "{splitPanes > 1 && <>" in page
-    assert "この分割はセッションの状態で、保存されません。" in page
+    assert "この分割は見ながら比べるための一時的な状態です。" in page
 
 
 def test_the_layout_control_does_not_vanish_between_the_two_kinds_of_view_item() -> None:
@@ -1774,7 +1774,7 @@ def test_the_canvas_carries_no_split_chrome_at_any_pane_count() -> None:
     # the two facts unique to a split are in the layout menu, behind the same guard
     menu = page[page.index("{splitPanes > 1 && <>"):page.index("</> : <>")]
     assert "onSelect={onPromoteSplit}" in menu
-    assert "この分割はセッションの状態で、保存されません。" in menu
+    assert "この分割は見ながら比べるための一時的な状態です。保存も書き出しもされません。" in menu
     # the dialogue it opens is the canvas's, so its open state is the shell's
     assert "const [splitPromoteOpen, setSplitPromoteOpen] = useState(false)" in page
     assert "{promoteOpen && <Dialog open onOpenChange={onPromoteOpenChange}>" in page
@@ -1921,3 +1921,24 @@ def test_the_background_tab_uses_a_world_icon_rather_than_a_picture() -> None:
 
     assert "{ id: 'background', label: '背景'" in page
     assert "icon: Globe, scope: 'view' }" in page
+
+
+def test_a_split_is_not_an_export_path_and_the_output_tab_says_so() -> None:
+    """XC-210: XC-202 promised a split export "labelled a capture of a layout" and no such export was
+    ever built - the output tab writes one named camera. The claim is removed rather than implemented,
+    and stated where a user would expect the side-by-side they are looking at."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "画面分割は書き出しに含まれません" in page
+    assert "{splitPanes > 1 && !isComparisonItem && <div className=\"property-unresolved\">" in page
+    # the same fact where the split is made, naming the route that does produce a figure
+    assert "並べた図を成果物にする場合は「この比較を保存」から比較項目を作ります。" in page
+    # nothing offers to export the layout: the subject of an image is a camera, and the only mention of
+    # the split layout left in the product is the shortcut that enters and leaves it
+    assert "レイアウトの記録" not in page
+    # the note may name the layout menu; the fields that choose what is written may not offer a layout
+    fields = page[page.index('<label><span>種類</span><select value={outputMode}'):page.index('<OutputPreflightDialog')]
+    assert "レイアウト" not in fields
+    assert "<label><span>カメラ</span>" in fields
+    assert page.count("分割レイアウト") == 2  # the shortcut, and the command it is bound to
+    assert "{ name: '分割レイアウトへ入る・出る'" in page

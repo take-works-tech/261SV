@@ -2500,9 +2500,9 @@ model or the prompt, never in a description that quietly went stale.
 - decided: 2026-08-23
 - status: active
 - decision: comparing is two mechanisms, separated by what the user is doing.
-  **Splitting** the canvas into one to four panes is **session state**: it is reached by a canvas
-  control, each pane may show anything, it is never written into a @View definition, and its export is
-  labelled a capture of a layout rather than a reproducible artefact.
+  **Splitting** the canvas into one to four panes is **session state**: each pane may show anything, it
+  is never written into a @View definition, and it produces no deliverable at all (XC-204 moved its
+  control to the area bar; XC-210 removed the export it was to have had).
   A **@Comparison** is a **second kind of workspace item in the View area**, created from
   `＋ 新規ビュー` beside a single View. Its definition names **one** base @View and varies **exactly one
   axis** over an ordered list of members, arranged either as a grid or as one overlaid picture. The axis
@@ -3226,3 +3226,34 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a user exporting a split believing it reproducible, which would mean the statement
   needs to be in view rather than in the menu that sets it
+
+### XC-210 - A split is for looking, not for output; the deliverable comes from the item
+- decided: 2026-08-23
+- status: active
+- decision: splitting the canvas is a way of **looking while working** and is **not an export path**.
+  The output tab writes the one camera it names, whatever the canvas is divided into, and while
+  `panes > 1` it states that the split is not included and names the route that is: `この比較を保存`,
+  which creates a @Comparison. The layout menu says the same where the split is made. The split keeps
+  its freedom - each pane may show any @Case and any camera - precisely because it produces no
+  deliverable: that freedom is what makes a pair of panes able to differ in several ways at once, which
+  is useful to look at and is not a figure anyone should publish
+- decided_by: the product owner, 2026-08-23
+- rationale: this product's claim is that a picture supports the comparison it invites. A @Comparison
+  earns that by varying exactly one axis and sharing one colour map and range (XC-202, XC-203); a split
+  earns none of it. Offering a split export with a label attached puts the burden on a caption, and a
+  caption is read after the figure has already been believed. Keeping the split as a working tool costs
+  nothing and removes the case entirely
+- correction: XC-202 said the split's export is "labelled a capture of a layout", and that export was
+  never built - the output tab has only ever written a single named camera. So the specification claimed
+  a guard for a path that did not exist, which is worse than either answer: a reader of the spec would
+  conclude the case was handled. It is resolved by removing the path rather than adding it, and by
+  saying so in the two places a user meets it
+- alternatives: building the labelled export matches the measured reference, which can save a screenshot
+  of a whole layout (E-121), and gives this product a second route to a multi-pane figure whose only
+  protection is its caption. A screenshot of the application window remains available to anyone who
+  wants exactly that, and it is not this product asserting the picture is a result
+- basis: E-121 (T1)
+- affects: 11_ui.md
+- decidedness: Fixed
+- reversal_trigger: a comparison that cannot express a figure users legitimately need, which would mean
+  the split has to become reproducible rather than the export being removed

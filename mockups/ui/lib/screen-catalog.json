@@ -417,6 +417,14 @@
       "href": "?screen=view&variant=split-four"
     },
     {
+      "id": "view.split-output",
+      "screen": "view",
+      "variant": "split-output",
+      "label": "分割中の出力タブ",
+      "intent": "11_ui.md「Comparing」・XC-210。分割は書き出しに含まれないことを、成果物タブで明示する。並べた図は比較項目から作る。",
+      "href": "?screen=view&variant=split-output"
+    },
+    {
       "id": "view.split-three",
       "screen": "view",
       "variant": "split-three",
