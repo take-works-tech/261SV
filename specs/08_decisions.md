@@ -3039,3 +3039,33 @@ model or the prompt, never in a description that quietly went stale.
   expansion and oversized decoded images against the target hardware, records peak memory/time and
   selects the lowest ceilings that admit the representative corpus with stated headroom
 - decidedness: Open
+
+### XC-204 - A split control belongs to the area bar, and the canvas stays a picture until it is split
+- decided: 2026-08-23
+- status: active
+- decision: the pane count and camera synchronisation are set from **one menu in the work area bar**,
+  behind a single icon that names the current count when the layout is divided. **The 3D canvas carries
+  no split control at all.** Once the canvas is divided it gains a strip that states the split is not
+  saved, points at the pane badges for what each pane shows, and offers `この比較を保存` and
+  `1画面に戻す` - all of them things that only make sense once there is more than one pane. Each pane's
+  @Case and camera stay on the pane badge. The control is absent for a @Comparison, whose pane count
+  comes from its member list, and in every area with no panes
+- decided_by: the product owner, 2026-08-23
+- rationale: the two placements answer different questions. What each pane shows is a property of that
+  picture and belongs on it; how many panes there are is a property of the layout, and the work area bar
+  is the layout's own header - the same place the edit/list mode switch and the item selector already
+  sit. Placing the count on the canvas made a control for a rarely-used feature into permanent chrome
+  over the picture, which is what the product is for looking at
+- correction: XC-202 said every split control is on the canvas, and that produced a strip of four
+  buttons standing over the 3D view of every single-pane @View, permanently, for a feature most sessions
+  never reach. Trimming its prose was a symptom fix and left the buttons; the placement was the cause.
+  XC-202's separation of session state from the saved item is unchanged - only where the session control
+  is drawn
+- alternatives: removing ad-hoc splitting outright is simpler still and was rejected because comparing
+  while working is a stated need and a @Comparison is a saved item, not a glance. Keeping the count in
+  both places would give one value two controls
+- basis: E-121 (T1)
+- affects: 11_ui.md
+- decidedness: Fixed
+- reversal_trigger: a measurement showing users hunt for the split, which would make an on-canvas
+  affordance worth its permanent cost

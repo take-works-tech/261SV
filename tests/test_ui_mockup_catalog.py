@@ -1617,21 +1617,35 @@ def test_the_pane_badge_is_the_control_the_split_bar_says_it_is() -> None:
     assert "{comparisonGrid ? (" in page
 
 
-def test_the_split_has_no_control_in_the_property_rail() -> None:
-    """XC-202: splitting is session state and every control for it is on the canvas it divides. A
-    document editor holding a session control is the confusion that decision removes - and it had the
-    camera-sync control in two places at once."""
+def test_the_split_is_set_from_the_area_bar_and_nowhere_else() -> None:
+    """XC-204: the property rail edits the saved item, so a session control there is the confusion
+    XC-202 removed - but the canvas is not the answer either. The count lives in the area bar above the
+    canvas it divides, once, and the canvas carries nothing until it is actually divided."""
     page = CHAT_PAGE.read_text(encoding="utf-8")
     overall = page[page.index("if (tab.id === 'overall') return"):page.index("if (tab.id === 'camera') return")]
 
     assert 'PropertyGroup title="画面分割"' not in overall
     assert "各画面のケース" not in overall
     assert "カメラ同期" not in overall
-    # the split bar owns the pane count, the synchronisation and the promotion, and says it is not saved
-    assert 'className="split-count"' in page
-    assert "onClick={() => setSplitPanes(count)}" in page
+    # exactly one control sets the count, and it is the area bar's menu
+    assert 'className="split-count"' not in page
+    assert page.count("onSplitPanesChange(count)") == 1
+    assert 'aria-label="画面分割"' in page
+    assert "work-area-split" in page
+    assert page.count("カメラ同期") == 2  # the menu item, and the canvas note that states its state
+    # the canvas says only what makes sense once split
+    assert "{!isComparisonItem && panes > 1 && <div className=\"pane-grid-controls\">" in page
     assert "この分割は保存されません" in page
-    assert page.count("カメラ同期") == 1
+    assert "1画面に戻す" in page
+
+
+def test_the_split_control_is_absent_from_a_comparison_and_from_other_areas() -> None:
+    """A @Comparison's pane count comes from its member list (XC-202), so a control that overrides it
+    would be a second source for one number; the graph and report areas have no panes at all."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "splitAvailable={scenario.screen === 'view' && !isComparisonItem}" in page
+    assert "{splitAvailable && !itemListOpen && <DropdownMenu>" in page
 
 
 def test_a_comparison_marks_the_tabs_it_borrows_in_the_rail_itself() -> None:
@@ -1731,11 +1745,14 @@ def test_a_saved_result_position_can_be_created_on_the_axis_it_indexes() -> None
     assert "onBookmarksChange" in page
 
 
-def test_the_split_control_carries_no_prose_until_the_canvas_is_split() -> None:
-    """A permanent strip of instruction beside an idle control is chrome; XC-160 made the same argument
-    for a disabled playback bar."""
+def test_the_canvas_carries_no_split_chrome_until_it_is_split() -> None:
+    """XC-204: a permanent strip of buttons over the 3D picture is chrome for something rarely used;
+    at one pane the canvas shows the picture and nothing else."""
     page = CHAT_PAGE.read_text(encoding="utf-8")
 
-    assert "{panes > 1 && <small>各画面のケースとカメラは、画面上部の表示をクリックして選びます。</small>}" in page
+    assert "panes === 1 ? 'compact' : ''" not in page
     assert "画面を分けると、ケースとカメラを画面ごとに選べます。" not in page
-    assert "panes === 1 ? 'compact' : ''" in page
+    # every split element on the canvas sits behind the same `panes > 1` guard
+    canvas = page[page.index("{!isComparisonItem && panes > 1"):page.index("{comparisonGrid && <div")]
+    assert "この分割は保存されません" in canvas
+    assert "この比較を保存" in canvas

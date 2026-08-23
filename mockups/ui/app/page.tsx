@@ -12,9 +12,10 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogFooter, DialogOverlay } from '@/components/ui/dialog'
 import { Popover, PopoverContent } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import {
   AlertTriangle,
+  Check,
   CheckCircle2,
   ArrowUpRight,
   ArrowUpDown,
@@ -217,7 +218,7 @@ const rightSidebarTabs: Record<ScreenId, SidebarTab[]> = {
     { id: 'history', label: '履歴', description: '実行結果と再現可能な処理履歴を確認します。', icon: Clock3 },
   ],
   view: [
-    { id: 'overall', label: '全体', description: 'ビュー項目と画面分割、キャンバスに重ねるガイドを設定します。', icon: LayoutTemplate, scope: 'view' },
+    { id: 'overall', label: '全体', description: 'ビュー項目そのものと、キャンバスに重ねるガイドを設定します。', icon: LayoutTemplate, scope: 'view' },
     { id: 'camera', label: 'カメラ', description: 'このビューが持つカメラを追加し、ポーズとレンズ、被写界深度を設定します。', icon: Camera, scope: 'view' },
     { id: 'rendering', label: '描画', description: 'レンダラー、照明、現像を設定します。', icon: MonitorCog, scope: 'view' },
     { id: 'background', label: '背景', description: 'ビューの背景と周辺表現を設定します。', icon: ImageIcon, scope: 'view' },
@@ -564,6 +565,10 @@ function ProductShell({ scenario, onScreen, draft, onDraftChange, settings, onSe
     arrangement: scenario.variant === 'comparison-overlay' ? 'overlay' : 'grid',
     sharedColourMap: true,
   })
+  // Session state, held by the shell rather than the canvas: the control that sets it is in the work
+  // area bar, and a value edited from the bar cannot live inside the thing the bar sits above (XC-204).
+  const [splitPanes, setSplitPanes] = useState(scenario.variant === 'split-two' ? 2 : scenario.variant === 'split-three' ? 3 : scenario.variant === 'split-four' ? 4 : 1)
+  const [cameraSync, setCameraSync] = useState(true)
   const [viewItem, setViewItem] = useState<ViewItemState>(initialViewItem)
   const [pipelineUnits, setPipelineUnits] = useState<PipelineUnitModel[]>(scenario.screen === 'pipeline' && scenario.variant === 'empty' ? [] : defaultPipelineUnits)
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>('unit-graph')
@@ -662,9 +667,9 @@ function ProductShell({ scenario, onScreen, draft, onDraftChange, settings, onSe
         >
           {leftOpen && showsCaseSidebar && <LeftSidebar screen={scenario.screen} width={leftSidebarWidth} setWidth={setLeftSidebarWidth} selectedCase={selectedCase} onSelectCase={setSelectedCase} />}
           <section className="centre-column">
-            {scenario.screen !== 'chat' && <WorkAreaBar screen={scenario.screen} itemListOpen={itemListOpen} onItemListOpenChange={setItemListOpen} itemListQuery={itemListQuery} onItemListQueryChange={setItemListQuery} itemListLayout={itemListLayout} onItemListLayoutChange={setItemListLayout} itemListScope={itemListScope} onItemListScopeChange={setItemListScope} openItems={openItems} onOpenItemChange={(screen, item) => setOpenItems((current) => ({ ...current, [screen]: item }))} />}
+            {scenario.screen !== 'chat' && <WorkAreaBar screen={scenario.screen} itemListOpen={itemListOpen} onItemListOpenChange={setItemListOpen} itemListQuery={itemListQuery} onItemListQueryChange={setItemListQuery} itemListLayout={itemListLayout} onItemListLayoutChange={setItemListLayout} itemListScope={itemListScope} onItemListScopeChange={setItemListScope} openItems={openItems} onOpenItemChange={(screen, item) => setOpenItems((current) => ({ ...current, [screen]: item }))} splitPanes={splitPanes} onSplitPanesChange={setSplitPanes} cameraSync={cameraSync} onCameraSyncChange={setCameraSync} splitAvailable={scenario.screen === 'view' && !isComparisonItem} />}
             <div className={`canvas-wrap ${scenario.screen === 'chat' ? 'chat-canvas-wrap' : ''} ${scenario.screen === 'view' && !itemListOpen ? 'view-canvas-wrap' : ''} ${itemListOpen ? 'work-item-list-wrap' : ''}`}>
-              {itemListOpen && scenario.screen !== 'chat' ? <WorkItemLibrary screen={scenario.screen} query={itemListQuery} layout={itemListLayout} scope={itemListScope} onSelect={() => setItemListOpen(false)} /> : <ScreenCanvas scenario={scenario} draft={draft} onDraftChange={onDraftChange} onViewObjectSelect={selectViewObject} onScreen={onScreen} settings={settings} onSettingsChange={onSettingsChange} pipelineUnits={pipelineUnits} onPipelineUnitsChange={setPipelineUnits} selectedUnitId={selectedUnitId} onSelectUnit={setSelectedUnitId} selectedCase={selectedCase} viewItem={viewItem} onViewItemChange={setViewItem} isComparisonItem={isComparisonItem} comparison={comparison} baseViewName={openViewItem?.baseViewName ?? '標準ビュー'} />}
+              {itemListOpen && scenario.screen !== 'chat' ? <WorkItemLibrary screen={scenario.screen} query={itemListQuery} layout={itemListLayout} scope={itemListScope} onSelect={() => setItemListOpen(false)} /> : <ScreenCanvas scenario={scenario} draft={draft} onDraftChange={onDraftChange} onViewObjectSelect={selectViewObject} onScreen={onScreen} settings={settings} onSettingsChange={onSettingsChange} pipelineUnits={pipelineUnits} onPipelineUnitsChange={setPipelineUnits} selectedUnitId={selectedUnitId} onSelectUnit={setSelectedUnitId} selectedCase={selectedCase} viewItem={viewItem} onViewItemChange={setViewItem} isComparisonItem={isComparisonItem} comparison={comparison} baseViewName={openViewItem?.baseViewName ?? '標準ビュー'} splitPanes={splitPanes} onSplitPanesChange={setSplitPanes} cameraSync={cameraSync} />}
               {!isChat && assistantOpen && <AssistantDrawer draft={draft} onDraftChange={onDraftChange} onClose={() => setAssistantOpen(false)} onOpenChat={() => onScreen('chat')} settings={settings} onSettingsChange={onSettingsChange} />}
             </div>
             {scenario.screen !== 'chat' && !itemListOpen && <AssetLibraryShelf screen={scenario.screen} variant={scenario.variant} />}
@@ -1187,7 +1192,7 @@ const workItemHeaderByScreen: Partial<Record<ScreenId, WorkItemHeader>> = {
   pipeline: { title: '自動化', itemLabel: 'パイプライン', detail: '結果処理と成果物生成を自動化', createLabel: '新規パイプライン', items: [{ name: 'レポート生成フロー', tags: ['レポート'], scope: 'ローカル' }, { name: 'ケース比較フロー', tags: ['比較'], scope: 'ローカル' }] },
 }
 
-function WorkAreaBar({ screen, itemListOpen, onItemListOpenChange, itemListQuery, onItemListQueryChange, itemListLayout, onItemListLayoutChange, itemListScope, onItemListScopeChange, openItems, onOpenItemChange }: { screen: ScreenId; itemListOpen: boolean; onItemListOpenChange: (open: boolean) => void; itemListQuery: string; onItemListQueryChange: (query: string) => void; itemListLayout: 'grid' | 'list'; onItemListLayoutChange: (layout: 'grid' | 'list') => void; itemListScope: string; onItemListScopeChange: (scope: string) => void; openItems: Partial<Record<ScreenId, string>>; onOpenItemChange: (screen: ScreenId, item: string) => void }) {
+function WorkAreaBar({ screen, itemListOpen, onItemListOpenChange, itemListQuery, onItemListQueryChange, itemListLayout, onItemListLayoutChange, itemListScope, onItemListScopeChange, openItems, onOpenItemChange, splitPanes, onSplitPanesChange, cameraSync, onCameraSyncChange, splitAvailable }: { screen: ScreenId; itemListOpen: boolean; onItemListOpenChange: (open: boolean) => void; itemListQuery: string; onItemListQueryChange: (query: string) => void; itemListLayout: 'grid' | 'list'; onItemListLayoutChange: (layout: 'grid' | 'list') => void; itemListScope: string; onItemListScopeChange: (scope: string) => void; openItems: Partial<Record<ScreenId, string>>; onOpenItemChange: (screen: ScreenId, item: string) => void; splitPanes: number; onSplitPanesChange: (panes: number) => void; cameraSync: boolean; onCameraSyncChange: (sync: boolean) => void; splitAvailable: boolean }) {
   const itemHeader = workItemHeaderByScreen[screen]
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -1281,6 +1286,21 @@ function WorkAreaBar({ screen, itemListOpen, onItemListOpenChange, itemListQuery
         </div>
         <div className="layout-switch"><Button variant="ghost" size="icon" className={itemListLayout === 'grid' ? 'active' : ''} aria-pressed={itemListLayout === 'grid'} aria-label="グリッド表示" onClick={() => onItemListLayoutChange('grid')}><LayoutGrid size={14} /></Button><Button variant="ghost" size="icon" className={itemListLayout === 'list' ? 'active' : ''} aria-pressed={itemListLayout === 'list'} aria-label="リスト表示" onClick={() => onItemListLayoutChange('list')}><List size={14} /></Button></div>
       </div>}
+      {/* XC-204: splitting is a session layout, so its control belongs to the area bar - the 3D canvas
+          carries only what is being looked at. At one pane this is a single icon; the canvas shows
+          nothing at all until the layout is actually divided. */}
+      {splitAvailable && !itemListOpen && <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button type="button" className={`work-area-split ${splitPanes > 1 ? 'active' : ''}`} aria-label="画面分割" aria-haspopup="menu"><Columns3 size={14} />{splitPanes > 1 && <span>{splitPanes}画面</span>}</button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {[1, 2, 3, 4].map((count) => (
+            <DropdownMenuItem key={count} onSelect={() => onSplitPanesChange(count)}>{splitPanes === count ? <Check size={12} /> : <span className="menu-check-space" />}{count}画面</DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem disabled={splitPanes === 1} onSelect={() => onCameraSyncChange(!cameraSync)}>{cameraSync ? <Check size={12} /> : <span className="menu-check-space" />}カメラ同期</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>}
       <Button className="primary-button" aria-label={`${itemHeader.createLabel}を作成`} onClick={() => setCreateOpen(true)}><Plus size={14} /> {itemHeader.createLabel}</Button>
       {itemNotice && <span className="work-item-notice" role="status">{itemNotice}</span>}
       <Dialog open={templateItem !== null} onOpenChange={(open) => { if (!open) setTemplateItem(null) }}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog compact-workflow-dialog"><header><span><small>{itemHeader.itemLabel}</small><b>テンプレートとして保存</b></span><button type="button" aria-label="テンプレート保存を閉じる" onClick={() => setTemplateItem(null)}><X size={15} /></button></header><div className="settings-fields"><label><span>名前</span><input defaultValue={`${templateItem ?? ''}のテンプレート`} /></label><label><span>保存先スコープ</span><Select value={templateScope} onValueChange={(value) => setTemplateScope(value as 'workspace' | 'shared')}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="workspace">このワークスペース</SelectItem><SelectItem value="shared">共有</SelectItem></SelectContent></Select></label></div><p className="workflow-trust-note"><ShieldCheck size={13} />定義を新しいテンプレート版として複写します。生きたリンクは作られないため、後からテンプレートを編集しても「{templateItem}」は変わりません。</p><footer><button type="button" onClick={() => setTemplateItem(null)}>戻る</button><button type="button" className="primary-button" onClick={() => { setItemNotice(`${templateItem}を${templateScope === 'shared' ? '共有' : 'このワークスペース'}のテンプレートとして保存しました`); setTemplateItem(null) }}>保存</button></footer></DialogContent></Dialog>
@@ -3286,11 +3306,11 @@ function OutlinerRow({ depth, expanded, onToggle, icon, name, visible, selected,
   return <div className={`outliner-row ${selected ? 'selected' : ''} ${active ? 'active' : ''}`} role="treeitem" aria-level={depth + 1} aria-expanded={onToggle ? expanded : undefined} aria-selected={selected} aria-current={active ? 'true' : undefined} tabIndex={0} onClick={select} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); select(event) } }} style={{ '--tree-indent': `${depth * 15}px` } as React.CSSProperties}><Button variant="ghost" size="icon" className="outliner-disclosure" aria-label={onToggle ? expanded ? '折りたたむ' : '展開する' : undefined} onClick={(event) => { event.stopPropagation(); onToggle?.() }} disabled={!onToggle}>{onToggle ? expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} /> : <span />}</Button><span className="outliner-type-icon">{icon}</span><b title={name}>{name}</b><Button variant="ghost" size="icon" className="outliner-visibility" aria-label={visible ? `${name}を非表示` : `${name}を表示`} onClick={(event) => { event.stopPropagation(); onVisibility?.(name, event.ctrlKey ? 'isolate' : event.shiftKey ? 'descendants' : 'single') }}>{visible ? <Eye size={13} /> : <EyeOff size={13} />}</Button></div>
 }
 
-function ScreenCanvas({ scenario, draft, onDraftChange, onViewObjectSelect, onScreen, settings, onSettingsChange, pipelineUnits, onPipelineUnitsChange, selectedUnitId, onSelectUnit, selectedCase, viewItem, onViewItemChange, isComparisonItem, comparison, baseViewName }: { scenario: Scenario; draft: string; onDraftChange: (draft: string) => void; onViewObjectSelect: (name: string, additive?: boolean) => void; onScreen: (screen: ScreenId) => void; settings: ConversationSettings; onSettingsChange: (settings: ConversationSettings) => void; pipelineUnits: PipelineUnitModel[]; onPipelineUnitsChange: (units: PipelineUnitModel[]) => void; selectedUnitId: string | null; onSelectUnit: (id: string) => void; selectedCase: string; viewItem: ViewItemState; onViewItemChange: (next: ViewItemState) => void; isComparisonItem: boolean; comparison: ComparisonModel; baseViewName: string }) {
+function ScreenCanvas({ scenario, draft, onDraftChange, onViewObjectSelect, onScreen, settings, onSettingsChange, pipelineUnits, onPipelineUnitsChange, selectedUnitId, onSelectUnit, selectedCase, viewItem, onViewItemChange, isComparisonItem, comparison, baseViewName, splitPanes, onSplitPanesChange, cameraSync }: { scenario: Scenario; draft: string; onDraftChange: (draft: string) => void; onViewObjectSelect: (name: string, additive?: boolean) => void; onScreen: (screen: ScreenId) => void; settings: ConversationSettings; onSettingsChange: (settings: ConversationSettings) => void; pipelineUnits: PipelineUnitModel[]; onPipelineUnitsChange: (units: PipelineUnitModel[]) => void; selectedUnitId: string | null; onSelectUnit: (id: string) => void; selectedCase: string; viewItem: ViewItemState; onViewItemChange: (next: ViewItemState) => void; isComparisonItem: boolean; comparison: ComparisonModel; baseViewName: string; splitPanes: number; onSplitPanesChange: (panes: number) => void; cameraSync: boolean }) {
   switch (scenario.screen) {
     case 'simulation': return <SimulationScreen variant={scenario.variant} onAutomation={() => onScreen('pipeline')} />
     case 'pipeline': return <PipelineScreen variant={scenario.variant} units={pipelineUnits} onUnitsChange={onPipelineUnitsChange} selectedUnitId={selectedUnitId} onSelectUnit={onSelectUnit} />
-    case 'view': return <ViewScreen variant={scenario.variant} onViewObjectSelect={onViewObjectSelect} selectedCase={selectedCase} viewItem={viewItem} onViewItemChange={onViewItemChange} isComparisonItem={isComparisonItem} comparison={comparison} baseViewName={baseViewName} />
+    case 'view': return <ViewScreen variant={scenario.variant} onViewObjectSelect={onViewObjectSelect} selectedCase={selectedCase} viewItem={viewItem} onViewItemChange={onViewItemChange} isComparisonItem={isComparisonItem} comparison={comparison} baseViewName={baseViewName} splitPanes={splitPanes} onSplitPanesChange={onSplitPanesChange} cameraSync={cameraSync} />
     case 'graph': return <GraphScreen variant={scenario.variant} />
     case 'report': return <ReportScreen variant={scenario.variant} />
     case 'chat': return <ChatScreen variant={scenario.variant} draft={draft} onDraftChange={onDraftChange} settings={settings} onSettingsChange={onSettingsChange} />
@@ -3595,12 +3615,10 @@ function PipelineUnit({ icon, title, detail, count, failed, muted, destructive, 
 // XC-131: a @Case is indexed by an axis that is not always time. XC-160 formats the scrubber readout
 // per axis and commits the exact pointer position unless the source axis is itself discrete. The
 // overlay used to print `m:ss` on every variant, so the mode-axis state showed a clock.
-function ViewScreen({ variant, onViewObjectSelect, selectedCase, viewItem, onViewItemChange, isComparisonItem, comparison, baseViewName }: { variant: string; onViewObjectSelect: (name: string, additive?: boolean) => void; selectedCase: string; viewItem: ViewItemState; onViewItemChange: (next: ViewItemState) => void; isComparisonItem: boolean; comparison: ComparisonModel; baseViewName: string }) {
+function ViewScreen({ variant, onViewObjectSelect, selectedCase, viewItem, onViewItemChange, isComparisonItem, comparison, baseViewName, splitPanes, onSplitPanesChange, cameraSync }: { variant: string; onViewObjectSelect: (name: string, additive?: boolean) => void; selectedCase: string; viewItem: ViewItemState; onViewItemChange: (next: ViewItemState) => void; isComparisonItem: boolean; comparison: ComparisonModel; baseViewName: string; splitPanes: number; onSplitPanesChange: (panes: number) => void; cameraSync: boolean }) {
   const [playbackVisible, setPlaybackVisible] = useState(false)
-  const [cameraSync, setCameraSync] = useState(true)
-  const [splitPanes, setSplitPanes] = useState(variant === 'split-two' ? 2 : variant === 'split-three' ? 3 : variant === 'split-four' ? 4 : 1)
-  // Session state, not the item's: a split is thrown away, so what each pane shows is thrown away with
-  // it (XC-202). Holding it on the saved View was the leftover of the group that used to edit it.
+  // What each pane shows is session state too: a split is thrown away, so its bindings go with it
+  // (XC-202). The count and the sync live in the area bar, above the canvas they divide (XC-204).
   const [paneBindings, setPaneBindings] = useState(() => ['cam-front', 'cam-iso', 'cam-peak', 'cam-fixture'].map((cameraId, index) => ({
     caseName: index === 0 ? selectedCase : workspaceCases[index % workspaceCases.length].name,
     cameraId,
@@ -3647,18 +3665,13 @@ function ViewScreen({ variant, onViewObjectSelect, selectedCase, viewItem, onVie
       {variant === 'result-bookmarks' && <StatePanel tone="info" title="結果軸ブックマーク" detail="固定位置・極値・しきい値交差を登録できます。規則はケースごとに解決し、保存位置の間に落ちたときは丸めた事実を明示します。" />}
       {variant === 'axis-error' && <StatePanel tone="error" title="指定した結果位置がありません" detail="要求されたモード8は存在しません。ビューはモード7のままで、近傍位置への丸めは行っていません。" />}
       {deformed && <StatePanel tone="warning" title="変形を50倍に誇張して表示しています" detail="測定・プローブ・レポートの値は未変形形状から計算します。画面上の形状を定規で測ると誤った寸法になります。" />}
-      {/* XC-202: every split control is here, on the canvas it divides. The property rail edits the
-          saved item; a session control sitting there is the confusion that decision removes. */}
-      {!isComparisonItem && <div className={`pane-grid-controls ${panes === 1 ? 'compact' : ''}`}>
-        <div className="split-count" role="group" aria-label="画面分割">
-          {[1, 2, 3, 4].map((count) => (
-            <button type="button" key={count} className={panes === count ? 'active' : ''} aria-pressed={panes === count} aria-label={`${count}画面`} onClick={() => setSplitPanes(count)}>{count}</button>
-          ))}
-        </div>
-        {panes > 1 && <button type="button" className={cameraSync ? 'active' : ''} aria-pressed={cameraSync} onClick={() => setCameraSync((current) => !current)}><Grid2X2 size={12} />カメラ同期{cameraSync ? 'オン' : 'オフ'}</button>}
-        {panes > 1 && <small>各画面のケースとカメラは、画面上部の表示をクリックして選びます。</small>}
-        {panes > 1 && <small className="pane-session-note">この分割は保存されません</small>}
-        {panes > 1 && <button type="button" className="pane-promote" onClick={() => setPromoteOpen(true)}><Save size={12} />この比較を保存</button>}
+      {/* XC-204: nothing here until the canvas is actually divided. What appears then is what only
+          makes sense once it is - that the layout is not saved, and how to make it an item that is. */}
+      {!isComparisonItem && panes > 1 && <div className="pane-grid-controls">
+        <span className="pane-session-note"><Columns3 size={12} />{panes}画面・この分割は保存されません</span>
+        <small>各画面のケースとカメラは、画面上部の表示をクリックして選びます。カメラ同期は{cameraSync ? 'オン' : 'オフ'}です。</small>
+        <button type="button" className="pane-promote" onClick={() => setPromoteOpen(true)}><Save size={12} />この比較を保存</button>
+        <button type="button" className="pane-close-split" onClick={() => onSplitPanesChange(1)}><X size={12} />1画面に戻す</button>
       </div>}
       {comparisonGrid && <div className="pane-grid-controls comparison-bar">
         <span className="comparison-axis-chip"><Columns3 size={12} />{comparisonAxisLabels[comparison.axis].replace('基準ビューのプロパティ：', '')}で比較・{comparisonMembers.length}メンバー</span>
