@@ -240,7 +240,7 @@ const rightSidebarTabs: Record<ScreenId, SidebarTab[]> = {
     { id: 'overall', label: 'グラフ', description: '開いているグラフそのもの（名前・種類・凡例）と、描く対象のケースを設定します。', icon: IdCard },
     { id: 'series', label: '系列', description: '系列ごとに、何を描くかと、どう見えるかを1か所で設定します。', icon: Database },
     { id: 'axes', label: '軸', description: '軸を1本選び、その表題・範囲・目盛・グリッドを設定します。', icon: Grid3x3 },
-    { id: 'style', label: 'スタイル', description: 'グラフ全体の配色・既定の線とマーカー・書体を設定します。', icon: Paintbrush },
+    { id: 'style', label: 'スタイル', description: 'グラフ全体の配色・背景・書体を設定します。系列の既定は適用中の資産が与えます。', icon: Paintbrush },
     { id: 'output', label: '出力', description: '画像、ベクター形式、表データの出力条件を設定します。', icon: FileOutput },
   ],
   report: [
@@ -2072,6 +2072,15 @@ const fontLabels: Record<string, string> = {
   mono: '等幅',
 }
 
+// XC-224: the defaults a series follows come from the applied style @Asset, and from nowhere else.
+// The measured reference has no chart-wide series default at all - its view-level properties are axes,
+// legend, annotation and tooltip, and every appearance value is keyed to the series (E-124). A level
+// between the two was invented here, and it is what kept reading as a duplicate.
+const styleAssetDefaults: Record<string, { width: string; marker: string; label: string }> = {
+  technical: { width: '2', marker: 'circle', label: '技術資料・標準' },
+  workspace: { width: '1', marker: 'none', label: 'ワークスペース設定' },
+}
+
 const comparisonAxisLabels: Record<ComparisonAxis, string> = {
   case: 'ケース',
   resultPosition: '結果位置（時刻・モード・周波数）',
@@ -2466,8 +2475,8 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
   const [chartBackground, setChartBackground] = useState('light')
   const [graphFont, setGraphFont] = useState('workspace')
   const [viewDirection, setViewDirection] = useState('saved')
-  const [defaultMarker, setDefaultMarker] = useState('circle')
-  const [defaultWidth, setDefaultWidth] = useState('2')
+  const [styleAsset, setStyleAsset] = useState('technical')
+  const assetDefaults = styleAssetDefaults[styleAsset]
   const [seriesLine, setSeriesLine] = useState('solid')
   const [seriesColour, setSeriesColour] = useState('palette')
   const [seriesMarker, setSeriesMarker] = useState('theme')
@@ -2555,9 +2564,9 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
             relationship between the two tabs is on screen instead of being two identical pickers. */}
         <VisualOptions label="線" kind="line" columns={4} value={seriesLine} onChange={setSeriesLine}
           options={[{ value: 'solid', label: '実線' }, { value: 'dashed', label: '破線' }, { value: 'dotted', label: '点線' }, { value: 'none', label: 'なし' }]} />
-        <label><span>線幅</span><select value={seriesWidth} onChange={(event) => setSeriesWidth(event.target.value)}><option value="theme">テーマに従う（{defaultWidth} px）</option>{['1', '2', '3', '4', '5', '6'].map((w) => <option value={w} key={w}>{w} px</option>)}</select></label>
+        <label><span>線幅</span><select value={seriesWidth} onChange={(event) => setSeriesWidth(event.target.value)}><option value="theme">テーマに従う（{assetDefaults.width} px）</option>{['1', '2', '3', '4', '5', '6'].map((w) => <option value={w} key={w}>{w} px</option>)}</select></label>
         <VisualOptions label="マーカー" kind="marker" columns={5} value={seriesMarker} onChange={setSeriesMarker}
-          options={[{ value: 'theme', label: 'テーマ', sample: defaultMarker, detail: `テーマに従う（${{ circle: '円', square: '四角', triangle: '三角', none: 'なし' }[defaultMarker] ?? defaultMarker}）` }, { value: 'circle', label: '円' }, { value: 'square', label: '四角' }, { value: 'triangle', label: '三角' }, { value: 'none', label: 'なし' }]} />
+          options={[{ value: 'theme', label: 'テーマ', sample: assetDefaults.marker, detail: `適用中の資産に従う（${{ circle: '円', square: '四角', triangle: '三角', none: 'なし' }[assetDefaults.marker] ?? assetDefaults.marker}）` }, { value: 'circle', label: '円' }, { value: 'square', label: '四角' }, { value: 'triangle', label: '三角' }, { value: 'none', label: 'なし' }]} />
         <label><span>使用する軸</span><select defaultValue="left"><option value="left">左（Y）</option><option value="right">右（第2Y）</option></select></label>
         <label><span>来歴</span><input value={activeSeries.quantity === 'unresolved' ? '数量の選択後に表示' : activeSeries.quantity === 'computed' || activeSeries.quantity === 'expression' ? '計算・式を表示' : activeSeries.quantity === 'reference' ? '参考資料・数値根拠には未使用' : activeSeries.quantity === 'measurement' ? '測定データ' : 'データセット'} readOnly /></label>
         <label><span>欠損</span><select defaultValue="gap"><option value="gap">欠損として表示・凡例に残す</option></select></label></>}
@@ -2602,8 +2611,11 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
     <PropertyGroup title="スタイル">
       {/* XC-216: the rail says which library resource is in effect; the shelf is where one is chosen.
           The field was called アセット here and スタイル in Report - one name for one thing. */}
-      <label><span>適用中</span><select defaultValue="technical"><option value="technical">技術資料・標準</option><option value="workspace">ワークスペース設定</option></select></label>
+      <label><span>適用中</span><select value={styleAsset} onChange={(event) => setStyleAsset(event.target.value)}>{Object.entries(styleAssetDefaults).map(([value, asset]) => <option value={value} key={value}>{asset.label}</option>)}</select></label>
       <label><span>見本</span><span className="palette-readout"><OptionSample kind="palette" value={palette} /><OptionSample kind="background" value={chartBackground} /></span></label>
+      {/* XC-224: a read-out, not a second control. Changing the asset above changes what a series
+          following the theme is drawn with; there is no third place to set it. */}
+      <label><span>系列の既定</span><span className="palette-readout"><OptionSample kind="marker" value={assetDefaults.marker} /><small>線幅 {assetDefaults.width} px・マーカー{{ circle: '円', square: '四角', triangle: '三角', none: 'なし' }[assetDefaults.marker]}。系列タブで上書きできます</small></span></label>
       <VisualOptions label="配色" kind="palette" columns={3} value={palette} onChange={setPalette}
         options={[{ value: 'accessible', label: '識別性優先' }, { value: 'monochrome', label: 'モノクロ' }, { value: 'print', label: '印刷向け' }]} />
       <VisualOptions label="背景" kind="background" columns={3} value={chartBackground} onChange={setChartBackground}
@@ -2612,15 +2624,7 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
     {/* XC-213: these are the defaults a new series starts from. What a *particular* series looks like
         is on that series' row in データ, because the measured reference keys line, marker and colour to
         the series rather than to the chart (E-124). Grid lines moved to 軸, which is what they mark. */}
-    {/* XC-221: what a series looks like unless it says otherwise. `auto` used to be the value here and
-        was not one of the four options, so the control rendered with nothing selected - and the series
-        tab offered the same four with no way to say "follow this", which made two identical pickers. */}
-    <PropertyGroup title="系列の既定">
-      <label><span>既定の線幅</span><select value={defaultWidth} onChange={(event) => setDefaultWidth(event.target.value)}>{['1', '2', '3', '4', '5', '6'].map((w) => <option value={w} key={w}>{w} px</option>)}</select></label>
-      <VisualOptions label="既定のマーカー" kind="marker" columns={4} value={defaultMarker} onChange={setDefaultMarker}
-        options={[{ value: 'circle', label: '円' }, { value: 'square', label: '四角' }, { value: 'triangle', label: '三角' }, { value: 'none', label: 'なし' }]} />
-      <p className="property-editor-note"><ShieldCheck size={12} />各系列は既定のまま描かれ、系列タブで「テーマ」以外を選んだ系列だけがそこを上書きします。</p>
-    </PropertyGroup>
+
     <PropertyGroup title="書体">
       <label><span>フォント</span><select value={graphFont} onChange={(event) => setGraphFont(event.target.value)} style={{ fontFamily: fontStacks[graphFont] }}>{Object.entries(fontLabels).map(([value, name]) => <option value={value} key={value} style={{ fontFamily: fontStacks[value] }}>{name}</option>)}</select></label>
       <label><span>見本</span><span className="font-specimen" style={{ fontFamily: fontStacks[graphFont] }}>最大応力 235 MPa</span></label>

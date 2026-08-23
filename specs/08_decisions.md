@@ -3660,3 +3660,35 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a sample whose own edges are meaningful and read as clipped against the tile, which
   would need padding on that kind alone rather than on all of them
+
+### XC-224 - A series' appearance has two levels, not three: the applied asset, and the series
+- decided: 2026-08-23
+- status: active
+- decision: the chart-wide `系列の既定` group is **removed as a control**. What a series follows unless it
+  overrides comes from the **applied style @Asset**, named in `適用中`, and the style tab **reports** what
+  that asset supplies rather than offering a second place to set it. Changing the asset changes what
+  every series following the theme is drawn with. Each appearance property therefore has exactly one
+  editable control: line, marker, width and colour on the series; palette and background chart-wide,
+  where there is no per-series counterpart at all
+- decided_by: the product owner, 2026-08-23
+- rationale: **the measurement says there is no such level.** ParaView's chart view carries 115
+  properties and every one of them is an axis, the legend, the annotation or the tooltip; appearance is
+  keyed to the series on the representation, one value per series addressed by name (E-124). The
+  chart-wide default between the asset and the series was invented here. It is also the level the style
+  asset already occupies - XC-216 says the shelf holds the reusable resource and the rail names which
+  one is applied - so it was a third place defining what two places already defined
+- correction: XC-221 introduced the level to explain the duplicate, and XC-222 renamed its rows to
+  `既定の…` so they would stop reading as one. Both treated the symptom. The product owner asked a third
+  time, and the third answer is the one the measurement supported from the start: remove the level.
+  What XC-221 got right and this keeps is the series' first option being the theme's, drawn as the theme
+  resolves it
+- what_is_lost: setting a default for every series without editing the asset. With the reference having
+  no such control, and a reusable default belonging to the asset by XC-216, that is where it goes if it
+  is ever wanted
+- alternatives: keeping the group and marking it read-only leaves a group whose only content is a
+  read-out; the read-out is one row inside `スタイル` instead
+- basis: E-124 (T1)
+- affects: 11_ui.md, 16_application_model.md
+- decidedness: Fixed
+- reversal_trigger: a chart with enough series that setting each one is the bulk of the work, which
+  would argue for an apply-to-all action on the series list rather than for a third level
