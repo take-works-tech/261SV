@@ -3472,7 +3472,9 @@ model or the prompt, never in a description that quietly went stale.
   lands it.
   **The switch is a repository variable, not a file.** `gh variable set AUTO_MERGE_ENABLED --body false`
   is one command with no diff and no pull request. A temporary measure that needs a pull request to end
-  becomes a permanent one. `no-auto-merge` stops a single pull request without touching the switch.
+  becomes a permanent one. `no-auto-merge` stops a single pull request without touching the switch -
+  **and a label that does not exist cannot be applied**, which is why `ci` fails when one the automation
+  names is absent. The repository had only GitHub's nine default labels when this was written.
   **How the period ends**: the variable goes to `false`, `.github/workflows/auto-merge.yml` is deleted,
   and this decision becomes `superseded`. `check_automerge_policy.py` fails if the workflow is present
   while the decision is superseded, or absent while it is active, so the period cannot end in the record

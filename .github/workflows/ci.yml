@@ -55,9 +55,12 @@ jobs:
   # rather than in `validate/` - and it is deliberately loud: once the secret is set, every run is red
   # until the two triggers are restored, which is a two-line change with the lines already written in
   # the file, commented, where they belong.
-  review-wiring:
-    name: review wiring matches the secret
+  merge-wiring:
+    name: the wiring the merge depends on
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
     steps:
       - uses: actions/checkout@v7
       - name: The review runs on pull requests exactly when it can authenticate
@@ -77,6 +80,26 @@ jobs:
             exit 1
           fi
           echo "The review's wiring and its credential agree."
+
+      # XC-218's brake is a label read by exact name. A label that does not exist cannot be applied,
+      # and the moment you need it is not the moment to discover that. Found by looking: the repository
+      # had only GitHub's nine defaults, so `no-auto-merge` - and the four names dependabot.yml uses -
+      # existed nowhere.
+      - name: The labels the automation names actually exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          existing=$(gh label list --repo "$GITHUB_REPOSITORY" --limit 200 --json name --jq '.[].name')
+          missing=""
+          for label in no-auto-merge dependencies needs-spec-change mockups ci; do
+            echo "$existing" | grep -qx "$label" || missing="$missing $label"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::labels named by the automation and absent from the repository:$missing"
+            exit 1
+          fi
+          echo "Every label the automation names exists."
 
   tests:
     name: tests
