@@ -46,6 +46,8 @@ import {
   Grid2X2,
   HardDrive,
   GripVertical,
+  Grid3x3,
+  PenLine,
   HelpCircle,
   Eye,
   EyeOff,
@@ -234,19 +236,17 @@ const rightSidebarTabs: Record<ScreenId, SidebarTab[]> = {
     { id: 'materials', label: 'マテリアル', description: '選択中の形状と結果表示に使う外観を設定します。', icon: MaterialSphereIcon, scope: 'selection' },
   ],
   graph: [
-    { id: 'overall', label: 'グラフ', description: '開いているグラフそのもの（名前・タイトル・構成）を設定します。', icon: IdCard },
-    { id: 'kind', label: '種類', description: 'データに合うグラフ形式を選択します。', icon: ChartNoAxesCombined },
-    { id: 'style', label: 'スタイル', description: '線、マーカー、配色の表現を調整します。', icon: Paintbrush },
-    { id: 'fonts', label: 'テキスト', description: 'タイトル、軸、凡例、注釈の文字表現を設定します。', icon: Type },
-    { id: 'data', label: 'データ', description: 'このグラフが描くケースと系列、その数量・単位・来歴を設定します。', icon: Database },
+    { id: 'overall', label: 'グラフ', description: '開いているグラフそのもの（名前・種類・凡例）を設定します。', icon: IdCard },
+    { id: 'data', label: 'データ', description: 'このグラフが描くケースと系列を設定します。系列の見え方も同じ行で決めます。', icon: Database },
+    { id: 'axes', label: '軸', description: '軸を1本選び、その表題・範囲・目盛・グリッドを設定します。', icon: Grid3x3 },
+    { id: 'style', label: 'スタイル', description: 'グラフ全体の配色・既定の線とマーカー・書体を設定します。', icon: Paintbrush },
     { id: 'output', label: '出力', description: '画像、ベクター形式、表データの出力条件を設定します。', icon: FileOutput },
   ],
   report: [
-    { id: 'overall', label: 'レポート', description: '開いているレポートそのもの（名前・タイトル・構成）を設定します。', icon: IdCard },
-    { id: 'layout', label: 'レイアウト', description: 'ページとコンテンツの配置を整えます。', icon: LayoutGrid },
-    { id: 'style', label: 'スタイル', description: '文書全体の視覚表現を調整します。', icon: Paintbrush },
-    { id: 'fonts', label: 'テキスト', description: '見出し、本文、注記の文字表現を設定します。', icon: Type },
-    { id: 'contents', label: '内容', description: '参照するケースの範囲、収録するブロック、コメントの方式を設定します。', icon: ListChecks },
+    { id: 'overall', label: 'レポート', description: '開いているレポートそのもの（名前・タイトル・必須情報）を設定します。', icon: IdCard },
+    { id: 'contents', label: '内容', description: '参照するケースの範囲と、収録するブロックを設定します。', icon: ListChecks },
+    { id: 'drafting', label: '執筆', description: '本文の書き方を決め、下書きを作って、確認したものだけを取り込みます。', icon: PenLine },
+    { id: 'style', label: 'スタイル', description: 'ページ・配色・書体を、文書全体のテーマとしてまとめて設定します。', icon: Paintbrush },
     { id: 'output', label: '出力', description: '文書形式と出力条件を設定します。', icon: FileOutput },
   ],
   chat: [],
@@ -1699,7 +1699,7 @@ function RightSidebar({ screen, variant, width, setWidth, selectedViewObjects, o
   const borrowedTabIds = ['camera', 'rendering', 'background', 'objects', 'text', 'materials']
   const isBorrowed = (tabId: string) => screen === 'view' && isComparisonItem && borrowedTabIds.includes(tabId)
   const [selectedByScreen, setSelectedByScreen] = useState<Partial<Record<ScreenId, string>>>({})
-  const variantTab = variant.startsWith('object-') ? 'objects' : variant.startsWith('material-') ? 'materials' : variant === 'steady-result' ? 'output' : variant === 'comparison-borrowed' ? 'materials' : variant === 'cameras' || variant.startsWith('camera-') ? 'camera' : variant === 'unit-reference' ? 'settings' : variant === 'output-motion' || variant === 'split-output' || variant === 'comparison-output' ? 'output' : variant === 'develop-grade' ? 'rendering' : variant.includes('output-preflight') ? 'output' : variant === 'series-unresolved' ? 'data' : variant === 'commentary-review' ? 'contents' : undefined
+  const variantTab = variant.startsWith('object-') ? 'objects' : variant.startsWith('material-') ? 'materials' : variant === 'steady-result' ? 'output' : variant === 'comparison-borrowed' ? 'materials' : variant === 'cameras' || variant.startsWith('camera-') ? 'camera' : variant === 'unit-reference' ? 'settings' : variant === 'commentary-review' || variant === 'drafting' ? 'drafting' : variant === 'axes' ? 'axes' : variant === 'output-motion' || variant === 'split-output' || variant === 'comparison-output' ? 'output' : variant === 'develop-grade' ? 'rendering' : variant.includes('output-preflight') ? 'output' : variant === 'series-unresolved' ? 'data' : undefined
   const selectedTab = tabs.find((tab) => tab.id === (selectedByScreen[screen] ?? variantTab)) ?? tabs[0]
 
   if (!selectedTab) return null
@@ -2450,6 +2450,12 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
   const [activeSeriesId, setActiveSeriesId] = useState('series-1')
   const activeSeries = graphSeries.find((series) => series.id === activeSeriesId) ?? graphSeries[0]
   const unresolvedSeries = graphSeries.filter((series) => series.quantity === 'unresolved')
+  // XC-213: the measured reference carries 25 properties per axis and repeats them for four axes -
+  // 100 of its 115 chart properties, in 20 of its 23 panel groups (E-124). One axis is chosen here and
+  // the same fields serve all of them, which is the same information in one twentieth of the panel.
+  const [axis, setAxis] = useState<'x' | 'y' | 'y2'>('x')
+  const [axisAuto, setAxisAuto] = useState(true)
+  const axisNames: Record<'x' | 'y' | 'y2', string> = { x: 'X（横）', y: 'Y（左）', y2: '第2Y（右）' }
 
   if (tab.id === 'overall') return <div className="property-editor">
     <PropertyGroup title="グラフ">
@@ -2458,15 +2464,9 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
       <label><span>副題</span><input placeholder="任意" /></label>
       <label><span>説明</span><textarea rows={3} placeholder="図が示す内容を記載" /></label>
     </PropertyGroup>
-    <PropertyGroup title="構成">
-      <label className="property-toggle"><span>タイトル</span><input type="checkbox" defaultChecked /></label>
-      <label className="property-toggle"><span>凡例</span><input type="checkbox" defaultChecked /></label>
-      <label><span>凡例位置</span><select defaultValue="right"><option value="right">右</option><option value="bottom">下</option><option value="inside">プロット内</option></select></label>
-    </PropertyGroup>
-    <p className="property-editor-note"><ShieldCheck size={12} />グラフは値のコピーではなく、数量・単位・来歴を参照する定義として保存します。</p>
-  </div>
+    {/* XC-213: the chart kind is two fields and the first thing chosen; a tab of its own was a click
+        to reach a pair of selects. The measured reference spends its panel on axes instead (E-124). */}
 
-  if (tab.id === 'kind') return <div className="property-editor">
     <PropertyGroup title="次元">
       <label><span>次元</span><select value={dimension} onChange={(event) => setDimension(event.target.value as typeof dimension)}><option value="2d">2D</option><option value="3d">3D</option></select></label>
       <label><span>種類</span>{dimension === '2d' ? <select defaultValue="line"><option value="line">折れ線</option><option value="scatter">散布図</option><option value="bar">棒</option><option value="distribution">分布</option><option value="heatmap">ヒートマップ</option></select> : <select defaultValue="surface"><option value="surface">サーフェス</option><option value="scatter3d">3D散布図</option><option value="contour3d">2変数コンター</option></select>}</label>
@@ -2476,6 +2476,12 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
       <label><span>視線</span><select defaultValue="saved"><option value="saved">保存済み</option><option value="isometric">等角</option><option value="front">正面</option><option value="top">上</option></select></label>
     </PropertyGroup>}
     <p className="property-editor-note"><ChartNoAxesCombined size={12} />種類を変えても数量の参照と単位互換性の検証は維持されます。</p>
+    <PropertyGroup title="構成">
+      <label className="property-toggle"><span>タイトル</span><input type="checkbox" defaultChecked /></label>
+      <label className="property-toggle"><span>凡例</span><input type="checkbox" defaultChecked /></label>
+      <label><span>凡例位置</span><select defaultValue="right"><option value="right">右</option><option value="bottom">下</option><option value="inside">プロット内</option></select></label>
+    </PropertyGroup>
+    <p className="property-editor-note"><ShieldCheck size={12} />グラフは値のコピーではなく、数量・単位・来歴を参照する定義として保存します。</p>
   </div>
 
   if (tab.id === 'style') return <div className="property-editor">
@@ -2484,23 +2490,53 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
       <label><span>配色</span><select defaultValue="accessible"><option value="accessible">識別性優先</option><option value="monochrome">モノクロ</option></select></label>
       <label><span>背景</span><select defaultValue="light"><option value="light">明るい</option><option value="transparent">透過</option><option value="dark">暗い</option></select></label>
     </PropertyGroup>
-    <PropertyGroup title="プロット">
+    {/* XC-213: these are the defaults a new series starts from. What a *particular* series looks like
+        is on that series' row in データ, because the measured reference keys line, marker and colour to
+        the series rather than to the chart (E-124). Grid lines moved to 軸, which is what they mark. */}
+    <PropertyGroup title="系列の既定">
       <label><span>線幅</span><div className="property-range"><input type="range" min="1" max="6" defaultValue="2" /><output>2 px</output></div></label>
       <label><span>マーカー</span><select defaultValue="auto"><option value="auto">自動</option><option value="circle">円</option><option value="square">四角</option><option value="none">なし</option></select></label>
-      <label className="property-toggle"><span>主グリッド</span><input type="checkbox" defaultChecked /></label>
-      <label className="property-toggle"><span>副グリッド</span><input type="checkbox" /></label>
     </PropertyGroup>
-    <p className="property-editor-note"><Paintbrush size={12} />再利用するスタイルは素材ライブラリから適用し、ここでは開いているグラフの表現を調整します。</p>
-  </div>
-
-  if (tab.id === 'fonts') return <div className="property-editor">
     <PropertyGroup title="書体">
       <label><span>フォント</span><select defaultValue="workspace"><option value="workspace">ワークスペース設定</option><option value="noto-sans">Noto Sans</option><option value="source-serif">Source Serif</option></select></label>
       <label><span>タイトル</span><select defaultValue="14"><option value="12">12 pt</option><option value="14">14 pt</option><option value="16">16 pt</option></select></label>
       <label><span>軸</span><select defaultValue="10"><option value="9">9 pt</option><option value="10">10 pt</option><option value="11">11 pt</option></select></label>
       <label><span>凡例</span><select defaultValue="9"><option value="8">8 pt</option><option value="9">9 pt</option><option value="10">10 pt</option></select></label>
     </PropertyGroup>
-    <p className="property-editor-note"><ShieldCheck size={12} />出力では使用文字を検査し、必要な字体をライセンス条件に従って埋め込みます。</p>
+    <p className="property-editor-note"><ShieldCheck size={12} />出力では使用文字を検査し、必要な字体をライセンス条件に従って埋め込みます。再利用するスタイルは素材ライブラリから適用します。</p>
+  </div>
+
+  if (tab.id === 'axes') return <div className="property-editor">
+    <div className="axis-picker" role="tablist" aria-label="設定する軸">
+      {(['x', 'y', 'y2'] as const).map((value) => (
+        <button type="button" role="tab" aria-selected={axis === value} className={axis === value ? 'active' : ''} key={value} onClick={() => setAxis(value)}>{axisNames[value]}</button>
+      ))}
+    </div>
+    <PropertyGroup title="表題">
+      <label><span>表題</span><input placeholder={`${axisNames[axis]}の表題`} /></label>
+      <label><span>単位の併記</span><select defaultValue="declared"><option value="declared">宣言済みのとき付ける</option><option value="never">付けない</option></select></label>
+    </PropertyGroup>
+    <PropertyGroup title="範囲">
+      <label className="property-toggle"><span>自動</span><input type="checkbox" checked={axisAuto} onChange={(event) => setAxisAuto(event.target.checked)} /></label>
+      {!axisAuto && <>
+        <label><span>最小</span><input defaultValue="0" /></label>
+        <label><span>最大</span><input defaultValue="250" /></label>
+      </>}
+      <label className="property-toggle"><span>対数目盛</span><input type="checkbox" /></label>
+      {/* XC-001 applied to a picture: a fixed range that hides part of the data is a chart that reads as
+          if the data ended there. It is allowed, and it is stated. */}
+      {!axisAuto && <p className="property-editor-note warning"><AlertTriangle size={12} />固定範囲の外にある点は描かれません。範囲外の点があるときは、図とその書き出しの両方にその旨を記載します。</p>}
+    </PropertyGroup>
+    <PropertyGroup title="目盛" open={false}>
+      <label><span>間隔</span><select defaultValue="auto"><option value="auto">自動</option><option value="custom">指定</option></select></label>
+      <label><span>表記</span><select defaultValue="auto"><option value="auto">自動</option><option value="fixed">小数固定</option><option value="scientific">指数</option></select></label>
+      <label><span>桁数</span><select defaultValue="3"><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>
+    </PropertyGroup>
+    <PropertyGroup title="グリッド" open={false}>
+      <label className="property-toggle"><span>主グリッド</span><input type="checkbox" defaultChecked /></label>
+      <label className="property-toggle"><span>副グリッド</span><input type="checkbox" /></label>
+    </PropertyGroup>
+    <p className="property-editor-note"><ShieldCheck size={12} />軸の設定は{axisNames[axis]}にだけ適用されます。単位は数量の宣言から取り、ここでは推測しません。</p>
   </div>
 
   if (tab.id === 'data') return <div className="property-editor">
@@ -2518,6 +2554,13 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
         <label><span>Y</span><select value={activeSeries.quantity} onChange={(event) => setGraphSeries((current) => current.map((series) => series.id === activeSeries.id ? { ...series, quantity: event.target.value } : series))}><option value="unresolved">数量を選択</option><option value="dataset">データセットの数量</option><option value="computed">計算済み数量</option><option value="measurement">測定値</option><option value="reference">参考ファイルの値</option><option value="expression">式</option></select></label>
         {activeSeries.quantity === 'expression' && <ExpressionEditor id={`graph-${activeSeries.id}`} label="系列の式" initial="設計許容応力 / 最大応力" />}
         <label><span>単位</span><input value={activeSeries.quantity === 'unresolved' ? '数量の選択後に表示' : '未宣言'} readOnly /></label>
+        {/* XC-213: colour, line and marker belong to the series, not to the chart - the measured
+            reference keys all three to the series (E-124), and splitting them across two tabs meant
+            changing one series' look and its quantity in two places. */}
+        <label><span>色</span><div className="property-pair"><select defaultValue="palette"><option value="palette">パレット順</option><option value="custom">指定色</option></select><input type="color" defaultValue="#2f6df6" aria-label={`${activeSeries.label}の色`} /></div></label>
+        <label><span>線</span><div className="property-pair"><select defaultValue="solid"><option value="solid">実線</option><option value="dashed">破線</option><option value="dotted">点線</option><option value="none">なし</option></select><select defaultValue="default" aria-label="線幅"><option value="default">既定の太さ</option><option value="thin">細い</option><option value="thick">太い</option></select></div></label>
+        <label><span>マーカー</span><select defaultValue="default"><option value="default">既定</option><option value="circle">円</option><option value="square">四角</option><option value="triangle">三角</option><option value="none">なし</option></select></label>
+        <label><span>軸</span><select defaultValue="left"><option value="left">左（Y）</option><option value="right">右（第2Y）</option></select></label>
         <label><span>来歴</span><input value={activeSeries.quantity === 'unresolved' ? '数量の選択後に表示' : activeSeries.quantity === 'computed' || activeSeries.quantity === 'expression' ? '計算・式を表示' : activeSeries.quantity === 'reference' ? '参考資料・数値根拠には未使用' : activeSeries.quantity === 'measurement' ? '測定データ' : 'データセット'} readOnly /></label>
         <label><span>欠損</span><select defaultValue="gap"><option value="gap">欠損として表示・凡例に残す</option></select></label></>}
     </PropertyGroup>
@@ -2555,7 +2598,8 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
 }
 
 function ReportPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: string }) {
-  const [commentary, setCommentary] = useState<'mechanical' | 'generated'>(variant === 'commentary-review' ? 'generated' : 'mechanical')
+  const [commentary, setCommentary] = useState<'mechanical' | 'generated'>(variant === 'commentary-review' || variant === 'drafting' ? 'generated' : 'mechanical')
+  const [draftState, setDraftState] = useState<'none' | 'review' | 'applied'>(variant === 'commentary-review' ? 'review' : 'none')
   const [search, setSearch] = useState<'off' | 'ask'>('off')
   const [reportOutput, setReportOutput] = useState<'html' | 'pptx' | 'docx' | 'xlsx' | 'csv' | 'image' | 'video' | 'text' | 'markdown'>('html')
   const [preflightOpen, setPreflightOpen] = useState(variant === 'output-preflight')
@@ -2582,7 +2626,11 @@ function ReportPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: stri
     <p className="property-editor-note"><ShieldCheck size={12} />必須情報は省略できません。レポートは不明点と未宣言単位を明示します。</p>
   </div>
 
-  if (tab.id === 'layout') return <div className="property-editor">
+  if (tab.id === 'style') return <div className="property-editor">
+    {/* XC-214: page, palette and type are one theme. The measured reference keeps exactly this split -
+        a document-wide theme covering colours, fonts and shapes, and per-block styling reached from the
+        block itself (E-127) - so three tabs for one theme was three clicks to change one look. */}
+
     <PropertyGroup title="ページ">
       <label><span>用紙</span><select defaultValue="a4"><option value="a4">A4</option><option value="letter">Letter</option><option value="screen">画面向け</option></select></label>
       <label><span>向き</span><select defaultValue="portrait"><option value="portrait">縦</option><option value="landscape">横</option></select></label>
@@ -2595,19 +2643,13 @@ function ReportPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: stri
       <label className="property-toggle"><span>ページ番号</span><input type="checkbox" defaultChecked /></label>
       <label><span>図の幅</span><select defaultValue="column"><option value="column">段幅</option><option value="page">ページ幅</option></select></label>
     </PropertyGroup>
-  </div>
-
-  if (tab.id === 'style') return <div className="property-editor">
     <PropertyGroup title="アートスタイル">
       <label><span>スタイル</span><select defaultValue="technical"><option value="technical">技術資料・標準</option><option value="workspace">ワークスペース設定</option></select></label>
       <label><span>配色</span><select defaultValue="accessible"><option value="accessible">識別性優先</option><option value="monochrome">モノクロ印刷</option></select></label>
       <label><span>図表</span><select defaultValue="flat"><option value="flat">フラット</option><option value="bordered">罫線あり</option></select></label>
       <label className="property-toggle"><span>表の縞</span><input type="checkbox" defaultChecked /></label>
     </PropertyGroup>
-    <p className="property-editor-note"><Paintbrush size={12} />スタイルは文章や解析値を変更せず、フォント・配色・図表表現だけに適用されます。</p>
-  </div>
 
-  if (tab.id === 'fonts') return <div className="property-editor">
     <PropertyGroup title="文字表現">
       <label><span>本文</span><select defaultValue="workspace"><option value="workspace">ワークスペース設定</option><option value="noto-sans">Noto Sans</option><option value="source-serif">Source Serif</option></select></label>
       <label><span>見出し</span><select defaultValue="same"><option value="same">本文と同じ</option><option value="noto-sans">Noto Sans</option></select></label>
@@ -2618,6 +2660,7 @@ function ReportPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: stri
       <label><span>状態</span><input value="使用文字を出力前に検査" readOnly /></label>
       <label><span>範囲</span><input value="使用グリフのみ" readOnly /></label>
     </PropertyGroup>
+    <p className="property-editor-note"><Paintbrush size={12} />テーマは文章や解析値を変更せず、ページ・配色・書体・図表表現だけに適用されます。</p>
     <p className="property-editor-note"><ShieldCheck size={12} />表示できない文字は、空の四角で出力せず要素と文字を特定して報告します。</p>
   </div>
 
@@ -2633,11 +2676,38 @@ function ReportPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: stri
       <label><span>追加</span><select defaultValue="choose" onChange={(event) => { if (event.target.value === 'choose') return; const id = `${event.target.value}-${reportBlocks.length}`; const labels: Record<string,string> = { view: 'ビュー', graph: 'グラフ', table: '数値表', text: '本文', references: '参考資料' }; setReportBlocks((current) => [...current, { id, name: labels[event.target.value], detail: '参照先を選択', locked: false }]); event.target.value = 'choose' }}><option value="choose">ブロックを選択</option><option value="view">ビュー</option><option value="graph">グラフ</option><option value="table">数値表</option><option value="text">本文</option><option value="references">参考資料</option></select></label>
       <label><span>ビュー形式</span><select defaultValue="still"><option value="still">静止画</option><option value="interactive">インタラクティブ3D</option><option value="video">動画</option></select></label>
     </PropertyGroup>
-    <PropertyGroup title="コメント">
+  </div>
+
+  if (tab.id === 'drafting') return <div className="property-editor">
+    {/* XC-214: the measured flow is a prompt, then an outline the user refines, then generation on the
+        user's word - and the vendor states the output must be human-reviewed (E-126). This product
+        cannot leave that to a caption: a generated sentence may not invent a number, so nothing enters
+        the report until each statement has been seen with its kind and its source (XC-104). */}
+    <PropertyGroup title="書き方">
       <label><span>方式</span><select value={commentary} onChange={(event) => setCommentary(event.target.value as typeof commentary)}><option value="mechanical">機械的要約のみ</option><option value="generated">生成コメント</option></select></label>
-      {commentary === 'generated' && <><label><span>方向</span><textarea rows={3} placeholder="議論してほしい観点" /></label><label><span>深さ</span><select defaultValue="standard"><option value="brief">簡潔</option><option value="standard">標準</option><option value="detailed">詳細</option></select></label><label><span>モデル</span><input value="未設定" readOnly /></label><label><span>検索の可否</span><select value={search} onChange={(event) => setSearch(event.target.value as typeof search)}><option value="off">検索しない</option><option value="ask">要求ごとに許可を確認</option></select></label>{search === 'ask' && <p className="property-editor-note"><ShieldCheck size={12} />送信する検索語と送信しない情報を要求ごとに表示し、許可されるまで送信しません。</p>}</>}
+      {commentary === 'mechanical' && <p className="property-editor-note"><ShieldCheck size={12} />読み取った値と単位を定型文で並べます。モデルは使わず、文面はケースが変わっても同じ形です。</p>}
     </PropertyGroup>
-    {commentary === 'generated' && <div className="property-unresolved"><AlertTriangle size={13} /><span><b>生成コメントは現在利用できません</b><small>モデルと送信範囲を設定し、費用を確認するまで外部通信しません。</small></span></div>}
+    {commentary === 'generated' && <>
+      <PropertyGroup title="方針">
+        <label><span>観点</span><textarea rows={3} placeholder="議論してほしい観点" /></label>
+        <label><span>深さ</span><select defaultValue="standard"><option value="brief">簡潔</option><option value="standard">標準</option><option value="detailed">詳細</option></select></label>
+        <label><span>モデル</span><input value="未設定" readOnly /></label>
+        <label><span>検索の可否</span><select value={search} onChange={(event) => setSearch(event.target.value as typeof search)}><option value="off">検索しない</option><option value="ask">要求ごとに許可を確認</option></select></label>
+        {search === 'ask' && <p className="property-editor-note"><ShieldCheck size={12} />送信する検索語と送信しない情報を要求ごとに表示し、許可されるまで送信しません。</p>}
+      </PropertyGroup>
+      {/* Restored with the tab: an unset model is why the draft cannot be made, and it gates the
+          action rather than being a note beside a button that still looks available. */}
+      <div className="property-unresolved"><AlertTriangle size={13} /><span><b>生成コメントは現在利用できません</b><small>モデルと送信範囲を設定し、費用を確認するまで外部通信しません。</small></span></div>
+      <PropertyGroup title="下書き">
+        <label><span>状態</span><input value={draftState === 'none' ? '未作成' : draftState === 'review' ? '確認待ち・4文＋除外2件' : '取り込み済み・4文'} readOnly /></label>
+        <div className="drafting-actions">
+          <button type="button" className="primary-button" disabled={draftState === 'review'} onClick={() => setDraftState('review')}><PenLine size={12} />下書きを作る</button>
+          <button type="button" disabled={draftState === 'none'} onClick={() => setDraftState('none')}><X size={12} />破棄</button>
+        </div>
+        {draftState === 'review' && <div className="property-unresolved"><AlertTriangle size={13} /><span><b>確認待ちです</b><small>中央の一覧で、各文の種別と出典、除外された記述を確認します。取り込むまでレポートは変わりません。</small></span></div>}
+        {draftState === 'applied' && <p className="property-editor-note"><ShieldCheck size={12} />取り込んだ文は本文ブロックとして保存され、種別と出典を保持します。ケースが変わると再確認が必要になります。</p>}
+      </PropertyGroup>
+    </>}
   </div>
 
   return <div className="property-editor">

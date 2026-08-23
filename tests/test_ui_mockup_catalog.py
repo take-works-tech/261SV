@@ -697,15 +697,15 @@ def test_every_right_sidebar_mode_uses_responsibility_specific_editors() -> None
     assert "カメラパス" in view_editor
 
     graph_editor = page[page.index("function GraphPropertyEditor("):page.index("function ReportPropertyEditor(")]
-    for section in ("グラフ", "構成", "次元", "投影", "スタイル", "プロット", "書体", "ケース選択", "系列", "集約", "成果物", "保存先"):
-        assert f'title="{section}"' in graph_editor
+    for section in ("グラフ", "構成", "次元", "投影", "スタイル", "系列の既定", "書体", "設定する軸", "表題", "範囲", "目盛", "グリッド", "ケース選択", "系列", "集約", "成果物", "保存先"):
+        assert f'title="{section}"' in graph_editor or f'aria-label="{section}"' in graph_editor
     for output in ("画像", "ベクター", "表データ", "アニメーション"):
         assert f">{output}</option>" in graph_editor
     assert "欠損として表示" in graph_editor
     assert "未宣言" in graph_editor
 
     report_editor = page[page.index("function ReportPropertyEditor("):page.index("function SimulationPropertyEditor(")]
-    for section in ("レポート", "必須情報", "ページ", "共通要素", "アートスタイル", "文字表現", "埋め込み", "参照範囲", "収録項目", "コメント", "形式", "保存先"):
+    for section in ("レポート", "必須情報", "ページ", "共通要素", "アートスタイル", "文字表現", "埋め込み", "参照範囲", "収録項目", "書き方", "方針", "下書き", "形式", "保存先"):
         assert f'title="{section}"' in report_editor
     for output in ("インタラクティブHTML", "PowerPoint", "Word", "Excel", "CSV", "画像", "動画", "プレーンテキスト", "Markdown"):
         assert f">{output}</option>" in report_editor
@@ -1065,16 +1065,20 @@ def test_view_property_tabs_follow_the_last_selected_active_object_without_a_sec
     assert ".outliner-row.selected.active" in styles
 
 
-def test_every_user_facing_font_tab_is_named_text() -> None:
+def test_type_settings_are_part_of_the_style_theme_not_a_tab_of_their_own() -> None:
+    """XC-213/XC-214: a `テキスト` tab beside `スタイル` split one look across two tabs. Type is part of
+    the theme in Graph and Report; the View rail keeps `テキスト` because there it is a selected object's
+    own content, not the document's type scale."""
     page = CHAT_PAGE.read_text(encoding="utf-8")
 
     graph_tabs = page[page.index("  graph: ["):page.index("  report: [")]
     report_tabs = page[page.index("  report: ["):page.index("  chat: [")]
-    assert "{ id: 'fonts', label: 'テキスト'" in graph_tabs
-    assert "{ id: 'fonts', label: 'テキスト'" in report_tabs
+    view_tabs = page[page.index("  view: ["):page.index("  graph: [")]
+    assert "id: 'fonts'" not in graph_tabs and "id: 'fonts'" not in report_tabs
+    assert "{ id: 'text', label: 'テキスト'" in view_tabs
     assert "fonts: { label: 'テキスト', icon: Type }" in page
     assert "label: 'フォント'" not in page
-    assert "<span>フォント</span>" in page  # field label remains precise inside the Text tab
+    assert "<span>フォント</span>" in page  # field label remains precise inside the theme
 
 
 def test_live_material_preview_defaults_to_sphere_and_offers_neutral_test_shapes() -> None:
@@ -1910,10 +1914,12 @@ def test_the_data_and_contents_tabs_are_named_for_what_they_hold() -> None:
 
     assert "{ id: 'data', label: 'データ'" in page
     assert "{ id: 'contents', label: '内容'" in page
+    assert "{ id: 'drafting', label: '執筆'" in page
     assert "label: '詳細'" not in page
     assert "if (tab.id === 'data') return" in page
     assert "if (tab.id === 'contents') return" in page
-    assert "variant === 'series-unresolved' ? 'data' : variant === 'commentary-review' ? 'contents'" in page
+    assert "variant === 'series-unresolved' ? 'data'" in page
+    assert "variant === 'commentary-review' || variant === 'drafting' ? 'drafting'" in page
 
 
 def test_the_background_tab_uses_a_world_icon_rather_than_a_picture() -> None:
@@ -1975,3 +1981,59 @@ def test_a_comparison_output_reports_its_bindings_instead_of_asking_again() -> N
     assert "const axisPinsEveryPane = isComparisonItem && comparison.axis === 'resultPosition'" in page
     assert "この比較は結果位置を軸にしています" in page
     assert "{outputMode === 'video' && canWriteVideo && <PropertyGroup" in page
+
+
+def test_the_graph_rail_is_five_sections_and_one_of_them_is_the_axis() -> None:
+    """XC-213: the rail had a tab for the chart's dimension and another for its fonts, and no way to set
+    an axis title, range or log scale at all - while the measured reference spends 100 of a chart's 115
+    properties on axes (E-124)."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    styles = CHAT_STYLES.read_text(encoding="utf-8")
+
+    graph_tabs = page[page.index("  graph: ["):page.index("  report: [")]
+    ids = re.findall(r"id: '([\w-]+)'", graph_tabs)
+    assert ids == ["overall", "data", "axes", "style", "output"]
+    # one axis is chosen and the same fields serve it, rather than the fields repeating per axis
+    assert "const [axis, setAxis] = useState<'x' | 'y' | 'y2'>('x')" in page
+    assert "axisNames: Record<'x' | 'y' | 'y2', string>" in page
+    assert page.count('<PropertyGroup title="範囲">') == 1
+    assert ".axis-picker" in styles
+    # a fixed range that cuts off data says so (XC-001)
+    assert "固定範囲の外にある点は描かれません。" in page
+    assert "{!axisAuto && <p className=\"property-editor-note warning\">" in page
+
+
+def test_a_graph_series_carries_its_own_appearance_on_its_own_row() -> None:
+    """XC-213: line, marker and colour are keyed to the series in the measured reference (E-124).
+    Holding them chart-wide meant several series could not be told apart, and meant editing one series
+    in two tabs."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    series = page[page.index('<PropertyGroup title="系列">'):page.index('<PropertyGroup title="集約"')]
+    for field in ("<span>色</span>", "<span>線</span>", "<span>マーカー</span>", "<span>軸</span>"):
+        assert field in series, field
+    assert 'aria-label={`${activeSeries.label}の色`}' in page
+    # what is left chart-wide is named as a default, not as the series' look
+    assert '<PropertyGroup title="系列の既定">' in page
+    assert '<PropertyGroup title="プロット">' not in page
+
+
+def test_report_writing_is_a_reviewed_sequence_rather_than_a_group_of_settings() -> None:
+    """XC-214: the measured tool produces an outline before content and generates on the user's word,
+    and its vendor states the output must be human-reviewed (E-126). The rail had four settings in a
+    group called コメント inside the contents tab, and no way to reach the review or see its state."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    report_tabs = page[page.index("  report: ["):page.index("  chat: [")]
+    ids = re.findall(r"id: '([\w-]+)'", report_tabs)
+    assert ids == ["overall", "contents", "drafting", "style", "output"]
+    assert "const [draftState, setDraftState] = useState<'none' | 'review' | 'applied'>" in page
+    assert "下書きを作る" in page
+    assert "確認待ち・4文＋除外2件" in page
+    assert "取り込むまでレポートは変わりません。" in page
+    # an unset model blocks the action rather than annotating it
+    assert "生成コメントは現在利用できません" in page
+    # the theme is one tab: page, palette and type together
+    style = page[page.index("if (tab.id === 'style') return", page.index("function ReportPropertyEditor(")):page.index("if (tab.id === 'drafting') return")]
+    for group in ("ページ", "共通要素", "アートスタイル", "文字表現", "埋め込み"):
+        assert f'title="{group}"' in style, group

@@ -1202,6 +1202,68 @@ can be repeated.
   by per-cell values: an ordered axis does not have to be enumerated by hand
 - justifies: XC-202, XC-203
 
+### E-124 - What a mature chart view actually exposes, counted in ParaView 6.2.0
+- tier: T1
+- url: `D:\Program Files\ParaView 6.2.0intkRemotingApplication-pv6.2.dll`, whose compiled proxy
+  XML was read directly and the `XYChartViewBase`, `XYChartViewBase4Axes`, `XYChartRepresentationBase`
+  and `XYChartRepresentation` elements extracted with their `<PropertyGroup>` labels
+- verified: 2026-08-23
+- says: the Line Chart View carries **65 properties in 13 named panel groups** for two axes, and the
+  four-axis variant adds **50 more in 10 groups** - **115 properties in 23 groups** for one chart.
+  **Twenty of the 23 groups are one pattern repeated per axis**: `<Axis>`, `<Axis> Title Properties`,
+  `<Axis> Range`, `<Axis> Labels`, `<Axis> Label Properties`, identical for Left, Bottom, Right and Top,
+  25 properties each. Only three groups are chart-wide: `Legend Properties`, `Annotation`, `Tooltip`.
+  Per-axis, the settings are title, grid visibility and colour, axis colour, title font family/file/
+  size/bold/italic/colour, log scale, custom range with minimum and maximum, label visibility, label
+  notation and precision, custom labels, and the label font set. **Series appearance is keyed to the
+  series, not to the chart**: the representation carries `SeriesVisibility`, `SeriesLabel`,
+  `SeriesColor`, `SeriesOpacity`, `SeriesPlotCorner` and, in `Series Parameters` groups,
+  `SeriesLineStyle`, `SeriesLineThickness`, `SeriesMarkerStyle`, `SeriesMarkerSize` - one value per
+  series, addressed by series name, with `SeriesPlotCorner` choosing which axis pair a series is drawn
+  against
+- justifies: XC-213
+
+### E-125 - Where Microsoft Office puts the properties of a selected chart element
+- tier: T1
+- url: https://support.microsoft.com/en-us/office/format-elements-of-a-chart-b6c787d5-f90a-41d2-a901-9d3ed9f0dbf0
+- verified: 2026-08-23
+- says: there is **one Format task pane**, opened from the element itself - "select a chart element,
+  right-click it, and click Format <chart element>" - and it is contextual: "The **Format** pane appears
+  with options that are tailored for the selected chart element", and "If you click on a different chart
+  element, you'll see that the task pane automatically updates to the new chart element." Its sections
+  are reached by **small icons at the top of the pane**, and the pane can be moved or resized. So the
+  tabs of the pane are the facets of the **selected element**, not of the whole document, and the
+  selection - not a tab - is how a user reaches an axis or a series
+- justifies: XC-213
+
+### E-126 - How a shipped LLM authoring tool sequences generation and review
+- tier: T1
+- url: https://support.microsoft.com/en-us/powerpoint/copilot/create-a-new-presentation-with-copilot-in-powerpoint
+- verified: 2026-08-23
+- says: the flow is prompt, then clarifying questions the user may answer or skip, then an **outline
+  produced before any slides**: "Once Copilot has generated your outline, you can continue to chat with
+  Copilot to refine your outline. When you're ready, you can let Copilot know to generate your slides."
+  Generation happens on the user's word, not automatically. The vendor states in its own limitations
+  that "The output of the Create a presentation feature is AI-generated content and should be
+  human-reviewed and edited accordingly"
+- justifies: XC-214
+
+### E-127 - Where Canva and Gamma put insertion, selection properties and document theme
+- tier: T1
+- url: https://www.canva.com/help/glow-up-variantb/, https://www.canva.com/help/editor-tabs-missing/ and
+  https://help.gamma.app/en/articles/11969695-how-do-i-style-cards-and-adjust-layout-settings-in-my-gamma
+- verified: 2026-08-23
+- says: **Canva** separates inserting from editing. The left side panel holds what can be added -
+  templates, elements, fonts, Brand Kit, Draw, Projects, Apps - and its documentation lists the tabs a
+  user may hide, "to help keep your editor view tidy": Photos, Audio, Videos, Background, Charts, Logos,
+  Bulk create, Design, Text, Apps, Projects. The properties of a selection are not in a persistent rail:
+  a fixed quick-actions toolbar sits below the header and "Just select an element and it'll suggest
+  relevant editing options", while an edit panel opens with features specific to that element.
+  **Gamma** splits appearance in two levels: a document-wide **Theme**, and per-slide styling that is
+  "per-block", reached from the slide's own corner rather than from a global tab, exposing accent image
+  and its placement, overlay style, intensity and colour, slide colour, full-bleed and content alignment
+- justifies: XC-213, XC-214
+
 ## Not verified here
 
 Recorded so that nothing silently depends on them:

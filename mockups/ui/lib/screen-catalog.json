@@ -481,6 +481,14 @@
       "href": "?screen=view&variant=unresolved-template"
     },
     {
+      "id": "graph.axes",
+      "screen": "graph",
+      "variant": "axes",
+      "label": "グラフ・軸",
+      "intent": "11_ui.md・XC-213。軸を1本選び、表題・範囲・目盛・グリッドを設定する。範囲を固定するとデータを切り落とす旨を明示する。",
+      "href": "?screen=graph&variant=axes"
+    },
+    {
       "id": "graph.default",
       "screen": "graph",
       "variant": "default",
@@ -535,6 +543,14 @@
       "label": "生成コメントの利用確認",
       "intent": "方向、深さ、モデル、検索許可、送信内容と費用を確定するまで生成を開始しない。",
       "href": "?screen=report&variant=commentary-review"
+    },
+    {
+      "id": "report.drafting",
+      "screen": "report",
+      "variant": "drafting",
+      "label": "レポート・執筆",
+      "intent": "11_ui.md・XC-214。方式と方針を決め、下書きを作り、確認するまで本文に入らない状態を示す。",
+      "href": "?screen=report&variant=drafting"
     },
     {
       "id": "report.default",

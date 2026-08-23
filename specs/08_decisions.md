@@ -3298,3 +3298,68 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a comparison over the result axis that should animate some other axis instead, which
   would make the video rule depend on two axes rather than one
+
+### XC-213 - The Graph rail is five sections, and one of them is the axis it never had
+- decided: 2026-08-23
+- status: active
+- decision: the Graph property rail is **`グラフ` / `データ` / `軸` / `スタイル` / `出力`**, five sections
+  where there were six.
+  `種類` folds into `グラフ`: the dimension and the chart form are two fields and the first thing chosen.
+  `テキスト` folds into `スタイル`: type is part of how a chart looks, and a separate tab split one look
+  across two places.
+  **`軸` is new.** One axis is chosen - `X（横）`, `Y（左）`, `第2Y（右）` - and the same fields serve
+  whichever is chosen: title, unit annotation, range (data-fitted or fixed), log scale, tick interval,
+  notation and precision, and grid lines. **A fixed range that excludes data says so on the figure and
+  in its export.**
+  **A series carries its own colour, line, marker and axis pair, on its own row in `データ`**, beside its
+  quantity, unit and provenance. `スタイル` keeps only the defaults a new series starts from
+- decided_by: the product owner, 2026-08-23
+- rationale: the measured reference spends 100 of a chart's 115 properties, in 20 of its 23 panel
+  groups, on four axes carrying an identical 25-property pattern (E-124) - and this product's Graph rail
+  had **no axis settings at all**, so a chart's title, range and log scale could not be set while two
+  tabs existed for its dimension and its fonts. Choosing the axis rather than repeating the fields keeps
+  the same reach in a twentieth of the panel. The same measurement keys line, marker and colour to the
+  series, which is why they move onto the series row: with them in `スタイル` a reader changed one
+  series' look in one tab and its quantity in another, and with several series the global controls could
+  not distinguish them at all. An axis range is not a cosmetic setting in this product - a fixed range
+  that cuts off data produces a chart that reads as if the data ended there (XC-001)
+- alternatives: making the rail contextual on the selected chart element, as Office does (E-125), is the
+  better model for a mouse-driven chart and needs a chart canvas that supports selecting an axis, a
+  legend and a series; the selection can drive which of these five sections is shown once it exists,
+  without changing them
+- basis: E-124 (T1), E-125 (T1), E-127 (T1)
+- affects: 11_ui.md
+- decidedness: Fixed
+- reversal_trigger: a chart form with more than three axes, which would make the axis picker a list
+
+### XC-214 - The Report rail is five sections, and writing is a reviewed draft rather than a setting
+- decided: 2026-08-23
+- status: active
+- decision: the Report property rail is **`レポート` / `内容` / `執筆` / `スタイル` / `出力`**, five
+  sections where there were six.
+  `レイアウト` and `テキスト` fold into `スタイル`, which becomes the **document theme**: page, margins,
+  columns, shared elements, palette, figure treatment, type and font embedding.
+  **`執筆` is new and holds what was a `コメント` group inside `内容`.** It is shaped as a sequence, not a
+  set of settings: choose the method (mechanical summary, or generated), state the direction, depth,
+  model and search permission, then **`下書きを作る`**, which produces a draft that is **reviewed before
+  it enters the report** - each statement with its kind and its source, and the statements the standard
+  excluded, shown together. The state - not made, awaiting review, taken in - is named in the rail.
+  Nothing is generated without the user asking, and an unset model blocks the action rather than
+  annotating it
+- decided_by: the product owner, 2026-08-23
+- rationale: the measured tool produces an outline **before** any content, lets the user refine it, and
+  generates on the user's word; its own vendor states the output "should be human-reviewed and edited
+  accordingly" (E-126). This product cannot discharge that with a caption, because a generated sentence
+  here may cite a number: the review already exists on the canvas (XC-104) and the rail had no way to
+  reach it and no state to say where a draft stood, so a reviewed flow was rendered as four settings in
+  a group called `コメント` inside a tab about contents. Page, palette and type are one theme in the
+  measured reference, which keeps a document-wide theme and reaches per-block styling from the block
+  (E-127) - so three tabs for one look was three places to change one thing
+- alternatives: a selection-scoped `ブロック` tab matches how the reference reaches per-block styling and
+  needs the report canvas to support selecting a block; per-block placement stays in the `内容` list
+  until it does
+- basis: E-126 (T1), E-127 (T1)
+- affects: 11_ui.md
+- decidedness: Fixed
+- reversal_trigger: a report whose blocks need placement per block, which makes the selection scope
+  worth its tab
