@@ -91,6 +91,9 @@ ran. Every gate in `validate/` runs in `.github/workflows/ci.yml`, and
   else may merge. **Nothing enforces any of this**: there is no branch protection on this plan (E-129,
   OPEN-020), so a direct push to `main` skips every check. Judgement is still required and nothing
   compels it.
+  A pull request **in conflict receives no checks at all** and therefore never merges - GitHub does not
+  run `pull_request` workflows while the merge commit cannot be computed. It looks like the mechanism
+  failing; merge `main` into the branch (never rebase) and the checks appear.
   To stop one pull request: the `no-auto-merge` label. To stop all of them:
   `gh variable set AUTO_MERGE_ENABLED --body false` - one command, no diff, no pull request, because a
   temporary measure that needs a pull request to end becomes a permanent one. An agent may open a pull

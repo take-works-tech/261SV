@@ -569,4 +569,6 @@ class TestMockupStateSweep:
             cwd=ROOT, capture_output=True, text=True, env=environment,
         )
         assert result.returncode == 1
-        assert "not this application" in result.stdout
+        # reported with both attempts, so a real failure is distinguishable from a flake
+        assert "and again on retry" in result.stdout
+        assert "is not serving this application" in result.stdout

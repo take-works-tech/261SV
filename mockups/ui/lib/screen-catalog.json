@@ -497,6 +497,14 @@
       "href": "?screen=graph&variant=axes"
     },
     {
+      "id": "graph.axis-unit-conflict",
+      "screen": "graph",
+      "variant": "axis-unit-conflict",
+      "label": "軸・単位が混在",
+      "intent": "11_ui.md・XC-228／XC-003。1本の軸に置かれた系列が異なる単位を宣言した場合、どちらかを軸に書かず「単位混在」と示し、単位は凡例に出す。",
+      "href": "?screen=graph&variant=axis-unit-conflict"
+    },
+    {
       "id": "graph.style",
       "screen": "graph",
       "variant": "style",

@@ -2335,3 +2335,62 @@ def test_no_rail_lets_two_controls_change_the_same_thing() -> None:
                 collisions.append(f"{name}: {control} in {sorted(tabs)}")
 
     assert not collisions, "two controls change one thing: " + "; ".join(collisions)
+
+
+def test_an_object_tab_separates_what_it_is_from_how_it_is_drawn() -> None:
+    """XC-227: the division XC-226 made across two tabs in the graph is made by group here, because the
+    object tab is the only tab the selected object has. A scalar field already read this way; mesh,
+    vector field, trajectory and point cloud held both kinds in one group."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    editor = page[page.index("function ObjectTypeProperties("):page.index("\nfunction ", page.index("function ObjectTypeProperties(") + 10)]
+
+    def groups_of(kind: str) -> list[str]:
+        mesh = "if (kind === 'analysis-mesh' || kind === 'reference-mesh')"
+        marker = mesh if kind == "analysis-mesh" else f"if (kind === '{kind}')"
+        at = editor.index(marker)
+        rest = editor[at + len(marker):]
+        nxt = "\n  if (kind ==="
+        cut = rest.index(nxt) if nxt in rest else len(rest)
+        return re.findall(r"<b>([^<]+)</b>", editor[at:at + len(marker) + cut])
+
+    # what it is, then how it is drawn
+    assert groups_of("analysis-mesh")[:3] == ["メッシュ", "表示", "エッジ"]
+    assert groups_of("vector-field")[:2] == ["ベクトル場", "グリフ"]
+    assert groups_of("point-cloud")[:2] == ["点群", "表示"]
+    assert groups_of("trajectory")[:2] == ["流線・軌跡", "表現"]
+    assert groups_of("scalar-field")[:2] == ["スカラー場", "色と範囲"]
+
+    # the drawn half really did move: representation is no longer beside the mesh's source
+    mesh = editor[editor.index("if (kind === 'analysis-mesh' || kind === 'reference-mesh')"):]
+    mesh_first_group = mesh[:mesh.index("<b>表示</b>")]
+    assert 'kind="representation"' not in mesh_first_group
+    assert "<span>参照元</span>" in mesh_first_group
+
+
+def test_the_axis_prints_the_unit_its_series_declared_and_reports_a_conflict() -> None:
+    """XC-228: 系列 and 軸 hold no duplicated function, and the unit crosses between them with nothing
+    saying in which direction. Two series on one axis declaring different units has no correct silent
+    answer - printing either mislabels the other (XC-003)."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "この軸に置かれた系列が宣言した単位を書きます。単位が未宣言なら書きません。推測はしません。" in page
+    assert "この軸の系列が異なる単位を宣言しています" in page
+    assert "軸には「単位混在」と表示し、系列ごとの単位は凡例に出します。" in page
+    assert "const unitConflict = variant === 'axis-unit-conflict'" in page
+
+
+def test_choosing_an_axis_says_which_kind_of_choosing_it_is() -> None:
+    """XC-228: the axes tab's picker chooses what you are editing; 使用する軸 chooses what a series is
+    drawn against. Both are "pick an axis", and the picker had its purpose only in an aria-label."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    styles = CHAT_STYLES.read_text(encoding="utf-8")
+
+    assert '<span className="axis-picker-caption">設定する軸</span>' in page
+    assert ".axis-picker-caption" in styles
+    # one vocabulary for the axes across both tabs
+    assert '<option value="y">Y（左）</option><option value="y2">第2Y（右）</option>' in page
+    assert "左（Y）" not in page
+    # and 範囲 names one thing in the rail
+    assert "<span>集約範囲</span>" in page
+    editor = page[page.index("function GraphPropertyEditor("):page.index("function ReportPropertyEditor(")]
+    assert editor.count("<span>範囲</span>") == 0

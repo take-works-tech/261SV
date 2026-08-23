@@ -3462,6 +3462,12 @@ model or the prompt, never in a description that quietly went stale.
   skipped or neutral; and it touches nothing under `.github/`, `validate/` or `.claude/`.
   **Every branch leaves without merging.** An answer the job cannot read, a check still running, a count
   it did not expect: each ends the run having merged nothing. An error in the job merges nothing at all.
+  **A pull request in conflict receives no checks at all**, so it never reaches those conditions: GitHub
+  does not run `pull_request` workflows while the merge commit cannot be computed. Measured 2026-08-23
+  on pull request #20, which sat with no check run of any kind while a manual dispatch on the same ref
+  ran normally; the cause was `mergeStateStatus: DIRTY`, and merging `main` into the branch produced the
+  event. This is correct - a conflicted change must not merge - and it reads exactly like the mechanism
+  being broken, so it is written down here rather than rediscovered.
   **What this accepts, stated rather than discovered later.** Everything outside those three directories
   merges unread - including `specs/`, `AGENTS.md` and `evidence/`, the documents that authorise the
   arrangement. And nothing enforces that work arrives by pull request: a direct push to `main` skips
@@ -3750,3 +3756,55 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: users reporting that they cannot find where a series' colour is set, which would
   mean the shared selection is not visible enough to carry the split
+
+### XC-227 - An object's tab separates what it is from how it is drawn, by group
+- decided: 2026-08-24
+- status: active
+- decision: the division XC-226 made across two tabs in the Graph rail is made **by group** in the
+  @View object tab, because there is only one tab there - the selected object's. For every object type,
+  the first group holds **what the object is** (its role, its source, the field it reads, the frame that
+  field is in) and a later group holds **how it is drawn** (representation, opacity, glyph, point size,
+  colour, edges). A scalar field already read this way, with `色と範囲` separate from the field
+  selection; mesh, vector field, trajectory and point cloud did not
+- decided_by: the product owner, 2026-08-24
+- rationale: the owner's argument for the Graph rail - that deciding what a figure shows and making it
+  readable are two kinds of work - is about the work, not about tabs, so it applies wherever both kinds
+  sit together. The object tab cannot use the same answer as the Graph rail because there is nothing to
+  split into: a second tab for an object's appearance would be a tab whose contents change with the
+  selection twice over. Groups are the unit available, and a collapsed group is a section a reader can
+  skip, which is most of what the split buys
+- alternatives: moving appearance to the `マテリアル` tab confuses a display setting with a surface
+  @Asset - a representation is not a material - and leaves the object tab holding only two fields
+- basis: E-124 (T1), E-125 (T1)
+- affects: 11_ui.md, 16_application_model.md
+- decidedness: Fixed
+- reversal_trigger: an object type whose appearance is one field, where a group of its own is heavier
+  than the field
+
+### XC-228 - The axis prints the unit its series declare, and says so when they disagree
+- decided: 2026-08-24
+- status: active
+- decision: three seams between `系列` and `軸`, which hold no duplicated function and did not say how
+  they relate.
+  **The axis's unit is the series' unit.** `単位の併記` writes what the series **on that axis** declared,
+  and nothing else - an undeclared unit is not written, and no unit is inferred (XC-003). **Two series
+  on one axis declaring different units is not resolved by choosing one**: the axis states that the
+  units are mixed, and the units go to the legend beside each series. A scale labelled `MPa` under a
+  series measured in `mm` is a figure that reads wrongly and looks right.
+  **Choosing an axis means two things, so each says which.** The `軸` tab's picker chooses the axis you
+  are **editing** and now carries that as a visible caption; `使用する軸` on a series chooses the axis it
+  is **drawn against**. Both tabs name the axes identically - `Y（左）`, `第2Y（右）` - where the series
+  said `左（Y）` and the axis tab said `Y（左）`.
+  **`範囲` named two things in one rail**: the reduction's range and the axis's. The reduction's is
+  `集約範囲`
+- decided_by: the product owner, 2026-08-24
+- rationale: asked whether `系列` and `軸` overlap. They do not overlap in function - one says what is
+  drawn, the other how the scale reads - but the unit crosses between them and nothing said in which
+  direction, which is the kind of gap that produces a confidently wrong figure rather than a confusing
+  one. The mixed-unit case has no correct silent answer: printing either unit mislabels the other
+  series, and printing neither without saying so leaves a reader to assume
+- basis: E-124 (T1), E-001 (T1)
+- affects: 11_ui.md
+- decidedness: Fixed
+- reversal_trigger: a chart form where two units on one axis is meaningful and conventional, which would
+  need the axis to carry both rather than to report the conflict
