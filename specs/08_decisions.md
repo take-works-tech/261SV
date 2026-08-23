@@ -3600,3 +3600,35 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a theme that cannot express a default some series needs, which would make the
   per-series field the only one and the theme group pointless
+
+### XC-222 - One name means one thing across the graph rail, and a control that does nothing is removed
+- decided: 2026-08-23
+- status: active
+- decision: within one area's property rail, **a control name means one thing**. In the graph rail five
+  names meant two: `軸` was both the axis a series is drawn against and the size of an axis label,
+  `種類` was both the chart's kind and the output's, and `マーカー` and `線幅` each named a value and its
+  default in adjacent tabs. They are now `使用する軸` and `軸ラベル`, `成果物の種類`, `既定のマーカー` and
+  `既定の線幅`. **One exemption, stated rather than silent**: `タイトル` is the graph's title in the item
+  tab and its type size under `書体`, where the group name and the `pt` value carry the difference and
+  the unambiguous alternatives wrap in a 68-pixel label column.
+  **A control that has no effect in its current state is not drawn.** A series' colour well sat beside
+  the mode selector and did nothing while the mode was `パレット順`, with the palette it would have drawn
+  from reported again on a row of its own - three elements for one decision, one of them inert. The row
+  now shows the mode, and beneath it either the palette position this series takes or the colour well,
+  never both and never neither
+- decided_by: the product owner, 2026-08-23
+- rationale: the owner reported the same thing twice - style controls in a tab called データ, and
+  apparent duplication and empty displays - which is what prompted counting every control in the five
+  tabs rather than answering from the last change. XC-221 fixed the pair that was genuinely one value in
+  two places; this fixes the pairs that were **different values wearing one name**, which read as
+  duplicates to anyone scanning, and the one control that was actually inert. A name that needs its
+  group to be understood is a name that fails when the reader is scanning, which is how a rail is read
+- correction: XC-221 introduced `既定` as a concept and left the rows named exactly as the series' own,
+  so the change that removed the duplicate left it looking like one
+- alternatives: renaming the graph's title text instead of the type size moves the ambiguity rather than
+  removing it, and the title is what that field holds
+- basis: E-124 (T1)
+- affects: 11_ui.md
+- decidedness: Fixed
+- reversal_trigger: a third meaning for one of these names, which would mean the rail has outgrown a
+  flat set of labels

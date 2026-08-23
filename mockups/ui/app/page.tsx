@@ -2467,6 +2467,7 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
   const [defaultMarker, setDefaultMarker] = useState('circle')
   const [defaultWidth, setDefaultWidth] = useState('2')
   const [seriesLine, setSeriesLine] = useState('solid')
+  const [seriesColour, setSeriesColour] = useState('palette')
   const [seriesMarker, setSeriesMarker] = useState('theme')
   const [seriesWidth, setSeriesWidth] = useState('theme')
   const [outputKind, setOutputKind] = useState<'image' | 'vector' | 'data' | 'animation'>('image')
@@ -2540,8 +2541,13 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
         {/* XC-213: colour, line and marker belong to the series, not to the chart - the measured
             reference keys all three to the series (E-124), and splitting them across two tabs meant
             changing one series' look and its quantity in two places. */}
-        <label><span>色</span><div className="property-pair"><select defaultValue="palette"><option value="palette">パレット順</option><option value="custom">指定色</option></select><input type="color" defaultValue="#2f6df6" aria-label={`${activeSeries.label}の色`} /></div></label>
-        <label><span>パレット</span><span className="palette-readout"><OptionSample kind="palette" value={palette} /><small>この系列は{['1番目','2番目','3番目','4番目','5番目'][graphSeries.indexOf(activeSeries) % 5]}の色を使います</small></span></label>
+        {/* XC-222: one decision, one row. The colour well used to sit beside the mode and did nothing
+            while the mode was パレット順 - a control with no effect is worse than no control - and the
+            palette it would have come from was reported again on a row of its own. */}
+        <label><span>色</span><select value={seriesColour} onChange={(event) => setSeriesColour(event.target.value)}><option value="palette">パレット順</option><option value="custom">指定色</option></select></label>
+        {seriesColour === 'palette'
+          ? <label><span> </span><span className="palette-readout"><OptionSample kind="palette" value={palette} /><small>この系列はパレットの{['1番目','2番目','3番目','4番目','5番目'][graphSeries.indexOf(activeSeries) % 5]}の色です</small></span></label>
+          : <label><span> </span><input type="color" defaultValue="#2f6df6" aria-label={`${activeSeries.label}の色`} /></label>}
         {/* XC-221: the first option is the theme's, drawn as the theme currently resolves it, so the
             relationship between the two tabs is on screen instead of being two identical pickers. */}
         <VisualOptions label="線" kind="line" columns={4} value={seriesLine} onChange={setSeriesLine}
@@ -2549,7 +2555,7 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
         <label><span>線幅</span><select value={seriesWidth} onChange={(event) => setSeriesWidth(event.target.value)}><option value="theme">テーマに従う（{defaultWidth} px）</option>{['1', '2', '3', '4', '5', '6'].map((w) => <option value={w} key={w}>{w} px</option>)}</select></label>
         <VisualOptions label="マーカー" kind="marker" columns={5} value={seriesMarker} onChange={setSeriesMarker}
           options={[{ value: 'theme', label: 'テーマ', sample: defaultMarker, detail: `テーマに従う（${{ circle: '円', square: '四角', triangle: '三角', none: 'なし' }[defaultMarker] ?? defaultMarker}）` }, { value: 'circle', label: '円' }, { value: 'square', label: '四角' }, { value: 'triangle', label: '三角' }, { value: 'none', label: 'なし' }]} />
-        <label><span>軸</span><select defaultValue="left"><option value="left">左（Y）</option><option value="right">右（第2Y）</option></select></label>
+        <label><span>使用する軸</span><select defaultValue="left"><option value="left">左（Y）</option><option value="right">右（第2Y）</option></select></label>
         <label><span>来歴</span><input value={activeSeries.quantity === 'unresolved' ? '数量の選択後に表示' : activeSeries.quantity === 'computed' || activeSeries.quantity === 'expression' ? '計算・式を表示' : activeSeries.quantity === 'reference' ? '参考資料・数値根拠には未使用' : activeSeries.quantity === 'measurement' ? '測定データ' : 'データセット'} readOnly /></label>
         <label><span>欠損</span><select defaultValue="gap"><option value="gap">欠損として表示・凡例に残す</option></select></label></>}
     </PropertyGroup>
@@ -2606,15 +2612,15 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
         was not one of the four options, so the control rendered with nothing selected - and the series
         tab offered the same four with no way to say "follow this", which made two identical pickers. */}
     <PropertyGroup title="系列の既定">
-      <label><span>線幅</span><select value={defaultWidth} onChange={(event) => setDefaultWidth(event.target.value)}>{['1', '2', '3', '4', '5', '6'].map((w) => <option value={w} key={w}>{w} px</option>)}</select></label>
-      <VisualOptions label="マーカー" kind="marker" columns={4} value={defaultMarker} onChange={setDefaultMarker}
+      <label><span>既定の線幅</span><select value={defaultWidth} onChange={(event) => setDefaultWidth(event.target.value)}>{['1', '2', '3', '4', '5', '6'].map((w) => <option value={w} key={w}>{w} px</option>)}</select></label>
+      <VisualOptions label="既定のマーカー" kind="marker" columns={4} value={defaultMarker} onChange={setDefaultMarker}
         options={[{ value: 'circle', label: '円' }, { value: 'square', label: '四角' }, { value: 'triangle', label: '三角' }, { value: 'none', label: 'なし' }]} />
       <p className="property-editor-note"><ShieldCheck size={12} />各系列は既定のまま描かれ、系列タブで「テーマ」以外を選んだ系列だけがそこを上書きします。</p>
     </PropertyGroup>
     <PropertyGroup title="書体">
       <label><span>フォント</span><select defaultValue="workspace"><option value="workspace">ワークスペース設定</option><option value="noto-sans">Noto Sans</option><option value="source-serif">Source Serif</option></select></label>
       <label><span>タイトル</span><select defaultValue="14"><option value="12">12 pt</option><option value="14">14 pt</option><option value="16">16 pt</option></select></label>
-      <label><span>軸</span><select defaultValue="10"><option value="9">9 pt</option><option value="10">10 pt</option><option value="11">11 pt</option></select></label>
+      <label><span>軸ラベル</span><select defaultValue="10"><option value="9">9 pt</option><option value="10">10 pt</option><option value="11">11 pt</option></select></label>
       <label><span>凡例</span><select defaultValue="9"><option value="8">8 pt</option><option value="9">9 pt</option><option value="10">10 pt</option></select></label>
     </PropertyGroup>
     <p className="property-editor-note"><ShieldCheck size={12} />出力では使用文字を検査し、必要な字体をライセンス条件に従って埋め込みます。素材ライブラリの「スタイル」は配色とプロットの既定に、「テキスト」は書体に適用されます。ここでは適用後のこのグラフの状態を調整します。</p>
@@ -2622,7 +2628,7 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
 
   return <div className="property-editor">
     <PropertyGroup title="成果物">
-      <label><span>種類</span><select value={outputKind} onChange={(event) => setOutputKind(event.target.value as typeof outputKind)}><option value="image">画像</option><option value="vector">ベクター</option><option value="data">表データ</option><option value="animation">アニメーション</option></select></label>
+      <label><span>成果物の種類</span><select value={outputKind} onChange={(event) => setOutputKind(event.target.value as typeof outputKind)}><option value="image">画像</option><option value="vector">ベクター</option><option value="data">表データ</option><option value="animation">アニメーション</option></select></label>
       {outputKind === 'image' && <><label><span>形式</span><select defaultValue="png"><option value="png">PNG</option><option value="jpeg">JPEG</option><option value="tiff">TIFF</option></select></label><label><span>サイズ</span><select defaultValue="1600x900"><option value="1600x900">1600 × 900</option><option value="2400x1350">2400 × 1350</option></select></label></>}
       {outputKind === 'vector' && <label><span>形式</span><select defaultValue="svg"><option value="svg">SVG</option><option value="pdf">PDF</option></select></label>}
       {outputKind === 'data' && <><label><span>形式</span><select defaultValue="csv"><option value="csv">CSV</option><option value="xlsx">Excel</option></select></label><label className="property-toggle"><span>来歴列</span><input type="checkbox" defaultChecked /></label></>}

@@ -2017,7 +2017,7 @@ def test_a_graph_series_carries_its_own_appearance_and_can_defer_to_the_theme() 
 
     series = page[page.index("if (tab.id === 'series') return"):page.index("if (tab.id === 'axes') return")]
     assert "<span>色</span>" in series
-    assert "<span>軸</span>" in series
+    assert "<span>使用する軸</span>" in series
     assert 'label="線" kind="line"' in series
     assert 'label="マーカー" kind="marker"' in series
     assert 'aria-label={`${activeSeries.label}の色`}' in page
@@ -2156,3 +2156,60 @@ def test_the_graph_panels_are_written_in_the_order_the_rail_shows_them() -> None
 
     # the last section is the fallback `return`, so it is not in the written list
     assert written == shown[:-1], f"written {written} against rail {shown}"
+
+
+def test_no_graph_control_name_means_two_things_in_two_tabs() -> None:
+    """XC-222: five did. 軸 was the axis a series is drawn against and the size of an axis label; 種類
+    was the chart's kind and the output's; マーカー and 線幅 were a value and its default, named
+    identically in adjacent tabs, which is what made the pair read as a duplicate rather than as a
+    default and an override."""
+    import collections
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    editor = page[page.index("function GraphPropertyEditor("):page.index("function ReportPropertyEditor(")]
+    marks = [(m.group(1), m.start()) for m in re.finditer(r"^  if \(tab\.id === '(\w+)'\) return", editor, re.M)]
+    fallback = re.search(r"^  return <div className=\"property-editor\">", editor, re.M).start()
+    blocks = {name: editor[start:(marks[i + 1][1] if i + 1 < len(marks) else fallback)]
+              for i, (name, start) in enumerate(marks)}
+    blocks["output"] = editor[fallback:]
+
+    where: dict[str, set[str]] = collections.defaultdict(set)
+    for tab, body in blocks.items():
+        names = re.findall(r"<label[^>]*><span>([^<]+)</span>", body) + re.findall(r'<VisualOptions label="([^"]+)"', body)
+        for name in names:
+            if name.strip():
+                where[name].add(tab)
+
+    # The one exemption, stated rather than silent: the graph's title text and the size of its type.
+    # The group name 書体 and the pt value carry the difference, and the alternatives -
+    # 「タイトルの大きさ」 and its siblings - wrap in a 68px label column, which is its own defect.
+    exempt = {"タイトル": {"overall", "style"}}
+    collisions = {name: tabs for name, tabs in where.items() if len(tabs) > 1 and exempt.get(name) != tabs}
+    assert not collisions, f"one name, two meanings: { {k: sorted(v) for k, v in collisions.items()} }"
+
+
+def test_the_series_colour_is_one_decision_without_an_inert_control() -> None:
+    """XC-222: the colour well sat beside the mode and did nothing while the mode was パレット順, and
+    the palette it would have drawn from was reported again on a row of its own - three elements for
+    one decision, one of them with no effect."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "const [seriesColour, setSeriesColour] = useState('palette')" in page
+    assert "{seriesColour === 'palette'" in page
+    # the well exists only in the branch where it does something
+    colour = page[page.index("<span>色</span>"):page.index('label="線" kind="line"')]
+    assert colour.count('type="color"') == 1
+    assert "seriesColour === 'palette'" in colour
+    assert "この系列はパレットの" in colour
+
+
+def test_the_output_tab_shows_one_format_field_at_a_time() -> None:
+    """The source names 形式 four times; they are the four mutually exclusive branches of 成果物の種類,
+    so one renders. Asserted rather than assumed, because a repeated label is exactly what a reader
+    reports as a duplicate."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    editor = page[page.index("function GraphPropertyEditor("):page.index("function ReportPropertyEditor(")]
+    output = editor[re.search(r"^  return <div className=\"property-editor\">", editor, re.M).start():]
+
+    assert output.count("<span>形式</span>") == 4
+    for kind in ("image", "vector", "data", "animation"):
+        assert f"outputKind === '{kind}'" in output
