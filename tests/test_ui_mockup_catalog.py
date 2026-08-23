@@ -1617,10 +1617,10 @@ def test_the_pane_badge_is_the_control_the_split_bar_says_it_is() -> None:
     assert "{comparisonGrid ? (" in page
 
 
-def test_the_split_is_set_from_the_area_bar_and_nowhere_else() -> None:
-    """XC-204: the property rail edits the saved item, so a session control there is the confusion
-    XC-202 removed - but the canvas is not the answer either. The count lives in the area bar above the
-    canvas it divides, once, and the canvas carries nothing until it is actually divided."""
+def test_the_layout_control_sets_the_arrangement_and_nothing_else_does() -> None:
+    """XC-204 and XC-206: the property rail edits the saved item, so a session control there is the
+    confusion XC-202 removed - but the canvas is not the answer either. One control in the area bar
+    answers one question, how this canvas is laid out, for both kinds of item."""
     page = CHAT_PAGE.read_text(encoding="utf-8")
     overall = page[page.index("if (tab.id === 'overall') return"):page.index("if (tab.id === 'camera') return")]
 
@@ -1630,7 +1630,7 @@ def test_the_split_is_set_from_the_area_bar_and_nowhere_else() -> None:
     # exactly one control sets the count, and it is the area bar's menu
     assert 'className="split-count"' not in page
     assert page.count("onSplitPanesChange(count)") == 1
-    assert 'aria-label="画面分割"' in page
+    assert 'aria-label="画面レイアウト"' in page
     assert "work-area-split" in page
     assert page.count("カメラ同期") == 2  # the menu item, and the canvas note that states its state
     # the canvas says only what makes sense once split
@@ -1639,13 +1639,23 @@ def test_the_split_is_set_from_the_area_bar_and_nowhere_else() -> None:
     assert "1画面に戻す" in page
 
 
-def test_the_split_control_is_absent_from_a_comparison_and_from_other_areas() -> None:
-    """A @Comparison's pane count comes from its member list (XC-202), so a control that overrides it
-    would be a second source for one number; the graph and report areas have no panes at all."""
+def test_the_layout_control_does_not_vanish_between_the_two_kinds_of_view_item() -> None:
+    """XC-206: a control that disappears without saying why reads as a missing feature. A @Comparison's
+    pane count is its member count, so the same control sets the columns those members wrap at instead -
+    and it is still absent where there is no canvas of panes to lay out."""
     page = CHAT_PAGE.read_text(encoding="utf-8")
 
-    assert "splitAvailable={scenario.screen === 'view' && !isComparisonItem}" in page
-    assert "{splitAvailable && !itemListOpen && <DropdownMenu>" in page
+    assert "const layoutControl: { kind: 'split' } | { kind: 'comparison'; members: number } | null" in page
+    assert "scenario.screen !== 'view'" in page
+    # an overlaid comparison draws one picture, so there is no arrangement to set
+    assert "comparison.arrangement === 'grid' ? { kind: 'comparison', members:" in page
+    assert "{layoutControl && !itemListOpen && <DropdownMenu>" in page
+    assert "onComparisonColumnsChange(value)" in page
+    assert "ペイン数はメンバー数（{layoutControl.members}件）です。" in page
+    # the column count is set in exactly one place; the rail reports what it resolved to
+    assert page.count("onComparisonColumnsChange") == 4
+    assert 'SelectTrigger aria-label="列数"' not in page
+    assert "列数は画面上部の「画面レイアウト」で選びます" in page
 
 
 def test_a_comparison_marks_the_tabs_it_borrows_in_the_rail_itself() -> None:
@@ -1774,6 +1784,7 @@ def test_a_comparison_grid_sets_its_columns_and_derives_its_rows() -> None:
     assert "自動（" in page
     # one rule feeds both the panel and the canvas, so they cannot state different grids
     assert page.count("comparisonGridColumns(") == 3
+    assert page.count("const comparisonMemberLabels = (comparison: ComparisonModel) =>") == 1
     assert "'--comparison-columns': comparisonGridColumns(comparisonMembers.length, comparison.columns)" in page
     assert "repeat(var(--comparison-columns, 1), minmax(0, 1fr))" in styles
     assert "grid-template-rows: 1fr; grid-template-areas: none; }" not in styles

@@ -3099,3 +3099,34 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a comparison whose members should be read down the columns rather than along the
   rows, which would make the row count the chosen one
+
+### XC-206 - The area bar's layout menu answers one question for both kinds of View item
+- decided: 2026-08-23
+- status: active
+- decision: the work area bar carries **one** layout control, and what it sets depends on the kind of
+  item open. On a single @View it is the **session split**: one to four panes, and camera
+  synchronisation. On a @Comparison arranged as a grid it is the **column count** its members wrap at -
+  `自動`, or one to four - with the menu stating that the pane count is the member count and cannot be
+  set. The control is absent only where there is no canvas of panes to lay out: an overlaid comparison,
+  which draws one picture, and every area with no panes. The property rail no longer offers a second
+  control for the column count; it reports the row and column the layout resolved to
+- decided_by: the product owner, 2026-08-23
+- rationale: a control that vanishes when the item changes reads as a feature that is missing rather than
+  one that does not apply, and the reader has nothing on screen to tell the two apart. Binding it to the
+  one question both kinds answer - how this canvas is laid out - keeps it in place across the switch, and
+  costs nothing, because each kind already had that value: the split for a @View, the column count for a
+  @Comparison
+- correction: XC-204 made the control conditional on `!isComparisonItem`, so opening a comparison made it
+  disappear with no explanation. The reasoning behind that - that a session split must not override
+  member-derived panes - was sound and is unchanged; what was wrong was concluding that the control had
+  to be removed rather than bound to the comparison's own arrangement. XC-205 then placed the column
+  count in the property rail, which is the second control this decision removes
+- alternatives: showing the control disabled with a reason keeps the position and gives the comparison no
+  way to arrange itself, which is the state that prompted this. Leaving the column count in the rail as
+  well would give one saved value two controls, and the two can be reached from different places with
+  different labels
+- basis: E-121 (T1), E-123 (T1)
+- affects: 11_ui.md
+- decidedness: Fixed
+- reversal_trigger: a third kind of View item whose canvas has no arrangement at all, which would make
+  the control conditional again

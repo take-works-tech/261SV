@@ -1452,6 +1452,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .work-area-split { display: flex; align-items: center; gap: 5px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 7px; background: var(--card); padding: 5px 8px; color: var(--muted-ink); font-size: var(--text-body); font-weight: var(--weight-bold); }
 .work-area-split.active { border-color: var(--blue); background: var(--blue-soft); color: var(--blue); }
 .menu-check-space { display: inline-block; width: 12px; }
+.menu-note { max-width: 260px; padding: 6px 10px 8px; color: var(--muted-ink); font-size: var(--text-caption); line-height: var(--leading-normal); }
 .comparison-bar .comparison-axis-chip { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--blue); border-radius: 20px; background: var(--blue-soft); padding: 3px 9px; color: var(--blue); font-size: var(--text-caption); font-weight: var(--weight-bold); }
 .comparison-overlay-note { display: flex; align-items: flex-start; gap: 7px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); padding: 8px 11px; }
 .comparison-overlay-note b { display: block; font-size: var(--text-body); }

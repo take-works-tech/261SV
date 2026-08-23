@@ -570,6 +570,11 @@ function ProductShell({ scenario, onScreen, draft, onDraftChange, settings, onSe
   // area bar, and a value edited from the bar cannot live inside the thing the bar sits above (XC-204).
   const [splitPanes, setSplitPanes] = useState(scenario.variant === 'split-two' ? 2 : scenario.variant === 'split-three' ? 3 : scenario.variant === 'split-four' ? 4 : 1)
   const [cameraSync, setCameraSync] = useState(true)
+  const layoutControl: { kind: 'split' } | { kind: 'comparison'; members: number } | null = scenario.screen !== 'view'
+    ? null
+    : isComparisonItem
+      ? (comparison.arrangement === 'grid' ? { kind: 'comparison', members: comparisonMemberLabels(comparison).length } : null)
+      : { kind: 'split' }
   const [viewItem, setViewItem] = useState<ViewItemState>(initialViewItem)
   const [pipelineUnits, setPipelineUnits] = useState<PipelineUnitModel[]>(scenario.screen === 'pipeline' && scenario.variant === 'empty' ? [] : defaultPipelineUnits)
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>('unit-graph')
@@ -668,7 +673,7 @@ function ProductShell({ scenario, onScreen, draft, onDraftChange, settings, onSe
         >
           {leftOpen && showsCaseSidebar && <LeftSidebar screen={scenario.screen} width={leftSidebarWidth} setWidth={setLeftSidebarWidth} selectedCase={selectedCase} onSelectCase={setSelectedCase} />}
           <section className="centre-column">
-            {scenario.screen !== 'chat' && <WorkAreaBar screen={scenario.screen} itemListOpen={itemListOpen} onItemListOpenChange={setItemListOpen} itemListQuery={itemListQuery} onItemListQueryChange={setItemListQuery} itemListLayout={itemListLayout} onItemListLayoutChange={setItemListLayout} itemListScope={itemListScope} onItemListScopeChange={setItemListScope} openItems={openItems} onOpenItemChange={(screen, item) => setOpenItems((current) => ({ ...current, [screen]: item }))} splitPanes={splitPanes} onSplitPanesChange={setSplitPanes} cameraSync={cameraSync} onCameraSyncChange={setCameraSync} splitAvailable={scenario.screen === 'view' && !isComparisonItem} />}
+            {scenario.screen !== 'chat' && <WorkAreaBar screen={scenario.screen} itemListOpen={itemListOpen} onItemListOpenChange={setItemListOpen} itemListQuery={itemListQuery} onItemListQueryChange={setItemListQuery} itemListLayout={itemListLayout} onItemListLayoutChange={setItemListLayout} itemListScope={itemListScope} onItemListScopeChange={setItemListScope} openItems={openItems} onOpenItemChange={(screen, item) => setOpenItems((current) => ({ ...current, [screen]: item }))} splitPanes={splitPanes} onSplitPanesChange={setSplitPanes} cameraSync={cameraSync} onCameraSyncChange={setCameraSync} layoutControl={layoutControl} comparisonColumns={comparison.columns} onComparisonColumnsChange={(columns) => setComparison({ ...comparison, columns })} />}
             <div className={`canvas-wrap ${scenario.screen === 'chat' ? 'chat-canvas-wrap' : ''} ${scenario.screen === 'view' && !itemListOpen ? 'view-canvas-wrap' : ''} ${itemListOpen ? 'work-item-list-wrap' : ''}`}>
               {itemListOpen && scenario.screen !== 'chat' ? <WorkItemLibrary screen={scenario.screen} query={itemListQuery} layout={itemListLayout} scope={itemListScope} onSelect={() => setItemListOpen(false)} /> : <ScreenCanvas scenario={scenario} draft={draft} onDraftChange={onDraftChange} onViewObjectSelect={selectViewObject} onScreen={onScreen} settings={settings} onSettingsChange={onSettingsChange} pipelineUnits={pipelineUnits} onPipelineUnitsChange={setPipelineUnits} selectedUnitId={selectedUnitId} onSelectUnit={setSelectedUnitId} selectedCase={selectedCase} viewItem={viewItem} onViewItemChange={setViewItem} isComparisonItem={isComparisonItem} comparison={comparison} baseViewName={openViewItem?.baseViewName ?? '標準ビュー'} splitPanes={splitPanes} onSplitPanesChange={setSplitPanes} cameraSync={cameraSync} />}
               {!isChat && assistantOpen && <AssistantDrawer draft={draft} onDraftChange={onDraftChange} onClose={() => setAssistantOpen(false)} onOpenChat={() => onScreen('chat')} settings={settings} onSettingsChange={onSettingsChange} />}
@@ -1193,7 +1198,7 @@ const workItemHeaderByScreen: Partial<Record<ScreenId, WorkItemHeader>> = {
   pipeline: { title: '自動化', itemLabel: 'パイプライン', detail: '結果処理と成果物生成を自動化', createLabel: '新規パイプライン', items: [{ name: 'レポート生成フロー', tags: ['レポート'], scope: 'ローカル' }, { name: 'ケース比較フロー', tags: ['比較'], scope: 'ローカル' }] },
 }
 
-function WorkAreaBar({ screen, itemListOpen, onItemListOpenChange, itemListQuery, onItemListQueryChange, itemListLayout, onItemListLayoutChange, itemListScope, onItemListScopeChange, openItems, onOpenItemChange, splitPanes, onSplitPanesChange, cameraSync, onCameraSyncChange, splitAvailable }: { screen: ScreenId; itemListOpen: boolean; onItemListOpenChange: (open: boolean) => void; itemListQuery: string; onItemListQueryChange: (query: string) => void; itemListLayout: 'grid' | 'list'; onItemListLayoutChange: (layout: 'grid' | 'list') => void; itemListScope: string; onItemListScopeChange: (scope: string) => void; openItems: Partial<Record<ScreenId, string>>; onOpenItemChange: (screen: ScreenId, item: string) => void; splitPanes: number; onSplitPanesChange: (panes: number) => void; cameraSync: boolean; onCameraSyncChange: (sync: boolean) => void; splitAvailable: boolean }) {
+function WorkAreaBar({ screen, itemListOpen, onItemListOpenChange, itemListQuery, onItemListQueryChange, itemListLayout, onItemListLayoutChange, itemListScope, onItemListScopeChange, openItems, onOpenItemChange, splitPanes, onSplitPanesChange, cameraSync, onCameraSyncChange, layoutControl, comparisonColumns, onComparisonColumnsChange }: { screen: ScreenId; itemListOpen: boolean; onItemListOpenChange: (open: boolean) => void; itemListQuery: string; onItemListQueryChange: (query: string) => void; itemListLayout: 'grid' | 'list'; onItemListLayoutChange: (layout: 'grid' | 'list') => void; itemListScope: string; onItemListScopeChange: (scope: string) => void; openItems: Partial<Record<ScreenId, string>>; onOpenItemChange: (screen: ScreenId, item: string) => void; splitPanes: number; onSplitPanesChange: (panes: number) => void; cameraSync: boolean; onCameraSyncChange: (sync: boolean) => void; layoutControl: { kind: 'split' } | { kind: 'comparison'; members: number } | null; comparisonColumns: 'auto' | number; onComparisonColumnsChange: (columns: 'auto' | number) => void }) {
   const itemHeader = workItemHeaderByScreen[screen]
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -1287,19 +1292,29 @@ function WorkAreaBar({ screen, itemListOpen, onItemListOpenChange, itemListQuery
         </div>
         <div className="layout-switch"><Button variant="ghost" size="icon" className={itemListLayout === 'grid' ? 'active' : ''} aria-pressed={itemListLayout === 'grid'} aria-label="グリッド表示" onClick={() => onItemListLayoutChange('grid')}><LayoutGrid size={14} /></Button><Button variant="ghost" size="icon" className={itemListLayout === 'list' ? 'active' : ''} aria-pressed={itemListLayout === 'list'} aria-label="リスト表示" onClick={() => onItemListLayoutChange('list')}><List size={14} /></Button></div>
       </div>}
-      {/* XC-204: splitting is a session layout, so its control belongs to the area bar - the 3D canvas
-          carries only what is being looked at. At one pane this is a single icon; the canvas shows
-          nothing at all until the layout is actually divided. */}
-      {splitAvailable && !itemListOpen && <DropdownMenu>
+      {/* XC-206: one control, in the area bar, for one question - how this canvas is laid out. It never
+          disappears between the two kinds of item; what it sets is what each kind has. For a @View that
+          is the session split; for a @Comparison the panes are its members, so it is the column count
+          the members wrap at. The 3D canvas carries neither (XC-204). */}
+      {layoutControl && !itemListOpen && <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button type="button" className={`work-area-split ${splitPanes > 1 ? 'active' : ''}`} aria-label="画面分割" aria-haspopup="menu"><Columns3 size={14} />{splitPanes > 1 && <span>{splitPanes}画面</span>}</button>
+          <button type="button" className={`work-area-split ${layoutControl.kind === 'split' ? (splitPanes > 1 ? 'active' : '') : 'active'}`} aria-label="画面レイアウト" aria-haspopup="menu"><Columns3 size={14} />{layoutControl.kind === 'split'
+            ? splitPanes > 1 && <span>{splitPanes}画面</span>
+            : <span>{comparisonColumns === 'auto' ? '自動' : `${comparisonColumns} 列`}</span>}</button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {[1, 2, 3, 4].map((count) => (
-            <DropdownMenuItem key={count} onSelect={() => onSplitPanesChange(count)}>{splitPanes === count ? <Check size={12} /> : <span className="menu-check-space" />}{count}画面</DropdownMenuItem>
-          ))}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem disabled={splitPanes === 1} onSelect={() => onCameraSyncChange(!cameraSync)}>{cameraSync ? <Check size={12} /> : <span className="menu-check-space" />}カメラ同期</DropdownMenuItem>
+          {layoutControl.kind === 'split' ? <>
+            {[1, 2, 3, 4].map((count) => (
+              <DropdownMenuItem key={count} onSelect={() => onSplitPanesChange(count)}>{splitPanes === count ? <Check size={12} /> : <span className="menu-check-space" />}{count}画面</DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem disabled={splitPanes === 1} onSelect={() => onCameraSyncChange(!cameraSync)}>{cameraSync ? <Check size={12} /> : <span className="menu-check-space" />}カメラ同期</DropdownMenuItem>
+          </> : <>
+            <div className="menu-note">ペイン数はメンバー数（{layoutControl.members}件）です。列数だけを選び、行数はそこから決まります。</div>
+            {(['auto', 1, 2, 3, 4] as const).map((value) => (
+              <DropdownMenuItem key={String(value)} onSelect={() => onComparisonColumnsChange(value)}>{comparisonColumns === value ? <Check size={12} /> : <span className="menu-check-space" />}{value === 'auto' ? `自動（${comparisonGridColumns(layoutControl.members, 'auto')} 列）` : `${value} 列`}</DropdownMenuItem>
+            ))}
+          </>}
         </DropdownMenuContent>
       </DropdownMenu>}
       <Button className="primary-button" aria-label={`${itemHeader.createLabel}を作成`} onClick={() => setCreateOpen(true)}><Plus size={14} /> {itemHeader.createLabel}</Button>
@@ -1984,6 +1999,13 @@ type ComparisonModel = {
 
 const orderedAxes: ComparisonAxis[] = ['resultPosition', 'deformation']
 
+// What a comparison actually draws, derived in one place: the panel's figures, the area bar's menu and
+// the canvas all read this, so none of the three can state a grid another one does not draw.
+const comparisonMemberLabels = (comparison: ComparisonModel) =>
+  comparison.memberMode === 'range' && orderedAxes.includes(comparison.axis)
+    ? rangeMembers(comparison.rangeCount).map((member) => member.label)
+    : comparison.members
+
 // A comparison varies one ordered axis, so `auto` keeps the members on one line and wraps only when
 // they no longer fit - reading order is the axis. A chosen column count never exceeds the member count,
 // and the rows follow from it, so every member has a pane (XC-205).
@@ -2056,11 +2078,7 @@ function ViewPropertyEditor({ tab, variant, viewItem, onViewItemChange, selected
   const hasResultAxis = caseHasResultAxis(selectedCase)
   const isComparison = isComparisonItem
   const setComparison = onComparisonChange
-  // One derivation of what the comparison actually draws, so the panel's figures and the canvas cannot
-  // disagree - the panel said three columns while the canvas drew four.
-  const effectiveMembers = comparison.memberMode === 'range' && orderedAxes.includes(comparison.axis)
-    ? rangeMembers(comparison.rangeCount).map((member) => member.label)
-    : comparison.members
+  const effectiveMembers = comparisonMemberLabels(comparison)
   const comparisonColumns = comparisonGridColumns(effectiveMembers.length, comparison.columns)
   const comparisonRows = Math.max(1, Math.ceil(effectiveMembers.length / Math.max(1, comparisonColumns)))
   const [backgroundMode, setBackgroundMode] = useState<'solid' | 'gradient' | 'image' | 'environment'>('gradient')
@@ -2173,14 +2191,8 @@ function ViewPropertyEditor({ tab, variant, viewItem, onViewItemChange, selected
       </div>
       <label><span>配置</span><select value={comparison.arrangement} onChange={(event) => setComparison({ ...comparison, arrangement: event.target.value as ComparisonModel['arrangement'] })}><option value="grid">グリッド</option><option value="overlay">重ね合わせ</option></select></label>
       {comparison.arrangement === 'grid'
-        ? <><label><span>列数</span><div className="property-pair">
-              <Select value={String(comparison.columns)} onValueChange={(value) => setComparison({ ...comparison, columns: value === 'auto' ? 'auto' : Number(value) })}>
-                <SelectTrigger aria-label="列数"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="auto">自動（{comparisonGridColumns(effectiveMembers.length, 'auto')} 列）</SelectItem>{[1, 2, 3, 4].map((count) => <SelectItem value={String(count)} key={count}>{count} 列</SelectItem>)}</SelectContent>
-              </Select>
-              <input value={`${comparisonRows} 行`} readOnly aria-label="行数" />
-            </div></label>
-            <p className="property-editor-note"><ShieldCheck size={12} />行数はメンバー数（{effectiveMembers.length}件）から決まるため、どの列数でも絵に出ないメンバーは生まれません。自動は1行に並べ、収まらなくなったときだけ折り返します。</p></>
+        ? <><label><span>行×列</span><div className="property-pair"><input value={`${comparisonRows} 行`} readOnly aria-label="行数" /><input value={comparison.columns === 'auto' ? `自動・${comparisonColumns} 列` : `${comparisonColumns} 列`} readOnly aria-label="列数" /></div></label>
+            <p className="property-editor-note"><ShieldCheck size={12} />列数は画面上部の「画面レイアウト」で選びます（XC-206）。行数はメンバー数（{effectiveMembers.length}件）から決まるため、どの列数でも絵に出ないメンバーは生まれません。</p></>
         : <div className="property-unresolved"><AlertTriangle size={13} /><span><b>結果色を持てるのは1メンバーだけです</b><small>「{comparison.members[0]}」に結果色を割り当て、残りは参照形状として描きます。2つのコンターを重ねた画は値を符号化しません。</small></span></div>}
       <label className="property-toggle"><span>ラベル</span><input type="checkbox" checked disabled readOnly /></label>
       <label className="property-toggle"><span>カラーマップを共有</span><input type="checkbox" checked={comparison.sharedColourMap} onChange={(event) => setComparison({ ...comparison, sharedColourMap: event.target.checked })} /></label>
@@ -3645,11 +3657,7 @@ function ViewScreen({ variant, onViewObjectSelect, selectedCase, viewItem, onVie
   const [promoteAxis, setPromoteAxis] = useState<'case' | 'camera' | 'resultPosition'>('case')
   if (variant === 'empty') return <div className="centred-state"><Boxes size={34} /><h2>表示するケースがありません</h2><p>開始プリセットを選ぶか、ワークスペースへ結果ファイルをドロップします。</p><div className="button-row"><button className="primary-button">開始プリセット</button><button>テンプレート</button></div></div>
   if (variant === 'renderer-error') return <div className="centred-state error-state"><AlertTriangle size={34} /><h2>Omniverseレンダラーを開始できません</h2><p>バックエンドを利用できません。VTK軽量レンダラーは利用できます。</p><button className="primary-button">VTKで続ける</button></div>
-  const comparisonMembers = !isComparisonItem
-    ? []
-    : comparison.memberMode === 'range' && orderedAxes.includes(comparison.axis)
-      ? rangeMembers(comparison.rangeCount).map((member) => member.label)
-      : comparison.members
+  const comparisonMembers = isComparisonItem ? comparisonMemberLabels(comparison) : []
   const comparisonOverlay = isComparisonItem && comparison.arrangement === 'overlay'
   const comparisonGrid = isComparisonItem && comparison.arrangement === 'grid'
   const panes = comparisonGrid ? comparisonMembers.length : splitPanes
