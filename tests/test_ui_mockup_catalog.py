@@ -1950,7 +1950,7 @@ def test_a_split_is_not_an_export_path_and_the_output_tab_says_so() -> None:
     # the split layout left in the product is the shortcut that enters and leaves it
     assert "レイアウトの記録" not in page
     # the note may name the layout menu; the fields that choose what is written may not offer a layout
-    fields = page[page.index('<label><span>種類</span><select value={outputMode}'):page.index('<OutputPreflightDialog')]
+    fields = page[page.index('<label><span>成果物の種類</span><select value={outputMode}'):page.index('<OutputPreflightDialog')]
     assert "レイアウト" not in fields
     assert "<label><span>カメラ</span>" in fields
     assert page.count("分割レイアウト") == 2  # the shortcut, and the command it is bound to
@@ -2286,3 +2286,46 @@ def test_a_sample_fills_its_tile() -> None:
     # the samples themselves no longer round their own corners inside a clipping tile
     band = styles.split(".option-sample-band {")[1].split("}")[0]
     assert "border-radius" not in band
+
+
+def test_no_rail_lets_two_controls_change_the_same_thing() -> None:
+    """XC-225 generalises XC-222 and XC-224 past the graph. Within one property rail, a reader scanning
+    for a control finds one. The check is per editor, because the same word naming a different object's
+    property in a different area is not a collision - every item has a 名前."""
+    import collections
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    editors = ["ViewPropertyEditor", "ViewObjectPropertyEditor", "ViewTextPropertyEditor",
+               "ViewMaterialPropertyEditor", "GraphPropertyEditor", "ReportPropertyEditor",
+               "SimulationPropertyEditor", "NetworkPropertyEditor", "AutomationPropertyEditor"]
+    starts = sorted(((name, page.index(f"function {name}(")) for name in editors), key=lambda kv: kv[1])
+
+    # The one exemption, stated: the graph's title text and the size of its type (XC-222).
+    exempt = {("GraphPropertyEditor", "タイトル")}
+    collisions = []
+    for i, (name, start) in enumerate(starts):
+        end = starts[i + 1][1] if i + 1 < len(starts) else len(page)
+        body = page[start:end]
+        marks = [(m.group(1), m.start()) for m in re.finditer(r"^  if \(tab\.id === '(\w+)'\) return", body, re.M)]
+        fallback = re.search(r"^  return <div className=\"property-editor\">", body, re.M)
+        blocks = {}
+        if marks:
+            for k, (tab, at) in enumerate(marks):
+                blocks[tab] = body[at:(marks[k + 1][1] if k + 1 < len(marks) else (fallback.start() if fallback else len(body)))]
+            if fallback:
+                blocks["(last)"] = body[fallback.start():]
+        else:
+            blocks["(all)"] = body
+
+        where: dict[str, set[str]] = collections.defaultdict(set)
+        for tab, block in blocks.items():
+            for m in re.finditer(r'<(?:label[^>]*><span>([^<]+)</span>|VisualOptions label="([^"]+)")', block):
+                control = m.group(1) or m.group(2)
+                window = block[m.start():m.start() + 300]
+                if "readOnly" in window or "palette-readout" in window or not control.strip():
+                    continue  # a read-out is not a control
+                where[control].add(tab)
+        for control, tabs in where.items():
+            if len(tabs) > 1 and (name, control) not in exempt:
+                collisions.append(f"{name}: {control} in {sorted(tabs)}")
+
+    assert not collisions, "two controls change one thing: " + "; ".join(collisions)

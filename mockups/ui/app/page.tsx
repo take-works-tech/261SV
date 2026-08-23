@@ -2216,8 +2216,8 @@ function ViewPropertyEditor({ tab, variant, viewItem, onViewItemChange, selected
       {comparisonPropertyAxes.includes(comparison.axis) && <p className="property-editor-note"><ShieldCheck size={12} />基準ビュー自身のプロパティを振ります。他はすべて共有されるので、差の原因はこのプロパティに限定されます。</p>}
       {orderedAxes.includes(comparison.axis) && <label><span>メンバーの決め方</span><select value={comparison.memberMode} onChange={(event) => setComparison({ ...comparison, memberMode: event.target.value as ComparisonModel['memberMode'] })}><option value="enumerate">保存した位置から選ぶ</option><option value="range">範囲を等分する</option></select></label>}
       {comparison.memberMode === 'range' && orderedAxes.includes(comparison.axis) ? <>
-        <label><span>開始</span><select defaultValue="first"><option value="first">軸の先頭</option>{viewItem.bookmarks.map((entry) => <option value={entry.id} key={entry.id}>{entry.name}</option>)}</select></label>
-        <label><span>終了</span><select defaultValue="last"><option value="last">軸の末尾</option>{viewItem.bookmarks.map((entry) => <option value={entry.id} key={entry.id}>{entry.name}</option>)}</select></label>
+        <label><span>範囲の先頭</span><select defaultValue="first"><option value="first">軸の先頭</option>{viewItem.bookmarks.map((entry) => <option value={entry.id} key={entry.id}>{entry.name}</option>)}</select></label>
+        <label><span>範囲の末尾</span><select defaultValue="last"><option value="last">軸の末尾</option>{viewItem.bookmarks.map((entry) => <option value={entry.id} key={entry.id}>{entry.name}</option>)}</select></label>
         <label><span>分割数</span><input type="number" min={2} max={12} value={comparison.rangeCount} onChange={(event) => setComparison({ ...comparison, rangeCount: Math.max(2, Math.min(12, Number(event.target.value))) })} /></label>
         <div className="comparison-members" role="group" aria-label="生成されたメンバー">
           {rangeMembers(comparison.rangeCount).map((member, index) => (
@@ -2246,7 +2246,7 @@ function ViewPropertyEditor({ tab, variant, viewItem, onViewItemChange, selected
         {comparison.axis !== 'camera' && <label><span>共有カメラ</span><select defaultValue={viewItem.cameras[0]?.id}>{viewItem.cameras.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>}
         {comparison.axis !== 'resultPosition' && <label><span>共有結果位置</span><select defaultValue="first"><option value="first">軸の先頭</option>{viewItem.bookmarks.map((entry) => <option value={entry.id} key={entry.id}>{entry.name}</option>)}</select></label>}
       </div>
-      <label><span>配置</span><select value={comparison.arrangement} onChange={(event) => setComparison({ ...comparison, arrangement: event.target.value as ComparisonModel['arrangement'] })}><option value="grid">グリッド</option><option value="overlay">重ね合わせ</option></select></label>
+      <label><span>並べ方</span><select value={comparison.arrangement} onChange={(event) => setComparison({ ...comparison, arrangement: event.target.value as ComparisonModel['arrangement'] })}><option value="grid">グリッド</option><option value="overlay">重ね合わせ</option></select></label>
       {comparison.arrangement === 'grid'
         ? <><label><span>行×列</span><div className="property-pair"><input value={`${comparisonRows} 行`} readOnly aria-label="行数" /><input value={comparison.columns === 'auto' ? `自動・${comparisonColumns} 列` : `${comparisonColumns} 列`} readOnly aria-label="列数" /></div></label>
             <p className="property-editor-note"><ShieldCheck size={12} />列数は画面上部の「画面レイアウト」で選びます（XC-206）。行数はメンバー数（{effectiveMembers.length}件）から決まるため、どの列数でも絵に出ないメンバーは生まれません。</p></>
@@ -2295,7 +2295,7 @@ function ViewPropertyEditor({ tab, variant, viewItem, onViewItemChange, selected
     </PropertyGroup>
     {camera ? <>
       <PropertyGroup title="ポーズ">
-        <label><span>名前</span><input value={camera.name} onChange={(event) => updateCamera({ name: event.target.value })} /></label>
+        <label><span>カメラ名</span><input value={camera.name} onChange={(event) => updateCamera({ name: event.target.value })} /></label>
         <label><span>決め方</span><select value={camera.pose} onChange={(event) => updateCamera({ pose: event.target.value as CameraModel['pose'], focus: event.target.value === 'explicit' ? null : camera.focus ?? { kind: 'extremum', quantity: '最大応力', statistic: '最大' } })}><option value="explicit">現在の位置を固定</option><option value="framed">対象を画面に収める</option></select></label>
         {camera.pose === 'framed' && <>
           <label><span>対象</span><select value={camera.focus?.kind ?? 'extremum'} onChange={(event) => updateCamera({ focus: event.target.value === 'extremum' ? { kind: 'extremum', quantity: '最大応力', statistic: '最大' } : event.target.value === 'object' ? { kind: 'object', label: '［選択したオブジェクト］' } : event.target.value === 'selection' ? { kind: 'selection', label: '［保存した選択］' } : { kind: 'position', label: '［座標］' } })}><option value="extremum">数量の極値</option><option value="object">オブジェクト</option><option value="selection">保存した選択</option><option value="position">座標</option></select></label>
@@ -2331,7 +2331,7 @@ function ViewPropertyEditor({ tab, variant, viewItem, onViewItemChange, selected
     <Dialog open={cameraDialogOpen} onOpenChange={setCameraDialogOpen}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog compact-workflow-dialog">
       <header><span><small>カメラ</small><b>カメラを追加</b></span><button type="button" aria-label="カメラ追加を閉じる" onClick={() => setCameraDialogOpen(false)}><X size={15} /></button></header>
       <div className="settings-fields">
-        <label><span>名前</span><input value={newCameraName} onChange={(event) => setNewCameraName(event.target.value)} placeholder="例：最大応力へ寄せる" /></label>
+        <label><span>新しい名前</span><input value={newCameraName} onChange={(event) => setNewCameraName(event.target.value)} placeholder="例：最大応力へ寄せる" /></label>
         <label><span>ポーズの決め方</span><Select value={newCameraKind} onValueChange={(value) => setNewCameraKind(value as typeof newCameraKind)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
           <SelectItem value="explicit">現在のカメラを固定する</SelectItem>
           <SelectItem value="object">オブジェクトを画面に収める</SelectItem>
@@ -2388,11 +2388,11 @@ function ViewPropertyEditor({ tab, variant, viewItem, onViewItemChange, selected
 
   if (tab.id === 'background') return <div className="property-editor">
     <PropertyGroup title="背景">
-      <VisualOptions label="種類" kind="background" columns={4} value={backgroundMode} onChange={(value) => setBackgroundMode(value as typeof backgroundMode)}
+      <VisualOptions label="背景の種類" kind="background" columns={4} value={backgroundMode} onChange={(value) => setBackgroundMode(value as typeof backgroundMode)}
         options={[{ value: 'solid', label: '単色' }, { value: 'gradient', label: 'グラデーション' }, { value: 'image', label: '画像' }, { value: 'environment', label: '環境' }]} />
       {backgroundMode === 'solid' && <label><span>カラー</span><input type="color" defaultValue="#1a2228" aria-label="背景色" /></label>}
       {backgroundMode === 'gradient' && <><label><span>上</span><input type="color" defaultValue="#182128" aria-label="背景グラデーション上端" /></label><label><span>下</span><input type="color" defaultValue="#2d3940" aria-label="背景グラデーション下端" /></label></>}
-      {backgroundMode === 'image' && <><label><span>画像</span><select defaultValue="unresolved"><option value="unresolved">未選択</option></select></label><label><span>配置</span><select defaultValue="cover"><option value="cover">全体を覆う</option><option value="contain">全体を表示</option><option value="stretch">引き伸ばす</option></select></label></>}
+      {backgroundMode === 'image' && <><label><span>画像</span><select defaultValue="unresolved"><option value="unresolved">未選択</option></select></label><label><span>画像の配置</span><select defaultValue="cover"><option value="cover">全体を覆う</option><option value="contain">全体を表示</option><option value="stretch">引き伸ばす</option></select></label></>}
       {backgroundMode === 'environment' && <><label><span>環境</span><select defaultValue="studio"><option value="studio">スタジオ・サンプル</option><option value="unresolved">未選択</option></select></label><label><span>回転</span><div className="property-range"><input type="range" min="-180" max="180" defaultValue="0" /><output>0°</output></div></label></>}
       <label><span>表示強度</span><div className="property-range"><input type="range" min="0" max="200" defaultValue="100" /><output>100%</output></div></label>
       <label className="property-toggle"><span>カメラに表示</span><input type="checkbox" defaultChecked /></label>
@@ -2405,7 +2405,7 @@ function ViewPropertyEditor({ tab, variant, viewItem, onViewItemChange, selected
       {/* XC-210: a split is not an export path. Saying so here is the point - this is the tab a user
           opens expecting the side-by-side they are looking at. */}
       {splitPanes > 1 && !isComparisonItem && <div className="property-unresolved"><AlertTriangle size={13} /><span><b>画面分割は書き出しに含まれません</b><small>いま{splitPanes}画面に分けていますが、出力は下で選ぶカメラ1つの絵です。並べた図が必要な場合は、画面上部の「画面レイアウト」から「この比較を保存」で比較項目にします。</small></span></div>}
-      <label><span>種類</span><select value={outputMode} onChange={(event) => setOutputMode(event.target.value as typeof outputMode)}><option value="image">画像</option><option value="video" disabled={!canWriteVideo}>動画{hasResultAxis ? '' : '・この結果には軸がありません'}</option></select></label>
+      <label><span>成果物の種類</span><select value={outputMode} onChange={(event) => setOutputMode(event.target.value as typeof outputMode)}><option value="image">画像</option><option value="video" disabled={!canWriteVideo}>動画{hasResultAxis ? '' : '・この結果には軸がありません'}</option></select></label>
       {axisPinsEveryPane && <div className="property-unresolved"><AlertTriangle size={13} /><span><b>この比較は結果位置を軸にしています</b><small>各ペインが別々の位置に固定されるため、再生する余地がありません。動画にする場合は、軸をケース・カメラなどに変え、結果位置を共有にします。</small></span></div>}
       {!hasResultAxis && <div className="property-unresolved"><AlertTriangle size={13} /><span><b>ケース「{selectedCase}」は定常結果です</b><small>再生する軸がないため、動画とその再生プリセットは選べません。画像とインタラクティブは通常どおり出力できます。</small></span></div>}
       {outputMode === 'image' ? <>
@@ -2446,10 +2446,10 @@ function ViewPropertyEditor({ tab, variant, viewItem, onViewItemChange, selected
         <button type="button" disabled={!timeline || viewItem.timelines.length <= 1} onClick={removeTimeline}><Trash2 size={12} />削除</button>
       </div>
       {timeline && <>
-        <label><span>名前</span><input value={timeline.name} onChange={(event) => updateTimeline({ name: event.target.value })} /></label>
+        <label><span>プリセット名</span><input value={timeline.name} onChange={(event) => updateTimeline({ name: event.target.value })} /></label>
         {timelineReversed && <div className="property-unresolved"><AlertTriangle size={13} /><span><b>終了が開始より手前に解決します</b><small>ケース「{selectedCase}」では終了位置が開始位置より前になります。位置を入れ替えるまで出力を拒否します。</small></span></div>}
-        <label><span>開始</span><select value={timeline.fromBookmarkId} onChange={(event) => updateTimeline({ fromBookmarkId: event.target.value })}><option value="first">軸の先頭</option>{viewItem.bookmarks.map((entry) => <option value={entry.id} key={entry.id}>{entry.name}</option>)}</select></label>
-        <label><span>終了</span><select value={timeline.toBookmarkId} onChange={(event) => updateTimeline({ toBookmarkId: event.target.value })}><option value="last">軸の末尾</option>{viewItem.bookmarks.map((entry) => <option value={entry.id} key={entry.id}>{entry.name}</option>)}</select></label>
+        <label><span>再生の先頭</span><select value={timeline.fromBookmarkId} onChange={(event) => updateTimeline({ fromBookmarkId: event.target.value })}><option value="first">軸の先頭</option>{viewItem.bookmarks.map((entry) => <option value={entry.id} key={entry.id}>{entry.name}</option>)}</select></label>
+        <label><span>再生の末尾</span><select value={timeline.toBookmarkId} onChange={(event) => updateTimeline({ toBookmarkId: event.target.value })}><option value="last">軸の末尾</option>{viewItem.bookmarks.map((entry) => <option value={entry.id} key={entry.id}>{entry.name}</option>)}</select></label>
         <label><span>間引き</span><select value={timeline.stride} onChange={(event) => updateTimeline({ stride: Number(event.target.value) })}><option value={1}>保存位置をすべて</option><option value={2}>2つおき</option><option value={5}>5つおき</option></select></label>
         <label><span>速度</span><select value={timeline.speed} onChange={(event) => updateTimeline({ speed: Number(event.target.value) })}><option value={0.25}>0.25×</option><option value={0.5}>0.5×</option><option value={1}>1.0×</option><option value={2}>2.0×</option><option value={4}>4.0×</option></select></label>
         <label><span>フレームレート</span><select value={timeline.frameRate} onChange={(event) => updateTimeline({ frameRate: Number(event.target.value) })}><option value={24}>24 fps</option><option value={30}>30 fps</option><option value={60}>60 fps</option></select></label>
