@@ -145,6 +145,14 @@
       "href": "?screen=view&variant=axis-error"
     },
     {
+      "id": "view.background",
+      "screen": "view",
+      "variant": "background",
+      "label": "ビュー・背景",
+      "intent": "11_ui.md・XC-215。背景の種類を、単色・グラデーション・画像・環境の見本から選ぶ。",
+      "href": "?screen=view&variant=background"
+    },
+    {
       "id": "view.camera-unresolved",
       "screen": "view",
       "variant": "camera-unresolved",
@@ -489,6 +497,14 @@
       "href": "?screen=graph&variant=axes"
     },
     {
+      "id": "graph.style",
+      "screen": "graph",
+      "variant": "style",
+      "label": "グラフ・スタイル",
+      "intent": "11_ui.md・XC-215。配色・背景・マーカーを、名前ではなく描いた見本から選ぶ。名前は見本の下に残す。",
+      "href": "?screen=graph&variant=style"
+    },
+    {
       "id": "graph.default",
       "screen": "graph",
       "variant": "default",
@@ -551,6 +567,14 @@
       "label": "レポート・執筆",
       "intent": "11_ui.md・XC-214。方式と方針を決め、下書きを作り、確認するまで本文に入らない状態を示す。",
       "href": "?screen=report&variant=drafting"
+    },
+    {
+      "id": "report.theme",
+      "screen": "report",
+      "variant": "theme",
+      "label": "レポート・テーマ",
+      "intent": "11_ui.md・XC-214/XC-215。ページ・配色・書体を1つのテーマにまとめ、向き・余白・段組み・図表は描いた見本から選ぶ。書体は書体自身で表示する。",
+      "href": "?screen=report&variant=theme"
     },
     {
       "id": "report.default",

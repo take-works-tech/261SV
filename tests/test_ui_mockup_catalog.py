@@ -18,6 +18,7 @@ CHAT_STYLES = ROOT / "mockups" / "ui" / "app" / "globals.css"
 THREE_VIEWPORT = ROOT / "mockups" / "ui" / "components" / "workspace" / "viewport.tsx"
 THREE_SCENE = ROOT / "mockups" / "ui" / "components" / "workspace" / "scene.tsx"
 MATERIAL_PREVIEW = ROOT / "mockups" / "ui" / "components" / "workspace" / "material-preview.tsx"
+OPTION_SAMPLES = ROOT / "mockups" / "ui" / "components" / "workspace" / "option-samples.tsx"
 MATERIAL_SPHERE_ICON = ROOT / "mockups" / "ui" / "components" / "icons" / "material-sphere-icon.tsx"
 MATERIAL_THUMBNAIL_DIR = ROOT / "mockups" / "ui" / "public" / "materials"
 VIEW_SCHEMA = ROOT / "specs" / "contracts" / "schema" / "CT-004.json"
@@ -2010,8 +2011,11 @@ def test_a_graph_series_carries_its_own_appearance_on_its_own_row() -> None:
     page = CHAT_PAGE.read_text(encoding="utf-8")
 
     series = page[page.index('<PropertyGroup title="系列">'):page.index('<PropertyGroup title="集約"')]
-    for field in ("<span>色</span>", "<span>線</span>", "<span>マーカー</span>", "<span>軸</span>"):
-        assert field in series, field
+    assert "<span>色</span>" in series
+    assert "<span>軸</span>" in series
+    # line and marker are pictures rather than lists of words (XC-215)
+    assert 'label="線" kind="line"' in series
+    assert 'label="マーカー" kind="marker"' in series
     assert 'aria-label={`${activeSeries.label}の色`}' in page
     # what is left chart-wide is named as a default, not as the series' look
     assert '<PropertyGroup title="系列の既定">' in page
@@ -2037,3 +2041,44 @@ def test_report_writing_is_a_reviewed_sequence_rather_than_a_group_of_settings()
     style = page[page.index("if (tab.id === 'style') return", page.index("function ReportPropertyEditor(")):page.index("if (tab.id === 'drafting') return")]
     for group in ("ページ", "共通要素", "アートスタイル", "文字表現", "埋め込み"):
         assert f'title="{group}"' in style, group
+
+
+def test_appearance_is_chosen_from_drawn_samples_with_the_name_kept() -> None:
+    """XC-215: neither measured reference asks for an appearance by name - ParaView renders every preset
+    to a pixmap and reflows them into a grid, Blender ships 42 studio-light previews and draws them
+    (E-128). One control does this, and the name stays beside the picture."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    styles = CHAT_STYLES.read_text(encoding="utf-8")
+    samples = OPTION_SAMPLES.read_text(encoding="utf-8")
+
+    assert "export function VisualOptions(" in samples
+    assert "export function OptionSample(" in samples
+    assert page.count("function VisualOptions(") == 0, "one implementation, imported"
+    assert "import { VisualOptions, OptionSample } from '@/components/workspace/option-samples'" in page
+
+    # every appearance choice named by the decision is drawn
+    for kind in ("chart", "palette", "background", "line", "marker", "page", "margin", "columns", "figure", "representation", "grade"):
+        assert f'kind="{kind}"' in page, kind
+
+    # the name is kept: each option renders a label, and the group carries an accessible name
+    assert '<small>{option.label}</small>' in samples
+    assert 'role="radiogroup"' in samples and 'aria-label={label}' in samples
+    assert 'aria-checked={value === option.value}' in samples
+
+    # samples are drawn, not loaded - the mockup ships no image for them
+    assert "<img" not in samples and "next/image" not in samples
+    assert ".visual-option-sample" in styles
+
+    # a typeface is shown in itself
+    assert "fontFamily: fontStacks[bodyFont]" in page
+    assert "font-specimen" in page and ".font-specimen" in styles
+
+
+def test_settings_that_are_not_about_appearance_stay_as_text() -> None:
+    """XC-215: a picture of `PNG` teaches nothing. The drawn samples are bounded to appearance."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    for text_only in (">PNG</option>", ">JPEG</option>", ">MP4</option>", ">CSV</option>"):
+        assert text_only in page, text_only
+    assert 'kind="format"' not in page
+    assert 'kind="unit"' not in page

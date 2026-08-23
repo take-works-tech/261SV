@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Viewport } from '@/components/workspace/viewport'
 import { MaterialPreview } from '@/components/workspace/material-preview'
+import { VisualOptions, OptionSample } from '@/components/workspace/option-samples'
 import { MaterialSphereIcon } from '@/components/icons/material-sphere-icon'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -1699,7 +1700,7 @@ function RightSidebar({ screen, variant, width, setWidth, selectedViewObjects, o
   const borrowedTabIds = ['camera', 'rendering', 'background', 'objects', 'text', 'materials']
   const isBorrowed = (tabId: string) => screen === 'view' && isComparisonItem && borrowedTabIds.includes(tabId)
   const [selectedByScreen, setSelectedByScreen] = useState<Partial<Record<ScreenId, string>>>({})
-  const variantTab = variant.startsWith('object-') ? 'objects' : variant.startsWith('material-') ? 'materials' : variant === 'steady-result' ? 'output' : variant === 'comparison-borrowed' ? 'materials' : variant === 'cameras' || variant.startsWith('camera-') ? 'camera' : variant === 'unit-reference' ? 'settings' : variant === 'commentary-review' || variant === 'drafting' ? 'drafting' : variant === 'axes' ? 'axes' : variant === 'output-motion' || variant === 'split-output' || variant === 'comparison-output' ? 'output' : variant === 'develop-grade' ? 'rendering' : variant.includes('output-preflight') ? 'output' : variant === 'series-unresolved' ? 'data' : undefined
+  const variantTab = variant.startsWith('object-') ? 'objects' : variant.startsWith('material-') ? 'materials' : variant === 'steady-result' ? 'output' : variant === 'comparison-borrowed' ? 'materials' : variant === 'cameras' || variant.startsWith('camera-') ? 'camera' : variant === 'unit-reference' ? 'settings' : variant === 'commentary-review' || variant === 'drafting' ? 'drafting' : variant === 'axes' ? 'axes' : variant === 'style' || variant === 'theme' ? 'style' : variant === 'background' ? 'background' : variant === 'output-motion' || variant === 'split-output' || variant === 'comparison-output' ? 'output' : variant === 'develop-grade' ? 'rendering' : variant.includes('output-preflight') ? 'output' : variant === 'series-unresolved' ? 'data' : undefined
   const selectedTab = tabs.find((tab) => tab.id === (selectedByScreen[screen] ?? variantTab)) ?? tabs[0]
 
   if (!selectedTab) return null
@@ -2055,6 +2056,20 @@ function rangeMembers(count: number) {
 // Three of these are sets of subjects or of the View's own named objects; the last three are published
 // properties of the base View itself. Sweeping a property is what lets stress be compared with
 // temperature, or a surface with a section, without two Views differing in five other ways (XC-202).
+// XC-215: a font choice is shown in the font. The stacks are the mockup's samples, not a shipped list.
+const fontStacks: Record<string, string> = {
+  workspace: 'var(--family-ui)',
+  'noto-sans': "'Noto Sans JP', var(--family-ui)",
+  'source-serif': "'Source Serif 4', Georgia, serif",
+  mono: 'var(--family-mono)',
+}
+const fontLabels: Record<string, string> = {
+  workspace: 'ワークスペース設定',
+  'noto-sans': 'Noto Sans',
+  'source-serif': 'Source Serif',
+  mono: '等幅',
+}
+
 const comparisonAxisLabels: Record<ComparisonAxis, string> = {
   case: 'ケース',
   resultPosition: '結果位置（時刻・モード・周波数）',
@@ -2338,7 +2353,8 @@ function ViewPropertyEditor({ tab, variant, viewItem, onViewItemChange, selected
         note below is the rule the reference implementations do not have: a graded picture must not
         leave the legend saying a different value. */}
     <PropertyGroup title="現像">
-      <label><span>プリセット</span><select value={grade} onChange={(event) => setGrade(event.target.value as GradePreset)}>{(Object.keys(gradePresets) as GradePreset[]).map((key) => <option value={key} key={key}>{gradePresets[key].label}・{gradePresets[key].detail}</option>)}</select></label>
+      <VisualOptions label="プリセット" kind="grade" columns={3} value={grade} onChange={(value) => setGrade(value as GradePreset)}
+        options={(Object.keys(gradePresets) as GradePreset[]).map((key) => ({ value: key, label: gradePresets[key].label, detail: `${gradePresets[key].label}・${gradePresets[key].tone}` }))} />
       <label><span>露光</span><input value={gradePresets[grade].exposure} readOnly={grade === 'measurement'} /></label>
       <label><span>トーンマップ</span><input value={gradePresets[grade].tone} readOnly={grade === 'measurement'} /></label>
       <label><span>画像処理</span><input value={gradePresets[grade].treatments} readOnly /></label>
@@ -2361,7 +2377,8 @@ function ViewPropertyEditor({ tab, variant, viewItem, onViewItemChange, selected
 
   if (tab.id === 'background') return <div className="property-editor">
     <PropertyGroup title="背景">
-      <label><span>種類</span><select value={backgroundMode} onChange={(event) => setBackgroundMode(event.target.value as typeof backgroundMode)}><option value="solid">単色</option><option value="gradient">グラデーション</option><option value="image">画像</option><option value="environment">環境</option></select></label>
+      <VisualOptions label="種類" kind="background" columns={4} value={backgroundMode} onChange={(value) => setBackgroundMode(value as typeof backgroundMode)}
+        options={[{ value: 'solid', label: '単色' }, { value: 'gradient', label: 'グラデーション' }, { value: 'image', label: '画像' }, { value: 'environment', label: '環境' }]} />
       {backgroundMode === 'solid' && <label><span>カラー</span><input type="color" defaultValue="#1a2228" aria-label="背景色" /></label>}
       {backgroundMode === 'gradient' && <><label><span>上</span><input type="color" defaultValue="#182128" aria-label="背景グラデーション上端" /></label><label><span>下</span><input type="color" defaultValue="#2d3940" aria-label="背景グラデーション下端" /></label></>}
       {backgroundMode === 'image' && <><label><span>画像</span><select defaultValue="unresolved"><option value="unresolved">未選択</option></select></label><label><span>配置</span><select defaultValue="cover"><option value="cover">全体を覆う</option><option value="contain">全体を表示</option><option value="stretch">引き伸ばす</option></select></label></>}
@@ -2442,6 +2459,12 @@ function ViewPropertyEditor({ tab, variant, viewItem, onViewItemChange, selected
 
 function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: string }) {
   const [dimension, setDimension] = useState<'2d' | '3d'>('2d')
+  const [chartKind, setChartKind] = useState('line')
+  const [palette, setPalette] = useState('accessible')
+  const [chartBackground, setChartBackground] = useState('light')
+  const [defaultMarker, setDefaultMarker] = useState('auto')
+  const [seriesLine, setSeriesLine] = useState('solid')
+  const [seriesMarker, setSeriesMarker] = useState('circle')
   const [outputKind, setOutputKind] = useState<'image' | 'vector' | 'data' | 'animation'>('image')
   const [preflightOpen, setPreflightOpen] = useState(variant === 'output-preflight')
   const [outputStarted, setOutputStarted] = useState(false)
@@ -2469,7 +2492,11 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
 
     <PropertyGroup title="次元">
       <label><span>次元</span><select value={dimension} onChange={(event) => setDimension(event.target.value as typeof dimension)}><option value="2d">2D</option><option value="3d">3D</option></select></label>
-      <label><span>種類</span>{dimension === '2d' ? <select defaultValue="line"><option value="line">折れ線</option><option value="scatter">散布図</option><option value="bar">棒</option><option value="distribution">分布</option><option value="heatmap">ヒートマップ</option></select> : <select defaultValue="surface"><option value="surface">サーフェス</option><option value="scatter3d">3D散布図</option><option value="contour3d">2変数コンター</option></select>}</label>
+      {/* XC-215: the shape of a chart is the thing being chosen, so it is drawn. */}
+      <VisualOptions label="種類" kind="chart" columns={3} value={chartKind} onChange={setChartKind}
+        options={dimension === '2d'
+          ? [{ value: 'line', label: '折れ線' }, { value: 'scatter', label: '散布図' }, { value: 'bar', label: '棒' }, { value: 'distribution', label: '分布' }, { value: 'heatmap', label: 'ヒートマップ' }]
+          : [{ value: 'surface', label: 'サーフェス' }, { value: 'scatter3d', label: '3D散布図' }, { value: 'contour3d', label: '2変数コンター' }]} />
     </PropertyGroup>
     {dimension === '3d' && <PropertyGroup title="投影">
       <label><span>投影</span><select defaultValue="perspective"><option value="perspective">透視投影</option><option value="orthographic">平行投影</option></select></label>
@@ -2487,15 +2514,18 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
   if (tab.id === 'style') return <div className="property-editor">
     <PropertyGroup title="スタイル">
       <label><span>アセット</span><select defaultValue="technical"><option value="technical">技術資料・標準</option><option value="workspace">ワークスペース設定</option></select></label>
-      <label><span>配色</span><select defaultValue="accessible"><option value="accessible">識別性優先</option><option value="monochrome">モノクロ</option></select></label>
-      <label><span>背景</span><select defaultValue="light"><option value="light">明るい</option><option value="transparent">透過</option><option value="dark">暗い</option></select></label>
+      <VisualOptions label="配色" kind="palette" columns={3} value={palette} onChange={setPalette}
+        options={[{ value: 'accessible', label: '識別性優先' }, { value: 'monochrome', label: 'モノクロ' }, { value: 'print', label: '印刷向け' }]} />
+      <VisualOptions label="背景" kind="background" columns={3} value={chartBackground} onChange={setChartBackground}
+        options={[{ value: 'light', label: '明るい' }, { value: 'transparent', label: '透過' }, { value: 'dark', label: '暗い' }]} />
     </PropertyGroup>
     {/* XC-213: these are the defaults a new series starts from. What a *particular* series looks like
         is on that series' row in データ, because the measured reference keys line, marker and colour to
         the series rather than to the chart (E-124). Grid lines moved to 軸, which is what they mark. */}
     <PropertyGroup title="系列の既定">
       <label><span>線幅</span><div className="property-range"><input type="range" min="1" max="6" defaultValue="2" /><output>2 px</output></div></label>
-      <label><span>マーカー</span><select defaultValue="auto"><option value="auto">自動</option><option value="circle">円</option><option value="square">四角</option><option value="none">なし</option></select></label>
+      <VisualOptions label="マーカー" kind="marker" columns={4} value={defaultMarker} onChange={setDefaultMarker}
+        options={[{ value: 'circle', label: '円' }, { value: 'square', label: '四角' }, { value: 'triangle', label: '三角' }, { value: 'none', label: 'なし' }]} />
     </PropertyGroup>
     <PropertyGroup title="書体">
       <label><span>フォント</span><select defaultValue="workspace"><option value="workspace">ワークスペース設定</option><option value="noto-sans">Noto Sans</option><option value="source-serif">Source Serif</option></select></label>
@@ -2558,8 +2588,12 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
             reference keys all three to the series (E-124), and splitting them across two tabs meant
             changing one series' look and its quantity in two places. */}
         <label><span>色</span><div className="property-pair"><select defaultValue="palette"><option value="palette">パレット順</option><option value="custom">指定色</option></select><input type="color" defaultValue="#2f6df6" aria-label={`${activeSeries.label}の色`} /></div></label>
-        <label><span>線</span><div className="property-pair"><select defaultValue="solid"><option value="solid">実線</option><option value="dashed">破線</option><option value="dotted">点線</option><option value="none">なし</option></select><select defaultValue="default" aria-label="線幅"><option value="default">既定の太さ</option><option value="thin">細い</option><option value="thick">太い</option></select></div></label>
-        <label><span>マーカー</span><select defaultValue="default"><option value="default">既定</option><option value="circle">円</option><option value="square">四角</option><option value="triangle">三角</option><option value="none">なし</option></select></label>
+        <label><span>パレット</span><span className="palette-readout"><OptionSample kind="palette" value={palette} /><small>この系列は{['1番目','2番目','3番目','4番目','5番目'][graphSeries.indexOf(activeSeries) % 5]}の色を使います</small></span></label>
+        <VisualOptions label="線" kind="line" columns={4} value={seriesLine} onChange={setSeriesLine}
+          options={[{ value: 'solid', label: '実線' }, { value: 'dashed', label: '破線' }, { value: 'dotted', label: '点線' }, { value: 'none', label: 'なし' }]} />
+        <label><span>線幅</span><select defaultValue="default"><option value="default">既定の太さ</option><option value="thin">細い</option><option value="thick">太い</option></select></label>
+        <VisualOptions label="マーカー" kind="marker" columns={4} value={seriesMarker} onChange={setSeriesMarker}
+          options={[{ value: 'circle', label: '円' }, { value: 'square', label: '四角' }, { value: 'triangle', label: '三角' }, { value: 'none', label: 'なし' }]} />
         <label><span>軸</span><select defaultValue="left"><option value="left">左（Y）</option><option value="right">右（第2Y）</option></select></label>
         <label><span>来歴</span><input value={activeSeries.quantity === 'unresolved' ? '数量の選択後に表示' : activeSeries.quantity === 'computed' || activeSeries.quantity === 'expression' ? '計算・式を表示' : activeSeries.quantity === 'reference' ? '参考資料・数値根拠には未使用' : activeSeries.quantity === 'measurement' ? '測定データ' : 'データセット'} readOnly /></label>
         <label><span>欠損</span><select defaultValue="gap"><option value="gap">欠損として表示・凡例に残す</option></select></label></>}
@@ -2598,6 +2632,12 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
 }
 
 function ReportPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: string }) {
+  const [orientation, setOrientation] = useState('portrait')
+  const [margin, setMargin] = useState('standard')
+  const [columns, setColumns] = useState('single')
+  const [reportPalette, setReportPalette] = useState('accessible')
+  const [figureStyle, setFigureStyle] = useState('flat')
+  const [bodyFont, setBodyFont] = useState('workspace')
   const [commentary, setCommentary] = useState<'mechanical' | 'generated'>(variant === 'commentary-review' || variant === 'drafting' ? 'generated' : 'mechanical')
   const [draftState, setDraftState] = useState<'none' | 'review' | 'applied'>(variant === 'commentary-review' ? 'review' : 'none')
   const [search, setSearch] = useState<'off' | 'ask'>('off')
@@ -2633,9 +2673,13 @@ function ReportPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: stri
 
     <PropertyGroup title="ページ">
       <label><span>用紙</span><select defaultValue="a4"><option value="a4">A4</option><option value="letter">Letter</option><option value="screen">画面向け</option></select></label>
-      <label><span>向き</span><select defaultValue="portrait"><option value="portrait">縦</option><option value="landscape">横</option></select></label>
-      <label><span>余白</span><select defaultValue="standard"><option value="standard">標準</option><option value="narrow">狭い</option><option value="wide">広い</option></select></label>
-      <label><span>段組み</span><select defaultValue="single"><option value="single">1段</option><option value="double">2段</option></select></label>
+      {/* XC-215: orientation, margin and columns are shapes on a page, so the page is drawn. */}
+      <VisualOptions label="向き" kind="page" columns={2} value={orientation} onChange={setOrientation}
+        options={[{ value: 'portrait', label: '縦' }, { value: 'landscape', label: '横' }]} />
+      <VisualOptions label="余白" kind="margin" columns={3} value={margin} onChange={setMargin}
+        options={[{ value: 'narrow', label: '狭い' }, { value: 'standard', label: '標準' }, { value: 'wide', label: '広い' }]} />
+      <VisualOptions label="段組み" kind="columns" columns={2} value={columns} onChange={setColumns}
+        options={[{ value: 'single', label: '1段' }, { value: 'double', label: '2段' }]} />
     </PropertyGroup>
     <PropertyGroup title="共通要素">
       <label className="property-toggle"><span>ヘッダー</span><input type="checkbox" defaultChecked /></label>
@@ -2645,13 +2689,16 @@ function ReportPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: stri
     </PropertyGroup>
     <PropertyGroup title="アートスタイル">
       <label><span>スタイル</span><select defaultValue="technical"><option value="technical">技術資料・標準</option><option value="workspace">ワークスペース設定</option></select></label>
-      <label><span>配色</span><select defaultValue="accessible"><option value="accessible">識別性優先</option><option value="monochrome">モノクロ印刷</option></select></label>
-      <label><span>図表</span><select defaultValue="flat"><option value="flat">フラット</option><option value="bordered">罫線あり</option></select></label>
+      <VisualOptions label="配色" kind="palette" columns={3} value={reportPalette} onChange={setReportPalette}
+        options={[{ value: 'accessible', label: '識別性優先' }, { value: 'monochrome', label: 'モノクロ印刷' }, { value: 'print', label: '印刷向け' }]} />
+      <VisualOptions label="図表" kind="figure" columns={2} value={figureStyle} onChange={setFigureStyle}
+        options={[{ value: 'flat', label: 'フラット' }, { value: 'bordered', label: '罫線あり' }]} />
       <label className="property-toggle"><span>表の縞</span><input type="checkbox" defaultChecked /></label>
     </PropertyGroup>
 
     <PropertyGroup title="文字表現">
-      <label><span>本文</span><select defaultValue="workspace"><option value="workspace">ワークスペース設定</option><option value="noto-sans">Noto Sans</option><option value="source-serif">Source Serif</option></select></label>
+      <label><span>本文</span><select value={bodyFont} onChange={(event) => setBodyFont(event.target.value)} style={{ fontFamily: fontStacks[bodyFont] }}>{Object.entries(fontLabels).map(([value, name]) => <option value={value} key={value} style={{ fontFamily: fontStacks[value] }}>{name}</option>)}</select></label>
+      <label><span>見本</span><span className="font-specimen" style={{ fontFamily: fontStacks[bodyFont] }}>最大応力 235 MPa / Design review 2026</span></label>
       <label><span>見出し</span><select defaultValue="same"><option value="same">本文と同じ</option><option value="noto-sans">Noto Sans</option></select></label>
       <label><span>本文サイズ</span><select defaultValue="10"><option value="9">9 pt</option><option value="10">10 pt</option><option value="11">11 pt</option></select></label>
       <label><span>注記サイズ</span><select defaultValue="8"><option value="8">8 pt</option><option value="9">9 pt</option></select></label>
@@ -2821,7 +2868,8 @@ function ObjectTypeProperties({ kind }: { kind: ViewObjectKind }) {
       <details className="property-group" open><summary><ChevronRight size={12} /><b>メッシュ</b></summary><div className="property-fields">
         <label><span>役割</span><input value={kind === 'analysis-mesh' ? '解析' : '参照'} readOnly /></label>
         <label><span>参照元</span><input value={kind === 'analysis-mesh' ? 'データセット・未接続' : '参照形状・未接続'} readOnly /></label>
-        <label><span>表示形式</span><select value={meshRepresentation} onChange={(event) => setMeshRepresentation(event.target.value as MeshRepresentation)}><option value="surface">サーフェス</option><option value="surface-edges">サーフェス＋エッジ</option><option value="wireframe">ワイヤーフレーム</option></select></label>
+        <VisualOptions label="表示形式" kind="representation" columns={3} value={meshRepresentation} onChange={(value) => setMeshRepresentation(value as MeshRepresentation)}
+          options={[{ value: 'surface', label: 'サーフェス' }, { value: 'surface-edges', label: 'サーフェス＋エッジ' }, { value: 'wireframe', label: 'ワイヤーフレーム' }]} />
       </div></details>
       <details className="property-group" open><summary><ChevronRight size={12} /><b>表示</b></summary><div className="property-fields">
         <label className="property-toggle"><span>表示する</span><input type="checkbox" defaultChecked /></label>

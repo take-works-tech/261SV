@@ -3363,3 +3363,33 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a report whose blocks need placement per block, which makes the selection scope
   worth its tab
+
+### XC-215 - A choice about appearance is shown as an appearance, with its name kept beside it
+- decided: 2026-08-23
+- status: active
+- decision: wherever the thing being chosen is **how something will look**, the options are **drawn** and
+  laid out as a grid of samples with the name beneath each: chart form, palette, background, line style,
+  marker, page orientation, margin, columns, figure treatment, mesh representation, develop preset, and
+  the typeface, which is rendered in itself. **The name is never removed** - a picture cannot be
+  searched, read aloud, or quoted in a specification, so every sample carries its label and its
+  accessible name. One control implements this (`VisualOptions`) and one module draws the samples; a
+  second implementation of either is the duplication `check_commands.py` exists to catch. Choices that
+  are **not** about appearance - a file format, a unit, a case, a quantity - stay as text, because a
+  picture of `PNG` teaches nothing.
+  In the mockup the samples are **drawn**, not photographed: inline SVG and CSS gradients, carrying no
+  asset, following the theme tokens, and staying crisp at any size. They illustrate a design state and
+  are never evidence that the renderer produces that picture (the standing rule for `mockups/ui/`)
+- decided_by: the product owner, 2026-08-23
+- rationale: both measured references refuse the word list for exactly these choices. ParaView ships
+  `pqPresetToPixmap` whose only job is to render a colour map into an image for the chooser, and reflows
+  those images into a grid; Blender ships 42 studio-light previews and 147 icon preview files and draws
+  them into the pickers (E-128). A word like `フラット` or `Filmic` names a result the reader has to
+  imagine, and the cost of imagining wrongly here is a figure that goes into a report
+- alternatives: showing the sample only on hover keeps the panel small and hides the comparison, which is
+  the whole reason to draw them - the choice is made by looking at them side by side. Replacing the name
+  with the picture saves a line and makes the setting unquotable
+- basis: E-128 (T1), E-120 (T1), E-121 (T1)
+- affects: 11_ui.md
+- decidedness: Fixed
+- reversal_trigger: a set of appearance options too numerous to draw at a readable size, which would
+  make a searchable list with previews the better control

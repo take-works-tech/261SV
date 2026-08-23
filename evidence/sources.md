@@ -1264,6 +1264,20 @@ can be repeated.
   and its placement, overlay style, intensity and colour, slide colour, full-bleed and content alignment
 - justifies: XC-213, XC-214
 
+### E-128 - How the measured references present a choice that is about appearance
+- tier: T1
+- url: `D:\Program Files\ParaView 6.2.0in\pqComponents-pv6.2.dll` and
+  `C:\Program Files\Blender Foundation\Blender 5.0.0\datafiles`, both read on this machine
+- verified: 2026-08-23
+- says: **neither reference asks a user to choose an appearance from a list of words.** ParaView's
+  colour-map chooser is built from `pqPresetDialog`, `pqPresetDialogTableModel`,
+  `pqPresetDialogReflowModel` and **`pqPresetToPixmap`** - the last of which exists to render each preset
+  into an image, and the reflow model to lay those images out as a grid rather than a list. Blender
+  ships the previews as files: `datafiles/studiolights` holds **28 matcap, 5 studio and 9 world** image
+  files, and `datafiles/icons` holds 147 preview data files, all drawn into the pickers that select
+  them. The names are still shown beside the pictures in both
+- justifies: XC-215
+
 ## Not verified here
 
 Recorded so that nothing silently depends on them:
