@@ -3692,3 +3692,32 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a chart with enough series that setting each one is the bulk of the work, which
   would argue for an apply-to-all action on the series list rather than for a third level
+
+### XC-225 - Within one property rail, two controls never change the same thing
+- decided: 2026-08-23
+- status: active
+- decision: the rule XC-222 and XC-224 established for the graph applies to **every** property rail, and
+  is checked for every rail rather than argued case by case. Within one editor, a control name means one
+  thing and one property has one editable control. Across editors the same word is fine and expected -
+  every item has a `名前`, every area has a `種類` of its own - so the check is per rail.
+  The View rail carried five: `開始`/`終了` were a @Comparison's member range and a @Timeline's playback
+  range, `配置` was a comparison's arrangement and an image's placement, `種類` was the background's kind
+  and the output's, and `名前` was the open item, a camera, a playback preset and a camera being created.
+  They are `範囲の先頭`/`範囲の末尾` against `再生の先頭`/`再生の末尾`, `並べ方` against `画像の配置`,
+  `背景の種類` against `成果物の種類`, and `カメラ名`/`プリセット名`/`新しい名前` beside the item's own
+  `名前`. **One exemption, stated**: the graph's `タイトル`, its text and the size of its type (XC-222)
+- decided_by: the product owner, 2026-08-23
+- rationale: the owner asked three times about one such pair in the graph before it was removed rather
+  than renamed, and then asked for the mockup as a whole. Counting them showed the graph was not
+  unusual: the View rail had five, none of them noticed because each reads correctly inside its own
+  group. A group heading disambiguates for a reader who is already there and not for one scanning a
+  rail, which is how a rail is used
+- correction: XC-222 wrote this rule for the graph rail and left every other rail unchecked, which is
+  the same shape of mistake as fixing one visible site of a defect
+- alternatives: relying on the group heading keeps the shorter labels and puts the burden on the reader
+  each time
+- basis: E-124 (T1)
+- affects: 11_ui.md
+- decidedness: Fixed
+- reversal_trigger: a rail where the distinguishing prefixes make every label too long for its column,
+  which would mean the rail has too many properties rather than that the rule is wrong
