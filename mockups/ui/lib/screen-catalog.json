@@ -193,6 +193,14 @@
       "href": "?screen=view&variant=comparison-range"
     },
     {
+      "id": "view.default",
+      "screen": "view",
+      "variant": "default",
+      "label": "ビュー・1画面",
+      "intent": "選択ケースを開いているビューで1画面に描画する。",
+      "href": "?screen=view&variant=default"
+    },
+    {
       "id": "view.deformation",
       "screen": "view",
       "variant": "deformation",
@@ -399,14 +407,6 @@
       "label": "結果軸ブックマーク",
       "intent": "固定時刻・極値時刻・しきい値交差を登録し、ケースごとに解決した位置と値を表示する。",
       "href": "?screen=view&variant=result-bookmarks"
-    },
-    {
-      "id": "view.single-pane",
-      "screen": "view",
-      "variant": "single-pane",
-      "label": "ビュー・1画面",
-      "intent": "選択ケースを開いているビューで1画面に描画する。",
-      "href": "?screen=view&variant=single-pane"
     },
     {
       "id": "view.split-four",

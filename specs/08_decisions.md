@@ -3130,3 +3130,37 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a third kind of View item whose canvas has no arrangement at all, which would make
   the control conditional again
+
+### XC-207 - An area opens in its resting state, and a control is named and sized for what it is
+- decided: 2026-08-23
+- status: active
+- decision: four rules the interface had been breaking in four places.
+  **Entering a work area lands on that area's declared baseline state**, never on whichever of its
+  catalogue states happens to sort first.
+  **The property rail's first View section is named after the item it edits** - `ビュー`, or `比較` when
+  a @Comparison is open - not `全体`. Graph and Report keep `全体`, where the contrast with their
+  per-selection tabs is real.
+  **A control is sized for its content**: only an icon-only button is a fixed-size circle, and a button
+  carrying a label is sized to that label and never wraps it. Where a surface is too narrow for the
+  labels, the button keeps its meaning as its accessible name and tooltip rather than keeping a label it
+  cannot draw.
+  **The assistant's identity mark is a chat mark**, not a four-point sparkle.
+  **A row that can be dragged is drawn as an object that can be picked up**: a frame, a grip and a grab
+  cursor
+- decided_by: the product owner, 2026-08-23
+- rationale: each of these is a case of the interface asserting something untrue. Opening the View area
+  on `assistant-drawer` presented a demonstration state as the product's resting state, with the chat
+  covering the 3D view before the user had asked for it. `全体` named a bucket in a rail where four other
+  tabs are equally "the whole view". A blanket `.chat-composer button` rule sized every button as a 27px
+  circle, so the two text buttons wrapped one character per line and spilled through the composer's
+  frame - the defect is in the blanket rule, not in the two buttons. A four-point sparkle is another
+  assistant's brand mark. A draggable row drawn as plain text says nothing about the drag, and the
+  sentence under the list was the only place it was stated
+- alternatives: opening the drawer by default is defensible if the assistant is the intended entry point,
+  and it is not: the area is for looking at geometry, and the instruction bar already offers the
+  conversation in one line. Naming the section `項目` covers both kinds without saying which is open
+- basis: E-120 (T1), E-121 (T1)
+- affects: 11_ui.md
+- decidedness: Fixed
+- reversal_trigger: usage showing the assistant is the first thing reached in the View area, which would
+  make the drawer the resting state rather than an opened one

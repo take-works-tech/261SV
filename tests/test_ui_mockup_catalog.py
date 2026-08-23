@@ -136,7 +136,7 @@ def test_chat_uses_a_single_column_document_flow_instead_of_message_bubbles() ->
     assert "className={`chat-thread ${compact ? 'assistant-drawer-thread' : ''}`}" in page
     assert 'className="chat-turn chat-turn-user"' in page
     assert 'className="chat-turn chat-turn-assistant"' in page
-    assert 'className="chat-composer"' in page
+    assert 'className={`chat-composer ${compact' in page
     assert 'className="user-message"' not in page
     assert 'className="assistant-message"' not in page
     assert ".user-message" not in styles
@@ -372,7 +372,7 @@ def test_non_chat_right_sidebar_uses_a_vertical_icon_rail_with_a_visible_active_
     assert 'aria-orientation="vertical"' in page
     assert 'role="tabpanel"' in page
     assert 'aria-selected={active}' in page
-    assert 'data-tooltip={isBorrowed(tab.id) ? `${tab.label}・基準ビューの設定` : tab.label}' in page
+    assert 'data-tooltip={isBorrowed(tab.id) ? `${label}・基準ビューの設定` : label}' in page
     assert "selectedTab.label" in page
     assert "sidebar-tab-panel-title" in page
     assert "<small>{screenNames[screen]}</small>" not in page
@@ -396,7 +396,7 @@ def test_non_chat_right_sidebar_uses_a_vertical_icon_rail_with_a_visible_active_
     assert ordered_tabs == sorted(ordered_tabs)
     assert 'className="sidebar-tab-scope-separator" aria-hidden="true"' in page
     assert "startsSelectionGroup" in page
-    assert "scopeLabel ? `${scopeLabel}：${tab.label}` : tab.label" in page
+    assert "scopeLabel ? `${scopeLabel}：${label}` : label" in page
     assert ".sidebar-tab-scope-separator" in styles
     assert page.index("{screen === 'view' && <OutlinerPanel") < page.index('className="sidebar-editor"')
 
@@ -643,7 +643,8 @@ def test_right_sidebar_is_context_editing_only_and_template_is_renamed_overall()
     for screen in ("view", "graph", "report"):
         block_start = page.index(f"  {screen}: [")
         next_block = page.index(f"  {next_screen_by_screen[screen]}: [", block_start)
-        assert "id: 'overall', label: '全体'" in page[block_start:next_block]
+        expected = "'ビュー'" if screen == "view" else "'全体'"
+        assert f"id: 'overall', label: {expected}" in page[block_start:next_block]
     sidebar = page[page.index("function RightSidebar") : page.index("function OutlinerPanel")]
     assert "<LibraryPanel" not in sidebar
     assert "template-source-tabs" not in sidebar
@@ -1378,7 +1379,7 @@ def test_one_conversation_keeps_its_settings_across_the_bar_and_chat() -> None:
 
     assert "type ConversationSettings = { model: string; effort: string; search: 'off' | 'allowed' }" in page
     assert "useState<ConversationSettings>({ model: 'local', effort: 'standard', search: 'off' })" in page
-    assert page.count("<ChatComposer draft={draft} onDraftChange={onDraftChange} settings={settings} onSettingsChange={onSettingsChange} />") == 3
+    assert page.count("<ChatComposer draft={draft} onDraftChange={onDraftChange} settings={settings} onSettingsChange={onSettingsChange}") == 3
     assert "onSettingsChange({ ...settings, model: event.target.value })" in page
 
 
@@ -1399,7 +1400,7 @@ def test_the_view_rail_gives_camera_its_own_tab_and_overall_keeps_none_of_it() -
     view_tabs = page[page.index("  view: ["):page.index("  graph: [")]
 
     order = re.findall(r"id: '([a-z]+)', label: '([^']+)'", view_tabs)
-    assert [label for _, label in order][:5] == ["全体", "カメラ", "描画", "背景", "出力"]
+    assert [label for _, label in order][:5] == ["ビュー", "カメラ", "描画", "背景", "出力"]
     assert [ident for ident, _ in order][5:] == ["objects", "text", "materials"]
 
     overall = page[page.index("if (tab.id === 'overall') return"):page.index("if (tab.id === 'camera') return")]
@@ -1788,3 +1789,67 @@ def test_a_comparison_grid_sets_its_columns_and_derives_its_rows() -> None:
     assert "'--comparison-columns': comparisonGridColumns(comparisonMembers.length, comparison.columns)" in page
     assert "repeat(var(--comparison-columns, 1), minmax(0, 1fr))" in styles
     assert "grid-template-rows: 1fr; grid-template-areas: none; }" not in styles
+
+
+def test_entering_an_area_lands_on_its_declared_baseline_state() -> None:
+    """XC-207: the View area opened on `assistant-drawer` because it sorts first, so the chat covered
+    the 3D view the moment the area was entered - a demonstration state shown as the resting state."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    scenarios = json.loads(CATALOG.read_text(encoding="utf-8"))["scenarios"]
+
+    assert "scenario.variant === 'default'" in page.split("function scenarioFor")[1].split("}")[0] + page.split("function scenarioFor")[1][:600]
+    screens = {item["screen"] for item in scenarios}
+    for screen in screens:
+        defaults = [item for item in scenarios if item["screen"] == screen and item["variant"] == "default"]
+        assert len(defaults) == 1, f"{screen} has {len(defaults)} baseline states"
+    # the drawer is reached, never landed on
+    assert "useState(scenario.variant === 'assistant-drawer')" in page
+
+
+def test_a_composer_button_is_sized_for_its_label_not_for_an_icon() -> None:
+    """XC-207: a blanket rule made every button in the composer a 27px circle, so 検索オフ and 詳細調査
+    wrapped one character per line and spilled out of the frame. The blanket rule is the defect."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    styles = CHAT_STYLES.read_text(encoding="utf-8")
+
+    assert ".chat-composer button { width: 27px" not in styles
+    assert ".chat-composer .chat-icon-button { width: 27px; height: 27px;" in styles
+    assert "white-space: nowrap" in styles.split(".chat-composer button {")[1].split("}")[0]
+    # the narrow drawer drops the labels and keeps the meaning
+    assert 'aria-label={searchLabel} title={searchLabel}' in page
+    assert "{compact ? <Telescope size={13} /> : '詳細調査'}" in page
+    assert "compact ? 'compact-composer' : ''" in page
+
+
+def test_the_assistant_mark_is_a_chat_mark() -> None:
+    """XC-207: a four-point sparkle is another assistant's brand mark."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    for site in ['<span className="chat-role-mark">', '<span className="assistant-mark">']:
+        assert f"{site}<MessageSquareText size={{14}} /></span>" in page
+    assert "Sparkles" not in page.split("function ChatScreen(")[1].split("function AssistantDrawer(")[0]
+    assert "instruction-bar\"><MessageSquareText size={15} />" in page
+
+
+def test_a_draggable_variable_row_is_drawn_as_something_that_can_be_picked_up() -> None:
+    """XC-207: the rows were `border: 0; background: transparent`, so nothing but a sentence under the
+    list said the drag existed."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    styles = CHAT_STYLES.read_text(encoding="utf-8")
+
+    assert '<GripVertical size={11} className="variable-grip" aria-hidden="true" />' in page
+    row = styles.split(".variable-row {")[1].split("}")[0]
+    assert "border: 1px solid var(--line)" in row
+    assert "cursor: grab" in row
+    assert ".variable-row:active { cursor: grabbing; }" in styles
+
+
+def test_the_first_view_tab_is_named_after_the_item_it_edits() -> None:
+    """XC-207: `全体` drew no distinction in a rail where カメラ, 描画, 背景 and 出力 are the whole view
+    too. Graph and Report keep it, where the contrast with their per-selection tabs is real."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "{ id: 'overall', label: 'ビュー'" in page
+    assert page.count("{ id: 'overall', label: '全体'") == 2
+    assert "tab.id === 'overall' && screen === 'view' && isComparisonItem ? '比較' : tab.label" in page
+    assert "selectedTab.id === 'overall' && screen === 'view' && isComparisonItem ? '比較' : selectedTab.label" in page

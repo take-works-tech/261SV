@@ -45,6 +45,7 @@ import {
   Globe2,
   Grid2X2,
   HardDrive,
+  GripVertical,
   HelpCircle,
   Eye,
   EyeOff,
@@ -77,6 +78,7 @@ import {
   Shapes,
   Tag,
   Target,
+  Telescope,
   Trash2,
   Type,
   Upload,
@@ -218,7 +220,7 @@ const rightSidebarTabs: Record<ScreenId, SidebarTab[]> = {
     { id: 'history', label: '履歴', description: '実行結果と再現可能な処理履歴を確認します。', icon: Clock3 },
   ],
   view: [
-    { id: 'overall', label: '全体', description: 'ビュー項目そのものと、キャンバスに重ねるガイドを設定します。', icon: LayoutTemplate, scope: 'view' },
+    { id: 'overall', label: 'ビュー', description: '開いている項目そのもの（名前・定義）と、キャンバスに重ねるガイドを設定します。', icon: LayoutTemplate, scope: 'view' },
     { id: 'camera', label: 'カメラ', description: 'このビューが持つカメラを追加し、ポーズとレンズ、被写界深度を設定します。', icon: Camera, scope: 'view' },
     { id: 'rendering', label: '描画', description: 'レンダラー、照明、現像を設定します。', icon: MonitorCog, scope: 'view' },
     { id: 'background', label: '背景', description: 'ビューの背景と周辺表現を設定します。', icon: ImageIcon, scope: 'view' },
@@ -391,9 +393,14 @@ function TopMenu({ menu, items, onAction }: { menu: string; items: TopMenuItem[]
 }
 
 
+// XC-207: entering an area lands on that area's declared baseline, never on whichever of its states
+// sorts first. The catalogue is ordered for reading, so "first" put the assistant drawer over the 3D
+// view the moment the View area was opened - a demonstration state presented as the product's resting
+// state.
 function scenarioFor(screen: ScreenId, variant?: string) {
   return (
     scenarios.find((scenario) => scenario.screen === screen && scenario.variant === variant) ??
+    scenarios.find((scenario) => scenario.screen === screen && scenario.variant === 'default') ??
     scenarios.find((scenario) => scenario.screen === screen) ??
     scenarios[0]
   )
@@ -1148,6 +1155,9 @@ function WorkspaceSourceSections({ selectedCase, onSelectCase, query, onQueryCha
             taken from reference material - each showing which it is (XC-088, INV-013). */}
         {workspaceVariables.map((variable) => (
           <div className="variable-row" key={variable.name} draggable aria-label={`${variable.name} をドラッグして入力へ挿入`}>
+            {/* XC-207: a row that can be dragged looks like an object that can be picked up. Without a
+                frame and a grip it read as text, and nothing on screen said the drag existed. */}
+            <GripVertical size={11} className="variable-grip" aria-hidden="true" />
             <span>{variable.name}</span>
             <NumberCell value={variable.value} unit={variable.unit} digits={variable.digits} provenance={variable.provenance} expression={variable.expression} />
           </div>
@@ -1707,6 +1717,10 @@ function RightSidebar({ screen, variant, width, setWidth, selectedViewObjects, o
         <nav className="sidebar-tab-rail" role="tablist" aria-label={`${screenNames[screen]}の設定`} aria-orientation="vertical">
           {tabs.map((tab, index) => {
             const Icon = tab.icon
+            // XC-207: this tab edits the open item itself, so it is named after that item rather than
+            // called 全体 - every other view-scoped tab is "the whole view" too, which is what made the
+            // old name say nothing.
+            const label = tab.id === 'overall' && screen === 'view' && isComparisonItem ? '比較' : tab.label
             const active = tab.id === selectedTab.id
             const startsSelectionGroup = tab.scope === 'selection' && tabs[index - 1]?.scope !== 'selection'
             const scopeLabel = tab.scope === 'selection' ? '選択中のオブジェクト' : tab.scope === 'view' ? 'ビュー全体' : undefined
@@ -1720,8 +1734,8 @@ function RightSidebar({ screen, variant, width, setWidth, selectedViewObjects, o
                   role="tab"
                   aria-selected={active}
                   aria-controls={`sidebar-panel-${screen}`}
-                  aria-label={isBorrowed(tab.id) ? `${tab.label}（基準ビューの設定）` : scopeLabel ? `${scopeLabel}：${tab.label}` : tab.label}
-                  data-tooltip={isBorrowed(tab.id) ? `${tab.label}・基準ビューの設定` : tab.label}
+                  aria-label={isBorrowed(tab.id) ? `${label}（基準ビューの設定）` : scopeLabel ? `${scopeLabel}：${label}` : label}
+                  data-tooltip={isBorrowed(tab.id) ? `${label}・基準ビューの設定` : label}
                   tabIndex={active ? 0 : -1}
                   onClick={() => selectTab(tab)}
                   onKeyDown={(event) => moveTabFocus(event, index)}
@@ -1740,7 +1754,7 @@ function RightSidebar({ screen, variant, width, setWidth, selectedViewObjects, o
         >
           <header className="sidebar-tab-panel-title">
             <span className="sidebar-tab-panel-icon"><SelectedTabIcon size={16} strokeWidth={1.8} aria-hidden="true" /></span>
-            <span><b>{selectedTab.label}</b></span>
+            <span><b>{selectedTab.id === 'overall' && screen === 'view' && isComparisonItem ? '比較' : selectedTab.label}</b></span>
             {isBorrowed(selectedTab.id) && <em className="sidebar-tab-borrowed-mark">基準ビューの設定</em>}
           </header>
           <p className="sidebar-tab-summary">{selectedTab.description}</p>
@@ -3953,7 +3967,7 @@ function ChatScreen({ variant, draft, onDraftChange, settings, onSettingsChange 
     return (
       <div className="chat-canvas">
         <div className="chat-empty">
-          <Sparkles size={30} />
+          <MessageSquareText size={30} />
           <h2>ワークスペースについて尋ねる</h2>
           <p>質問、操作、レポート構成を同じチャットで続けられます。</p>
           <div className="chat-suggestions">
@@ -3988,7 +4002,7 @@ function ConversationThread({ variant, compact = false }: { variant?: string; co
           <div className="chat-turn-body"><p>このワークスペースで利用可能な物理量を説明して</p></div>
         </article>
         <article className="chat-turn chat-turn-assistant">
-          <header><span className="chat-role-mark"><Sparkles size={14} /></span><b>SOLVIA</b><small>ローカルモデル</small></header>
+          <header><span className="chat-role-mark"><MessageSquareText size={14} /></span><b>SOLVIA</b><small>ローカルモデル</small></header>
           <div className="chat-turn-body">
             {/* XC-104: a generated statement says which of the four kinds it is and where it came from.
                 Chat is named alongside Report in the shared-components table; it carried no badge. */}
@@ -4008,14 +4022,14 @@ function AssistantDrawer({ draft, onDraftChange, onClose, onOpenChat, settings, 
   return (
     <aside className="assistant-drawer" aria-label="アシスタントチャット">
       <header className="assistant-drawer-header">
-        <div><span className="assistant-mark"><Sparkles size={14} /></span><span><b>アシスタント</b><small>現在のチャット</small></span></div>
+        <div><span className="assistant-mark"><MessageSquareText size={14} /></span><span><b>アシスタント</b><small>現在のチャット</small></span></div>
         <div>
           <button type="button" className="assistant-open-chat" onClick={onOpenChat}>チャットで開く<ArrowUpRight size={13} /></button>
           <button type="button" aria-label="アシスタントを閉じる" onClick={onClose}><X size={15} /></button>
         </div>
       </header>
       <ConversationThread compact />
-      <ChatComposer draft={draft} onDraftChange={onDraftChange} settings={settings} onSettingsChange={onSettingsChange} />
+      <ChatComposer draft={draft} onDraftChange={onDraftChange} settings={settings} onSettingsChange={onSettingsChange} compact />
     </aside>
   )
 }
@@ -4025,7 +4039,7 @@ function AssistantDrawer({ draft, onDraftChange, onClose, onOpenChat, settings, 
 // permission inside this component made each surface its own conversation the moment it unmounted.
 type ConversationSettings = { model: string; effort: string; search: 'off' | 'allowed' }
 
-function ChatComposer({ draft, onDraftChange, settings, onSettingsChange }: { draft: string; onDraftChange: (draft: string) => void; settings: ConversationSettings; onSettingsChange: (settings: ConversationSettings) => void }) {
+function ChatComposer({ draft, onDraftChange, settings, onSettingsChange, compact }: { draft: string; onDraftChange: (draft: string) => void; settings: ConversationSettings; onSettingsChange: (settings: ConversationSettings) => void; compact?: boolean }) {
   const [permission, setPermission] = useState<'search' | 'research' | null>(null)
   const [host, setHost] = useState('')
   // XC-106: the query is the data that leaves. Nothing is sent until both the exact query and the host
@@ -4036,7 +4050,11 @@ function ChatComposer({ draft, onDraftChange, settings, onSettingsChange }: { dr
       ? 'このワークスペースで許可するホストが未登録です。'
       : '要求数と費用見積を取得できるまで詳細調査は送信しません。'
   const outboundBlocked = !draft.trim() || !host.trim() || permission === 'research'
-  return <div className="chat-composer"><textarea rows={2} value={draft} onChange={(event) => onDraftChange(event.target.value)} placeholder="ワークスペースへの質問または操作" /><div><button aria-label="ファイルを追加"><Plus size={16} /></button><label className="chat-inline-select"><span className="sr-only">モデル</span><select value={settings.model} onChange={(event) => onSettingsChange({ ...settings, model: event.target.value })}><option value="local">ローカルモデル</option><option value="remote" disabled>外部モデル・未構成</option></select></label><label className="chat-inline-select"><span className="sr-only">推論の深さ</span><select value={settings.effort} onChange={(event) => onSettingsChange({ ...settings, effort: event.target.value })}><option value="brief">簡潔</option><option value="standard">標準</option><option value="deep">詳細</option></select></label><button type="button" className="chat-search-status" aria-pressed={settings.search === 'allowed'} onClick={() => setPermission('search')}><ShieldCheck size={11} />{settings.search === 'allowed' ? '検索オン' : '検索オフ'}</button><button type="button" className="chat-research-button" onClick={() => setPermission('research')}>詳細調査</button><button className="chat-send" aria-label="送信" disabled={!draft.trim()}><Play size={14} /></button></div><small>回答は誤る可能性があります。解析値・単位・来歴は元データで確認してください。</small>
+  // XC-207: the drawer is roughly half the width of the Chat area, so the two permission buttons drop
+  // their labels there and keep them in their accessible name. Nothing is removed - a control that is
+  // only an icon still says what it is to a screen reader and on hover.
+  const searchLabel = settings.search === 'allowed' ? '検索オン' : '検索オフ'
+  return <div className={`chat-composer ${compact ? 'compact-composer' : ''}`}><textarea rows={2} value={draft} onChange={(event) => onDraftChange(event.target.value)} placeholder="ワークスペースへの質問または操作" /><div><button className="chat-icon-button" aria-label="ファイルを追加" title="ファイルを追加"><Plus size={16} /></button><label className="chat-inline-select"><span className="sr-only">モデル</span><select value={settings.model} onChange={(event) => onSettingsChange({ ...settings, model: event.target.value })}><option value="local">ローカルモデル</option><option value="remote" disabled>外部モデル・未構成</option></select></label><label className="chat-inline-select"><span className="sr-only">推論の深さ</span><select value={settings.effort} onChange={(event) => onSettingsChange({ ...settings, effort: event.target.value })}><option value="brief">簡潔</option><option value="standard">標準</option><option value="deep">詳細</option></select></label><button type="button" className={`chat-search-status ${compact ? 'chat-icon-button' : ''}`} aria-pressed={settings.search === 'allowed'} aria-label={searchLabel} title={searchLabel} onClick={() => setPermission('search')}><ShieldCheck size={compact ? 13 : 11} />{!compact && searchLabel}</button><button type="button" className={`chat-research-button ${compact ? 'chat-icon-button' : ''}`} aria-label="詳細調査" title="詳細調査" onClick={() => setPermission('research')}>{compact ? <Telescope size={13} /> : '詳細調査'}</button><button className="chat-send chat-icon-button" aria-label="送信" title="送信" disabled={!draft.trim()}><Play size={14} /></button></div><small>回答は誤る可能性があります。解析値・単位・来歴は元データで確認してください。</small>
     <Dialog open={permission !== null} onOpenChange={(open) => !open && setPermission(null)}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog outbound-review-dialog"><header><span><small>外部通信</small><b>{permission === 'research' ? '詳細調査の許可' : 'Web検索の許可'}</b></span><button type="button" aria-label="外部通信確認を閉じる" onClick={() => setPermission(null)}><X size={15} /></button></header><section className="outbound-review"><label><span>送信する検索語</span><textarea rows={2} value={draft.trim() || '［検索語を入力してください］'} readOnly /></label><label><span>送信しない情報</span><input value="ケース名・ファイルパス・形状・解析値" readOnly /></label><label><span>許可ホスト</span><Input value={host} onChange={(event) => setHost(event.target.value)} placeholder="例：docs.example.org" aria-label="このワークスペースで許可するホスト" /></label>{permission === 'research' && <><label><span>予定要求数</span><input value="未取得" readOnly /></label><label><span>費用見積</span><input value="未取得" readOnly /></label></>}</section><p className={outboundBlocked ? 'workflow-trust-note blocked' : 'workflow-trust-note'}>{outboundBlocked ? <AlertTriangle size={13} /> : <ShieldCheck size={13} />}{outboundBlocked ? outboundBlockedReason : '表示した検索語だけを、指定したホストへ1回だけ送信します。ホスト・日時・判断はローカル監査に記録されます。'}</p><footer><button type="button" onClick={() => { onSettingsChange({ ...settings, search: 'off' }); setPermission(null) }}>オフラインを維持</button><button type="button" className="primary-button" disabled={outboundBlocked} onClick={() => { onSettingsChange({ ...settings, search: 'allowed' }); setPermission(null) }}>今回だけ許可</button></footer></DialogContent></Dialog>
   </div>
 }
@@ -4193,7 +4211,7 @@ function NetworkScreen({ variant, onSettings }: { variant: string; onSettings: (
 }
 
 function InstructionBar({ draft, onDraftChange, onOpen }: { draft: string; onDraftChange: (draft: string) => void; onOpen: () => void }) {
-  return <div className="instruction-bar"><Sparkles size={15} /><Input className="h-auto border-0 bg-transparent p-0 type-body shadow-none focus-visible:ring-0" value={draft} onChange={(event) => onDraftChange(event.target.value)} placeholder="自然言語で操作 — 同じチャットへ送信" /><kbd>{shortcutFor('指示バーへフォーカス')?.key}</kbd><Button variant="ghost" size="icon" type="button" aria-label="チャットを開く" onClick={onOpen}><MessageSquareText size={14} /></Button></div>
+  return <div className="instruction-bar"><MessageSquareText size={15} /><Input className="h-auto border-0 bg-transparent p-0 type-body shadow-none focus-visible:ring-0" value={draft} onChange={(event) => onDraftChange(event.target.value)} placeholder="自然言語で操作 — 同じチャットへ送信" /><kbd>{shortcutFor('指示バーへフォーカス')?.key}</kbd><Button variant="ghost" size="icon" type="button" aria-label="チャットを開く" onClick={onOpen}><MessageSquareText size={14} /></Button></div>
 }
 
 function StatePanel({ tone, title, detail }: { tone: 'info' | 'progress' | 'warning' | 'error'; title: string; detail: string }) {
