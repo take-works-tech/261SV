@@ -698,7 +698,7 @@ def test_every_right_sidebar_mode_uses_responsibility_specific_editors() -> None
     assert "カメラパス" in view_editor
 
     graph_editor = page[page.index("function GraphPropertyEditor("):page.index("function ReportPropertyEditor(")]
-    for section in ("グラフ", "構成", "次元", "投影", "スタイル", "系列の既定", "書体", "設定する軸", "表題", "範囲", "目盛", "グリッド", "ケース選択", "系列", "集約", "成果物", "保存先"):
+    for section in ("グラフ", "構成", "次元", "投影", "スタイル", "書体", "設定する軸", "表題", "範囲", "目盛", "グリッド", "ケース選択", "系列", "集約", "成果物", "保存先"):
         assert f'title="{section}"' in graph_editor or f'aria-label="{section}"' in graph_editor
     for output in ("画像", "ベクター", "表データ", "アニメーション"):
         assert f">{output}</option>" in graph_editor
@@ -2008,11 +2008,12 @@ def test_the_graph_rail_is_five_sections_and_one_of_them_is_the_axis() -> None:
     assert "{!axisAuto && <p className=\"property-editor-note warning\">" in page
 
 
-def test_a_graph_series_carries_its_own_appearance_and_can_defer_to_the_theme() -> None:
-    """XC-213 keyed appearance to the series, as the measured reference does (E-124). XC-221 fixed what
-    that left behind: the theme's default and the series' override were two identical pickers with no
-    relationship on screen, and the theme's own value - `auto` - was not among its four options, so that
-    control rendered with nothing selected."""
+def test_a_graph_series_carries_its_own_appearance_and_defers_to_the_applied_asset() -> None:
+    """XC-213 keyed appearance to the series, as the measured reference does (E-124). XC-224 removed the
+    level XC-221 invented between the asset and the series: the reference has no chart-wide series
+    default - its 115 chart properties are axes, legend, annotation and tooltip - so what a series
+    follows comes from the applied style asset, and the style tab reports it rather than re-offering
+    it."""
     page = CHAT_PAGE.read_text(encoding="utf-8")
 
     series = page[page.index("if (tab.id === 'series') return"):page.index("if (tab.id === 'axes') return")]
@@ -2020,20 +2021,49 @@ def test_a_graph_series_carries_its_own_appearance_and_can_defer_to_the_theme() 
     assert "<span>使用する軸</span>" in series
     assert 'label="線" kind="line"' in series
     assert 'label="マーカー" kind="marker"' in series
-    assert 'aria-label={`${activeSeries.label}の色`}' in page
 
-    # the first option is the theme's, drawn as the theme resolves it
-    assert "{ value: 'theme', label: 'テーマ', sample: defaultMarker" in page
+    # the first option is the asset's, drawn as the asset resolves it
+    assert "{ value: 'theme', label: 'テーマ', sample: assetDefaults.marker" in page
+    assert "テーマに従う（{assetDefaults.width} px）" in page
     assert "option.sample ?? option.value" in OPTION_SAMPLES.read_text(encoding="utf-8")
-    # one vocabulary for width in both places, and the series can defer
-    assert "テーマに従う（{defaultWidth} px）" in page
-    assert "既定の太さ" not in page
 
-    # the theme's own control can show its own value
-    assert "useState('circle')" in page
-    assert "useState('auto')" not in page
-    assert '<PropertyGroup title="系列の既定">' in page
-    assert '<PropertyGroup title="プロット">' not in page
+    # and the level between them is gone
+    assert '<PropertyGroup title="系列の既定">' not in page
+    assert "既定のマーカー" not in page
+    assert "setDefaultMarker" not in page and "setDefaultWidth" not in page
+    assert "const styleAssetDefaults: Record<string, { width: string; marker: string; label: string }>" in page
+
+
+def test_each_graph_appearance_property_has_exactly_one_editable_control() -> None:
+    """XC-224: three times the same duplication was reported, and twice it was answered by renaming.
+    This is the check that would have caught it - not what the controls are called, but how many of them
+    can change one thing."""
+    import collections
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    editor = page[page.index("function GraphPropertyEditor("):page.index("function ReportPropertyEditor(")]
+    marks = [(m.group(1), m.start()) for m in re.finditer(r"^  if \(tab\.id === '(\w+)'\) return", editor, re.M)]
+    fallback = re.search(r"^  return <div className=\"property-editor\">", editor, re.M).start()
+    blocks = {name: editor[start:(marks[i + 1][1] if i + 1 < len(marks) else fallback)]
+              for i, (name, start) in enumerate(marks)}
+    blocks["output"] = editor[fallback:]
+
+    APPEARANCE = ("線", "マーカー", "線幅", "配色", "背景")
+    where: dict[str, list[str]] = collections.defaultdict(list)
+    for tab, body in blocks.items():
+        for m in re.finditer(r'<(?:label[^>]*><span>([^<]+)</span>|VisualOptions label="([^"]+)")', body):
+            name = m.group(1) or m.group(2)
+            if name not in APPEARANCE:
+                continue
+            window = body[m.start():m.start() + 300]
+            if "readOnly" in window or "palette-readout" in window:
+                continue  # a read-out is not a control
+            where[name].append(tab)
+
+    for name, tabs in where.items():
+        assert len(tabs) == 1, f"{name} can be changed in {tabs}"
+    assert where["線"] == ["series"]
+    assert where["マーカー"] == ["series"]
+    assert where["配色"] == ["style"]
 
 
 def test_the_graph_item_tab_holds_which_cases_and_no_two_fields_share_a_name() -> None:
