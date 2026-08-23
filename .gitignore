@@ -41,3 +41,7 @@ CLAUDE.local.md
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Scratch files from a working session. Named so that `git add -A` cannot pick one up: three of them
+# reached commits before this rule existed, each removed in a follow-up.
+.tmp_*

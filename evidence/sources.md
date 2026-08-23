@@ -1302,6 +1302,22 @@ can be repeated.
   means the session ended, not that the task succeeded
 - justifies: XC-218
 
+### E-130 - Which of the formats this build reads declares a frame or a unit at all
+- tier: T1
+- url: `D:\Program Files\ParaView 6.2.0intkcgns-pv6.2.dll` and the sibling `vtk*.dll`, read on
+  this machine 2026-08-24
+- says: **of the formats in this stack, CGNS is the one that declares a length unit.** Its library
+  carries `vtkcgns_LengthUnitsName` and the enumeration values `Meter`, `Centimeter`, `Millimeter`,
+  `Foot`, `Inch`, alongside `DataClass_t` and `DimensionalExponents_t` - a file can therefore say what
+  its coordinates mean. Probing the same libraries for `Length_Unit`, `UnitSystem`, `up_axis`, `ZUp` and
+  `metersPerUnit` found none of them, and `CoordinateSystem` appears only in the VTK-m acceleration
+  modules, where it names a mesh's coordinate array rather than a declared frame. **The VTK XML formats
+  this build reads - `.vtu`, `.pvtu`, `.vtp` - and STL declare neither an up axis nor a length unit**,
+  which is why a file in one of them is assumed canonical and the assumption is recorded (ingest/AC-028)
+  rather than read
+- verified: 2026-08-24
+- justifies: XC-230
+
 ## Not verified here
 
 Recorded so that nothing silently depends on them:

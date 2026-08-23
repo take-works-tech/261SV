@@ -24,6 +24,13 @@ is either missing a requirement or is not work this specification asked for.
 - satisfies: AC-029
 - depends_on: TASK-002
 - done_when: an unsupported frame or scale refuses the import and names what it did not support
+- done: 2026-08-24, `domain_core/frame.py`. The rule lives in the domain rather than the reader,
+  because it is about what a coordinate means and because it is then verifiable with no VTK installed.
+  **What the formats actually declare was measured first** (E-130): CGNS declares a length unit, with
+  the enumeration this reader converts; the VTK XML formats and STL declare nothing, so `_declared_frame`
+  returns an empty declaration for every format this build reads today and the criterion's refusal path
+  is exercised by its rule rather than end to end. Adding a format that declares is a change in one
+  place
 
 ### TASK-004 - Field listing with association preserved
 - satisfies: AC-023

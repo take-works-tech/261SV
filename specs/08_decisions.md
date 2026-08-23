@@ -3808,3 +3808,66 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a chart form where two units on one axis is meaningful and conventional, which would
   need the axis to carry both rather than to report the conflict
+
+### XC-229 - A language model writes the code and the sentence; the data never reaches it
+- decided: 2026-08-24
+- status: active
+- decision: **no @Dataset value is sent to a language model, ever.** What a model may receive is
+  structure and the user's words: field names, whether each is held at points or cells, the @Declared unit of a quantity,
+  counts, the @Case and @Part names, the command surface, and the instruction itself. What it may not
+  receive is the numbers those names refer to.
+  A model therefore produces one of two things. **Code or a command sequence**, executed by the product
+  through the same command surface the interface uses (assistant/REQ-001), against the dataset. Or a
+  **statement template with slots** - `最大応力は［値］［単位］でした` - which the product fills from the
+  dataset in the canonical frame, at the @Significant digits the value honestly carries, and then checks
+  against the written standard (XC-104).
+  A number that appears in a deliverable has therefore never been through a model. It was read from the
+  file, computed by this product, and formatted by this product
+- decided_by: the product owner, 2026-08-24
+- rationale: this product's claim is trustworthy numbers, and a value that has passed through a model is
+  a value that may have been altered with nothing downstream able to tell - not because the model is
+  dishonest, but because a token sequence carries no provenance and no arithmetic. The rule also removes
+  a whole class of failure that would otherwise need detecting: a transposed digit, a plausible unit
+  conversion, a rounded figure quoted back as exact. It costs the model the ability to comment on what
+  the numbers *are*, which is why the template carries slots and the product carries the values
+- what_this_forbids: pasting a table of results into a prompt; asking a model to summarise a field;
+  letting a model compute a comparison, a ratio or a maximum; quoting a model's arithmetic anywhere
+- alternatives: sending values and validating the output against the dataset afterwards is what a
+  checking layer would do, and it can only catch a wrong value it can attribute to a field - a sentence
+  that invents a plausible number for a quantity nobody reported passes
+- basis: E-001 (T1)
+- affects: features/assistant/spec.md, 14_reporting_standards.md
+- decidedness: Fixed
+- reversal_trigger: none foreseen; the rule is the product's claim expressed as an architecture
+
+### XC-230 - A reported value is computed in as few operations as the specification allows
+- decided: 2026-08-24
+- status: active
+- decision: the path from a stored value to a reported one is **as short as the meaning permits**, and
+  what it consists of is stated.
+  **No operation consumes a value that was rounded for display.** A displayed figure is an output, never
+  an input: a percentage, a ratio, a difference or a maximum is computed from the stored values, not
+  from what the screen shows.
+  **A conversion happens once, at a stated point.** The canonical frame and unit are applied on load
+  (INV-001, ingest/AC-028) and not re-applied afterwards; nothing converts a second time "to be sure".
+  **A derived quantity is computed from source fields**, and where it is computed from another derived
+  quantity, that chain is what the definition says it is and each step keeps full precision until the
+  last.
+  **Computed once, then reused.** A reduction, an aggregate or a decimation is computed once and cached
+  against its inputs, so the same figure asked for twice is the same figure rather than two roundings of
+  it (ingest/TASK-017)
+- decided_by: the product owner, 2026-08-24
+- rationale: every floating-point operation is a chance to lose a digit, and the losses compound in the
+  order the operations happened to be written. A product whose claim is trustworthy numbers cannot leave
+  that to chance: the shortest path from the file to the figure has the fewest chances to be wrong, and
+  where a path must be long, saying what it is makes the error attributable instead of mysterious. The
+  worst case this rules out is the quiet one - a figure recomputed from a rounded figure, which is
+  wrong by an amount nobody can reconstruct later
+- alternatives: computing in higher precision throughout and rounding only at the end reduces the error
+  without reducing the operations, and does not help when the input was already rounded; it is a
+  complement to this rule rather than a substitute
+- basis: E-001 (T1)
+- affects: 02_invariants.md, 15_derived_quantities.md, features/ingest/tasks.md
+- decidedness: Fixed
+- reversal_trigger: a quantity whose definition genuinely requires a longer chain, which is recorded as
+  part of that quantity rather than as an exception to this
