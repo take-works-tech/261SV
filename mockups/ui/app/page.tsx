@@ -569,7 +569,7 @@ function ProductShell({ scenario, onScreen, draft, onDraftChange, settings, onSe
   const openViewItem = workItemHeaderByScreen.view?.items.find((item) => item.name === (openItems.view ?? workItemHeaderByScreen.view?.items[0].name)) ?? null
   const isComparisonItem = openViewItem?.kind === 'comparison'
   const [comparison, setComparison] = useState<ComparisonModel>({
-    axis: scenario.variant === 'comparison-range' || scenario.variant === 'comparison-columns' ? 'resultPosition' : 'case',
+    axis: scenario.variant === 'comparison-range' || scenario.variant === 'comparison-columns' || scenario.variant === 'comparison-output' ? 'resultPosition' : 'case',
     members: workspaceCases.map((item) => item.name),
     memberMode: scenario.variant === 'comparison-range' || scenario.variant === 'comparison-columns' ? 'range' : 'enumerate',
     rangeCount: scenario.variant === 'comparison-columns' ? 6 : 4,
@@ -1699,7 +1699,7 @@ function RightSidebar({ screen, variant, width, setWidth, selectedViewObjects, o
   const borrowedTabIds = ['camera', 'rendering', 'background', 'objects', 'text', 'materials']
   const isBorrowed = (tabId: string) => screen === 'view' && isComparisonItem && borrowedTabIds.includes(tabId)
   const [selectedByScreen, setSelectedByScreen] = useState<Partial<Record<ScreenId, string>>>({})
-  const variantTab = variant.startsWith('object-') ? 'objects' : variant.startsWith('material-') ? 'materials' : variant === 'steady-result' ? 'output' : variant === 'comparison-borrowed' ? 'materials' : variant === 'cameras' || variant.startsWith('camera-') ? 'camera' : variant === 'output-motion' || variant === 'split-output' ? 'output' : variant === 'develop-grade' ? 'rendering' : variant.includes('output-preflight') ? 'output' : variant === 'series-unresolved' ? 'data' : variant === 'commentary-review' ? 'contents' : undefined
+  const variantTab = variant.startsWith('object-') ? 'objects' : variant.startsWith('material-') ? 'materials' : variant === 'steady-result' ? 'output' : variant === 'comparison-borrowed' ? 'materials' : variant === 'cameras' || variant.startsWith('camera-') ? 'camera' : variant === 'unit-reference' ? 'settings' : variant === 'output-motion' || variant === 'split-output' || variant === 'comparison-output' ? 'output' : variant === 'develop-grade' ? 'rendering' : variant.includes('output-preflight') ? 'output' : variant === 'series-unresolved' ? 'data' : variant === 'commentary-review' ? 'contents' : undefined
   const selectedTab = tabs.find((tab) => tab.id === (selectedByScreen[screen] ?? variantTab)) ?? tabs[0]
 
   if (!selectedTab) return null
@@ -2102,6 +2102,11 @@ function ViewPropertyEditor({ tab, variant, viewItem, onViewItemChange, selected
   const [newCameraKind, setNewCameraKind] = useState<'explicit' | 'object' | 'selection' | 'extremum'>('extremum')
   const [grade, setGrade] = useState<GradePreset>('measurement')
   const hasResultAxis = caseHasResultAxis(selectedCase)
+  // XC-212: a comparison over the result axis pins every pane to its own position, so there is nothing
+  // left to play. Over any other axis the panes advance together along the shared position, which is
+  // the multi-pane video a deliverable actually needs.
+  const axisPinsEveryPane = isComparisonItem && comparison.axis === 'resultPosition'
+  const canWriteVideo = hasResultAxis && !axisPinsEveryPane
   const isComparison = isComparisonItem
   const setComparison = onComparisonChange
   const effectiveMembers = comparisonMemberLabels(comparison)
@@ -2372,21 +2377,30 @@ function ViewPropertyEditor({ tab, variant, viewItem, onViewItemChange, selected
       {/* XC-210: a split is not an export path. Saying so here is the point - this is the tab a user
           opens expecting the side-by-side they are looking at. */}
       {splitPanes > 1 && !isComparisonItem && <div className="property-unresolved"><AlertTriangle size={13} /><span><b>画面分割は書き出しに含まれません</b><small>いま{splitPanes}画面に分けていますが、出力は下で選ぶカメラ1つの絵です。並べた図が必要な場合は、画面上部の「画面レイアウト」から「この比較を保存」で比較項目にします。</small></span></div>}
-      <label><span>種類</span><select value={outputMode} onChange={(event) => setOutputMode(event.target.value as typeof outputMode)}><option value="image">画像</option><option value="video" disabled={!hasResultAxis}>動画{hasResultAxis ? '' : '・この結果には軸がありません'}</option></select></label>
+      <label><span>種類</span><select value={outputMode} onChange={(event) => setOutputMode(event.target.value as typeof outputMode)}><option value="image">画像</option><option value="video" disabled={!canWriteVideo}>動画{hasResultAxis ? '' : '・この結果には軸がありません'}</option></select></label>
+      {axisPinsEveryPane && <div className="property-unresolved"><AlertTriangle size={13} /><span><b>この比較は結果位置を軸にしています</b><small>各ペインが別々の位置に固定されるため、再生する余地がありません。動画にする場合は、軸をケース・カメラなどに変え、結果位置を共有にします。</small></span></div>}
       {!hasResultAxis && <div className="property-unresolved"><AlertTriangle size={13} /><span><b>ケース「{selectedCase}」は定常結果です</b><small>再生する軸がないため、動画とその再生プリセットは選べません。画像とインタラクティブは通常どおり出力できます。</small></span></div>}
       {outputMode === 'image' ? <>
         <label><span>形式</span><select defaultValue="png"><option value="png">PNG</option><option value="jpeg">JPEG</option><option value="tiff">TIFF</option></select></label>
         <label><span>サイズ</span><select defaultValue="1920x1080"><option value="1920x1080">1920 × 1080</option><option value="3840x2160">3840 × 2160</option><option value="viewport">現在の表示領域</option></select></label>
         <label className="property-toggle"><span>背景を透過</span><input type="checkbox" /></label>
-        <label><span>カメラ</span><select defaultValue={viewItem.activeCameraId}>{viewItem.cameras.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
-        <label><span>結果位置</span><select defaultValue="current"><option value="current">現在の位置</option>{viewItem.bookmarks.map((entry) => <option value={entry.id} key={entry.id}>ブックマーク：{entry.name}</option>)}</select></label>
+        {/* XC-212: a @Comparison already fixes both of these - one as the axis it varies, the other as
+            the shared binding in the 比較 tab. Asking again here would be a second control for one
+            value, and the two could disagree in the file that gets sent to someone. */}
+        {isComparisonItem ? <>
+          <label><span>カメラ</span><input value={comparison.axis === 'camera' ? '比較の軸・メンバーごと' : '比較で共有・比較タブで設定'} readOnly /></label>
+          <label><span>結果位置</span><input value={comparison.axis === 'resultPosition' ? '比較の軸・メンバーごと' : '比較で共有・比較タブで設定'} readOnly /></label>
+        </> : <>
+          <label><span>カメラ</span><select defaultValue={viewItem.activeCameraId}>{viewItem.cameras.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
+          <label><span>結果位置</span><select defaultValue="current"><option value="current">現在の位置</option>{viewItem.bookmarks.map((entry) => <option value={entry.id} key={entry.id}>ブックマーク：{entry.name}</option>)}</select></label>
+        </>}
       </> : <>
         <label><span>形式</span><select defaultValue="mp4"><option value="mp4">MP4</option><option value="webm">WebM</option><option value="frames">PNG連番</option></select></label>
         {/* Motion belongs to the timeline, not to the file it is written into (XC-196 correction). */}
         <label><span>タイムライン</span><select value={selectedTimelineId} onChange={(event) => { setSelectedTimelineId(event.target.value); onViewItemChange({ ...viewItem, activeTimelineId: event.target.value }) }}>{viewItem.timelines.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
       </>}
     </PropertyGroup>
-    {outputMode === 'video' && hasResultAxis && <PropertyGroup title="再生プリセット">
+    {outputMode === 'video' && canWriteVideo && <PropertyGroup title="再生プリセット">
       {/* XC-200: a timeline is six values and carries no camera. The video above names one timeline and
           one camera, which is what lets the same motion be replayed from somewhere else. */}
       <div className="named-object-list" role="listbox" aria-label="このビューの再生プリセット">
@@ -3180,6 +3194,9 @@ function AutomationPropertyEditor({ tab, variant, units, onUnitsChange, selected
   const [addedUnit, setAddedUnit] = useState<string | null>(null)
   const flattened = flattenPipelineUnits(units)
   const selectedUnit = flattened.find((unit) => unit.id === selectedUnitId) ?? null
+  const selectedUnitItem = selectedUnit && (selectedUnit.kind === 'view' || selectedUnit.kind === 'graph' || selectedUnit.kind === 'report')
+    ? workItemHeaderByScreen[selectedUnit.kind as ScreenId]?.items.find((item) => item.name === selectedUnit.itemName) ?? null
+    : null
 
   if (tab.id === 'unit') {
     const addUnit = (kind: PipelineUnitKind) => {
@@ -3243,8 +3260,17 @@ function AutomationPropertyEditor({ tab, variant, units, onUnitsChange, selected
           <label><span>名前</span><input value={selectedUnit.title} onChange={(event) => update({ title: event.target.value })} /></label>
           <label><span>種類</span><input value={meta.label} readOnly /></label>
           {selectedUnit.kind === 'case' && <label><span>追加ケース数</span><input type="number" min={0} max={9} value={selectedUnit.addsCases ?? 0} onChange={(event) => update({ addsCases: Number(event.target.value) })} /></label>}
+          {/* XC-211: a unit that produces a @View has to name which one, or the pipeline cannot say what
+              it makes. A comparison is one of the choices, which is how a run produces the same
+              side-by-side figure for every @Case (XC-202). */}
           {(selectedUnit.kind === 'view' || selectedUnit.kind === 'graph' || selectedUnit.kind === 'report') && <>
-            <label><span>参照元</span><select defaultValue="workspace"><option value="workspace">ワークスペース項目</option><option value="template">テンプレート</option></select></label>
+            <label><span>参照元</span><select value={selectedUnit.source ?? 'workspace'} onChange={(event) => update({ source: event.target.value as PipelineUnitModel['source'] })}><option value="workspace">ワークスペース項目</option><option value="template">テンプレート</option></select></label>
+            <label><span>{selectedUnit.source === 'template' ? 'テンプレート' : '項目'}</span><select value={selectedUnit.itemName ?? ''} onChange={(event) => update({ itemName: event.target.value })}>
+              <option value="">選択してください</option>
+              {(workItemHeaderByScreen[selectedUnit.kind as ScreenId]?.items ?? []).map((item) => <option value={item.name} key={item.name}>{item.name}{item.kind === 'comparison' ? '（比較）' : ''}</option>)}
+            </select></label>
+            {!selectedUnit.itemName && <div className="property-unresolved"><AlertTriangle size={13} /><span><b>参照する項目が未選択です</b><small>どの項目を作るかが決まるまで、このユニットは実行できません。既定の項目で代用することはありません。</small></span></div>}
+            {selectedUnitItem?.kind === 'comparison' && <p className="property-editor-note"><ShieldCheck size={12} />比較「{selectedUnit.itemName}」は基準ビュー「{selectedUnitItem.baseViewName}」を1本の軸で振った図です。ケースごとに同じ軸・同じカラーマップで生成されます。</p>}
             <label><span>リビジョン</span><input value="固定" readOnly /></label>
           </>}
         </div>
@@ -3432,6 +3458,9 @@ type PipelineUnitModel = {
   detail: string
   addsCases?: number
   children?: PipelineUnitModel[]
+  // XC-211: which item this unit produces, and whether it comes from the workspace or a template.
+  source?: 'workspace' | 'template'
+  itemName?: string
 }
 
 const pipelineUnitCatalogue: Record<PipelineUnitKind, { label: string; detail: string; icon: typeof Boxes; destructive?: boolean; zone?: boolean }> = {
@@ -3452,11 +3481,11 @@ const pipelineUnitCatalogue: Record<PipelineUnitKind, { label: string; detail: s
 const defaultPipelineUnits: PipelineUnitModel[] = [
   { id: 'unit-cases', kind: 'case', title: 'ケースユニット', detail: '設計スタディの3ケースを明示選択', addsCases: 3 },
   { id: 'unit-loop', kind: 'loop', title: 'ループ・material_variant', detail: '3反復', children: [
-    { id: 'unit-view', kind: 'view', title: 'ビューテンプレート', detail: '技術資料・標準' },
-    { id: 'unit-graph', kind: 'graph', title: 'グラフテンプレート', detail: '比較図' },
+    { id: 'unit-view', kind: 'view', title: 'ビュー・ケース比較', detail: '比較「ケース比較」をケースごとに生成', source: 'workspace', itemName: 'ケース比較' },
+    { id: 'unit-graph', kind: 'graph', title: 'グラフ・ケース比較', detail: 'ケースごとに生成', source: 'workspace', itemName: 'ケース比較グラフ' },
   ] },
   { id: 'unit-condition', kind: 'condition', title: '条件・許容応力の超過', detail: '式：最大応力 > 設計許容応力', children: [
-    { id: 'unit-report', kind: 'report', title: 'レポートテンプレート', detail: '設計レビュー' },
+    { id: 'unit-report', kind: 'report', title: 'レポート・設計レビュー', detail: '超過したケースだけ生成', source: 'workspace', itemName: '設計レビューレポート' },
   ] },
   { id: 'unit-export', kind: 'export', title: '出力ユニット', detail: '新しい実行フォルダーへ書き出し' },
   { id: 'unit-clear', kind: 'clear', title: 'クリアユニット', detail: '読み込み済みデータを解放し対象セットを空にする' },

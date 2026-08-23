@@ -1727,9 +1727,11 @@ def test_motion_follows_the_data_not_only_the_chosen_output_kind() -> None:
     # absent, not disabled
     assert "{caseHasResultAxis(selectedCase) && (playbackVisible" in page
     # video and its preset name the reason instead of being offered
-    assert 'disabled={!hasResultAxis}' in page
+    # the video is refused for two distinct reasons now, and the flag names both (XC-212)
+    assert 'disabled={!canWriteVideo}' in page
+    assert "const canWriteVideo = hasResultAxis && !axisPinsEveryPane" in page
     assert "は定常結果です" in page
-    assert "{outputMode === 'video' && hasResultAxis && <PropertyGroup title=\"再生プリセット\">" in page
+    assert "{outputMode === 'video' && canWriteVideo && <PropertyGroup title=\"再生プリセット\">" in page
 
 
 def test_the_timeline_is_a_group_in_output_and_not_a_rail_tab() -> None:
@@ -1942,3 +1944,34 @@ def test_a_split_is_not_an_export_path_and_the_output_tab_says_so() -> None:
     assert "<label><span>カメラ</span>" in fields
     assert page.count("分割レイアウト") == 2  # the shortcut, and the command it is bound to
     assert "{ name: '分割レイアウトへ入る・出る'" in page
+
+
+def test_a_pipeline_unit_names_the_item_it_produces() -> None:
+    """XC-211: XC-202 claims a pipeline can produce a comparison per case, and the unit editor had no way
+    to say which item at all - only `ワークスペース項目` or `テンプレート`."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "source?: 'workspace' | 'template'" in page
+    assert "itemName?: string" in page
+    assert "workItemHeaderByScreen[selectedUnit.kind as ScreenId]?.items ?? []" in page
+    assert "item.kind === 'comparison' ? '（比較）' : ''" in page
+    # unresolved rather than defaulted (XC-001)
+    assert "{!selectedUnit.itemName && <div className=\"property-unresolved\">" in page
+    assert "既定の項目で代用することはありません。" in page
+    # the seeded pipeline names real items, one of them a comparison
+    assert "itemName: 'ケース比較' }" in page
+
+
+def test_a_comparison_output_reports_its_bindings_instead_of_asking_again() -> None:
+    """XC-212: the output tab was the single-View one unchanged, so it offered a camera picker beside a
+    comparison whose axis was already the camera - two controls for one value, in a file that leaves the
+    building."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "{isComparisonItem ? <>" in page
+    assert "comparison.axis === 'camera' ? '比較の軸・メンバーごと' : '比較で共有・比較タブで設定'" in page
+    assert "comparison.axis === 'resultPosition' ? '比較の軸・メンバーごと' : '比較で共有・比較タブで設定'" in page
+    # a result-axis comparison has nothing left to play, and says so rather than writing stills
+    assert "const axisPinsEveryPane = isComparisonItem && comparison.axis === 'resultPosition'" in page
+    assert "この比較は結果位置を軸にしています" in page
+    assert "{outputMode === 'video' && canWriteVideo && <PropertyGroup" in page

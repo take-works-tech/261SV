@@ -105,6 +105,14 @@
       "href": "?screen=pipeline&variant=failed"
     },
     {
+      "id": "pipeline.unit-reference",
+      "screen": "pipeline",
+      "variant": "unit-reference",
+      "label": "ユニットの参照先",
+      "intent": "11_ui.md「Comparing」・XC-211。ビュー・グラフ・レポートを作るユニットは、どの項目を作るかを名指しする。比較も選べる。未選択なら未解決として実行を拒む。",
+      "href": "?screen=pipeline&variant=unit-reference"
+    },
+    {
       "id": "pipeline.running",
       "screen": "pipeline",
       "variant": "running",
@@ -175,6 +183,14 @@
       "label": "比較・列数を指定",
       "intent": "11_ui.md「Comparing」・XC-205。6メンバーを3列2行に折り返します。行数はメンバー数から決まるため、どの列数でも絵に出ないメンバーは生まれません。",
       "href": "?screen=view&variant=comparison-columns"
+    },
+    {
+      "id": "view.comparison-output",
+      "screen": "view",
+      "variant": "comparison-output",
+      "label": "比較・成果物タブ",
+      "intent": "11_ui.md「Comparing」・XC-212。比較の出力はカメラと結果位置を訊き直さず、軸か共有かを表示する。結果位置を軸にした比較は動画にできない理由を示す。",
+      "href": "?screen=view&variant=comparison-output"
     },
     {
       "id": "view.comparison-overlay",

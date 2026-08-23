@@ -3257,3 +3257,44 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a comparison that cannot express a figure users legitimately need, which would mean
   the split has to become reproducible rather than the export being removed
+
+### XC-211 - A pipeline unit names the item it produces, and will not run until it does
+- decided: 2026-08-23
+- status: active
+- decision: a @Pipeline unit that produces a @View, @Graph or @Report names **which** item - chosen from
+  the workspace items of that kind, or from a template - and a @Comparison is one of the choices. Until
+  an item is named the unit is unresolved and the run is refused; no default item is substituted
+- decided_by: the product owner, 2026-08-23
+- rationale: XC-202 says a @Pipeline can produce one @Comparison per @Case, and the unit editor offered
+  only `ワークスペース項目` or `テンプレート` with no way to say which - so the capability the decision
+  claimed could not be expressed at all. Refusing rather than defaulting is XC-001 applied to a
+  definition: a run that quietly picked the first View would produce forty figures of the wrong thing
+- basis: E-121 (T1)
+- affects: 11_ui.md, 16_application_model.md
+- decidedness: Fixed
+- reversal_trigger: a unit kind whose output is not a workspace item
+
+### XC-212 - A comparison's output writes the grid, and asks nothing its definition already answers
+- decided: 2026-08-23
+- status: active
+- decision: a @Comparison's `出力` tab writes the whole grid as an image or a video. It **does not ask
+  for the camera or the position on the @Result axis**: each is either the axis being varied or the shared
+  binding named in the `比較` tab, and the tab reports which. A comparison whose axis **is** the
+  @Result axis
+  **cannot be written as a video** - every pane is pinned to its own position - and the tab says so and
+  names what to change; over any other axis every pane advances together along the shared position
+- decided_by: the product owner, 2026-08-23
+- rationale: the output tab was the single-@View one, unchanged, so it offered a camera picker beside a
+  comparison whose axis was already the camera. That is two controls for one value with no way to tell
+  which the written file used - the failure this project treats as worse than a missing feature, because
+  the file leaves the building. Reporting the binding instead keeps one definition and still answers the
+  question the tab is opened to answer
+- correction: XC-202 established that a comparison keeps `出力` as its own tab rather than borrowing it,
+  and nothing was done to that tab, so "its own" meant "the View's, applied to something else"
+- alternatives: letting the output tab override the comparison's camera for one export is the flexible
+  reading and produces a file that does not match the item that names it
+- basis: E-123 (T1)
+- affects: 11_ui.md
+- decidedness: Fixed
+- reversal_trigger: a comparison over the result axis that should animate some other axis instead, which
+  would make the video rule depend on two axes rather than one
