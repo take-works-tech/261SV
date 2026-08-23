@@ -913,7 +913,6 @@ function LeftSidebar({ screen, width, setWidth, selectedCase, onSelectCase }: { 
           </div>
         ) : (
           <>
-            <div className="permanent-search"><Search size={13} /><input value={caseQuery} onChange={(event) => setCaseQuery(event.target.value)} placeholder="ケースを検索・タグ絞込" aria-label="ケースを検索" /></div>
             <WorkspaceSourceSections selectedCase={selectedCase} onSelectCase={onSelectCase} query={caseQuery} onQueryChange={setCaseQuery} />
           </>
         )}
@@ -1129,6 +1128,9 @@ function WorkspaceSourceSections({ selectedCase, onSelectCase, query, onQueryCha
   return (
     <>
       <SidebarSection title="ケース" icon={<FolderOpen size={13} />}>
+        {/* XC-217: the field filters cases, so it lives inside the case section. Above the heading it
+            sat over 変数 and 参考資料 as well, claiming a scope it does not have. */}
+        <div className="permanent-search"><Search size={13} /><input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="ケースを検索・タグ絞込" aria-label="ケースを検索" /></div>
         {/* Tag filtering is a permanent control at this scale, not a dialogue (LIM-005). */}
         <div className="case-tag-filter" role="group" aria-label="タグで絞り込む">
           <Tag size={10} />
@@ -2513,7 +2515,9 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
 
   if (tab.id === 'style') return <div className="property-editor">
     <PropertyGroup title="スタイル">
-      <label><span>アセット</span><select defaultValue="technical"><option value="technical">技術資料・標準</option><option value="workspace">ワークスペース設定</option></select></label>
+      {/* XC-216: the rail says which library resource is in effect; the shelf is where one is chosen.
+          The field was called アセット here and スタイル in Report - one name for one thing. */}
+      <label><span>適用中</span><select defaultValue="technical"><option value="technical">技術資料・標準</option><option value="workspace">ワークスペース設定</option></select></label>
       <VisualOptions label="配色" kind="palette" columns={3} value={palette} onChange={setPalette}
         options={[{ value: 'accessible', label: '識別性優先' }, { value: 'monochrome', label: 'モノクロ' }, { value: 'print', label: '印刷向け' }]} />
       <VisualOptions label="背景" kind="background" columns={3} value={chartBackground} onChange={setChartBackground}
@@ -2533,7 +2537,7 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
       <label><span>軸</span><select defaultValue="10"><option value="9">9 pt</option><option value="10">10 pt</option><option value="11">11 pt</option></select></label>
       <label><span>凡例</span><select defaultValue="9"><option value="8">8 pt</option><option value="9">9 pt</option><option value="10">10 pt</option></select></label>
     </PropertyGroup>
-    <p className="property-editor-note"><ShieldCheck size={12} />出力では使用文字を検査し、必要な字体をライセンス条件に従って埋め込みます。再利用するスタイルは素材ライブラリから適用します。</p>
+    <p className="property-editor-note"><ShieldCheck size={12} />出力では使用文字を検査し、必要な字体をライセンス条件に従って埋め込みます。素材ライブラリの「スタイル」は配色とプロットの既定に、「テキスト」は書体に適用されます。ここでは適用後のこのグラフの状態を調整します。</p>
   </div>
 
   if (tab.id === 'axes') return <div className="property-editor">
@@ -2688,7 +2692,7 @@ function ReportPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: stri
       <label><span>図の幅</span><select defaultValue="column"><option value="column">段幅</option><option value="page">ページ幅</option></select></label>
     </PropertyGroup>
     <PropertyGroup title="アートスタイル">
-      <label><span>スタイル</span><select defaultValue="technical"><option value="technical">技術資料・標準</option><option value="workspace">ワークスペース設定</option></select></label>
+      <label><span>適用中</span><select defaultValue="technical"><option value="technical">技術資料・標準</option><option value="workspace">ワークスペース設定</option></select></label>
       <VisualOptions label="配色" kind="palette" columns={3} value={reportPalette} onChange={setReportPalette}
         options={[{ value: 'accessible', label: '識別性優先' }, { value: 'monochrome', label: 'モノクロ印刷' }, { value: 'print', label: '印刷向け' }]} />
       <VisualOptions label="図表" kind="figure" columns={2} value={figureStyle} onChange={setFigureStyle}
@@ -2708,6 +2712,9 @@ function ReportPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: stri
       <label><span>範囲</span><input value="使用グリフのみ" readOnly /></label>
     </PropertyGroup>
     <p className="property-editor-note"><Paintbrush size={12} />テーマは文章や解析値を変更せず、ページ・配色・書体・図表表現だけに適用されます。</p>
+    {/* XC-216: three library categories write into this one tab, and each writes a different group, so
+        applying two of them is not a conflict. Saying which is what makes that readable. */}
+    <p className="property-editor-note"><Grid2X2 size={12} />素材ライブラリの「レイアウト」はページと共通要素、「スタイル」は配色と図表、「テキスト」は書体に適用されます。互いに上書きしません。</p>
     <p className="property-editor-note"><ShieldCheck size={12} />表示できない文字は、空の四角で出力せず要素と文字を特定して報告します。</p>
   </div>
 

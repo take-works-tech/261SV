@@ -3393,3 +3393,52 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a set of appearance options too numerous to draw at a readable size, which would
   make a searchable list with previews the better control
+
+### XC-216 - The shelf chooses a reusable resource; the rail adjusts the item and names what is applied
+- decided: 2026-08-23
+- status: active
+- decision: the centre-bottom @Material library and the right property rail divide as follows, and the
+  interface says so at every seam.
+  **The shelf is the reusable resources**: things that exist independently of the open item and can be
+  applied to many of them - templates, styles, layouts, fonts, materials, backgrounds, objects. It is
+  where one is found and applied, and it keeps the browsing apparatus: Sample/Original, search, tag,
+  sort, preview.
+  **The rail is the open item's current state**: the values in effect now, and a field named **`適用中`**
+  saying which library resource they came from. The same field carries the same name in every area; it
+  was `アセット` in Graph and `スタイル` in Report.
+  **Where several library categories write into one rail tab, each writes a different group and the tab
+  says which.** In Report's theme, `レイアウト` supplies the page and shared elements, `スタイル` the
+  palette and figure treatment, `テキスト` the type - so applying two resources is composition, not a
+  conflict, and the tab states that rather than leaving a reader to guess which one won
+- decided_by: the product owner, 2026-08-23
+- rationale: the division itself is XC-149's and is sound - the measured reference separates the two the
+  same way, with a side panel of things to add and the properties of what is selected reached elsewhere
+  (E-127). What was missing was that the seam is only legible where it is stated: one concept had two
+  names across two areas, Report's theme said nothing about where a reusable theme comes from while
+  Graph's and View's did, and after XC-214 merged three tabs into one theme, three library categories
+  wrote into that one tab with nothing saying they do not overwrite each other
+- alternatives: merging Report's `レイアウト` and `スタイル` into one `テーマ` resource removes the
+  question by removing the ability to change the page without changing the palette; the measured
+  reference keeps layout out of its theme for that reason (E-127)
+- basis: E-127 (T1)
+- affects: 11_ui.md
+- decidedness: Fixed
+- reversal_trigger: two library categories that genuinely write the same property, which would need a
+  stated precedence rather than a statement that they do not overlap
+
+### XC-217 - A filter sits inside the section it filters
+- decided: 2026-08-23
+- status: active
+- decision: the left sidebar's case search is **inside the `ケース` section**, directly above the tag
+  filter, not above the section heading. The general rule: a control that narrows a list is placed
+  within the boundary of that list, so its reach is visible without reading its placeholder
+- decided_by: the product owner, 2026-08-23
+- rationale: the field sat above every section in the sidebar - `ケース`, `変数` and `参考資料` - while
+  filtering only the first. Position is a claim about scope, and this one was wider than the truth; the
+  placeholder said `ケースを検索` but a placeholder disappears as soon as anything is typed. It also sat
+  apart from the tag filter, which narrows the same list and was already inside the section
+- basis: E-120 (T1)
+- affects: 11_ui.md
+- decidedness: Fixed
+- reversal_trigger: a search that genuinely spans the sidebar's sections, which would belong above them
+  and would have to say so in its own label rather than its placeholder

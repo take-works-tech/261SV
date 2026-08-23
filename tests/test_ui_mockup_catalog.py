@@ -1202,7 +1202,11 @@ def test_case_tree_searches_selects_and_confirms_a_deletion_by_its_references() 
     """Selecting a @Case changes the subject of every area, and deleting one is confirmed (XC-062)."""
     page = CHAT_PAGE.read_text(encoding="utf-8")
 
-    assert "value={caseQuery} onChange={(event) => setCaseQuery(event.target.value)}" in page
+    # XC-217: the field is inside the case section, so it reads that section's own query prop
+    assert "value={query} onChange={(event) => onQueryChange(event.target.value)}" in page
+    case_section = page[page.index('<SidebarSection title="ケース"'):page.index('<SidebarSection title="変数"')]
+    assert 'className="permanent-search"' in case_section
+    assert page.count('className="permanent-search"') == 1
     assert "onClick={() => onSelectCase(item.name)}" in page
     assert "selectedCase={selectedCase}" in page
     assert "references: [" in page
@@ -2082,3 +2086,33 @@ def test_settings_that_are_not_about_appearance_stay_as_text() -> None:
         assert text_only in page, text_only
     assert 'kind="format"' not in page
     assert 'kind="unit"' not in page
+
+
+def test_the_shelf_and_the_rail_name_their_seam_the_same_way_everywhere() -> None:
+    """XC-216: the shelf chooses a reusable resource, the rail adjusts the item and names what is
+    applied. The field was called アセット in Graph and スタイル in Report - one concept, two names."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert page.count("<span>適用中</span>") == 2
+    assert "<span>アセット</span>" not in page
+    # the rail never grows the shelf's browsing apparatus (XC-149)
+    rail = page[page.index("function GraphPropertyEditor("):page.index("function SimulationPropertyEditor(")]
+    for browser in ("library-source", "library-sort", "library-tag", "setSource(", "setSort("):
+        assert browser not in rail, browser
+    # a template is named as provenance, not as a live binding: XC-109 makes it a copy with no link
+    assert '<label><span>テンプレート</span><input value="技術メモ・サンプル / リビジョン未接続" readOnly />' in rail
+
+
+def test_every_rail_tab_fed_by_the_library_says_which_category_feeds_it() -> None:
+    """XC-216: after XC-214 merged three tabs into one theme, three library categories write into that
+    one tab. Saying which group each supplies is what makes applying two of them readable as composition
+    rather than a conflict."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "素材ライブラリの「レイアウト」はページと共通要素、「スタイル」は配色と図表、「テキスト」は書体に適用されます。互いに上書きしません。" in page
+    assert "素材ライブラリの「スタイル」は配色とプロットの既定に、「テキスト」は書体に適用されます。" in page
+    assert "再利用する背景は素材ライブラリから適用し、このタブでは現在のビューへの配置を調整します。" in page
+    # the library still offers those categories, so the statement is about something that exists
+    categories = page[page.index("const libraryCategories"):page.index("const libraryCategoryMeta")]
+    assert "graph: ['template', 'style', 'fonts']" in categories
+    assert "report: ['template', 'layout', 'style', 'fonts']" in categories
