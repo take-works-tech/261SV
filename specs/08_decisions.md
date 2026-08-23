@@ -3721,3 +3721,32 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a rail where the distinguishing prefixes make every label too long for its column,
   which would mean the rail has too many properties rather than that the rule is wrong
+
+### XC-226 - The graph rail divides what a series is from how it looks
+- decided: 2026-08-23
+- status: active
+- decision: **`系列` holds what each series plots** - its X source, Y quantity, @Declared unit,
+  @Provenance, missing-value policy and the axis it is read against - and **`スタイル` holds how it
+  looks**, per series: colour, line style, width and marker, beneath the chart-wide palette, background
+  and type. **Both address the same selection**: a chip row in `スタイル` and the list in `系列` set the
+  same series, so no list is repeated and switching tabs keeps the series you were working on.
+  Appearance stays **per series**. That is not what changes here
+- decided_by: the product owner, 2026-08-23
+- rationale: the two are different kinds of work - deciding what a figure shows, and making it readable -
+  and the owner reads the rail that way. The measurement constrains the **model**, not the panel: E-124
+  says appearance is keyed to the series and addressed by series name, which this keeps, and it also
+  records that the reference groups the series' parameters separately from the array selection. A panel
+  that follows the selected element is the measured behaviour of the other reference (E-125)
+- correction: XC-213 moved appearance onto the series row and argued against exactly this split, on the
+  grounds that it means editing one series' look and its quantity in two tabs. What XC-213 was actually
+  fixing was appearance that could only be set **chart-wide**, which left several series
+  indistinguishable; it over-corrected from "not global" to "on the same row". Sharing the selection
+  answers the two-tab objection, which is what the reference does anyway
+- alternatives: a table in `スタイル` with one row per series and a column per property matches the
+  reference's own grouping most closely and does not fit four properties across a 286-pixel rail;
+  keeping everything on the series row is what three rounds of review kept objecting to
+- basis: E-124 (T1), E-125 (T1)
+- affects: 11_ui.md, 16_application_model.md
+- decidedness: Fixed
+- reversal_trigger: users reporting that they cannot find where a series' colour is set, which would
+  mean the shared selection is not visible enough to carry the split

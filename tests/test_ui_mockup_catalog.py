@@ -2008,30 +2008,35 @@ def test_the_graph_rail_is_five_sections_and_one_of_them_is_the_axis() -> None:
     assert "{!axisAuto && <p className=\"property-editor-note warning\">" in page
 
 
-def test_a_graph_series_carries_its_own_appearance_and_defers_to_the_applied_asset() -> None:
-    """XC-213 keyed appearance to the series, as the measured reference does (E-124). XC-224 removed the
-    level XC-221 invented between the asset and the series: the reference has no chart-wide series
-    default - its 115 chart properties are axes, legend, annotation and tooltip - so what a series
-    follows comes from the applied style asset, and the style tab reports it rather than re-offering
-    it."""
+def test_the_graph_rail_divides_what_a_series_is_from_how_it_looks() -> None:
+    """XC-226: 系列 holds what each series plots; スタイル holds how each series looks, per series, and
+    both address the same selection. XC-213 was right that appearance cannot be chart-wide - several
+    series would be indistinguishable - and wrong to conclude it must therefore sit on the data row."""
     page = CHAT_PAGE.read_text(encoding="utf-8")
+    editor = page[page.index("function GraphPropertyEditor("):page.index("function ReportPropertyEditor(")]
+    series = editor[editor.index("if (tab.id === 'series') return"):editor.index("if (tab.id === 'axes') return")]
+    style = editor[editor.index("if (tab.id === 'style') return"):]
 
-    series = page[page.index("if (tab.id === 'series') return"):page.index("if (tab.id === 'axes') return")]
-    assert "<span>色</span>" in series
-    assert "<span>使用する軸</span>" in series
-    assert 'label="線" kind="line"' in series
-    assert 'label="マーカー" kind="marker"' in series
+    # what it plots
+    for field in ("<span>X</span>", "<span>Y</span>", "<span>単位</span>", "<span>来歴</span>", "<span>使用する軸</span>"):
+        assert field in series, field
+    assert 'kind="line"' not in series and 'kind="marker"' not in series
+    assert "<span>色</span>" not in series
 
-    # the first option is the asset's, drawn as the asset resolves it
+    # how it looks, per series, in the style tab
+    assert '<PropertyGroup title="系列の外観">' in style
+    assert "<span>色</span>" in style
+    assert 'label="線" kind="line"' in style
+    assert 'label="マーカー" kind="marker"' in style
+
+    # one selection, addressed from both
+    assert 'className="series-chips"' in style
+    assert "onClick={() => setActiveSeriesId(series.id)}" in style
+    assert page.count("const [activeSeriesId, setActiveSeriesId]") == 1
+
+    # still deferring to the applied asset, not to a chart-wide control (XC-224)
     assert "{ value: 'theme', label: 'テーマ', sample: assetDefaults.marker" in page
-    assert "テーマに従う（{assetDefaults.width} px）" in page
-    assert "option.sample ?? option.value" in OPTION_SAMPLES.read_text(encoding="utf-8")
-
-    # and the level between them is gone
     assert '<PropertyGroup title="系列の既定">' not in page
-    assert "既定のマーカー" not in page
-    assert "setDefaultMarker" not in page and "setDefaultWidth" not in page
-    assert "const styleAssetDefaults: Record<string, { width: string; marker: string; label: string }>" in page
 
 
 def test_each_graph_appearance_property_has_exactly_one_editable_control() -> None:
@@ -2061,8 +2066,9 @@ def test_each_graph_appearance_property_has_exactly_one_editable_control() -> No
 
     for name, tabs in where.items():
         assert len(tabs) == 1, f"{name} can be changed in {tabs}"
-    assert where["線"] == ["series"]
-    assert where["マーカー"] == ["series"]
+    # appearance is now all in one tab, and it is the style tab (XC-226)
+    assert where["線"] == ["style"]
+    assert where["マーカー"] == ["style"]
     assert where["配色"] == ["style"]
 
 
