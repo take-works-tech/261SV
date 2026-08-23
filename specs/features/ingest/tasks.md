@@ -76,6 +76,15 @@ is either missing a requirement or is not work this specification asked for.
 - depends_on: TASK-005, TASK-009
 - done_when: a CGNS file carrying dimensional units still reports the unit as undeclared, and the
   interface says the file has unit information the reader does not read
+- done: 2026-08-24, `domain_core/frame.py` and `engine/reader.py`. Both halves are rules rather than a
+  CGNS path, because **this build has no CGNS reader** and its fixture cannot be written (XC-085). The
+  first half holds by construction and is asserted: nothing in the reader ever sets a unit, so a field
+  is undeclared whatever the file carried. The second is enforced where a reader is added -
+  `FORMATS_CARRYING_UNIT_INFORMATION` records, from measurement (E-130), that CGNS carries `LengthUnits`
+  and `DimensionalExponents` and that no other format in this stack carries any, and `ReaderChoice`
+  **refuses to be constructed** for such a format unless it either reads that information or states that
+  it does not. The statement reaches the interface through `support_level`, beside the other known gaps
+  (AC-032), so nothing new has to be asked for it
 
 ### TASK-012 - Time series and partitioned sets as one Case
 - satisfies: AC-026

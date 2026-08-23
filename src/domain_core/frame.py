@@ -27,6 +27,15 @@ LENGTH_UNITS_IN_METRES: dict[str, float] = {
     "Inch": 0.0254,
 }
 
+# Which formats can carry unit information at all, and what they carry. Measured, not assumed (E-130):
+# CGNS declares `LengthUnits` and `DimensionalExponents`, and no other format in this stack declares a
+# unit. A format listed here whose reader does not read that information has to say so - a file that
+# knows its own units, opened by a reader that ignores them, must not leave a user believing the unit
+# came through (ingest/AC-034).
+FORMATS_CARRYING_UNIT_INFORMATION: dict[str, str] = {
+    ".cgns": "LengthUnits and DimensionalExponents",
+}
+
 # The up axes this reader can bring to the canonical frame. A file declaring anything else is refused
 # rather than rotated on a guess: a rotation applied to the wrong axis produces geometry that looks
 # plausible and measures wrongly (ingest/AC-029).

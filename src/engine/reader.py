@@ -32,7 +32,13 @@ from vtkmodules.vtkIOXML import (
 )
 
 from domain_core.dataset import Association, Dataset, Field, SourceFrame
-from domain_core.frame import CANONICAL_SCALE, CANONICAL_UP, FrameDeclaration, resolve_frame
+from domain_core.frame import (
+    CANONICAL_SCALE,
+    CANONICAL_UP,
+    FORMATS_CARRYING_UNIT_INFORMATION,
+    FrameDeclaration,
+    resolve_frame,
+)
 
 class UnsupportedFormatError(Exception):
     """Raised for a file this build has no reader for. Names the format rather than failing vaguely."""
@@ -62,6 +68,18 @@ class ReaderChoice:
     factory: type
     support_level: str  # "Verified" | "Offered"
     known_gaps: str = ""
+    # What unit information the file may carry that this reader does not read. Empty means the format
+    # carries none - which is the measured case for every format in this build (E-130) - not that the
+    # question was skipped.
+    unread_unit_information: str = ""
+
+    def __post_init__(self) -> None:
+        carried = FORMATS_CARRYING_UNIT_INFORMATION.get(self.suffix)
+        if carried and not self.unread_unit_information:
+            raise ValueError(
+                f"{self.suffix} files carry {carried}; a reader for them must either read it or say "
+                f"that it does not (ingest/AC-034)"
+            )
 
 
 _READERS: dict[str, ReaderChoice] = {
@@ -159,11 +177,17 @@ def read(path: str | Path) -> Dataset:
 
 
 def support_level(path: str | Path) -> tuple[str, str]:
-    """The level this product promises for a file's format, and the reader's known gaps (AC-032)."""
+    """The level this product promises for a file's format, and the reader's known gaps (AC-032).
+
+    An unread unit declaration is one of those gaps (AC-034): the unit stays undeclared either way, and
+    the difference between "this file said nothing" and "this file said something we did not read" is
+    the user's to know, because only one of the two can be fixed by asking the solver.
+    """
     choice = _READERS.get(Path(path).suffix.lower())
     if choice is None:
         return "Absent", "no reader for this format in this build"
-    return choice.support_level, choice.known_gaps
+    gaps = [gap for gap in (choice.known_gaps, choice.unread_unit_information) if gap]
+    return choice.support_level, "; ".join(gaps)
 
 
 def is_unstructured(data: vtkDataSet) -> bool:
