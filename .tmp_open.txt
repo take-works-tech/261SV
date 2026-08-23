@@ -1,0 +1,40 @@
+OPEN-012 | Which solvers the first customers actually use
+    blocks: (not stated)
+OPEN-001 | Which renderer backends ship, and which is the default
+    blocks: (not stated)
+OPEN-002 | What a Diff means between meshes that differ
+    blocks: (not stated)
+OPEN-003 | The canonical frame and unit policy
+    blocks: (not stated)
+OPEN-004 | Whether Omniverse can be embedded and redistributed
+    blocks: (not stated)
+OPEN-005 | Automatic hierarchy and variable inference on import
+    blocks: (not stated)
+OPEN-006 | How far generated visual configurations may go
+    blocks: (not stated)
+OPEN-007 | How the product verifies its own licence offline
+    blocks: (not stated)
+OPEN-011 | Build VTK from source, or accept the gl2ps obligation
+    blocks: (not stated)
+OPEN-008 | The capacity limits are placeholders until measured
+    blocks: (not stated)
+OPEN-013 | What the pipeline view shows, and whether it can be edited
+    blocks: (not stated)
+OPEN-016 | Which background kinds ship
+    blocks: nothing. The rules that constrain any background are settled (XC-119), the budget exists (LIM-009), and a kind can be added at the same seam as any other asset
+OPEN-015 | How much variation one workspace should span
+    blocks: nothing today - the product does not enforce a boundary, and templates already report what they cannot resolve. It becomes urgent if the product ever starts assuming homogeneity for speed
+OPEN-017 | What the latency budgets should be
+    blocks: nothing today; the budgets exist as limits and are enforced once numbered
+OPEN-014 | How many loop iterations is too many
+    blocks: nothing - the limit is enforced and reported, so the cost of it being wrong is a refusal a user can report rather than a study that silently truncated
+OPEN-022 | Whether the mockup may show a number at all, given that it may not invent one
+    blocks: nothing today. The catalogue is design states and never evidence of implemented behaviour
+OPEN-021 | Which of the remaining colour literals should become tokens, and as which role
+    blocks: nothing today. The catalogue is design states and never shipped code; XC-187 governs the product interface, which does not exist yet and can be built with the layering from the first line
+OPEN-020 | How the append-only rule is enforced on the server, not only on this machine
+    blocks: **XC-218, as of 2026-08-23.** Automatic merge needs a gate that a change cannot walk past, and with no server-side enforcement the gate is a workflow in the same repository the change is edi
+OPEN-019 | Whether to move the engine from VTK 9.5.2 to 9.7.x, and what it costs to do so
+    blocks: nothing today. 9.5.2 is pinned, checked by XC-185, and every value describing it is true of it
+OPEN-018 | Measured hostile MaterialX parser and image limits
+    blocks: (not stated)

@@ -32,12 +32,7 @@ from vtkmodules.vtkIOXML import (
 )
 
 from domain_core.dataset import Association, Dataset, Field, SourceFrame
-
-# Metres, Z up. A file that declares something else is converted on load; a file that declares nothing
-# is assumed to be in these already, and the assumption is recorded rather than hidden (AC-028).
-CANONICAL_UP = "Z"
-CANONICAL_SCALE = 1.0
-
+from domain_core.frame import CANONICAL_SCALE, CANONICAL_UP, FrameDeclaration, resolve_frame
 
 class UnsupportedFormatError(Exception):
     """Raised for a file this build has no reader for. Names the format rather than failing vaguely."""
@@ -45,6 +40,18 @@ class UnsupportedFormatError(Exception):
 
 class UnreadableFileError(Exception):
     """Raised when a supported format cannot be read: truncated, damaged, or empty of geometry."""
+
+
+def _declared_frame(path: Path, data: vtkDataSet | None) -> FrameDeclaration:
+    """What this file declares about its frame.
+
+    Every format this build reads declares **nothing**: the VTK XML formats carry no frame or unit
+    field, and STL carries geometry alone (E-130). So this returns an empty declaration today, and the
+    assumption that the file is already canonical is what gets recorded (AC-028). It exists as a step
+    rather than as a comment so that a format which does declare - CGNS, with its `LengthUnits`
+    enumeration - is read here and validated by the same rule, instead of at whatever call site adds it.
+    """
+    return FrameDeclaration()
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,17 +137,22 @@ def read(path: str | Path) -> Dataset:
     if data is None or data.GetNumberOfPoints() == 0:
         raise UnreadableFileError(f"{location.name} was read by {choice.factory.__name__} but contains no points")
 
+    up_axis, scale = resolve_frame(_declared_frame(location, data))
+
     fields = _fields(data)
     surface = _as_surface(data)
     points = vtk_to_numpy(surface.GetPoints().GetData()).astype(np.float64, copy=True)
 
+    # One multiplication, at one point, and only when it changes the value. XC-230: a conversion happens
+    # once at a stated place, and `* 1.0` on every coordinate of every dataset is an operation that can
+    # only lose precision and never adds any.
     return Dataset(
-        points_m=points * CANONICAL_SCALE,
+        points_m=points if scale == CANONICAL_SCALE else points * scale,
         cells=_cells_as_indices(surface),
         fields=fields,
         source=SourceFrame(
-            up_axis=CANONICAL_UP,
-            scale_to_metres=CANONICAL_SCALE,
+            up_axis=up_axis,
+            scale_to_metres=scale,
             reader=choice.factory.__name__,
         ),
     )

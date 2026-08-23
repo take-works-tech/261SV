@@ -1,0 +1,27 @@
+TASK-001 [done] AC-020   Reader entry point returning a Dataset
+TASK-002 [done] AC-028   Canonical frame conversion on load
+TASK-003 [    ] AC-029   Refuse frames the reader does not support
+TASK-004 [done] AC-023   Field listing with association preserved
+TASK-005 [done] AC-024   Undeclared units everywhere
+TASK-006 [done] AC-025   Undeclared marker survives display and export
+TASK-007 [done] AC-020   Drop to load in the shell
+TASK-008 [done] AC-021   Unsupported and unreadable files
+TASK-009 [done] AC-032   Support level table and its display
+TASK-010 [done] AC-033   Named gaps for Offered formats
+TASK-011 [    ] AC-034   Units present in the file but unread
+TASK-012 [    ] AC-026   Time series and partitioned sets as one Case
+TASK-013 [    ] AC-027   Partial sets marked, and the mark propagated
+TASK-014 [    ] AC-027   Boundary points counted once
+TASK-015 [    ] AC-030   Reduction for display, marked
+TASK-016 [    ] AC-031   Numbers computed on the full dataset
+TASK-017 [    ] AC-030   Reduction computed once and cached
+TASK-018 [    ] AC-035   Preserve source identifiers
+TASK-019 [    ] AC-036   Absent identifiers stated
+TASK-020 [    ] AC-037   Measurement data import
+TASK-021 [    ] AC-038   Uncertainty travels with a measured value
+TASK-022 [    ] AC-039   Undeclared measured units
+TASK-023 [    ] AC-040   Integration-point values read as written
+TASK-024 [    ] AC-041   Modal results
+TASK-025 [    ] AC-042   Harmonic results stay complex
+TASK-026 [    ] AC-043   Unknown result kinds
+TASK-027 [    ] AC-044   Mixed axes are stated
