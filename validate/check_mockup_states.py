@@ -93,19 +93,26 @@ def main() -> int:
     for scenario in scenarios:
         url = f"{base.rstrip('/')}/?screen={scenario['screen']}&variant={scenario['variant']}"
         body, error = render(browser, url)
-        if error:
-            findings.append(f"{scenario['id']}: {error}")
-            continue
-        if RENDERED_MARKER not in body:
-            findings.append(f"{scenario['id']}: the document is not this application - no {RENDERED_MARKER!r} in it")
-            # The first state already says there is nothing to sweep. Eighty-seven more browser launches
-            # against the same address add no information and take four minutes to say so.
-            if scenario is scenarios[0]:
-                print(f"[mockup state] {findings[0]}")
-                print()
-                print(f"Stopped at the first state: {base} is not serving this application.")
-                return 1
-        elif len(body) < MINIMUM_DOCUMENT_BYTES:
+        # A browser launch can fail for reasons that have nothing to do with the page. One sweep in four
+        # reported a single finding that three later sweeps of the same build did not, and the run was
+        # gone before it could be read. A state that fails is therefore rendered a second time, and both
+        # attempts are reported - a flake says so instead of looking like a defect, and a defect still
+        # fails twice.
+        if error or RENDERED_MARKER not in body:
+            first = error or f"{len(body)} bytes, no {RENDERED_MARKER!r}"
+            body, error = render(browser, url)
+            second = error or ("rendered" if RENDERED_MARKER in body else f"{len(body)} bytes, no {RENDERED_MARKER!r}")
+            if not error and RENDERED_MARKER in body:
+                print(f"[mockup state] {scenario['id']}: first attempt {first}, second attempt {second} - not counted")
+            else:
+                findings.append(f"{scenario['id']}: {first}, and again on retry: {second}")
+                if scenario is scenarios[0]:
+                    print(f"[mockup state] {findings[0]}")
+                    print()
+                    print(f"Stopped at the first state: {base} is not serving this application.")
+                    return 1
+                continue
+        if len(body) < MINIMUM_DOCUMENT_BYTES:
             findings.append(f"{scenario['id']}: {len(body)} bytes, below the {MINIMUM_DOCUMENT_BYTES} floor")
         for marker in FAILURE_MARKERS:
             if marker in body:

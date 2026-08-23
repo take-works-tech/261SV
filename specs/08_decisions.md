@@ -3462,6 +3462,12 @@ model or the prompt, never in a description that quietly went stale.
   skipped or neutral; and it touches nothing under `.github/`, `validate/` or `.claude/`.
   **Every branch leaves without merging.** An answer the job cannot read, a check still running, a count
   it did not expect: each ends the run having merged nothing. An error in the job merges nothing at all.
+  **A pull request in conflict receives no checks at all**, so it never reaches those conditions: GitHub
+  does not run `pull_request` workflows while the merge commit cannot be computed. Measured 2026-08-23
+  on pull request #20, which sat with no check run of any kind while a manual dispatch on the same ref
+  ran normally; the cause was `mergeStateStatus: DIRTY`, and merging `main` into the branch produced the
+  event. This is correct - a conflicted change must not merge - and it reads exactly like the mechanism
+  being broken, so it is written down here rather than rediscovered.
   **What this accepts, stated rather than discovered later.** Everything outside those three directories
   merges unread - including `specs/`, `AGENTS.md` and `evidence/`, the documents that authorise the
   arrangement. And nothing enforces that work arrives by pull request: a direct push to `main` skips
@@ -3750,3 +3756,27 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: users reporting that they cannot find where a series' colour is set, which would
   mean the shared selection is not visible enough to carry the split
+
+### XC-227 - An object's tab separates what it is from how it is drawn, by group
+- decided: 2026-08-24
+- status: active
+- decision: the division XC-226 made across two tabs in the Graph rail is made **by group** in the
+  @View object tab, because there is only one tab there - the selected object's. For every object type,
+  the first group holds **what the object is** (its role, its source, the field it reads, the frame that
+  field is in) and a later group holds **how it is drawn** (representation, opacity, glyph, point size,
+  colour, edges). A scalar field already read this way, with `色と範囲` separate from the field
+  selection; mesh, vector field, trajectory and point cloud did not
+- decided_by: the product owner, 2026-08-24
+- rationale: the owner's argument for the Graph rail - that deciding what a figure shows and making it
+  readable are two kinds of work - is about the work, not about tabs, so it applies wherever both kinds
+  sit together. The object tab cannot use the same answer as the Graph rail because there is nothing to
+  split into: a second tab for an object's appearance would be a tab whose contents change with the
+  selection twice over. Groups are the unit available, and a collapsed group is a section a reader can
+  skip, which is most of what the split buys
+- alternatives: moving appearance to the `マテリアル` tab confuses a display setting with a surface
+  @Asset - a representation is not a material - and leaves the object tab holding only two fields
+- basis: E-124 (T1), E-125 (T1)
+- affects: 11_ui.md, 16_application_model.md
+- decidedness: Fixed
+- reversal_trigger: an object type whose appearance is one field, where a group of its own is heavier
+  than the field

@@ -2916,10 +2916,10 @@ function ObjectTypeProperties({ kind }: { kind: ViewObjectKind }) {
       <details className="property-group" open><summary><ChevronRight size={12} /><b>メッシュ</b></summary><div className="property-fields">
         <label><span>役割</span><input value={kind === 'analysis-mesh' ? '解析' : '参照'} readOnly /></label>
         <label><span>参照元</span><input value={kind === 'analysis-mesh' ? 'データセット・未接続' : '参照形状・未接続'} readOnly /></label>
-        <VisualOptions label="表示形式" kind="representation" columns={3} value={meshRepresentation} onChange={(value) => setMeshRepresentation(value as MeshRepresentation)}
-          options={[{ value: 'surface', label: 'サーフェス' }, { value: 'surface-edges', label: 'サーフェス＋エッジ' }, { value: 'wireframe', label: 'ワイヤーフレーム' }]} />
       </div></details>
       <details className="property-group" open><summary><ChevronRight size={12} /><b>表示</b></summary><div className="property-fields">
+        <VisualOptions label="表示形式" kind="representation" columns={3} value={meshRepresentation} onChange={(value) => setMeshRepresentation(value as MeshRepresentation)}
+          options={[{ value: 'surface', label: 'サーフェス' }, { value: 'surface-edges', label: 'サーフェス＋エッジ' }, { value: 'wireframe', label: 'ワイヤーフレーム' }]} />
         <label className="property-toggle"><span>表示する</span><input type="checkbox" defaultChecked /></label>
         <label><span>表示不透明度</span><div className="property-range"><input type="range" min="0" max="100" defaultValue="100" /><output>100%</output></div></label>
       </div></details>
@@ -2955,6 +2955,8 @@ function ObjectTypeProperties({ kind }: { kind: ViewObjectKind }) {
       <details className="property-group" open><summary><ChevronRight size={12} /><b>ベクトル場</b></summary><div className="property-fields">
         <label><span>フィールド</span><select defaultValue="unresolved"><option value="unresolved">未接続</option></select></label>
         <label><span>座標系</span><select defaultValue="global"><option value="global">グローバル直交</option></select></label>
+      </div></details>
+      <details className="property-group" open><summary><ChevronRight size={12} /><b>グリフ</b></summary><div className="property-fields">
         <VisualOptions label="グリフ" kind="glyph" columns={2} value={glyphShape} onChange={setGlyphShape}
           options={[{ value: 'arrow', label: '矢印' }, { value: 'line', label: '線' }]} />
         <label><span>密度</span><div className="property-range"><input type="range" min="1" max="10" defaultValue="4" /><output>低</output></div></label>
@@ -2969,6 +2971,8 @@ function ObjectTypeProperties({ kind }: { kind: ViewObjectKind }) {
         <label><span>ベクトル場</span><select defaultValue="unresolved"><option value="unresolved">未接続</option></select></label>
         <label><span>シード</span><select defaultValue="unresolved"><option value="unresolved">未定義</option></select></label>
         <label><span>積分器</span><select defaultValue="rk45"><option value="rk45">Runge–Kutta 4/5</option></select></label>
+      </div></details>
+      <details className="property-group" open><summary><ChevronRight size={12} /><b>表現</b></summary><div className="property-fields">
         <label><span>表現</span><select defaultValue="tube"><option value="tube">チューブ</option><option value="line">線</option></select></label>
       </div></details>
       <div className="property-unresolved"><AlertTriangle size={13} /><span><b>描画条件が未解決です</b><small>フィールドとシードを指定するまで形状を生成しません。</small></span></div>
@@ -2976,12 +2980,16 @@ function ObjectTypeProperties({ kind }: { kind: ViewObjectKind }) {
   }
 
   if (kind === 'point-cloud') {
-    return <details className="property-group" open><summary><ChevronRight size={12} /><b>点群</b></summary><div className="property-fields">
+    return <>
+      <details className="property-group" open><summary><ChevronRight size={12} /><b>点群</b></summary><div className="property-fields">
       <label><span>参照元</span><input value="点データ・未接続" readOnly /></label>
+    </div></details>
+    <details className="property-group" open><summary><ChevronRight size={12} /><b>表示</b></summary><div className="property-fields">
       <label><span>点サイズ</span><div className="property-range"><input type="range" min="1" max="10" defaultValue="3" /><output>3 px</output></div></label>
       <label><span>色</span><select defaultValue="uniform"><option value="uniform">一様色</option><option value="field">値による色</option></select></label>
       <label className="property-toggle"><span>表示する</span><input type="checkbox" defaultChecked /></label>
     </div></details>
+    </>
   }
 
   if (kind === 'annotation') {
