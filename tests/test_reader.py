@@ -162,7 +162,12 @@ def test_geometry_is_float_and_three_dimensional(tmp_path: Path) -> None:
 
 class TestUnreadUnitInformation:
     """ingest/AC-034, at the reader table. The rule is enforced when the table is built, so a reader
-    added for a format that carries units cannot be added silently."""
+    added for a format that carries units cannot be added silently.
+
+    The other half of AC-034 - the unit staying undeclared whatever the file carried - is
+    `test_no_unit_is_declared_on_load` above, which already asserts it for AC-023. One assertion rather
+    than two: a duplicate passes while the original is deleted.
+    """
 
     def test_a_reader_for_a_format_carrying_units_must_state_the_gap(self) -> None:
         from engine.reader import ReaderChoice
@@ -197,11 +202,3 @@ class TestUnreadUnitInformation:
 
         assert level == "Verified"
         assert "one gap" in gaps and "LengthUnits" in gaps
-
-    def test_a_read_field_has_no_unit_whatever_the_file_carried(self, tmp_path: Path) -> None:
-        """The half that must hold for every format: nothing in this product fills a unit in (XC-003)."""
-        from engine.reader import read
-
-        dataset = read(_write_grid(tmp_path / "units.vtu"))
-        assert dataset.fields
-        assert all(field.unit is None for field in dataset.fields.values())
