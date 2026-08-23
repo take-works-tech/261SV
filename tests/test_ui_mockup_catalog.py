@@ -180,7 +180,7 @@ def test_dataset_components_live_in_the_view_outliner_not_the_left_sidebar() -> 
     assert re.search(r"\.outliner-panel\s*\{[^}]*background: #f7f9fa", styles)
     assert re.search(r"\.outliner-header\s*\{[^}]*background: #edf2f5", styles)
     assert ".outliner-row { --tree-indent: 0px; position: relative; height: 27px;" in styles
-    assert ".outliner-row b { overflow: hidden; padding-left: 2px; font-size: 10px;" in styles
+    assert ".outliner-row b { overflow: hidden; padding-left: 2px; font-size: var(--text-emphasis);" in styles
     assert re.search(r"\.outliner-row\.selected\.active\s*\{[^}]*background: #dceafe", styles)
     assert re.search(r"\.outliner-row\.selected\.active\s*\{[^}]*box-shadow: inset 2px 0 var\(--blue\)", styles)
     assert 'className="outliner-hint"' not in page
@@ -250,7 +250,7 @@ def test_chat_left_sidebar_returns_to_conversation_history() -> None:
 
     assert "const chat = screen === 'chat'" in left_sidebar
     assert "className=\"conversation-list\"" in left_sidebar
-    assert "<WorkspaceSourceSections />" in left_sidebar
+    assert "<WorkspaceSourceSections selectedCase={selectedCase}" in left_sidebar
     assert "className=\"permanent-search\"" in left_sidebar
     assert "conversation-search" in left_sidebar
     assert "新しいチャット" in left_sidebar
@@ -372,7 +372,7 @@ def test_non_chat_right_sidebar_uses_a_vertical_icon_rail_with_a_visible_active_
     assert 'aria-orientation="vertical"' in page
     assert 'role="tabpanel"' in page
     assert 'aria-selected={active}' in page
-    assert 'data-tooltip={tab.label}' in page
+    assert 'data-tooltip={isBorrowed(tab.id) ? `${tab.label}・基準ビューの設定` : tab.label}' in page
     assert "selectedTab.label" in page
     assert "sidebar-tab-panel-title" in page
     assert "<small>{screenNames[screen]}</small>" not in page
@@ -414,12 +414,17 @@ def test_view_playback_controls_float_over_the_canvas_on_hover() -> None:
     assert "playback-hover-time" in view_screen
     assert "playback-hover-marker" in view_screen
     assert "playback-current-marker" in view_screen
-    assert "currentPercent" in view_screen
-    assert "onClick={handleTimelineClick}" in view_screen
+    assert "hoverPosition" in view_screen
+    assert "onClick={(event) => commit(positionFromPointer(event))}" in view_screen
     assert "onMouseMove" in view_screen
     assert "getBoundingClientRect" in view_screen
     assert "clientX" in view_screen
-    assert "formatPlaybackTime" in view_screen
+    # XC-131: the axis is time, mode number or frequency, and XC-160 gives each its own value format.
+    # A single `m:ss` formatter printed a clock on the mode-axis state.
+    assert "resultAxes" in view_screen
+    assert "'time'" in view_screen and "'mode'" in view_screen and "'frequency'" in view_screen
+    assert "definition.discrete ? Math.round" in view_screen
+    assert "aria-valuetext={definition.format(position)}" in view_screen
     assert ".view-playback-overlay" in styles
     marker_css = styles[styles.index(".playback-hover-marker") : styles.index(".playback-hover-marker") + 300]
     assert "width: 8px" in marker_css
@@ -995,6 +1000,9 @@ def test_material_library_uses_thumbnails_while_sidebar_slots_use_names_only() -
         "inspection-orange.png",
         "translucent-cyan.png",
         "brushed-steel.png",
+        # view/AC-076: a data-dependent Asset uses its own versioned sample fixture. It used to point
+        # at technical-blue.png, which is another Asset's thumbnail.
+        "result-sample.png",
     }
 
     assert {path.name for path in MATERIAL_THUMBNAIL_DIR.glob("*.png")} == expected
@@ -1008,7 +1016,12 @@ def test_material_library_uses_thumbnails_while_sidebar_slots_use_names_only() -
 
     assert "item.thumbnail ? <Image" in page
     assert "thumbnail: '/materials/brushed-steel.png'" in page
-    assert page.count("/materials/brushed-steel.png") == 1
+    # No Asset borrows another Asset's rendered thumbnail, and an absent one is named rather than
+    # replaced by a generic sphere (view/AC-076).
+    for thumbnail in expected:
+        assert page.count(f"/materials/{thumbnail}") <= 2
+    assert "thumbnailMissing" in page
+    assert "サムネイル未生成" in page
     assert ".library-card-preview.material-sphere-thumbnail" in styles
     assert ".material-slot-row" in styles
     assert ".material-slot-controls" in styles
@@ -1030,10 +1043,14 @@ def test_view_property_tabs_follow_the_last_selected_active_object_without_a_sec
     text_editor = page[page.index("function ViewTextPropertyEditor("):page.index("function AutomationPropertyEditor(")]
     assert "{ id: 'text', label: 'テキスト'" in view_tabs
     assert "{ id: 'fonts', label: 'フォント'" not in view_tabs
-    assert "tab.id !== 'text' || viewObjectKinds[activeViewObjectKind].textProperties" in page
+    # view/AC-068: the active object comes from the shared viewport and Outliner selection, not from
+    # the scenario variant, so selecting another element changes which type-specific form is shown.
+    assert "tab.id !== 'text' || (active.kind !== 'container' && viewObjectKinds[active.kind].textProperties)" in page
+    assert "const active = activeViewObject(variant, selectedViewObjects)" in page
+    assert "const selectedKind = name ? outlinerObjectKinds[name] : undefined" in page
     assert "annotation: { label: 'テキスト・注釈'" in page
     assert "textProperties: true" in page
-    assert "if (!viewObjectKinds[kind].textProperties) return null" in text_editor
+    assert "if (activeObject.kind === 'container' || !viewObjectKinds[activeObject.kind].textProperties) return null" in text_editor
     assert "アクティブなテキスト・注釈オブジェクトだけを編集します" in text_editor
     assert "フォント設定はありません" not in page
     assert '<span>テキスト</span><textarea' in text_editor
@@ -1114,3 +1131,611 @@ def test_live_material_preview_defaults_to_sphere_and_offers_neutral_test_shapes
     active_preview_index = material_editor.index("<MaterialPreview", slot_list_index)
     assert slot_list_index < active_preview_index < material_editor.index("material-editor-tabs")
     assert "resultOutput={activeResultBinding}" in material_editor
+
+
+def test_every_required_modal_state_renders_a_controlled_dialog() -> None:
+    """`chat.outbound-request` and `pipeline.scope-confirmation` used to render nothing at all.
+
+    ModalCard wrapped a Radix Dialog with no `open`, so it stayed shut and two states the
+    specification requires showed an empty canvas while the catalogue reported them covered.
+    """
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "function ModalCard({ title, detail, open, onClose, children }" in page
+    assert "<Dialog open={open} onOpenChange={(next) => { if (!next) onClose() }}>" in page
+    assert re.search(r"<Dialog>\s", page) is None, "an uncontrolled Dialog renders nothing"
+    assert "<ModalCard open={outboundOpen}" in page
+    assert "{scopeUnit && <ModalCard" in page
+
+
+def test_the_command_list_covers_every_group_of_the_specified_keyboard_scheme() -> None:
+    """The spec's keyboard table is the source; the settings command list must answer every row.
+
+    Four of its ten rows - case tree, outliner, instruction bar and panels - had no group in the
+    mockup, so `settings.shortcuts` showed a command list that was missing whole areas of the scheme.
+    """
+    spec = UI_SPEC.read_text(encoding="utf-8")
+    section = spec[spec.index("## The keyboard scheme") : spec.index("## Conventions")]
+    groups = set()
+    for line in section.splitlines():
+        if not line.startswith("|"):
+            continue
+        first = line.split("|")[1].strip()
+        if first in {"Group", ""} or set(first) <= {"-"}:
+            continue
+        groups.add(first.replace("**", ""))
+    assert {"workspace", "case tree", "outliner", "instruction bar", "panels"} <= groups
+
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    declared = set(re.findall(r"specGroup: '([^']+)'", page))
+    assert groups <= declared, f"no command group for {sorted(groups - declared)}"
+
+
+def test_top_menus_name_commands_and_show_their_key_from_the_one_command_table() -> None:
+    """The menus held `ファイルを開く` / `ファイルの設定` placeholders and taught no key.
+
+    11_ui.md requires a shortcut to be discoverable beside the action in menus as well as in the
+    command list, and one definition per key means the menu reads the table rather than restating it.
+    """
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "{menu}を開く" not in page
+    assert "{menu}の設定" not in page
+    assert "const commandByName = new Map(shortcutGroups.flatMap(" in page
+    assert "const command = shortcutFor(item.command)" in page
+    assert "command.key === null" in page and "キーなし" in page
+    assert "<kbd>{shortcutFor('指示バーへフォーカス')?.key}</kbd>" in page
+    for menu in ["ファイル", "編集", "表示", "フィルタ", "ツール", "ヘルプ"]:
+        assert f"menu: '{menu}'" in page
+
+
+def test_case_tree_searches_selects_and_confirms_a_deletion_by_its_references() -> None:
+    """Selecting a @Case changes the subject of every area, and deleting one is confirmed (XC-062)."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "value={caseQuery} onChange={(event) => setCaseQuery(event.target.value)}" in page
+    assert "onClick={() => onSelectCase(item.name)}" in page
+    assert "selectedCase={selectedCase}" in page
+    assert "references: [" in page
+    assert "このケースを参照している箇所は{references.length}件です" in page
+    assert "代替値では埋めません" in page
+
+
+def test_expressions_use_the_shared_editor_with_scope_units_and_an_error_position() -> None:
+    """`Expression editor` is a shared component in 11_ui.md; Graph and Pipeline wrote bare inputs."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "function ExpressionEditor({ id, label, initial }" in page
+    assert "function checkExpression(text: string): ExpressionCheck" in page
+    assert "はスコープにありません" in page
+    assert "の単位が未宣言のため、次元を検査できません" in page
+    assert "比較の左右で次元が違います" in page
+    assert "expression-caret" in page
+    assert "文字目：" in page
+    assert "<ExpressionEditor id={`graph-${activeSeries.id}`}" in page
+    assert "<ExpressionEditor\n            id={`pipeline-${selectedUnit.id}`}" in page
+    assert 'placeholder="単位付きの式"' not in page
+
+
+def test_pipeline_units_reorder_with_a_drop_position_shown_before_the_drop() -> None:
+    """11_ui.md: a drop position is previewed as a line before the drop, and units are reordered."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "pipeline-drop-line" in page
+    assert "setDropIndex(index)" in page
+    assert "const dropUnit = (index: number)" in page
+    assert "const moveUnit = (id: string, direction: -1 | 1)" in page
+    assert "を上へ移動" in page and "を下へ移動" in page
+    assert "function annotatePipelineTargets" in page
+    assert "対象{row.acts}" in page
+
+
+def test_pipeline_reports_an_outcome_per_case_and_unit_including_a_false_condition() -> None:
+    """The `Run outcome table` of 11_ui.md: applied, skipped, failed, refused - and the value a false
+    condition evaluated to, without which a refused unit reads like one never reached."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    styles = CHAT_STYLES.read_text(encoding="utf-8")
+
+    assert "function RunOutcomeTable(" in page
+    for outcome in ["applied", "skipped", "failed", "refused"]:
+        assert f"'{outcome}'" in page
+        assert f".run-outcome-{outcome}" in styles
+    assert "条件の評価値：false" in page
+    assert "先行ユニットの失敗により未実行" in page
+
+
+def test_a_destructive_pipeline_unit_states_its_scope_before_it_is_authorised() -> None:
+    """XC-094: authorised once, for a named scope, with the case count stated."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "clear: { label: 'クリア'" in page and "destructive: true" in page
+    assert "実行前に範囲確認が必要" in page
+    assert "ケースの範囲で許可" in page
+    assert "disabled={unauthorised.length > 0}" in page
+    assert "同じ数はドライランでも確認できます" in page
+
+
+def test_import_review_proposes_grouping_and_tags_without_applying_them() -> None:
+    """XC-120: proposals, nothing applied until accepted, and a rejected proposal is not re-offered."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "const importTagProposals = [" in page
+    assert "受け入れるまで何も適用しません" in page
+    assert "setGroupingAccepted" in page
+    assert "setRejectedTags" in page
+    assert "このセッションでは再提案しません" in page
+    assert "提案を適用せず取込" in page
+
+
+def test_material_library_originals_carry_workspace_or_shared_scope() -> None:
+    """GL-019: an original is workspace-scoped or shared, labelled inside オリジナル rather than folded
+    into the サンプル/オリジナル choice. The original source used to render an empty state everywhere."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "const libraryOriginals: Record<string, LibraryItem[]>" in page
+    assert "libraryScopeLabels: Record<LibraryScope, string> = { workspace: 'このワークスペース', shared: '共有' }" in page
+    assert "library-scope-filter" in page
+    assert "ドラッグでの移動は複写です" in page
+    assert "source === 'sample' ? samples : originals" in page
+
+
+def test_report_and_chat_statements_carry_which_kind_they_are_and_their_source() -> None:
+    """XC-104's four statement kinds. The `Provenance badge` shared component names Report and Chat as
+    its users; the mockup had only the quantity-provenance badge, which answers a different question."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "type StatementKind = 'value' | 'comparison' | 'citation' | 'user'" in page
+    assert "function StatementKindBadge({ kind, source }" in page
+    assert "function ReportCommentaryReview()" in page
+    assert "除外した記述" in page
+    assert "書き直しを1回試み" in page
+    assert page.count("<StatementKindBadge") >= 3
+    chat_thread = page[page.index("function ConversationThread(") : page.index("function AssistantDrawer(")]
+    assert "<StatementKindBadge" in chat_thread
+
+
+def test_an_unresolved_template_lists_what_failed_with_its_source_revision() -> None:
+    """XC-063 keeps the unresolved list plus the template identifier and revision reachable. The state
+    was a paragraph of prose, which is neither a list nor an identity."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "function UnresolvedList({ title, source, revision, resolved, unresolved }" in page
+    assert 'source="ビューテンプレート「技術資料・標準」"' in page
+    assert 'revision="リビジョン 3"' in page
+    assert "既定値で埋めません" in page
+
+
+def test_split_view_names_the_case_in_each_pane_and_offers_camera_synchronisation() -> None:
+    """`Split layout`: one to four panes with per-pane case and camera synchronisation."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert ": Array.from({ length: panes }, (_, index) => index === 0 ? selectedCase" in page
+    # one overlay per pane naming both the case and the camera, so it cannot collide with the
+    # viewport's own controls the way two corner pills did (11_ui.md)
+    assert 'className="view-pane-subject"' in page
+    assert 'className="view-pane-camera"' not in page
+    assert "カメラ同期" in page
+    assert "各画面のケースとカメラは、画面上部の表示をクリックして選びます。" in page
+
+
+def test_the_three_viewport_carries_one_mock_label_and_shares_names_with_the_outliner() -> None:
+    """11_ui.md: no separate status footer - the in-viewport mock label is sufficient - and the
+    Outliner row is synchronized with viewport selection, which two naming schemes made impossible."""
+    viewport = THREE_VIEWPORT.read_text(encoding="utf-8")
+    scene = THREE_SCENE.read_text(encoding="utf-8")
+    styles = CHAT_STYLES.read_text(encoding="utf-8")
+
+    assert "viewport-status" not in viewport
+    assert ".viewport-status" not in styles
+    assert viewport.count("表示用モック・データ未接続") == 0
+    assert "viewport-badge-selection" in viewport
+    for name in ["［元ファイルの部品名 01］", "［元ファイルの部品名 02］", "［元ファイルの領域名］"]:
+        assert name in scene
+    assert 'label="ベース（仮）"' not in scene
+
+
+def test_network_has_no_case_tree_and_one_audit_source() -> None:
+    """The layout table grants the left column to five work areas and Chat; Network is in neither list.
+    Its rail also claimed there were no audit records while the centre listed some."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "const showsCaseSidebar = scenario.screen !== 'network'" in page
+    assert "{leftOpen && showsCaseSidebar && <LeftSidebar" in page
+    assert "const networkAuditRows" in page
+    assert "function auditRowsFor(variant: string)" in page
+    assert "property-audit-empty" not in page
+    assert '<span className="eyebrow">{screenNames[screen]}</span><b>{screenNames[screen]}</b>' not in page
+
+
+def test_the_work_item_catalogue_has_exactly_one_grid_and_list_switch() -> None:
+    """XC-149 puts search, filtering and the display switch in the shared title bar. The catalogue
+    added a second switch of its own, and the title-bar pair was decorative."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    library = page[page.index("function WorkItemLibrary(") : page.index("function WorkItemCatalogPreview(")]
+
+    assert "layout-switch" not in library
+    assert "workspace-filters" not in library
+    assert "layout={itemListLayout}" in page
+    assert "onClick={() => onItemListLayoutChange('grid')}" in page
+    assert "work-area-list-scope" in page
+
+
+def test_the_workspace_list_filters_only_by_metadata_its_cards_carry() -> None:
+    """A `最近使用` chip returned the whole list while every card said `最終利用：—`."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    home = page[page.index("function WorkspaceHome(") : page.index("function LeftSidebar(")]
+
+    assert "'最近使用'" not in home
+    assert "const availableHomeTags = Array.from(new Set(workspaceItems.map(([, tag]) => tag)))" in home
+    assert "setHomeTags" in home
+    assert "共有スコープのワークスペースはこのモックアップにありません" in home
+
+
+def test_one_conversation_keeps_its_settings_across_the_bar_and_chat() -> None:
+    """XC-150: switching surfaces preserves the draft *and* the conversation settings. Model, effort
+    and search permission lived inside the composer, so each surface reset them on mount."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "type ConversationSettings = { model: string; effort: string; search: 'off' | 'allowed' }" in page
+    assert "useState<ConversationSettings>({ model: 'local', effort: 'standard', search: 'off' })" in page
+    assert page.count("<ChatComposer draft={draft} onDraftChange={onDraftChange} settings={settings} onSettingsChange={onSettingsChange} />") == 3
+    assert "onSettingsChange({ ...settings, model: event.target.value })" in page
+
+
+def test_an_invalid_setting_is_rejected_at_its_field_with_the_previous_value_kept() -> None:
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "function UnitSettings({ invalid }" in page
+    assert "aria-invalid={!valid}" in page
+    assert "を拒否しました" in page
+    assert "直前の値「{acceptedUnit}」を維持しています" in page
+    assert 'role="alert"' in page
+
+
+def test_the_view_rail_gives_camera_its_own_tab_and_overall_keeps_none_of_it() -> None:
+    """XC-196. `全体` held the camera as one selector, which stops working the moment saved viewpoints,
+    a focus target and depth of field exist - and XC-197 adds exactly those."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    view_tabs = page[page.index("  view: ["):page.index("  graph: [")]
+
+    order = re.findall(r"id: '([a-z]+)', label: '([^']+)'", view_tabs)
+    assert [label for _, label in order][:5] == ["全体", "カメラ", "描画", "背景", "出力"]
+    assert [ident for ident, _ in order][5:] == ["objects", "text", "materials"]
+
+    overall = page[page.index("if (tab.id === 'overall') return"):page.index("if (tab.id === 'camera') return")]
+    assert "投影" not in overall, "projection stayed in 全体 after moving to カメラ"
+    assert "<span>カメラ</span>" not in overall
+    assert "画面分割" not in overall, "the split is session state and belongs on the canvas (XC-202)"
+    assert "ガイド" in overall
+
+
+def test_a_view_holds_several_named_cameras_each_storing_its_rule() -> None:
+    """XC-197 and XC-199: one camera object carries its pose and its lens, and a pose rule resolves per
+    case. Storing the resolved numbers would show four panes one case's critical moment; separating the
+    pose from the lens would mean changing the lens for one saved position changed it for all."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "type CameraModel = {" in page
+    assert "pose: 'explicit' | 'framed'" in page
+    assert "focalLengthMm: number" in page and "projection: 'perspective' | 'orthographic'" in page
+    assert "ViewpointModel" not in page, "the viewpoint concept was merged into the camera"
+    assert "kind: 'extremum'; quantity: string; statistic:" in page
+    assert "function resolveCamera(" in page
+    assert "規則：${camera.focus.quantity}の${camera.focus.statistic}へ寄せる" in page
+    # the unresolved path names the quantity and leaves the camera alone
+    assert "がこのケースにありません。カメラは動かしていません" in page
+    assert "座標は保存せず、ケースごとに解決し直します" in page
+    # several cameras, and a pane names the one it looks through
+    assert "const seedCameras: CameraModel[] = [" in page
+    # a pane's camera is session state, chosen on the canvas, so it is not a member of the saved item
+    assert "paneCameraIds" not in page
+    assert "const [paneBindings, setPaneBindings] = useState" in page
+    assert "各画面のケースとカメラは、画面上部の表示をクリックして選びます。" in page
+
+
+def test_result_bookmarks_resolve_per_case_snap_to_a_stored_position_and_say_so() -> None:
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    styles = CHAT_STYLES.read_text(encoding="utf-8")
+
+    assert "type ResultBookmarkModel = {" in page
+    for kind in ["'explicit'", "'extremum'", "'crossing'", "'relative'"]:
+        assert f"kind: {kind}" in page
+    assert "function resolveBookmark(" in page
+    assert "storedStep" in page
+    assert "保存位置へ丸め" in page
+    assert "caseName" in page and 'small>ケース「{caseName}」で解決した位置' in page
+    # an unresolved rule draws no marker: a marker at the axis minimum would be a plausible default
+    assert "resolved.filter((entry) => entry.resolution.state === 'resolved').map" in page
+    assert ".playback-bookmark-marker" in styles
+
+
+def test_grading_is_a_group_inside_rendering_that_defaults_to_no_grade() -> None:
+    """XC-198. Both references ship grading; neither has this product's constraint that a value must not
+    show as two colours in two screenshots."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "type GradePreset = 'measurement' | 'standard' | 'technicalDocument' | 'presentation' | 'photoreal'" in page
+    assert "useState<GradePreset>('measurement')" in page
+    rendering = page[page.index("if (tab.id === 'rendering') return"):page.index("if (tab.id === 'background') return")]
+    assert 'PropertyGroup title="照明"' in rendering
+    assert 'PropertyGroup title="現像"' in rendering
+    assert rendering.index('title="照明"') < rendering.index('title="現像"')
+    assert "計測プリセットは無補正です" in rendering
+    assert "凡例も同じ補正を通すか、補正名とパラメータを成果物に記載します" in rendering
+    # a treatment the backend cannot perform is named rather than offered
+    assert "フォトリアル経路は未接続です" in rendering
+
+
+def test_a_property_row_is_laid_out_by_its_shape_not_by_its_depth() -> None:
+    """The row grid was bound to the direct-child position, so wrapping a few rows in a group to give
+    them one accessible name silently dropped it and left the caption and the control out of line with
+    their neighbours. A rule that stops applying when a wrapper appears, with nothing to notice, is the
+    structure at fault rather than the one site that hit it."""
+    styles = CHAT_STYLES.read_text(encoding="utf-8")
+
+    assert ".property-fields > label {" not in styles
+    assert ".property-fields label:has(> span) { display: grid; grid-template-columns: 68px minmax(0, 1fr);" in styles
+    # a label with no caption span - the expression editor's - is deliberately not a row
+    assert ".expression-editor > label" in styles
+
+
+def test_type_is_declared_only_through_the_scale() -> None:
+    """XC-201. The catalogue had grown twenty distinct sizes across 368 declarations, four of them
+    within a pixel of each other and sixteen at 5 or 6 pixels, while the button primitives rendered at
+    14 (E-122). None of that was chosen; it accumulated because no check could see it. This is the
+    check: outside the token block, no rule states a type value of its own.
+    """
+    styles = CHAT_STYLES.read_text(encoding="utf-8")
+    root_start = styles.index(":root {")
+    tokens = styles[root_start:styles.index("\n}", root_start)]
+    rules = styles[styles.index("\n}", root_start):]
+
+    for step in ["--text-caption", "--text-body", "--text-emphasis", "--text-title", "--text-heading", "--text-display"]:
+        assert f"{step}: var(--size-" in tokens, f"{step} is not defined on the primitive layer"
+    for primitive in ["--size-1", "--size-6", "--weight-regular", "--weight-bold", "--leading-none",
+                      "--leading-relaxed", "--tracking-wide", "--tracking-tight", "--family-ui",
+                      "--family-mono", "--family-deliverable"]:
+        assert f"{primitive}:" in tokens, f"{primitive} is missing from the primitive layer"
+
+    allowed = {"inherit", "0"}
+    for prop in ["font-size", "font-weight", "line-height", "letter-spacing", "font-family"]:
+        raw = [
+            match.group(0)
+            for match in re.finditer(prop + r": ([^;]*);", rules)
+            if "var(--" not in match.group(1) and match.group(1).strip() not in allowed
+        ]
+        assert not raw, f"{len(raw)} rule(s) set {prop} without a token: {raw[:4]}"
+
+    # One monospace stack, one UI stack, and the deliverable's serif named as a different thing (GL-013)
+    assert styles.count("Cascadia Mono") == 1
+    assert styles.count("Noto Sans JP") == 1
+    assert "--family-deliverable" in tokens and "Georgia" in tokens
+
+    # Figures align in columns wherever a number appears, set once rather than per table (11_ui.md)
+    assert styles.count("font-variant-numeric: tabular-nums") == 1
+    document_rule = styles[styles.index("html, body {"):styles.index("\n", styles.index("html, body {"))]
+    assert "font-variant-numeric: tabular-nums" in document_rule
+
+
+def test_component_primitives_take_the_scale_instead_of_their_own_sizes() -> None:
+    """A primitive that ships with `text-sm` renders one and a half times the label beside it."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    primitives = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in sorted((ROOT / "mockups" / "ui" / "components" / "ui").glob("*.tsx"))
+    )
+    for source, label in ((page, "page.tsx"), (primitives, "components/ui")):
+        for banned in ["text-sm", "text-xs", "text-base", "text-[9px]", "text-[10px]", "text-[length:"]:
+            assert banned not in source, f"{label} still sets type outside the scale: {banned}"
+    for step in ["type-body", "type-caption"]:
+        assert step in primitives
+
+
+def test_a_comparison_varies_one_axis_which_may_be_a_property_of_its_base_view() -> None:
+    """XC-202. Three sets alone cannot express stress against temperature, or a surface against a
+    section - both everyday CAE figures. Sweeping one published property of the base View keeps
+    "everything else is provably identical" true, because the varied thing is that View's own."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "type ComparisonAxis = 'case' | 'resultPosition' | 'camera' | 'quantity' | 'deformation' | 'representation'" in page
+    assert "const comparisonPropertyAxes: ComparisonAxis[] = ['quantity', 'deformation', 'representation']" in page
+    assert "基準ビュー自身のプロパティを振ります" in page
+    # several saved Views are never the members: that case is the split
+    assert "'view'" not in page.split("type ComparisonAxis")[1].split("\n")[0]
+
+
+def test_a_comparison_holds_a_live_reference_and_deleting_its_base_view_names_it() -> None:
+    """XC-202, against XC-109: a template copies and a comparison references. A live reference is why
+    the comparison holds nothing of its own, and why deleting the View it points at is confirmed by
+    naming what breaks rather than by repointing it somewhere plausible (XC-062)."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "生きた参照・「${baseViewName}」の編集が全ペインに反映" in page
+    assert "usedBy?: string[]" in page
+    assert "deleteItemReferences" in page
+    assert "を参照している項目が{deleteItemReferences.length}件あります" in page
+    assert "別の{itemHeader.itemLabel}へ付け替えることはしません" in page
+
+
+def test_the_view_area_holds_two_item_kinds_chosen_at_creation() -> None:
+    """XC-202. Until the kind was an attribute of the item, a comparison existed only as two scenario
+    states: the creation dialogue offered no choice, the selector showed a plain name, and the rail
+    could not know what it was editing."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "type WorkItemKind = 'single' | 'comparison'" in page
+    assert "kind?: WorkItemKind; baseViewName?: string" in page
+    assert "kind: 'comparison', baseViewName: '標準ビュー'" in page
+    # the choice is made where the item is created
+    assert 'className="creation-kind"' in page
+    assert "['single', '単一ビュー'" in page
+    assert "['comparison', '比較'" in page
+    # and the open item, not the scenario variant, is what the rail and the canvas read
+    assert "const isComparisonItem = openViewItem?.kind === 'comparison'" in page
+    assert "const isComparison = isComparisonItem" in page
+    assert "variant === 'comparison' ||" not in page
+
+
+def test_the_kind_is_readable_in_the_selector_and_the_catalogue() -> None:
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "work-item-kind-badge" in page
+    assert "基準：{selectedWorkItem.baseViewName}" in page
+    assert "`基準ビュー：${entry.baseViewName}`" in page
+    assert "item.kind === 'comparison' ? '比較' : itemHeader.itemLabel" in page
+
+
+def test_a_comparison_names_the_tabs_it_borrows_instead_of_offering_a_copy() -> None:
+    """XC-202 with XC-182: an editable copy would let one pane's material differ, which destroys the one
+    guarantee a comparison makes. The borrowed tabs stay visible so the reader is told where the setting
+    lives rather than left hunting for a tab that vanished."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "function BorrowedSettingPanel(" in page
+    assert "この設定は基準ビューが持っています" in page
+    assert "を編集" in page
+    # the check sits above the per-tab dispatch, or materials, objects and text would never reach it
+    borrowed = page.index("if (screen === 'view' && isComparisonItem &&")
+    objects = page.index("if (screen === 'view' && tab.id === 'objects')")
+    assert borrowed < objects
+    for tab in ["'camera'", "'rendering'", "'background'", "'objects'", "'text'", "'materials'"]:
+        assert tab in page[borrowed:objects]
+    # 全体 and 出力 are the comparison's own and are not in that list
+    assert "'overall'" not in page[borrowed:objects]
+    assert "'output'" not in page[borrowed:objects]
+
+
+def test_the_pane_badge_is_the_control_the_split_bar_says_it_is() -> None:
+    """The split bar tells the reader to click the pane's subject to change it, so the badge has to be a
+    control. It was a span: copy that promises an interaction nobody can perform."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert 'className="view-pane-subject" aria-label={`画面 ${index + 1} のケースとカメラを選ぶ`}' in page
+    assert "bindPane(index, { caseName: item.name })" in page
+    assert "bindPane(index, { cameraId: item.id })" in page
+    # a comparison's panes come from its members, so there is nothing to pick there
+    assert "{comparisonGrid ? (" in page
+
+
+def test_the_split_has_no_control_in_the_property_rail() -> None:
+    """XC-202: splitting is session state and every control for it is on the canvas it divides. A
+    document editor holding a session control is the confusion that decision removes - and it had the
+    camera-sync control in two places at once."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    overall = page[page.index("if (tab.id === 'overall') return"):page.index("if (tab.id === 'camera') return")]
+
+    assert 'PropertyGroup title="画面分割"' not in overall
+    assert "各画面のケース" not in overall
+    assert "カメラ同期" not in overall
+    # the split bar owns the pane count, the synchronisation and the promotion, and says it is not saved
+    assert 'className="split-count"' in page
+    assert "onClick={() => setSplitPanes(count)}" in page
+    assert "この分割は保存されません" in page
+    assert page.count("カメラ同期") == 1
+
+
+def test_a_comparison_marks_the_tabs_it_borrows_in_the_rail_itself() -> None:
+    """Keeping the tabs answers "where did the material go"; marking them stops a reader opening six of
+    them to find the two that are the comparison's own (XC-202)."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    styles = CHAT_STYLES.read_text(encoding="utf-8")
+
+    assert "const isBorrowed = (tabId: string) =>" in page
+    assert "isBorrowed(tab.id) ? 'borrowed' : ''" in page
+    assert "（基準ビューの設定）" in page
+    assert "sidebar-tab-borrowed-mark" in page
+    assert ".sidebar-tab-button.borrowed" in styles
+    # the Outliner is the base View's too, and says whose it is
+    assert 'className="outliner-borrowed"' in page
+    assert "borrowedFrom={isComparisonItem ? baseViewName : null}" in page
+
+
+def test_a_comparison_writes_down_the_values_every_pane_shares() -> None:
+    """"Everything else is shared" is only checkable when the shared values are on screen. A comparison
+    over cases has to say which single camera and which single result position every pane uses."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert 'className="comparison-shared"' in page
+    assert "comparison.axis !== 'case' && <label><span>共有ケース</span>" in page
+    assert "comparison.axis !== 'camera' && <label><span>共有カメラ</span>" in page
+    assert "comparison.axis !== 'resultPosition' && <label><span>共有結果位置</span>" in page
+
+
+def test_an_ordered_comparison_axis_can_divide_a_range_instead_of_listing_members() -> None:
+    """A contact sheet over time should not require naming every position as a bookmark first. The
+    reference distributes a swept parameter across the grid as a range - its comparative cue carries
+    UpdateWholeRange, UpdateXRange and UpdateYRange beside UpdateValue (E-123)."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "memberMode: 'enumerate' | 'range'" in page
+    assert "const orderedAxes: ComparisonAxis[] = ['resultPosition', 'deformation']" in page
+    assert "function rangeMembers(count: number)" in page
+    assert "<span>分割数</span>" in page
+    # the axis says which quantities it can be, so time is findable without contradicting XC-131
+    assert "resultPosition: '結果位置（時刻・モード・周波数）'" in page
+    # a generated member lands on a position that exists, and says when it snapped
+    assert "保存位置へ丸め" in page
+    assert "snapped: Math.abs(value - raw[index]) > 1e-9" in page
+    # two members on one stored position are reported rather than drawn as two identical panes
+    assert "duplicate: snapped.indexOf(value) !== index" in page
+    assert "同じ位置に解決するメンバーがあります" in page
+    # and the canvas draws the generated members, not the enumerated list
+    assert "rangeMembers(comparison.rangeCount).map((member) => member.label)" in page
+    # the grid figures are derived from the same member list the canvas draws, so they cannot disagree
+    assert "const comparisonColumns = Math.min(effectiveMembers.length, 4)" in page
+    assert "rows: number" not in page.split("type ComparisonModel")[1].split("}")[0]
+
+
+def test_motion_follows_the_data_not_only_the_chosen_output_kind() -> None:
+    """XC-131: a @Case may be steady, and then there is no axis to play along. XC-160 already required
+    the playback overlay to be absent rather than disabled there; the same follows for the video output
+    and its playback preset, which offered a range over an axis that does not exist."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "resultAxis: 'time' | 'steady'" in page
+    assert "const caseHasResultAxis = (name: string)" in page
+    assert "resultAxis: 'steady'" in page
+    # absent, not disabled
+    assert "{caseHasResultAxis(selectedCase) && (playbackVisible" in page
+    # video and its preset name the reason instead of being offered
+    assert 'disabled={!hasResultAxis}' in page
+    assert "は定常結果です" in page
+    assert "{outputMode === 'video' && hasResultAxis && <PropertyGroup title=\"再生プリセット\">" in page
+
+
+def test_the_timeline_is_a_group_in_output_and_not_a_rail_tab() -> None:
+    """The tab was abolished with the shot list: a timeline is six values, and the thing that names one
+    is the video output (XC-200)."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    view_tabs = page[page.index("  view: ["):page.index("  graph: [")]
+
+    assert "label: 'タイムライン'" not in view_tabs
+    assert "id: 'timeline'" not in view_tabs
+    assert "if (tab.id === 'timeline')" not in page
+    assert '<PropertyGroup title="再生プリセット">' in page
+
+
+def test_a_saved_result_position_can_be_created_on_the_axis_it_indexes() -> None:
+    """XC-197 holds the saved positions on the @View, and the comparison, the timeline and the output
+    all reference them - but nothing could add one: the list was a constant with no creation path."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "bookmarks: ResultBookmarkModel[]" in page.split("type ViewItemState")[1].split("}")[0]
+    assert "現在位置を保存" in page
+    assert "規則で追加" in page
+    # the explicit kind keeps the position being looked at; the rule kinds state a condition
+    assert "rule: { kind: 'explicit', position }" in page
+    for kind in ["extremum", "crossing", "relative"]:
+        assert f"SelectItem value=\"{kind}\"" in page
+    assert "playback-bookmark-remove" in page
+    assert "onBookmarksChange" in page
+
+
+def test_the_split_control_carries_no_prose_until_the_canvas_is_split() -> None:
+    """A permanent strip of instruction beside an idle control is chrome; XC-160 made the same argument
+    for a disabled playback bar."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    assert "{panes > 1 && <small>各画面のケースとカメラは、画面上部の表示をクリックして選びます。</small>}" in page
+    assert "画面を分けると、ケースとカメラを画面ごとに選べます。" not in page
+    assert "panes === 1 ? 'compact' : ''" in page

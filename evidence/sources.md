@@ -1091,6 +1091,117 @@ kept separate so that the correction, not just the corrected text, is on the rec
   initial release and for Python versions **3 years** after theirs
 - justifies: XC-040
 
+## Reference application structure, measured on this machine
+
+The two products this design borrows from are installed here, so their structure was read from the
+installation rather than from documentation about it. Both entries are measurements: the numbers below
+came out of the running program, and the commands that produced them are recorded so the measurement
+can be repeated.
+
+### E-120 - Blender 5.0.1 shell, panel and command structure, read from the installation
+- tier: T1
+- url: `D:\dev\Blender Foundation\Blender 5.0` (build a3db93c5b259, 2025-12-16), enumerated with
+  `blender.exe --background --factory-startup --python` over `bpy.types` and `bpy.ops`
+- verified: 2026-08-22
+- says: the shell is Window -> Screen -> Area -> Region. **19 space types** exist
+  (VIEW_3D, IMAGE_EDITOR, NODE_EDITOR, SEQUENCE_EDITOR, CLIP_EDITOR, DOPESHEET_EDITOR, GRAPH_EDITOR,
+  NLA_EDITOR, TEXT_EDITOR, CONSOLE, INFO, TOPBAR, STATUSBAR, OUTLINER, PROPERTIES, FILE_BROWSER,
+  SPREADSHEET, PREFERENCES, EMPTY) and **16 region types**
+  (WINDOW, HEADER, CHANNELS, TEMPORARY, UI, TOOLS, TOOL_PROPS, ASSET_SHELF, ASSET_SHELF_HEADER,
+  PREVIEW, HUD, NAVIGATION_BAR, EXECUTE, FOOTER, TOOL_HEADER, XR). A registered panel declares
+  `bl_space_type`, `bl_region_type`, `bl_category` and `bl_context`, and those four fields alone
+  partition the 121 measured panel groups: the Properties editor subdivides its WINDOW region by
+  `bl_context` into a vertical icon rail (object 26 panels, material 31, data 129, render 89,
+  view_layer 40, scene 16, output 16, collection 6), while the 3D viewport subdivides its UI region by
+  `bl_category` into Item, Tool and View tabs. The Outliner carries **7 display modes**
+  (SCENES, VIEW_LAYER, SEQUENCE, LIBRARIES, DATA_API, LIBRARY_OVERRIDES, ORPHAN_DATA) and 34 further
+  properties, of which 22 are filters; its restriction columns are individually toggled
+  (`show_restrict_column_select/hide/viewport/render/holdout/indirect_only/enable`) and
+  `use_sync_select` is what couples the tree to viewport selection. Display state is separated from
+  data: `View3DShading` has 40 properties and `View3DOverlay` has 95, none of which are on the mesh.
+  A material slot is four fields only - `link`, `material`, `name`, `slot_index`. The command surface
+  is **2442 operators across 77 modules** (object 249, node 167, mesh 161, wm 117, outliner 72,
+  view3d 67), and a key binding is a `KeyMapItem` of `idname` plus `type`, `value`, `ctrl/shift/alt/
+  oskey/hyper`, `key_modifier`, `map_type`, `properties`, `active` and `is_user_modified`, held in one
+  of **105 keymaps** scoped by area - so the same key means different things in different areas by
+  construction rather than by convention. Asset metadata is 8 fields
+  (`author`, `catalog_id`, `copyright`, `description`, `license`, `tags`, `active_tag`,
+  `catalog_simple_name`), and unit handling is 8 (`system`, `system_rotation`, `length_unit`,
+  `mass_unit`, `temperature_unit`, `time_unit`, `scale_length`, `use_separate`)
+- justifies: XC-190, XC-191, XC-192, XC-193
+
+### E-121 - ParaView 6.2.0 proxy, view and state structure, read from the installation
+- tier: T1
+- url: `D:\Program Files\ParaView 6.2.0`, enumerated with `pvpython.exe` over the proxy definition
+  manager, and a saved `.pvsm` state produced by `SaveState` after `Wavelet` -> `Show` -> `ColorBy`
+- verified: 2026-08-22
+- says: everything is a **proxy** with typed properties, and a saved state is those proxies plus named
+  `ProxyCollection`s. **1143 proxy definitions in 78 groups**: filters 279, sources 254,
+  representations 78, writers 45, 3d_widgets 23, exporters 22, misc 21, extract_writers 20,
+  **views 18**, implicit_functions 15. The 18 view types are RenderView, RenderViewWithEDL,
+  ComparativeRenderView, OrthographicSliceView, MultiSlice, SpreadSheetView, XYChartView,
+  XYBarChartView, XYPointChartView, XYHistogramChartView, QuartileChartView, BoxChartView,
+  ParallelCoordinatesChartView, PlotMatrixView, ImageChartView, PythonView, ComparativeXYChartView and
+  ComparativeXYBarChartView - so a table and a chart are views beside the 3D one, not features inside
+  it. Property counts show where the complexity actually sits: RenderView 159, a geometry
+  representation 222, XYChartView 130, ScalarBarWidgetRepresentation 66, PVLookupTable 34,
+  SpreadSheetView 17, TimeKeeper 7, AnimationScene 22, SaveScreenshot 12, SaveAnimation 15. XYChartView
+  carries a full four-axis model - bottom, left, top and right each with title, colour, log scale,
+  range, custom labels, label notation and precision, and independent title/label typography - while a
+  chart representation carries per-series `SeriesVisibility`, `SeriesColor`, `SeriesLabel`,
+  `SeriesLineStyle`, `SeriesLineThickness`, `SeriesMarkerStyle`, `SeriesMarkerSize`, `SeriesOpacity`
+  and `SeriesPlotCorner`. The colour map is its own proxy referenced by representations, with
+  `RGBPoints`, `ScalarOpacityFunction`, `NanColor`, `UseAboveRangeColor`/`BelowRangeColor`,
+  `UseLogScale`, `Discretize`, `IndexedColors`, `Annotations` and `AutomaticRescaleRangeMode`; the
+  scalar bar is a separate representation with 66 properties of its own. Time is one `TimeKeeper` proxy
+  holding `TimestepValues`, `TimeRange`, `Time` and the views it drives, and animation is a separate
+  `AnimationScene` with cues. The 3D widgets are plane, box, sphere, line, spline, polyline, handle,
+  slider, distance, protractor, cone, cylinder, annulus, frustum, coordinate frame and light
+- justifies: XC-190, XC-191, XC-194, XC-195
+
+### E-122 - The design catalogue's own type usage, counted
+- tier: T1
+- url: `mockups/ui/app/globals.css` and `mockups/ui/components/ui/*.tsx` at commit time, counted with
+  `grep -o "font-size: [^;]*;" | sort | uniq -c` and the equivalent for family, weight, line height and
+  letter spacing
+- verified: 2026-08-23
+- says: **368 `font-size` declarations carrying 20 distinct values** - 8px used 156 times, 9px 80, 7px
+  60, 10px 28, 6px 14, 11px 9, and one or two each of 5, 12, 13, 14, 15, 17, 18, 19, 22, 24 and 27px,
+  plus two `!important` overrides. Sixteen sites set type at **5px or 6px**, all of them inside the
+  material property panel, so that panel runs a different type system from the rail it sits in.
+  Separately, the shadcn primitives in `components/ui` set their own size through Tailwind:
+  `text-sm` (14px) on Button, Input and SelectItem, `text-xs` (12px) on Badge, TabsTrigger and the small
+  button, and `text-[10px]` on DropdownMenuItem - so a button renders at **14px beside an 8px label**,
+  which is the visible mismatch. Two monospace stacks are spelled differently for one purpose,
+  `"Cascadia Mono", Consolas, monospace` five times and `ui-monospace, "Cascadia Mono", Consolas,
+  monospace` three times; one `Georgia, serif` appears once, in the report preview. `font-variant-numeric:
+  tabular-nums` is set at **two** of the many places a number is displayed. Weight uses four values
+  (700 forty-five times, 800 ten, 400 twice, 500 once), line height nine (1, 1.4, 1.45, 1.5, 1.55, 1.6,
+  1.7, 1.75, 1.8) and letter spacing six (.025, .04, .08, .1, .14 em and -.03em)
+- justifies: XC-201
+
+### E-123 - How ParaView separates an interactive layout from a saved comparison
+- tier: T1
+- url: `D:\Program Files\ParaView 6.2.0`, proxy properties read with `pvpython` for
+  `views/ComparativeRenderView`, `views/ComparativeXYChartView`, `misc/ViewLayout`,
+  `misc/SaveScreenshot` and `animation/ComparativeAnimationCue`
+- verified: 2026-08-23
+- says: the two are different objects. **`ViewLayout`** - the interactive split of the central area -
+  carries **three properties only**: `PreviewMode`, `SeparatorColor`, `SeparatorWidth`. It holds no
+  per-pane meaning at all; what each pane shows is a property of the view dropped into it. It can still
+  be exported as one image, because `SaveScreenshot` and `SaveAnimation` each carry `SaveAllViews`,
+  `Layout`, `SeparatorColor` and `SeparatorWidth` beside their `View`. **`ComparativeRenderView`** is a
+  view type of its own with 88 properties, of which only **two** are about comparison: `Dimensions`,
+  the grid, and **`OverlayAllComparisons`**, a boolean that draws every member into one picture instead
+  of a grid - so grid and overlay are one switch on one object rather than two features. What varies
+  across the grid is declared, not configured per pane: a `ComparativeAnimationCue` names
+  `AnimatedProxy`, `AnimatedPropertyName`, `AnimatedElement` and `AnimatedDomainName`, one cue per swept
+  parameter. `ComparativeXYChartView` exposes the same `Dimensions` and nothing else comparison-specific.
+  The cue also carries **`UpdateWholeRange`, `UpdateXRange` and `UpdateYRange`** beside `UpdateValue`,
+  so a swept parameter is distributed across the grid as a **range divided among the cells** as well as
+  by per-cell values: an ordered axis does not have to be enumerated by hand
+- justifies: XC-202, XC-203
+
 ## Not verified here
 
 Recorded so that nothing silently depends on them:

@@ -137,12 +137,68 @@
       "href": "?screen=view&variant=axis-error"
     },
     {
+      "id": "view.camera-unresolved",
+      "screen": "view",
+      "variant": "camera-unresolved",
+      "label": "カメラ・視点未解決",
+      "intent": "規則が参照する数量がこのケースに無い場合、名指しして拒否し、カメラを動かさない。",
+      "href": "?screen=view&variant=camera-unresolved"
+    },
+    {
+      "id": "view.cameras",
+      "screen": "view",
+      "variant": "cameras",
+      "label": "カメラ・複数登録",
+      "intent": "1つのビューに複数のカメラを保存し、どの画面がどれを覗くかと、規則の解決結果を示す。",
+      "href": "?screen=view&variant=cameras"
+    },
+    {
+      "id": "view.comparison",
+      "screen": "view",
+      "variant": "comparison",
+      "label": "比較ビュー・グリッド",
+      "intent": "基準ビューを1本の軸で振り、メンバーを格子に並べる。全ペインでカラーマップと範囲を共有する。",
+      "href": "?screen=view&variant=comparison"
+    },
+    {
+      "id": "view.comparison-borrowed",
+      "screen": "view",
+      "variant": "comparison-borrowed",
+      "label": "比較ビュー・借りている設定",
+      "intent": "比較が持たない設定は、編集できる複製ではなく基準ビューのものとして名指しし、そこへ移動できるようにする。",
+      "href": "?screen=view&variant=comparison-borrowed"
+    },
+    {
+      "id": "view.comparison-overlay",
+      "screen": "view",
+      "variant": "comparison-overlay",
+      "label": "比較ビュー・重ね合わせ",
+      "intent": "同じ比較を1枚に重ねる。結果色を持てるのは1メンバーのみで、残りは参照形状として描く。",
+      "href": "?screen=view&variant=comparison-overlay"
+    },
+    {
+      "id": "view.comparison-range",
+      "screen": "view",
+      "variant": "comparison-range",
+      "label": "比較ビュー・時間を等分",
+      "intent": "結果軸を等分してメンバーを生成し、保存位置への丸めと重複を明示する。ブックマークを先に作らずに時間比較を作る。",
+      "href": "?screen=view&variant=comparison-range"
+    },
+    {
       "id": "view.deformation",
       "screen": "view",
       "variant": "deformation",
       "label": "変形表示",
       "intent": "変形倍率を画面に描き込み、報告値は未変形形状から計算されることを明示する。",
       "href": "?screen=view&variant=deformation"
+    },
+    {
+      "id": "view.develop-grade",
+      "screen": "view",
+      "variant": "develop-grade",
+      "label": "描画・現像",
+      "intent": "露光やトーンマップのプリセットを選び、既定の計測では無補正であることと凡例の整合を示す。",
+      "href": "?screen=view&variant=develop-grade"
     },
     {
       "id": "view.empty",
@@ -289,6 +345,14 @@
       "href": "?screen=view&variant=outliner-flat"
     },
     {
+      "id": "view.output-motion",
+      "screen": "view",
+      "variant": "output-motion",
+      "label": "出力・再生プリセット",
+      "intent": "再生範囲と速度の異なるプリセットを複数保存し、動画はプリセット1つとカメラ1台を名指しする。",
+      "href": "?screen=view&variant=output-motion"
+    },
+    {
       "id": "view.output-preflight",
       "screen": "view",
       "variant": "output-preflight",
@@ -321,6 +385,14 @@
       "href": "?screen=view&variant=renderer-error"
     },
     {
+      "id": "view.result-bookmarks",
+      "screen": "view",
+      "variant": "result-bookmarks",
+      "label": "結果軸ブックマーク",
+      "intent": "固定時刻・極値時刻・しきい値交差を登録し、ケースごとに解決した位置と値を表示する。",
+      "href": "?screen=view&variant=result-bookmarks"
+    },
+    {
       "id": "view.single-pane",
       "screen": "view",
       "variant": "single-pane",
@@ -351,6 +423,14 @@
       "label": "ビュー・2分割",
       "intent": "任意のカメラ同期を使って2画面を比較する。",
       "href": "?screen=view&variant=split-two"
+    },
+    {
+      "id": "view.steady-result",
+      "screen": "view",
+      "variant": "steady-result",
+      "label": "定常結果・再生なし",
+      "intent": "結果軸を持たないケースでは、再生オーバーレイを出さず、動画と再生プリセットを利用不可として名指しする。",
+      "href": "?screen=view&variant=steady-result"
     },
     {
       "id": "view.temporal-axis",

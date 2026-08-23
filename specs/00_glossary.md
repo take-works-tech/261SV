@@ -409,6 +409,31 @@ Reference a term from any other spec by writing `@Term`.
 - decidedness: Fixed
 - basis: E-001 (T1)
 
+### GL-049 - Timeline
+- definition: one named, saved playback preset of a @View, holding six values: the start and end
+  positions on the @Result axis, the stride, the playback speed, the frame rate and whether it loops.
+  A @View owns several, so "the first five seconds slowly" and "the whole run at four times" are two
+  saved objects rather than two edits to one
+- not: a camera or a sequence of them. A timeline answers **when**; the camera answers **from where**,
+  and a video output names one of each, which is what lets the same timeline be played from a different
+  camera (XC-200). Nor the @Result axis itself, which belongs to the @Case and is the same whichever
+  timeline reads it
+- decidedness: Fixed
+- basis: E-120 (T1), E-121 (T1)
+
+### GL-050 - Comparison
+- definition: a saved workspace item that draws one base @View once per member of an ordered set,
+  varying **exactly one** axis - a @Case set, a position set on the @Result axis, a camera the View
+  owns, or one published property of the View such as the coloured quantity, the @Deformation scale or
+  the representation - and arranging the members as a grid or as one overlaid picture, with every
+  member labelled. It borrows the base View's objects, materials, lighting, background and guides
+  rather than holding any of its own, and its reference to that View is live (XC-202)
+- not: the interactive split of the canvas into panes, which is session state, may show anything per
+  pane, and is never saved into a definition. Nor a @Diff, which is a quantity - a comparison shows
+  members beside each other, a diff computes the difference between two
+- decidedness: Fixed
+- basis: E-123 (T1)
+
 ## Units
 
 CAE result files usually carry no unit information: the solver wrote numbers, and the meaning of those

@@ -39,9 +39,14 @@ export function Viewport({ paneIndex, compact = false, onObjectSelect }: Viewpor
         }}
       />
 
+      {/* One mock label per pane. The pane carried two - this badge and a separate status footer that
+          repeated it - and 11_ui.md asks for neither the footer nor the repetition: the in-viewport
+          mock label is sufficient. The clicked part's identity belongs here because clicking a part
+          identifies only the mock part. */}
       <div className="viewport-badges" aria-label="ビュー情報">
         <span>ペイン {paneIndex + 1}</span>
         <span className="viewport-badge-secondary">Three.js仮形状・解析値なし</span>
+        <span className="viewport-badge-selection"><MousePointer2 size={10} /> {selection}</span>
       </div>
 
       <div className="viewport-rail viewport-rail-left" aria-label="カメラ操作">
@@ -77,11 +82,6 @@ export function Viewport({ paneIndex, compact = false, onObjectSelect }: Viewpor
           onClick={() => setRepresentation('wireframe')}
           icon={<Grid3X3 size={14} />}
         />
-      </div>
-
-      <div className="viewport-status">
-        <span><MousePointer2 size={11} /> {selection}</span>
-        <span>表示用モック・データ未接続</span>
       </div>
     </div>
   )

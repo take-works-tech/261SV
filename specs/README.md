@@ -25,6 +25,8 @@ Index. The always-loaded layer points here and nowhere else; every body below is
 | [13_scripting.md](13_scripting.md) | the Python surface, the naming rule, and the expression language | - |
 | [14_reporting_standards.md](14_reporting_standards.md) | what a generated report may say, and in what language | - |
 | [15_derived_quantities.md](15_derived_quantities.md) | derived quantities, component frames, result axes, identifiers | - |
+| [16_application_model.md](16_application_model.md) | the complete product: shell grammar, areas, regions, transitions, element inventory, object model | - |
+| [17_user_scenarios.md](17_user_scenarios.md) | eleven end-to-end paths through the complete product | - |
 | [contracts/](contracts/) | data contracts, one file each | 3 |
 | [verification/plan.md](verification/plan.md) | how each acceptance criterion is verified | 6 |
 | [features/](features/) | one directory per feature | 2, 6 |

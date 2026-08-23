@@ -86,11 +86,16 @@ function MockAssembly({ representation, onSelect }: Pick<SceneProps, 'representa
 
   return (
     <group rotation={[0, -0.28, 0]}>
-      <BoxPart id="base" label="ベース（仮）" position={[0, -0.76, 0]} scale={[3.4, 0.34, 2.35]} color="#577f92" {...common} />
-      <BoxPart id="left-support" label="左支持部（仮）" position={[-1.22, 0.35, 0]} scale={[0.42, 2.25, 0.5]} color="#6e9cb0" {...common} />
-      <BoxPart id="right-support" label="右支持部（仮）" position={[1.22, 0.35, 0]} scale={[0.42, 2.25, 0.5]} color="#6e9cb0" {...common} />
-      <BoxPart id="bridge" label="上部連結（仮）" position={[0, 1.48, 0]} scale={[2.85, 0.42, 0.5]} color="#618c9f" {...common} />
-      <BoxPart id="rear-rib" label="補強リブ（仮）" position={[0, 0.12, -0.86]} scale={[2.4, 1.35, 0.18]} color="#4f7383" {...common} />
+      {/* The pane and the Outliner name the same elements. They used to name two disjoint sets - the
+          Outliner listed source-file placeholders while the mock parts were called ベース（仮） - so
+          "the selected row is synchronized with selection in the active viewport" could not happen and
+          the Object panel showed a name no row carried. The mock geometry stays labelled a mock; what
+          it no longer does is invent a second naming scheme. */}
+      <BoxPart id="［元ファイルの部品名 01］" label="［元ファイルの部品名 01］" position={[0, -0.76, 0]} scale={[3.4, 0.34, 2.35]} color="#577f92" {...common} />
+      <BoxPart id="［元ファイルの部品名 02］" label="［元ファイルの部品名 02］" position={[-1.22, 0.35, 0]} scale={[0.42, 2.25, 0.5]} color="#6e9cb0" {...common} />
+      <BoxPart id="［元ファイルの部品名 02］" label="［元ファイルの部品名 02］" position={[1.22, 0.35, 0]} scale={[0.42, 2.25, 0.5]} color="#6e9cb0" {...common} />
+      <BoxPart id="［元ファイルの部品名 02］" label="［元ファイルの部品名 02］" position={[0, 1.48, 0]} scale={[2.85, 0.42, 0.5]} color="#618c9f" {...common} />
+      <BoxPart id="［元ファイルの領域名］" label="［元ファイルの領域名］" position={[0, 0.12, -0.86]} scale={[2.4, 1.35, 0.18]} color="#4f7383" {...common} />
       {[
         [-1.1, -0.5, -0.76],
         [1.1, -0.5, -0.76],
@@ -99,8 +104,8 @@ function MockAssembly({ representation, onSelect }: Pick<SceneProps, 'representa
       ].map((position, index) => (
         <Bolt
           key={index}
-          id={`bolt-${index}`}
-          label={`固定具 ${index + 1}（仮）`}
+          id="［元ファイルの領域名］"
+          label="［元ファイルの領域名］"
           position={position as [number, number, number]}
           {...common}
         />

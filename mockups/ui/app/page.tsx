@@ -19,7 +19,9 @@ import {
   ArrowUpRight,
   ArrowUpDown,
   BarChart3,
+  Bookmark,
   Boxes,
+  Camera,
   ChartNoAxesCombined,
   ChevronDown,
   ChevronLeft,
@@ -29,10 +31,13 @@ import {
   ChevronUp,
   CircleDashed,
   Clock3,
+  Columns3,
   Copy,
   Cpu,
+  Crosshair,
   FileOutput,
   FileText,
+  Film,
   FolderOpen,
   FolderPlus,
   Gauge,
@@ -70,6 +75,7 @@ import {
   Square,
   Shapes,
   Tag,
+  Target,
   Trash2,
   Type,
   Upload,
@@ -165,6 +171,17 @@ const viewObjectKinds: Record<ViewObjectKind, { label: string; name: string; mat
   effect: { label: 'エフェクト', name: '強調表示（仮）', materialSurface: false, textProperties: false },
 }
 
+// view/AC-068: selection in the viewport or the @Outliner decides which View object the Object,
+// Materials and contextual Text sections edit. The rail used to read the scenario variant alone, so
+// clicking another element left every property form describing the previous one.
+const outlinerObjectKinds: Record<string, ViewObjectKind | 'container'> = {
+  '［元ファイルのルート名］': 'container',
+  '［元ファイルのアセンブリ名］': 'container',
+  '［元ファイルの部品名 01］': 'analysis-mesh',
+  '［元ファイルの部品名 02］': 'reference-mesh',
+  '［元ファイルの領域名］': 'point-cloud',
+}
+
 const viewObjectKindByVariant: Partial<Record<string, ViewObjectKind>> = {
   'object-analysis-mesh': 'analysis-mesh',
   'object-reference-mesh': 'reference-mesh',
@@ -175,6 +192,18 @@ const viewObjectKindByVariant: Partial<Record<string, ViewObjectKind>> = {
   'object-annotation': 'annotation',
   'object-effect': 'effect',
   'material-composition': 'analysis-mesh',
+}
+
+type ActiveViewObject = { name: string; kind: ViewObjectKind | 'container' }
+
+function activeViewObject(variant: string, selectedViewObjects: string[]): ActiveViewObject {
+  // The most recently selected object is the active one; the rest stay selected without producing an
+  // aggregate form (view/AC-068).
+  const name = selectedViewObjects.at(-1)
+  const selectedKind = name ? outlinerObjectKinds[name] : undefined
+  if (name && selectedKind) return { name, kind: selectedKind }
+  const kind = viewObjectKindByVariant[variant] ?? 'analysis-mesh'
+  return { name: name ?? viewObjectKinds[kind].name, kind }
 }
 
 const rightSidebarTabs: Record<ScreenId, SidebarTab[]> = {
@@ -188,8 +217,9 @@ const rightSidebarTabs: Record<ScreenId, SidebarTab[]> = {
     { id: 'history', label: '履歴', description: '実行結果と再現可能な処理履歴を確認します。', icon: Clock3 },
   ],
   view: [
-    { id: 'overall', label: '全体', description: '現在のビュー全体に関わる表示と操作を設定します。', icon: LayoutTemplate, scope: 'view' },
-    { id: 'rendering', label: '描画', description: '表示方式とレンダリング品質を調整します。', icon: MonitorCog, scope: 'view' },
+    { id: 'overall', label: '全体', description: 'ビュー項目と画面分割、キャンバスに重ねるガイドを設定します。', icon: LayoutTemplate, scope: 'view' },
+    { id: 'camera', label: 'カメラ', description: 'このビューが持つカメラを追加し、ポーズとレンズ、被写界深度を設定します。', icon: Camera, scope: 'view' },
+    { id: 'rendering', label: '描画', description: 'レンダラー、照明、現像を設定します。', icon: MonitorCog, scope: 'view' },
     { id: 'background', label: '背景', description: 'ビューの背景と周辺表現を設定します。', icon: ImageIcon, scope: 'view' },
     { id: 'output', label: '出力', description: '画像と動画の作成条件を設定します。', icon: FileOutput, scope: 'view' },
     { id: 'objects', label: 'オブジェクト', description: '選択中の表示オブジェクトを設定します。', icon: Shapes, scope: 'selection' },
@@ -237,7 +267,128 @@ const libraryCategoryMeta: Record<string, { label: string; icon: typeof Boxes }>
   layout: { label: 'レイアウト', icon: LayoutGrid },
 }
 
-const topMenus = ['ファイル', '編集', '表示', 'フィルタ', 'ツール', 'ヘルプ']
+// The keyboard scheme of 11_ui.md, shown where the commands are. "Every command is reachable from the
+// keyboard" was once a promise with nothing behind it; a scheme nobody can find is the same promise.
+// The exact key is a platform decision - what this table fixes is what has a shortcut and what may
+// never have one. `specGroup` names the row of the specification's keyboard table this group answers,
+// so a row added there fails the build until a group here carries it.
+const shortcutGroups: { group: string; specGroup: string; note: string; commands: { name: string; key: string | null; reason?: string }[] }[] = [
+  { group: 'ワークスペース', specGroup: 'workspace', note: 'プラットフォーム標準の修飾キーに従います', commands: [
+    { name: '新規', key: 'Ctrl + N' }, { name: '開く', key: 'Ctrl + O' }, { name: '保存', key: 'Ctrl + S' }, { name: '名前を付けて保存', key: 'Ctrl + Shift + S' },
+  ] },
+  { group: '取り消しとやり直し', specGroup: 'undo and redo', note: '1つの指示は1ステップ。スクリプト全体でも同じです（XC-061）', commands: [
+    { name: '取り消し', key: 'Ctrl + Z' }, { name: 'やり直し', key: 'Ctrl + Y' },
+  ] },
+  { group: '作業モード', specGroup: 'areas', note: '6モードに6キー。対象は変わりません', commands: [
+    { name: 'シミュレーション', key: 'Ctrl + 1' }, { name: 'ビュー', key: 'Ctrl + 2' }, { name: 'グラフ', key: 'Ctrl + 3' },
+    { name: 'レポート', key: 'Ctrl + 4' }, { name: '自動化', key: 'Ctrl + 5' }, { name: 'チャット', key: 'Ctrl + 6' },
+  ] },
+  { group: 'ケースツリー', specGroup: 'case tree', note: '検索は常設の入力欄で、ダイアログではありません', commands: [
+    { name: 'ケースを上下に移動', key: '↑ / ↓' }, { name: 'ケースを折りたたむ・展開する', key: '← / →' }, { name: 'ケースを文字入力で検索', key: '文字キー' },
+  ] },
+  { group: 'アウトライナー', specGroup: 'outliner', note: 'アクティブなビューにのみ作用し、元データの階層は編集しません', commands: [
+    { name: '構成要素を上下に移動', key: '↑ / ↓' }, { name: '構成要素を折りたたむ・展開する', key: '← / →' },
+    { name: '構成要素を文字入力で検索', key: '文字キー' }, { name: '表示・非表示を切り替え', key: 'H' }, { name: '分岐だけを表示', key: 'Shift + H' },
+  ] },
+  { group: '結果軸', specGroup: 'result axis', note: '軸が時刻・モード・周波数のいずれでも同じキーです（XC-131）', commands: [
+    { name: '再生／一時停止', key: 'Space' }, { name: '前へ', key: '←' }, { name: '次へ', key: '→' },
+    { name: '先頭', key: 'Home' }, { name: '末尾', key: 'End' },
+  ] },
+  { group: 'ビュー', specGroup: 'view', note: '変形の切り替えがあるからこそ、倍率は常に描き込まれます（INV-024）', commands: [
+    { name: '全体を表示', key: 'F' }, { name: '正投影方向', key: 'Numpad 1 / 3 / 7' }, { name: '変形倍率を1.0と設定値で切替', key: 'D' },
+  ] },
+  { group: '選択とプローブ', specGroup: 'selection and probe', note: '保持は常に明示操作で、自動では行いません', commands: [
+    { name: 'カーソル位置をプローブ', key: 'P' }, { name: 'プローブ値を変数として保持', key: 'Ctrl + P' },
+  ] },
+  { group: '指示バー', specGroup: 'instruction bar', note: 'エージェント支援の利用者がいちばん多く通る経路です', commands: [
+    { name: '指示バーへフォーカス', key: 'Ctrl + K' }, { name: 'フォーカスを元の位置へ戻す', key: 'Esc' },
+  ] },
+  { group: 'パネル', specGroup: 'panels', note: '表示状態だけを変え、解析内容や項目の定義は変えません', commands: [
+    { name: '左サイドバーの表示切替', key: 'Ctrl + B' }, { name: '右サイドバーの表示切替', key: 'Ctrl + Shift + B' },
+    { name: '分割レイアウトへ入る・出る', key: 'Ctrl + Alt + S' },
+  ] },
+  { group: '破壊的な操作', specGroup: 'destructive', note: 'いずれも単一キーを持ちません。確認を経由してのみ到達します（XC-062、XC-094）', commands: [
+    { name: 'ケースを削除', key: null, reason: '影響するケース数を示す確認から実行' },
+    { name: '対象集合をクリア', key: null, reason: '対象範囲を示す確認から実行' },
+    { name: '破壊的パイプラインユニットを実行', key: null, reason: '影響範囲の確認から実行' },
+  ] },
+]
+
+// One definition per key. The menus below and the instruction bar read from this table instead of
+// printing a second copy of `Ctrl + K` that nothing keeps in step (P7, XC-187).
+const commandByName = new Map(shortcutGroups.flatMap((group) => group.commands.map((command) => [command.name, command] as const)))
+
+function shortcutFor(name: string) {
+  return commandByName.get(name) ?? null
+}
+
+// The File/Edit/View/Filter/Tools/Help menus. They used to hold two generated placeholders per menu -
+// `ファイルを開く` and `ファイルの設定` - which named no command and taught no key. 11_ui.md requires a
+// shortcut to be discoverable from the thing it operates on: beside the action in the menu, and in the
+// command list. Both now read the one command table above.
+type TopMenuItem = { command: string; action?: TopMenuAction }
+type TopMenuAction = 'import' | 'settings' | 'shortcuts' | 'script' | 'notifications' | 'left-panel' | 'right-panel' | 'assistant' | 'network' | 'home'
+
+const topMenuCommands: { menu: string; items: TopMenuItem[] }[] = [
+  { menu: 'ファイル', items: [
+    { command: '新規', action: 'home' },
+    { command: '開く', action: 'home' },
+    { command: '保存' },
+    { command: '名前を付けて保存' },
+    { command: '結果ファイルを取り込む', action: 'import' },
+  ] },
+  { menu: '編集', items: [
+    { command: '取り消し' },
+    { command: 'やり直し' },
+    { command: 'ケースを削除' },
+    { command: '対象集合をクリア' },
+  ] },
+  { menu: '表示', items: [
+    { command: '左サイドバーの表示切替', action: 'left-panel' },
+    { command: '右サイドバーの表示切替', action: 'right-panel' },
+    { command: '分割レイアウトへ入る・出る' },
+    { command: '全体を表示' },
+    { command: '変形倍率を1.0と設定値で切替' },
+  ] },
+  { menu: 'フィルタ', items: [
+    { command: 'ケースを文字入力で検索' },
+    { command: '構成要素を文字入力で検索' },
+    { command: '分岐だけを表示' },
+  ] },
+  { menu: 'ツール', items: [
+    { command: 'カーソル位置をプローブ' },
+    { command: 'プローブ値を変数として保持' },
+    { command: '指示バーへフォーカス', action: 'assistant' },
+    { command: '操作のスクリプトを表示', action: 'script' },
+  ] },
+  { menu: 'ヘルプ', items: [
+    { command: 'コマンドとキーの一覧', action: 'shortcuts' },
+    { command: '通知履歴', action: 'notifications' },
+    { command: 'ネットワークと監査', action: 'network' },
+  ] },
+]
+
+function TopMenu({ menu, items, onAction }: { menu: string; items: TopMenuItem[]; onAction: (action: TopMenuAction) => void }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild><button type="button">{menu}</button></DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="top-menu-content command-menu">
+        {items.map((item) => {
+          const command = shortcutFor(item.command)
+          return (
+            <DropdownMenuItem key={item.command} onSelect={() => item.action && onAction(item.action)}>
+              <span>{item.command}</span>
+              {command && command.key === null
+                ? <em className="command-menu-no-key" title={command.reason}>キーなし</em>
+                : <kbd>{command?.key ?? '—'}</kbd>}
+            </DropdownMenuItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 
 function scenarioFor(screen: ScreenId, variant?: string) {
   return (
@@ -259,6 +410,7 @@ function MockupCatalog() {
   const router = useRouter()
   const params = useSearchParams()
   const [sharedDraft, setSharedDraft] = useState('')
+  const [conversationSettings, setConversationSettings] = useState<ConversationSettings>({ model: 'local', effort: 'standard', search: 'off' })
   const screen = (params.get('screen') as ScreenId | null) ?? 'home'
   const variant = params.get('variant') ?? 'default'
   const selected = scenarioFor(screenNames[screen] ? screen : 'home', variant)
@@ -267,7 +419,7 @@ function MockupCatalog() {
 
   return (
     <main className="mockup-root">
-      <ProductShell key={selected.id} scenario={selected} onScreen={navigateScreen} draft={sharedDraft} onDraftChange={setSharedDraft} />
+      <ProductShell key={selected.id} scenario={selected} onScreen={navigateScreen} draft={sharedDraft} onDraftChange={setSharedDraft} settings={conversationSettings} onSettingsChange={setConversationSettings} />
       <ScenarioCatalog selected={selected} onSelect={navigate} />
     </main>
   )
@@ -378,10 +530,15 @@ function startLibraryResize(
   handle.addEventListener('pointercancel', finish)
 }
 
-function ProductShell({ scenario, onScreen, draft, onDraftChange }: { scenario: Scenario; onScreen: (screen: ScreenId) => void; draft: string; onDraftChange: (draft: string) => void }) {
+function ProductShell({ scenario, onScreen, draft, onDraftChange, settings, onSettingsChange }: { scenario: Scenario; onScreen: (screen: ScreenId) => void; draft: string; onDraftChange: (draft: string) => void; settings: ConversationSettings; onSettingsChange: (settings: ConversationSettings) => void }) {
   const isHome = scenario.screen === 'home'
   const isChat = scenario.screen === 'chat'
   const isSettings = scenario.screen === 'settings'
+  // 11_ui.md's layout table grants the left column to Simulation, View, Graph, Report and Automation,
+  // and the chat history to Chat. Network and audit is in neither list: a case tree beside a
+  // workspace-wide permission implies the permission belongs to the selected case (the reasoning of
+  // XC-165, one screen over).
+  const showsCaseSidebar = scenario.screen !== 'network'
   const [leftOpen, setLeftOpen] = useState(true)
   const [rightOpen, setRightOpen] = useState(true)
   const [assistantOpen, setAssistantOpen] = useState(scenario.variant === 'assistant-drawer')
@@ -390,13 +547,50 @@ function ProductShell({ scenario, onScreen, draft, onDraftChange }: { scenario: 
   const [scriptOpen, setScriptOpen] = useState(false)
   const [itemListOpen, setItemListOpen] = useState(false)
   const [itemListQuery, setItemListQuery] = useState('')
+  const [itemListLayout, setItemListLayout] = useState<'grid' | 'list'>('grid')
+  const [itemListScope, setItemListScope] = useState('すべて')
+  const [selectedCase, setSelectedCase] = useState(scenario.variant === 'steady-result' ? '静荷重ケース' : workspaceCases[0].name)
+  // Which item is open in each area, and - for the View area - therefore which kind it is (XC-202).
+  const [openItems, setOpenItems] = useState<Partial<Record<ScreenId, string>>>(
+    scenario.screen === 'view' && scenario.variant.startsWith('comparison') ? { view: 'ケース比較' } : {},
+  )
+  const openViewItem = workItemHeaderByScreen.view?.items.find((item) => item.name === (openItems.view ?? workItemHeaderByScreen.view?.items[0].name)) ?? null
+  const isComparisonItem = openViewItem?.kind === 'comparison'
+  const [comparison, setComparison] = useState<ComparisonModel>({
+    axis: scenario.variant === 'comparison-range' ? 'resultPosition' : 'case',
+    members: workspaceCases.map((item) => item.name),
+    memberMode: scenario.variant === 'comparison-range' ? 'range' : 'enumerate',
+    rangeCount: 4,
+    arrangement: scenario.variant === 'comparison-overlay' ? 'overlay' : 'grid',
+    sharedColourMap: true,
+  })
+  const [viewItem, setViewItem] = useState<ViewItemState>(initialViewItem)
+  const [pipelineUnits, setPipelineUnits] = useState<PipelineUnitModel[]>(scenario.screen === 'pipeline' && scenario.variant === 'empty' ? [] : defaultPipelineUnits)
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>('unit-graph')
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(220)
   const [rightSidebarWidth, setRightSidebarWidth] = useState(286)
-  const viewObjectKind = viewObjectKindByVariant[scenario.variant] ?? 'analysis-mesh'
-  const [selectedViewObjects, setSelectedViewObjects] = useState([viewObjectKinds[viewObjectKind].name])
+  // A taxonomy variant seeds its own object; every other View state starts on a source element the
+  // Outliner actually lists, so the highlighted row and the Object panel name the same thing.
+  const [selectedViewObjects, setSelectedViewObjects] = useState([
+    viewObjectKindByVariant[scenario.variant]
+      ? viewObjectKinds[viewObjectKindByVariant[scenario.variant] as ViewObjectKind].name
+      : '［元ファイルの部品名 01］',
+  ])
 
   const selectViewObject = (name: string, additive = false) => {
     setSelectedViewObjects((current) => additive ? [...current.filter((item) => item !== name), name] : [name])
+  }
+
+  const runTopMenuAction = (action: TopMenuAction) => {
+    if (action === 'import') setImportOpen(true)
+    if (action === 'settings' || action === 'shortcuts') onScreen('settings')
+    if (action === 'script') setScriptOpen(true)
+    if (action === 'notifications') setNotificationsOpen(true)
+    if (action === 'left-panel') setLeftOpen((open) => !open)
+    if (action === 'right-panel') setRightOpen((open) => !open)
+    if (action === 'assistant') setAssistantOpen(true)
+    if (action === 'network') onScreen('network')
+    if (action === 'home') onScreen('home')
   }
 
   return (
@@ -409,7 +603,7 @@ function ProductShell({ scenario, onScreen, draft, onDraftChange }: { scenario: 
             <small>UIモック</small>
           </button>
           <nav className="main-menu" aria-label="メインメニュー">
-            {topMenus.map((menu) => <DropdownMenu key={menu}><DropdownMenuTrigger asChild><button>{menu}</button></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuItem>{menu}を開く</DropdownMenuItem><DropdownMenuItem>{menu}の設定</DropdownMenuItem></DropdownMenuContent></DropdownMenu>)}
+            {topMenuCommands.map(({ menu, items }) => <TopMenu key={menu} menu={menu} items={items} onAction={runTopMenuAction} />)}
           </nav>
           <div className="top-actions">
             <div className="view-switcher" aria-label="表示切替">
@@ -433,7 +627,7 @@ function ProductShell({ scenario, onScreen, draft, onDraftChange }: { scenario: 
           </div>
         </div>
         {!isHome && !isSettings && <div className="work-toolbar">
-          <Button variant="ghost" size="icon" className="panel-toggle panel-toggle-left" aria-label={leftOpen ? '左サイドバーを閉じる' : '左サイドバーを開く'} onClick={() => setLeftOpen((open) => !open)}><PanelLeft size={15} /></Button>
+          {showsCaseSidebar && <Button variant="ghost" size="icon" className="panel-toggle panel-toggle-left" aria-label={leftOpen ? '左サイドバーを閉じる' : '左サイドバーを開く'} onClick={() => setLeftOpen((open) => !open)}><PanelLeft size={15} /></Button>}
           <span className="tool-divider" />
           <button className="toolbar-button" aria-label="ファイルを取り込む" onClick={() => setImportOpen(true)}><Upload size={14} /></button>
           <button className="toolbar-button" aria-label="ワークスペースを保存"><Save size={14} /></button>
@@ -463,20 +657,20 @@ function ProductShell({ scenario, onScreen, draft, onDraftChange }: { scenario: 
         </div>
       ) : (
         <div
-          className={`workbench ${isChat ? 'chat-workbench' : ''} ${!leftOpen ? 'left-closed' : ''} ${!rightOpen || itemListOpen ? 'right-closed' : ''}`}
+          className={`workbench ${isChat ? 'chat-workbench' : ''} ${!leftOpen || !showsCaseSidebar ? 'left-closed' : ''} ${!rightOpen || itemListOpen ? 'right-closed' : ''}`}
           style={{ '--left-sidebar-width': `${leftSidebarWidth}px`, '--right-sidebar-width': `${rightSidebarWidth}px` } as React.CSSProperties}
         >
-          {leftOpen && <LeftSidebar screen={scenario.screen} width={leftSidebarWidth} setWidth={setLeftSidebarWidth} />}
+          {leftOpen && showsCaseSidebar && <LeftSidebar screen={scenario.screen} width={leftSidebarWidth} setWidth={setLeftSidebarWidth} selectedCase={selectedCase} onSelectCase={setSelectedCase} />}
           <section className="centre-column">
-            {scenario.screen !== 'chat' && <WorkAreaBar screen={scenario.screen} itemListOpen={itemListOpen} onItemListOpenChange={setItemListOpen} itemListQuery={itemListQuery} onItemListQueryChange={setItemListQuery} />}
+            {scenario.screen !== 'chat' && <WorkAreaBar screen={scenario.screen} itemListOpen={itemListOpen} onItemListOpenChange={setItemListOpen} itemListQuery={itemListQuery} onItemListQueryChange={setItemListQuery} itemListLayout={itemListLayout} onItemListLayoutChange={setItemListLayout} itemListScope={itemListScope} onItemListScopeChange={setItemListScope} openItems={openItems} onOpenItemChange={(screen, item) => setOpenItems((current) => ({ ...current, [screen]: item }))} />}
             <div className={`canvas-wrap ${scenario.screen === 'chat' ? 'chat-canvas-wrap' : ''} ${scenario.screen === 'view' && !itemListOpen ? 'view-canvas-wrap' : ''} ${itemListOpen ? 'work-item-list-wrap' : ''}`}>
-              {itemListOpen && scenario.screen !== 'chat' ? <WorkItemLibrary screen={scenario.screen} query={itemListQuery} onSelect={() => setItemListOpen(false)} /> : <ScreenCanvas scenario={scenario} draft={draft} onDraftChange={onDraftChange} onViewObjectSelect={selectViewObject} onScreen={onScreen} />}
-              {!isChat && assistantOpen && <AssistantDrawer draft={draft} onDraftChange={onDraftChange} onClose={() => setAssistantOpen(false)} onOpenChat={() => onScreen('chat')} />}
+              {itemListOpen && scenario.screen !== 'chat' ? <WorkItemLibrary screen={scenario.screen} query={itemListQuery} layout={itemListLayout} scope={itemListScope} onSelect={() => setItemListOpen(false)} /> : <ScreenCanvas scenario={scenario} draft={draft} onDraftChange={onDraftChange} onViewObjectSelect={selectViewObject} onScreen={onScreen} settings={settings} onSettingsChange={onSettingsChange} pipelineUnits={pipelineUnits} onPipelineUnitsChange={setPipelineUnits} selectedUnitId={selectedUnitId} onSelectUnit={setSelectedUnitId} selectedCase={selectedCase} viewItem={viewItem} onViewItemChange={setViewItem} isComparisonItem={isComparisonItem} comparison={comparison} baseViewName={openViewItem?.baseViewName ?? '標準ビュー'} />}
+              {!isChat && assistantOpen && <AssistantDrawer draft={draft} onDraftChange={onDraftChange} onClose={() => setAssistantOpen(false)} onOpenChat={() => onScreen('chat')} settings={settings} onSettingsChange={onSettingsChange} />}
             </div>
             {scenario.screen !== 'chat' && !itemListOpen && <AssetLibraryShelf screen={scenario.screen} variant={scenario.variant} />}
             {scenario.screen !== 'chat' && (assistantOpen ? null : <InstructionBar draft={draft} onDraftChange={onDraftChange} onOpen={() => setAssistantOpen(true)} />)}
           </section>
-          {!isChat && rightOpen && !itemListOpen && <RightSidebar screen={scenario.screen} variant={scenario.variant} width={rightSidebarWidth} setWidth={setRightSidebarWidth} selectedViewObjects={selectedViewObjects} onViewObjectSelect={selectViewObject} />}
+          {!isChat && rightOpen && !itemListOpen && <RightSidebar screen={scenario.screen} variant={scenario.variant} width={rightSidebarWidth} setWidth={setRightSidebarWidth} selectedViewObjects={selectedViewObjects} onViewObjectSelect={selectViewObject} pipelineUnits={pipelineUnits} onPipelineUnitsChange={setPipelineUnits} selectedUnitId={selectedUnitId} onSelectUnit={setSelectedUnitId} viewItem={viewItem} onViewItemChange={setViewItem} selectedCase={selectedCase} isComparisonItem={isComparisonItem} baseViewName={openViewItem?.baseViewName ?? '標準ビュー'} comparison={comparison} onComparisonChange={setComparison} />}
         </div>
       )}
       <ImportFlowDialog open={importOpen} onOpenChange={setImportOpen} initialStep={scenario.variant === 'import-review' ? 'review' : 'choose'} />
@@ -517,13 +711,26 @@ function NotificationHistory({ onClose }: { onClose: () => void }) {
     <div className="notification-history-list">
       <article><ShieldCheck size={14} /><span><b>ワークスペースを開きました</b><small>ローカル操作・外部通信なし</small></span></article>
       <article className="warning"><AlertTriangle size={14} /><span><b>未宣言の単位があります</b><small>変換は行わず、数量を未宣言として維持しています</small></span></article>
+      {/* A failure is shown where it happened *and* kept here, so a failure during a long run is not
+          lost by looking away. Neither surface replaces the other. */}
+      <article className="error"><AlertTriangle size={14} /><span><b>パイプライン：板厚変更ケースが失敗しました</b><small>グラフユニットで失敗・後続ユニットはこのケースだけスキップ</small></span></article>
     </div>
     <footer><button type="button">すべての通知を表示</button></footer>
   </section>
 }
 
+const importTagProposals = [
+  { tag: 'ソルバー：［書き出し元］', basis: '根拠：ファイルヘッダーの書き出し元' },
+  { tag: '要素数：［メッシュ規模］', basis: '根拠：読み取ったメッシュ規模の区分' },
+  { tag: '差分：板厚', basis: '根拠：兄弟ケースと異なる変数' },
+  { tag: '取込日：［日付］', basis: '根拠：ファイルの更新日時' },
+]
+
 function ImportFlowDialog({ open, onOpenChange, initialStep = 'choose' }: { open: boolean; onOpenChange: (open: boolean) => void; initialStep?: 'choose' | 'review' }) {
   const [step, setStep] = useState<'choose' | 'review' | 'importing'>(initialStep)
+  const [groupingAccepted, setGroupingAccepted] = useState<boolean | null>(null)
+  const [acceptedTags, setAcceptedTags] = useState<string[]>([])
+  const [rejectedTags, setRejectedTags] = useState<string[]>([])
   const close = () => { setStep('choose'); onOpenChange(false) }
   return <Dialog open={open} onOpenChange={(nextOpen) => nextOpen ? onOpenChange(true) : close()}>
     <DialogOverlay className="modal-backdrop" />
@@ -543,12 +750,40 @@ function ImportFlowDialog({ open, onOpenChange, initialStep = 'choose' }: { open
           <p><AlertTriangle size={13} /><span><b>単位</b><small>取込直後は未宣言。利用者が宣言するまで変換不可</small></span></p>
           <p><AlertTriangle size={13} /><span><b>座標フレーム</b><small>解決できないフレームや尺度なら取込を拒否</small></span></p>
         </section>
+        {/* XC-120: grouping and tags are *proposals*. Nothing is applied until accepted, in one action
+            for the whole import, and a rejected proposal is not offered again in this session. The
+            review step listed only the format checks, so the state the specification names - proposed
+            grouping and tags, nothing applied - had nowhere to appear. */}
+        <section className="import-proposals" aria-label="提案された分類とタグ">
+          <header><b>提案された分類とタグ</b><small>読み取れた内容からの提案です。受け入れるまで何も適用しません</small></header>
+          <div className="import-proposal-group">
+            <span className="import-proposal-kind">分類</span>
+            <p>［選択したファイル群］を1つの設計スタディとしてまとめる（根拠：同一フォルダー・連続する更新日時）</p>
+            <div>
+              <button type="button" className={groupingAccepted === true ? 'active' : ''} aria-pressed={groupingAccepted === true} onClick={() => setGroupingAccepted(true)}>受け入れる</button>
+              <button type="button" className={groupingAccepted === false ? 'active' : ''} aria-pressed={groupingAccepted === false} onClick={() => setGroupingAccepted(false)}>今回は使わない</button>
+            </div>
+          </div>
+          <ul className="import-proposal-tags">
+            {importTagProposals.filter((proposal) => !rejectedTags.includes(proposal.tag)).map((proposal) => (
+              <li key={proposal.tag}>
+                <label><input type="checkbox" checked={acceptedTags.includes(proposal.tag)} onChange={(event) => setAcceptedTags((current) => event.target.checked ? [...current, proposal.tag] : current.filter((tag) => tag !== proposal.tag))} /><b>{proposal.tag}</b><small>{proposal.basis}</small></label>
+                <button type="button" aria-label={`${proposal.tag}の提案を今回は出さない`} onClick={() => { setRejectedTags((current) => [...current, proposal.tag]); setAcceptedTags((current) => current.filter((tag) => tag !== proposal.tag)) }}><X size={11} /></button>
+              </li>
+            ))}
+            {importTagProposals.every((proposal) => rejectedTags.includes(proposal.tag)) && <li className="import-proposal-empty">提案はすべて却下しました。このセッションでは再提案しません。</li>}
+          </ul>
+          <footer>
+            <button type="button" onClick={() => setAcceptedTags(importTagProposals.filter((proposal) => !rejectedTags.includes(proposal.tag)).map((proposal) => proposal.tag))}>すべて受け入れる</button>
+            <small>{acceptedTags.length}件のタグを取込時に付与します。却下した提案はこのセッションでは再提案しません。</small>
+          </footer>
+        </section>
       </>}
       {step === 'importing' && <section className="workflow-progress" aria-live="polite"><CircleDashed size={22} /><span><b>構造と完全性を検証しています</b><small>キャンセルしても部分ケースを残しません</small></span><i><span /></i></section>}
       <footer>
         <button type="button" onClick={close}>キャンセル</button>
         {step === 'choose' && <button type="button" className="primary-button" onClick={() => setStep('review')}>ファイルを選択</button>}
-        {step === 'review' && <button type="button" className="primary-button" onClick={() => setStep('importing')}>検証して取込</button>}
+        {step === 'review' && <button type="button" className="primary-button" onClick={() => setStep('importing')}>{acceptedTags.length > 0 || groupingAccepted ? '提案を受け入れて取込' : '提案を適用せず取込'}</button>}
       </footer>
     </DialogContent>
   </Dialog>
@@ -558,8 +793,14 @@ function WorkspaceHome({ variant, onOpenView, onImport }: { variant: string; onO
   const [homeQuery, setHomeQuery] = useState('')
   const [homeFilter, setHomeFilter] = useState('すべて')
   const [homeLayout, setHomeLayout] = useState<'grid' | 'list'>('grid')
+  const [homeTags, setHomeTags] = useState<string[]>([])
+  const [filterOpen, setFilterOpen] = useState(false)
   const workspaceItems = [['冷却ブラケット検討', '構造', 'ケース、テンプレート、パイプラインをまとめた設計検討', 'ローカル', '/thumbnails/bracket-1.png'], ['マニホールド流量検証', '流体', '複数条件を整理した流量検証ワークスペース', 'ローカル', '/thumbnails/manifold-1.png'], ['筐体熱解析', '熱', '熱解析結果とレポート構成を管理するワークスペース', 'ローカル', '/thumbnails/housing.png'], ['翼型空力検討', '流体', '翼型まわりの解析構成とレポートを整理するワークスペース', 'ローカル', '/thumbnails/wing.png']]
-  const visibleWorkspaces = workspaceItems.filter(([name, tag, description, scope]) => `${name} ${tag} ${description}`.includes(homeQuery.trim()) && (homeFilter === 'すべて' || homeFilter === '最近使用' || homeFilter === scope))
+  const availableHomeTags = Array.from(new Set(workspaceItems.map(([, tag]) => tag)))
+  const visibleWorkspaces = workspaceItems
+    .filter(([name, tag, description]) => `${name} ${tag} ${description}`.includes(homeQuery.trim()))
+    .filter(([, , , scope]) => homeFilter === 'すべて' || homeFilter === scope)
+    .filter(([, tag]) => homeTags.length === 0 || homeTags.includes(tag))
   if (variant === 'first-run') {
     return (
       <div className="home-state">
@@ -595,8 +836,29 @@ function WorkspaceHome({ variant, onOpenView, onImport }: { variant: string; onO
 
   return (
     <div className="home-page">
-      <div className="workspace-list-toolbar"><div><h1>ワークスペース一覧</h1><p>解析プロジェクトを整理・検索して開きます。</p></div><div className="home-tools"><label><Search size={15} /><input value={homeQuery} onChange={(event) => setHomeQuery(event.target.value)} placeholder="名前・説明・タグで検索" /></label><button aria-label="絞り込み"><SlidersHorizontal size={14} /></button><div className="layout-switch"><button className={homeLayout === 'grid' ? 'active' : ''} aria-label="グリッド表示" aria-pressed={homeLayout === 'grid'} onClick={() => setHomeLayout('grid')}><LayoutGrid size={14} /></button><button className={homeLayout === 'list' ? 'active' : ''} aria-label="リスト表示" aria-pressed={homeLayout === 'list'} onClick={() => setHomeLayout('list')}><List size={14} /></button></div><button className="primary-button" onClick={onOpenView}><Plus size={15} /> 新規ワークスペース</button></div></div>
-      <div className="workspace-filters">{['すべて', '最近使用', 'ローカル', '共有'].map((item) => <button className={homeFilter === item ? 'active' : ''} onClick={() => setHomeFilter(item)} key={item}>{item}</button>)}</div>
+      <div className="workspace-list-toolbar"><div><h1>ワークスペース一覧</h1><p>解析プロジェクトを整理・検索して開きます。</p></div><div className="home-tools"><label><Search size={15} /><input value={homeQuery} onChange={(event) => setHomeQuery(event.target.value)} placeholder="名前・説明・タグで検索" /></label>
+        <button type="button" className={homeTags.length > 0 ? 'active' : ''} aria-label="絞り込み" aria-expanded={filterOpen} aria-haspopup="listbox" onClick={() => setFilterOpen((open) => !open)}><SlidersHorizontal size={14} /></button>
+        <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+          <PopoverContent className="template-tag-popover home-filter-popover">
+            {/* The tags offered are the ones the listed workspaces actually carry; the picker never
+                proposes a tag no card has. */}
+            <header><b>タグで絞り込み</b>{homeTags.length > 0 && <Button variant="ghost" size="sm" type="button" onClick={() => setHomeTags([])}>すべて解除</Button>}</header>
+            <ul role="listbox" aria-label="ワークスペースのタグ" aria-multiselectable="true">
+              {availableHomeTags.map((tag) => (
+                <li key={tag} role="option" aria-selected={homeTags.includes(tag)}>
+                  <button type="button" onClick={() => setHomeTags((current) => current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag])}><span>{tag}</span>{homeTags.includes(tag) && <span aria-hidden="true">✓</span>}</button>
+                </li>
+              ))}
+            </ul>
+          </PopoverContent>
+        </Popover>
+        <div className="layout-switch"><button className={homeLayout === 'grid' ? 'active' : ''} aria-label="グリッド表示" aria-pressed={homeLayout === 'grid'} onClick={() => setHomeLayout('grid')}><LayoutGrid size={14} /></button><button className={homeLayout === 'list' ? 'active' : ''} aria-label="リスト表示" aria-pressed={homeLayout === 'list'} onClick={() => setHomeLayout('list')}><List size={14} /></button></div><button className="primary-button" onClick={onOpenView}><Plus size={15} /> 新規ワークスペース</button></div></div>
+      {/* The chips name the scope each card actually carries. A `最近使用` chip stood here while every
+          card reported `最終利用：—`, so it silently returned the whole list - a filter that quietly
+          does nothing is the same defect as a value quietly substituted. */}
+      <div className="workspace-filters">{(['すべて', 'ローカル', '共有'] as const).map((item) => <button className={homeFilter === item ? 'active' : ''} onClick={() => setHomeFilter(item)} key={item}>{item}</button>)}
+        {homeTags.map((tag) => <button className="workspace-filter-chip" key={tag} onClick={() => setHomeTags((current) => current.filter((item) => item !== tag))} aria-label={`${tag}を解除`}>{tag}<X size={10} /></button>)}
+      </div>
       <div className={`workspace-grid ${homeLayout === 'list' ? 'workspace-list-layout' : ''}`}>
         {visibleWorkspaces.map(([name, tag, description, scope, preview]) => (
           <button className="workspace-card" key={name} onClick={onOpenView}>
@@ -605,12 +867,13 @@ function WorkspaceHome({ variant, onOpenView, onImport }: { variant: string; onO
           </button>
         ))}
       </div>
-      {visibleWorkspaces.length === 0 && <div className="centred-state"><Search size={24} /><h2>一致するワークスペースはありません</h2><p>検索語または絞り込みを変更してください。</p></div>}
+      {visibleWorkspaces.length === 0 && <div className="centred-state"><Search size={24} /><h2>一致するワークスペースはありません</h2><p>{homeFilter === '共有' ? '共有スコープのワークスペースはこのモックアップにありません。' : '検索語または絞り込みを変更してください。'}</p></div>}
     </div>
   )
 }
 
-function LeftSidebar({ screen, width, setWidth }: { screen: ScreenId; width: number; setWidth: React.Dispatch<React.SetStateAction<number>> }) {
+function LeftSidebar({ screen, width, setWidth, selectedCase, onSelectCase }: { screen: ScreenId; width: number; setWidth: React.Dispatch<React.SetStateAction<number>>; selectedCase: string; onSelectCase: (name: string) => void }) {
+  const [caseQuery, setCaseQuery] = useState('')
   const chat = screen === 'chat'
   const [conversationQuery, setConversationQuery] = useState('')
   const conversations = ['結果の確認', 'レポート構成', '新しいチャット']
@@ -626,8 +889,8 @@ function LeftSidebar({ screen, width, setWidth }: { screen: ScreenId; width: num
           </div>
         ) : (
           <>
-            <div className="permanent-search"><Search size={13} /><input placeholder="ケースを検索・タグ絞込" /></div>
-            <WorkspaceSourceSections />
+            <div className="permanent-search"><Search size={13} /><input value={caseQuery} onChange={(event) => setCaseQuery(event.target.value)} placeholder="ケースを検索・タグ絞込" aria-label="ケースを検索" /></div>
+            <WorkspaceSourceSections selectedCase={selectedCase} onSelectCase={onSelectCase} query={caseQuery} onQueryChange={setCaseQuery} />
           </>
         )}
       </div>
@@ -691,23 +954,154 @@ function QuantityChip({ name, provenance, unit }: { name: string; provenance: Pr
   )
 }
 
-const workspaceCases = [
-  { name: '基準ケース', tags: ['基準'] },
-  { name: '板厚変更', tags: ['板厚', '要確認'] },
-  { name: '荷重変更', tags: ['荷重'] },
+// XC-104: every generated statement carries which of four kinds it is. This is a different taxonomy
+// from a quantity's provenance (GL-016, above): that one says where a *number* came from, this one
+// says what kind of *claim* a sentence is. The shared components table names both, and the mockup
+// carried only the first - so Report and Chat showed generated prose with nothing attached.
+type StatementKind = 'value' | 'comparison' | 'citation' | 'user'
+
+const statementKindLabels: Record<StatementKind, { short: string; full: string }> = {
+  value: { short: '値', full: 'データセットから読んだ値の記述' },
+  comparison: { short: '比較', full: '計算による比較' },
+  citation: { short: '引用', full: '参考資料からの引用' },
+  user: { short: '記述', full: '利用者が述べた内容' },
+}
+
+function StatementKindBadge({ kind, source }: { kind: StatementKind; source: string }) {
+  const label = statementKindLabels[kind]
+  return <em className={`statement-kind-badge statement-kind-${kind}`} title={`${label.full}：${source}`} aria-label={`${label.full}：${source}`}>{label.short}<small>{source}</small></em>
+}
+
+const workspaceCases: { name: string; tags: string[]; resultAxis: 'time' | 'steady'; references: string[] }[] = [
+  { name: '基準ケース', tags: ['基準'], resultAxis: 'time', references: ['ビュー「標準ビュー」', 'グラフ「ケース比較グラフ」', 'パイプライン「レポート生成フロー」の対象セット'] },
+  { name: '板厚変更', tags: ['板厚', '要確認'], resultAxis: 'time', references: ['グラフ「ケース比較グラフ」', 'パイプライン「レポート生成フロー」の対象セット'] },
+  { name: '荷重変更', tags: ['荷重'], resultAxis: 'time', references: ['パイプライン「レポート生成フロー」の対象セット'] },
+  { name: '静荷重ケース', tags: ['定常'], resultAxis: 'steady', references: [] },
 ]
+
+// XC-131: a steady @Case has no @Result axis at all. XC-160 already requires the playback overlay to be
+// absent rather than disabled there, and the same follows for anything that offers motion.
+const caseHasResultAxis = (name: string) => workspaceCases.find((item) => item.name === name)?.resultAxis !== 'steady'
 
 const workspaceVariables: { name: string; value: number | null; unit: string | null; digits: number; provenance: Provenance; expression?: string }[] = [
   { name: '荷重', value: 1200, unit: null, digits: 4, provenance: 'declared' },
   { name: '応力場', value: null, unit: null, digits: 7, provenance: 'dataset' },
   { name: '安全率', value: 1.83, unit: '—', digits: 3, provenance: 'computed', expression: '= 降伏応力 / 最大応力' },
   { name: '設計許容応力', value: 235, unit: 'MPa', digits: 3, provenance: 'reference', expression: '出典：設計ノート・数値根拠には使用しない' },
+  { name: '最大応力', value: null, unit: 'MPa', digits: 4, provenance: 'dataset' },
 ]
 
-function WorkspaceSourceSections() {
+// The shared @Expression editor named in 11_ui.md: the names in scope, unit checking, and the error at
+// the position it occurred. Graph, computed quantities and Pipeline each wrote a bare text input, so an
+// expression could name a variable that does not exist and nothing said where.
+type UnitSignature = Record<string, number>
+type ExpressionToken = { kind: 'name' | 'number' | 'op'; text: string; index: number }
+type ExpressionCheck = { status: 'ok' | 'error' | 'undeclared'; message: string; position: number; length: number }
+
+function tokeniseExpression(text: string): ExpressionToken[] {
+  const tokens: ExpressionToken[] = []
+  const pattern = /([+\-*/()]|<=|>=|==|<|>)|([0-9]+(?:\.[0-9]+)?)|([^\s+\-*/()<>=]+)/g
+  let match: RegExpExecArray | null
+  while ((match = pattern.exec(text)) !== null) {
+    if (match[1]) tokens.push({ kind: 'op', text: match[1], index: match.index })
+    else if (match[2]) tokens.push({ kind: 'number', text: match[2], index: match.index })
+    else tokens.push({ kind: 'name', text: match[3], index: match.index })
+  }
+  return tokens
+}
+
+function multiplySignature(left: UnitSignature, right: UnitSignature, sign: 1 | -1): UnitSignature {
+  const result: UnitSignature = { ...left }
+  for (const [unit, power] of Object.entries(right)) {
+    const next = (result[unit] ?? 0) + sign * power
+    if (next === 0) delete result[unit]
+    else result[unit] = next
+  }
+  return result
+}
+
+function describeSignature(signature: UnitSignature) {
+  const entries = Object.entries(signature)
+  if (entries.length === 0) return '無次元'
+  return entries.map(([unit, power]) => (power === 1 ? unit : `${unit}^${power}`)).join('·')
+}
+
+function sameSignature(left: UnitSignature, right: UnitSignature) {
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)])
+  return Array.from(keys).every((key) => (left[key] ?? 0) === (right[key] ?? 0))
+}
+
+// XC-003 decides the hard case: an undeclared unit is not treated as dimensionless, because that would
+// let `荷重 + 応力場` pass. The check stops and names which quantity has no declared unit.
+function checkExpression(text: string): ExpressionCheck {
+  const declared = new Map(workspaceVariables.map((variable) => [variable.name, variable.unit]))
+  const tokens = tokeniseExpression(text)
+  if (tokens.length === 0) return { status: 'error', message: '式が空です。', position: 0, length: 0 }
+  const unknown = tokens.find((token) => token.kind === 'name' && !declared.has(token.text))
+  if (unknown) return { status: 'error', message: `名前「${unknown.text}」はスコープにありません。`, position: unknown.index, length: unknown.text.length }
+  const undeclared = tokens.find((token) => token.kind === 'name' && declared.get(token.text) === null)
+  if (undeclared) return { status: 'undeclared', message: `「${undeclared.text}」の単位が未宣言のため、次元を検査できません。`, position: undeclared.index, length: undeclared.text.length }
+
+  let term: UnitSignature = {}
+  let pending: '*' | '/' | null = null
+  let started = false
+  let comparison: UnitSignature | null = null
+  for (const token of tokens) {
+    if (token.kind === 'op') {
+      if (token.text === '*' || token.text === '/') { pending = token.text; continue }
+      if (token.text === '(' || token.text === ')' || token.text === '+' || token.text === '-') { pending = null; continue }
+      comparison = term
+      term = {}
+      started = false
+      pending = null
+      continue
+    }
+    const unit = token.kind === 'number' ? null : declared.get(token.text) ?? null
+    const signature: UnitSignature = unit && unit !== '—' ? { [unit]: 1 } : {}
+    if (!started) { term = signature; started = true; continue }
+    term = multiplySignature(term, signature, pending === '/' ? -1 : 1)
+    pending = null
+  }
+  if (comparison && !sameSignature(comparison, term)) {
+    return { status: 'error', message: `比較の左右で次元が違います（${describeSignature(comparison)} と ${describeSignature(term)}）。`, position: 0, length: text.length }
+  }
+  return { status: 'ok', message: `次元を検査しました：${describeSignature(comparison ?? term)}`, position: 0, length: 0 }
+}
+
+function ExpressionEditor({ id, label, initial }: { id: string; label: string; initial: string }) {
+  const [text, setText] = useState(initial)
+  const check = checkExpression(text)
+  const caret = check.status === 'ok' ? '' : `${' '.repeat(check.position)}${'^'.repeat(Math.max(1, check.length))}`
+  return (
+    <section className="expression-editor" aria-label={`${label}の式`}>
+      <label htmlFor={`expression-${id}`}>{label}</label>
+      <input id={`expression-${id}`} className="expression-input" value={text} spellCheck={false} aria-invalid={check.status !== 'ok'} aria-describedby={`expression-status-${id}`} onChange={(event) => setText(event.target.value)} />
+      {check.status !== 'ok' && caret && <pre className="expression-caret" aria-hidden="true">{caret}</pre>}
+      <p id={`expression-status-${id}`} className={`expression-status expression-status-${check.status}`} role="status">
+        {check.status === 'ok' ? <ShieldCheck size={11} /> : <AlertTriangle size={11} />}
+        <span>{check.status !== 'ok' && check.length > 0 ? `${check.position + 1}文字目：${check.message}` : check.message}</span>
+      </p>
+      <div className="expression-scope" aria-label="スコープにある名前">
+        {workspaceVariables.map((variable) => (
+          <button type="button" key={variable.name} onClick={() => setText((current) => `${current}${current && !current.endsWith(' ') ? ' ' : ''}${variable.name}`)}>
+            <QuantityChip name={variable.name} provenance={variable.provenance} unit={variable.unit} />
+          </button>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function WorkspaceSourceSections({ selectedCase, onSelectCase, query, onQueryChange }: { selectedCase: string; onSelectCase: (name: string) => void; query: string; onQueryChange: (query: string) => void }) {
   const [tagFilter, setTagFilter] = useState<string | null>(null)
+  const [deleteCase, setDeleteCase] = useState<string | null>(null)
+  const [notice, setNotice] = useState('')
   const tags = Array.from(new Set(workspaceCases.flatMap((item) => item.tags)))
-  const visibleCases = tagFilter ? workspaceCases.filter((item) => item.tags.includes(tagFilter)) : workspaceCases
+  const needle = query.trim()
+  const visibleCases = workspaceCases
+    .filter((item) => !tagFilter || item.tags.includes(tagFilter))
+    .filter((item) => !needle || item.name.includes(needle) || item.tags.some((tag) => tag.includes(needle)) || item.name === selectedCase)
+  const references = workspaceCases.find((item) => item.name === deleteCase)?.references ?? []
   return (
     <>
       <SidebarSection title="ケース" icon={<FolderOpen size={13} />}>
@@ -716,14 +1110,27 @@ function WorkspaceSourceSections() {
           <Tag size={10} />
           {tags.map((tag) => <button className={tagFilter === tag ? 'active' : ''} key={tag} type="button" aria-pressed={tagFilter === tag} onClick={() => setTagFilter((current) => (current === tag ? null : tag))}>{tag}</button>)}
         </div>
-        <button className="tree-row active"><ChevronDown size={12} /><span><b>設計スタディ</b><small>{visibleCases.length}／{workspaceCases.length}ケース</small></span></button>
+        <button className="tree-row" type="button"><ChevronDown size={12} /><span><b>設計スタディ</b><small>{visibleCases.length}／{workspaceCases.length}ケース</small></span></button>
         {visibleCases.map((item) => (
-          <button className="tree-row nested" key={item.name}>
-            <Square size={10} />
-            <span><b>{item.name}</b><small>{item.tags.join('・')}</small></span>
-          </button>
+          <div className={`tree-row nested case-row ${selectedCase === item.name ? 'active' : ''}`} key={item.name}>
+            <button type="button" className="case-row-select" aria-pressed={selectedCase === item.name} onClick={() => onSelectCase(item.name)}>
+              <Square size={10} />
+              <span><b>{item.name}</b><small>{item.tags.join('・')}</small></span>
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild><button type="button" className="case-row-more" aria-label={`${item.name}の操作`}><MoreHorizontal size={13} /></button></DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => setNotice(`${item.name}の名前編集を開始しました`)}><Pencil size={12} />名前を変更</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setNotice(`${item.name}にタグを付与しました`)}><Tag size={12} />タグを付与</DropdownMenuItem>
+                {/* XC-062: deleting a @Case is confirmed by naming what changes and how many places. */}
+                <DropdownMenuItem onSelect={() => setDeleteCase(item.name)}><Trash2 size={12} />削除</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         ))}
+        {visibleCases.length === 0 && <p className="filter-note">「{needle}」に一致するケースはありません。<button type="button" className="filter-note-action" onClick={() => onQueryChange('')}>検索を解除</button></p>}
         {tagFilter && <p className="filter-note">タグ「{tagFilter}」で絞り込み中。選択中のケースは範囲外でも表示されます。</p>}
+        {notice && <p className="filter-note" role="status">{notice}</p>}
       </SidebarSection>
       <SidebarSection title="変数" icon={<Variable size={13} />}>
         {/* One list holding declared values, fields read from data, computed quantities and values
@@ -737,6 +1144,16 @@ function WorkspaceSourceSections() {
         <p className="filter-note">行はそのまま入力へドラッグできます。値の由来は表示のたびに付け直すのではなく、値と一緒に運ばれます。</p>
       </SidebarSection>
       <SidebarSection title="参考資料" icon={<FileText size={13} />}><button className="tree-row"><FileText size={11} /><span><b>設計ノート</b><small>数値根拠には使用しない</small></span></button></SidebarSection>
+      <Dialog open={deleteCase !== null} onOpenChange={(open) => { if (!open) setDeleteCase(null) }}>
+        <DialogOverlay className="modal-backdrop" />
+        <DialogContent className="workflow-dialog compact-workflow-dialog">
+          <header><span><small>削除の確認</small><b>{deleteCase}</b></span><button type="button" aria-label="ケース削除の確認を閉じる" onClick={() => setDeleteCase(null)}><X size={15} /></button></header>
+          <p>このケースを参照している箇所は{references.length}件です。削除するとその参照は未解決になり、代替値では埋めません。</p>
+          <ul className="confirmation-reference-list">{references.map((reference) => <li key={reference}>{reference}</li>)}</ul>
+          <p className="workflow-trust-note"><ShieldCheck size={13} />ワークスペースの変更としてUndoできます。書き出し済みファイルは削除しません。</p>
+          <footer><button type="button" onClick={() => setDeleteCase(null)}>キャンセル</button><button type="button" className="danger-button" onClick={() => { setNotice(`${deleteCase}を削除しました。参照${references.length}件は未解決として残ります`); setDeleteCase(null) }}>{references.length}件の参照ごと削除</button></footer>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
@@ -745,43 +1162,56 @@ function SidebarSection({ title, icon, children }: { title: string; icon: React.
   return <section className="sidebar-section"><h3>{icon}{title}<ChevronDown size={11} /></h3>{children}</section>
 }
 
+// XC-202: the View area holds two kinds of item. A comparison is not a second work area and not a
+// mode of every View - it is an item that names a base View and varies one axis.
+type WorkItemKind = 'single' | 'comparison'
+type WorkItem = { name: string; tags: string[]; scope: 'ローカル' | '共有'; kind?: WorkItemKind; baseViewName?: string; usedBy?: string[] }
+
 type WorkItemHeader = {
   title: string
   itemLabel: string
   detail: string
   createLabel: string
-  items: string[]
+  items: WorkItem[]
 }
 
 const workItemHeaderByScreen: Partial<Record<ScreenId, WorkItemHeader>> = {
-  simulation: { title: 'シミュレーション', itemLabel: 'シミュレーション', detail: '外部ソルバー実行定義・後続リリース', createLabel: '新規シミュレーション', items: ['基準シミュレーション', '材料条件スタディ'] },
-  view: { title: 'ビュー', itemLabel: 'ビュー', detail: 'ワークスペース内のビューを編集中', createLabel: '新規ビュー', items: ['標準ビュー', 'ケース比較ビュー'] },
-  graph: { title: 'グラフ', itemLabel: 'グラフ', detail: 'ワークスペース内のグラフを編集中', createLabel: '新規グラフ', items: ['ケース比較グラフ', '結果推移グラフ'] },
-  report: { title: 'レポート', itemLabel: 'レポート', detail: 'ワークスペース内のレポートを編集中', createLabel: '新規レポート', items: ['設計レビューレポート', '要約レポート'] },
-  pipeline: { title: '自動化', itemLabel: 'パイプライン', detail: '結果処理と成果物生成を自動化', createLabel: '新規パイプライン', items: ['レポート生成フロー', 'ケース比較フロー'] },
+  simulation: { title: 'シミュレーション', itemLabel: 'シミュレーション', detail: '外部ソルバー実行定義・後続リリース', createLabel: '新規シミュレーション', items: [{ name: '基準シミュレーション', tags: ['基準'], scope: 'ローカル' }, { name: '材料条件スタディ', tags: ['材料'], scope: 'ローカル' }] },
+  view: { title: 'ビュー', itemLabel: 'ビュー', detail: 'ワークスペース内のビューを編集中', createLabel: '新規ビュー', items: [
+    { name: '標準ビュー', tags: ['標準'], scope: 'ローカル', kind: 'single', usedBy: ['比較「ケース比較」', '比較「時刻比較」', 'レポート「設計レビューレポート」'] },
+    { name: 'ケース比較', tags: ['比較'], scope: 'ローカル', kind: 'comparison', baseViewName: '標準ビュー' },
+    { name: '時刻比較', tags: ['比較'], scope: '共有', kind: 'comparison', baseViewName: '標準ビュー' },
+  ] },
+  graph: { title: 'グラフ', itemLabel: 'グラフ', detail: 'ワークスペース内のグラフを編集中', createLabel: '新規グラフ', items: [{ name: 'ケース比較グラフ', tags: ['比較'], scope: 'ローカル' }, { name: '結果推移グラフ', tags: ['推移'], scope: 'ローカル' }] },
+  report: { title: 'レポート', itemLabel: 'レポート', detail: 'ワークスペース内のレポートを編集中', createLabel: '新規レポート', items: [{ name: '設計レビューレポート', tags: ['レビュー'], scope: 'ローカル' }, { name: '要約レポート', tags: ['要約'], scope: '共有' }] },
+  pipeline: { title: '自動化', itemLabel: 'パイプライン', detail: '結果処理と成果物生成を自動化', createLabel: '新規パイプライン', items: [{ name: 'レポート生成フロー', tags: ['レポート'], scope: 'ローカル' }, { name: 'ケース比較フロー', tags: ['比較'], scope: 'ローカル' }] },
 }
 
-function WorkAreaBar({ screen, itemListOpen, onItemListOpenChange, itemListQuery, onItemListQueryChange }: { screen: ScreenId; itemListOpen: boolean; onItemListOpenChange: (open: boolean) => void; itemListQuery: string; onItemListQueryChange: (query: string) => void }) {
+function WorkAreaBar({ screen, itemListOpen, onItemListOpenChange, itemListQuery, onItemListQueryChange, itemListLayout, onItemListLayoutChange, itemListScope, onItemListScopeChange, openItems, onOpenItemChange }: { screen: ScreenId; itemListOpen: boolean; onItemListOpenChange: (open: boolean) => void; itemListQuery: string; onItemListQueryChange: (query: string) => void; itemListLayout: 'grid' | 'list'; onItemListLayoutChange: (layout: 'grid' | 'list') => void; itemListScope: string; onItemListScopeChange: (scope: string) => void; openItems: Partial<Record<ScreenId, string>>; onOpenItemChange: (screen: ScreenId, item: string) => void }) {
   const itemHeader = workItemHeaderByScreen[screen]
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
   const [previewTop, setPreviewTop] = useState<number | null>(null)
-  const [selectedByScreen, setSelectedByScreen] = useState<Partial<Record<ScreenId, string>>>({})
   const [createOpen, setCreateOpen] = useState(false)
+  const [createKind, setCreateKind] = useState<WorkItemKind>('single')
   const [deleteItem, setDeleteItem] = useState<string | null>(null)
   const [templateItem, setTemplateItem] = useState<string | null>(null)
   const [templateScope, setTemplateScope] = useState<'workspace' | 'shared'>('workspace')
   const [itemNotice, setItemNotice] = useState('')
 
   if (!itemHeader) {
-    return <div className="work-area-bar"><div className="work-area-static"><span className="eyebrow">{screenNames[screen]}</span><b>{screenNames[screen]}</b><small>対象ワークスペースは変わりません</small></div></div>
+    // Network and audit has no saved workspace item to switch between. This bar printed the screen
+    // name twice - once as the eyebrow and once as the title - which said nothing the second time.
+    return <div className="work-area-bar"><div className="work-area-static"><span className="eyebrow">ワークスペース権限</span><b>{screenNames[screen]}</b><small>このワークスペースから外部へ出せる内容と、実際に出た記録</small></div></div>
   }
-  const selectedItem = selectedByScreen[screen] ?? itemHeader.items[0]
-  const visibleItems = itemHeader.items.filter((item) => item.includes(query.trim()))
+  const selectedItem = openItems[screen] ?? itemHeader.items[0].name
+  const selectedWorkItem = itemHeader.items.find((item) => item.name === selectedItem) ?? itemHeader.items[0]
+  const visibleItems = itemHeader.items.filter((item) => item.name.includes(query.trim()))
+  const deleteItemReferences = itemHeader.items.find((item) => item.name === deleteItem)?.usedBy ?? []
 
   const selectItem = (item: string) => {
-    setSelectedByScreen((current) => ({ ...current, [screen]: item }))
+    onOpenItemChange(screen, item)
     setOpen(false)
     setQuery('')
     setPreviewIndex(null)
@@ -814,16 +1244,18 @@ function WorkAreaBar({ screen, itemListOpen, onItemListOpenChange, itemListQuery
           aria-controls={`work-item-list-${screen}`}
           onClick={() => setOpen((current) => !current)}
         >
-          <span className="work-item-selector-copy"><small className="work-item-selector-kind">{itemHeader.itemLabel}</small><b>{selectedItem}</b></span>
+          <span className="work-item-selector-copy"><small className="work-item-selector-kind">{selectedWorkItem.kind === 'comparison' ? '比較' : itemHeader.itemLabel}</small><b>{selectedItem}</b>{selectedWorkItem.kind === 'comparison' && <em className="work-item-base">基準：{selectedWorkItem.baseViewName}</em>}</span>
           <ChevronDown size={14} aria-hidden="true" />
         </button>
         {open && (
           <section className="work-item-popover" aria-label={`${itemHeader.itemLabel}一覧`}>
             <label><Search size={13} aria-hidden="true" /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`${itemHeader.itemLabel}を検索`} /></label>
             <div id={`work-item-list-${screen}`} role="listbox" aria-label={`${itemHeader.itemLabel}一覧`} onMouseLeave={() => { setPreviewIndex(null); setPreviewTop(null) }}>
-              {visibleItems.map((item, index) => (
+              {visibleItems.map((entry, index) => {
+                const item = entry.name
+                return (
                 <div className={`work-item-option ${selectedItem === item ? 'active' : ''}`} key={item} onMouseEnter={(event) => showPreview(event, index)} onFocus={(event) => showPreview(event, index)}>
-                  <button type="button" role="option" aria-selected={selectedItem === item} onClick={() => selectItem(item)}><span>{item}</span><small>{selectedItem === item ? '編集中' : 'ワークスペース項目'}</small></button>
+                  <button type="button" role="option" aria-selected={selectedItem === item} onClick={() => selectItem(item)}><span>{item}{entry.kind === 'comparison' && <em className="work-item-kind-badge"><Columns3 size={9} />比較</em>}</span><small>{entry.kind === 'comparison' ? `基準ビュー：${entry.baseViewName}` : selectedItem === item ? '編集中' : 'ワークスペース項目'}</small></button>
                   <DropdownMenu><DropdownMenuTrigger asChild><button type="button" className="work-item-more" aria-label={`${item}の操作`}><MoreHorizontal size={14} /></button></DropdownMenuTrigger><DropdownMenuContent align="end">
                     <DropdownMenuItem onSelect={() => setItemNotice(`${item}の名前編集を開始しました`)}><Pencil size={12} />名前を変更</DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => setItemNotice(`${item}を独立した複製として作成しました`)}><Copy size={12} />複製</DropdownMenuItem>
@@ -834,7 +1266,8 @@ function WorkAreaBar({ screen, itemListOpen, onItemListOpenChange, itemListQuery
                     <DropdownMenuItem onSelect={() => setDeleteItem(item)}><Trash2 size={12} />削除</DropdownMenuItem>
                   </DropdownMenuContent></DropdownMenu>
                 </div>
-              ))}
+                )
+              })}
               {visibleItems.length === 0 && <p>一致する{itemHeader.itemLabel}はありません。</p>}
             </div>
             {open && previewIndex !== null && (screen === 'view' || screen === 'graph' || screen === 'report') && <div className="work-item-popover-preview" style={{ top: `${previewTop ?? 48}px` }}><WorkItemPreview screen={screen} index={previewIndex} /></div>}
@@ -843,28 +1276,61 @@ function WorkAreaBar({ screen, itemListOpen, onItemListOpenChange, itemListQuery
       </div>}
       {itemListOpen && <div className="work-area-list-tools">
         <div className="work-area-list-search"><Search size={14} aria-hidden="true" /><Input value={itemListQuery} onChange={(event) => onItemListQueryChange(event.target.value)} className="work-area-list-search-input" placeholder={`${itemHeader.itemLabel}・説明・タグで検索`} aria-label={`${itemHeader.itemLabel}を検索`} /></div>
-        <Button variant="outline" size="icon" aria-label="絞り込み"><SlidersHorizontal size={14} /></Button>
-        <div className="layout-switch"><Button variant="ghost" size="icon" className="active" aria-label="グリッド表示"><LayoutGrid size={14} /></Button><Button variant="ghost" size="icon" aria-label="リスト表示"><List size={14} /></Button></div>
+        <div className="work-area-list-scope" role="group" aria-label={`${itemHeader.itemLabel}の保存範囲`}>
+          {['すべて', 'ローカル', '共有'].map((value) => <button type="button" key={value} className={itemListScope === value ? 'active' : ''} aria-pressed={itemListScope === value} onClick={() => onItemListScopeChange(value)}>{value}</button>)}
+        </div>
+        <div className="layout-switch"><Button variant="ghost" size="icon" className={itemListLayout === 'grid' ? 'active' : ''} aria-pressed={itemListLayout === 'grid'} aria-label="グリッド表示" onClick={() => onItemListLayoutChange('grid')}><LayoutGrid size={14} /></Button><Button variant="ghost" size="icon" className={itemListLayout === 'list' ? 'active' : ''} aria-pressed={itemListLayout === 'list'} aria-label="リスト表示" onClick={() => onItemListLayoutChange('list')}><List size={14} /></Button></div>
       </div>}
       <Button className="primary-button" aria-label={`${itemHeader.createLabel}を作成`} onClick={() => setCreateOpen(true)}><Plus size={14} /> {itemHeader.createLabel}</Button>
       {itemNotice && <span className="work-item-notice" role="status">{itemNotice}</span>}
       <Dialog open={templateItem !== null} onOpenChange={(open) => { if (!open) setTemplateItem(null) }}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog compact-workflow-dialog"><header><span><small>{itemHeader.itemLabel}</small><b>テンプレートとして保存</b></span><button type="button" aria-label="テンプレート保存を閉じる" onClick={() => setTemplateItem(null)}><X size={15} /></button></header><div className="settings-fields"><label><span>名前</span><input defaultValue={`${templateItem ?? ''}のテンプレート`} /></label><label><span>保存先スコープ</span><Select value={templateScope} onValueChange={(value) => setTemplateScope(value as 'workspace' | 'shared')}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="workspace">このワークスペース</SelectItem><SelectItem value="shared">共有</SelectItem></SelectContent></Select></label></div><p className="workflow-trust-note"><ShieldCheck size={13} />定義を新しいテンプレート版として複写します。生きたリンクは作られないため、後からテンプレートを編集しても「{templateItem}」は変わりません。</p><footer><button type="button" onClick={() => setTemplateItem(null)}>戻る</button><button type="button" className="primary-button" onClick={() => { setItemNotice(`${templateItem}を${templateScope === 'shared' ? '共有' : 'このワークスペース'}のテンプレートとして保存しました`); setTemplateItem(null) }}>保存</button></footer></DialogContent></Dialog>
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog compact-workflow-dialog"><header><span><small>{itemHeader.itemLabel}</small><b>{itemHeader.createLabel}</b></span><button type="button" aria-label="新規作成を閉じる" onClick={() => setCreateOpen(false)}><X size={15} /></button></header><div className="creation-options"><button type="button" onClick={() => { setItemNotice(`空の${itemHeader.itemLabel}を作成しました`); setCreateOpen(false) }}><Plus size={18} /><span><b>空から作成</b><small>独立したワークスペース項目</small></span></button>{screen !== 'simulation' && <button type="button" onClick={() => { setItemNotice('テンプレートの解決確認へ進みます'); setCreateOpen(false) }}><LayoutTemplate size={18} /><span><b>テンプレートから作成</b><small>解決結果を確認してから作成</small></span></button>}</div>{screen === 'simulation' && <p className="workflow-trust-note"><AlertTriangle size={13} />定義は保存できますが、r1では外部ソルバーを実行しません。</p>}</DialogContent></Dialog>
-      <Dialog open={Boolean(deleteItem)} onOpenChange={(open) => !open && setDeleteItem(null)}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog compact-workflow-dialog"><header><span><small>削除の確認</small><b>{deleteItem}</b></span><button type="button" aria-label="削除確認を閉じる" onClick={() => setDeleteItem(null)}><X size={15} /></button></header><p>この{itemHeader.itemLabel}だけを削除します。テンプレートや出力済みファイルは削除しません。</p><footer><button type="button" onClick={() => setDeleteItem(null)}>キャンセル</button><button type="button" className="danger-button" onClick={() => { setItemNotice(`${deleteItem}を削除しました`); setDeleteItem(null) }}>削除</button></footer></DialogContent></Dialog>
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog compact-workflow-dialog">
+        <header><span><small>{itemHeader.itemLabel}</small><b>{itemHeader.createLabel}</b></span><button type="button" aria-label="新規作成を閉じる" onClick={() => setCreateOpen(false)}><X size={15} /></button></header>
+        {/* XC-202: the View area holds two kinds. Choosing here is what makes a comparison an item
+            rather than a mode every View has to carry. */}
+        {screen === 'view' && <div className="creation-kind" role="radiogroup" aria-label="作成する種別">
+          {([['single', '単一ビュー', '1ケース・1カメラ・1結果位置の絵'], ['comparison', '比較', '基準ビューを1本の軸で振って並べる']] as const).map(([kind, label, detail]) => (
+            <label key={kind} className={createKind === kind ? 'active' : ''}>
+              <input type="radio" name="create-kind" checked={createKind === kind} onChange={() => setCreateKind(kind)} />
+              <span><b>{label}</b><small>{detail}</small></span>
+            </label>
+          ))}
+        </div>}
+        {screen === 'view' && createKind === 'comparison'
+          ? <>
+              <div className="settings-fields">
+                <label><span>基準ビュー</span><Select defaultValue="standard"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{itemHeader.items.filter((item) => item.kind !== 'comparison').map((item) => <SelectItem value="standard" key={item.name}>{item.name}</SelectItem>)}</SelectContent></Select></label>
+                <label><span>変える軸</span><Select defaultValue="case"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{(Object.keys(comparisonAxisLabels) as ComparisonAxis[]).map((axis) => <SelectItem value={axis} key={axis}>{comparisonAxisLabels[axis]}</SelectItem>)}</SelectContent></Select></label>
+              </div>
+              <p className="workflow-trust-note"><ShieldCheck size={13} />比較は自前のマテリアル・照明・背景を持ちません。基準ビューへの生きた参照なので、基準ビューを直すと全ペインが変わります。</p>
+              <footer><button type="button" onClick={() => setCreateOpen(false)}>キャンセル</button><button type="button" className="primary-button" onClick={() => { setItemNotice('比較を作成しました。基準ビューを参照します'); setCreateOpen(false) }}>比較を作成</button></footer>
+            </>
+          : <>
+              <div className="creation-options">
+                <button type="button" onClick={() => { setItemNotice(`空の${itemHeader.itemLabel}を作成しました`); setCreateOpen(false) }}><Plus size={18} /><span><b>空から作成</b><small>独立したワークスペース項目</small></span></button>
+                {screen !== 'simulation' && <button type="button" onClick={() => { setItemNotice('テンプレートの解決確認へ進みます'); setCreateOpen(false) }}><LayoutTemplate size={18} /><span><b>テンプレートから作成</b><small>解決結果を確認してから作成</small></span></button>}
+              </div>
+              {screen === 'simulation' && <p className="workflow-trust-note"><AlertTriangle size={13} />定義は保存できますが、r1では外部ソルバーを実行しません。</p>}
+            </>}
+      </DialogContent></Dialog>
+      <Dialog open={Boolean(deleteItem)} onOpenChange={(open) => !open && setDeleteItem(null)}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog compact-workflow-dialog"><header><span><small>削除の確認</small><b>{deleteItem}</b></span><button type="button" aria-label="削除確認を閉じる" onClick={() => setDeleteItem(null)}><X size={15} /></button></header><p>この{itemHeader.itemLabel}だけを削除します。テンプレートや出力済みファイルは削除しません。</p>{deleteItemReferences.length > 0 && <><p className="workflow-trust-note blocked"><AlertTriangle size={13} />この{itemHeader.itemLabel}を参照している項目が{deleteItemReferences.length}件あります。削除すると未解決になり、別の{itemHeader.itemLabel}へ付け替えることはしません。</p><ul className="confirmation-reference-list">{deleteItemReferences.map((reference) => <li key={reference}>{reference}</li>)}</ul></>}<footer><button type="button" onClick={() => setDeleteItem(null)}>キャンセル</button><button type="button" className="danger-button" onClick={() => { setItemNotice(`${deleteItem}を削除しました`); setDeleteItem(null) }}>削除</button></footer></DialogContent></Dialog>
     </div>
   )
 }
 
-function WorkItemLibrary({ screen, query, onSelect }: { screen: ScreenId; query: string; onSelect: () => void }) {
-  const [scope, setScope] = useState('すべて')
-  const [layout, setLayout] = useState<'grid' | 'list'>('grid')
+// The `一覧` catalogue. The shared title bar owns search, tag filtering and the grid/list switch
+// (XC-149); this surface owned a *second* grid/list switch while the title-bar pair was decorative,
+// so the visible control and the working control were different buttons.
+function WorkItemLibrary({ screen, query, layout, scope, onSelect }: { screen: ScreenId; query: string; layout: 'grid' | 'list'; scope: string; onSelect: () => void }) {
   const itemHeader = workItemHeaderByScreen[screen]
   if (!itemHeader) return null
-  const visibleItems = itemHeader.items.map((item, index) => ({ item, index })).filter(({ item }) => item.includes(query.trim())).filter(() => scope !== '共有')
+  const visibleItems = itemHeader.items
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => item.name.includes(query.trim()))
+    .filter(({ item }) => scope === 'すべて' || item.scope === scope)
   return <section className="home-page work-item-library" aria-label={`${itemHeader.itemLabel}一覧`}>
-    <div className="workspace-filters"><div>{['すべて', '最近使用', 'ローカル', '共有'].map((item) => <button className={scope === item ? 'active' : ''} onClick={() => setScope(item)} key={item}>{item}</button>)}</div><div className="layout-switch"><button className={layout === 'grid' ? 'active' : ''} onClick={() => setLayout('grid')} aria-label="グリッド表示"><LayoutGrid size={14} /></button><button className={layout === 'list' ? 'active' : ''} onClick={() => setLayout('list')} aria-label="リスト表示"><List size={14} /></button></div></div>
-    <div className={`workspace-grid ${layout === 'list' ? 'workspace-list-layout' : ''}`}>{visibleItems.map(({ item, index }) => <button type="button" className="workspace-card" key={item} onClick={onSelect}><WorkItemCatalogPreview screen={screen} index={index} label={itemHeader.itemLabel} /><div><div className="workspace-card-heading"><span><small>{itemHeader.itemLabel}</small><h2>{item}</h2></span><ArrowUpRight size={15} /></div><p>ワークスペースに保存された{itemHeader.itemLabel}の設定と表示内容。</p><div className="workspace-tags"><span>{index === 0 ? '現在使用中' : 'ローカル'}</span><span>{itemHeader.title}</span></div><footer><span>項目番号 {index + 1}</span><span>最近使用</span></footer></div></button>)}</div>
-    {visibleItems.length === 0 && <div className="centred-state"><Search size={24} /><h2>一致する{itemHeader.itemLabel}はありません</h2><p>検索語を変更してください。</p></div>}
+    <div className={`workspace-grid ${layout === 'list' ? 'workspace-list-layout' : ''}`}>{visibleItems.map(({ item, index }) => <button type="button" className="workspace-card" key={item.name} onClick={onSelect}><WorkItemCatalogPreview screen={screen} index={index} label={itemHeader.itemLabel} /><div><div className="workspace-card-heading"><span><small>{item.kind === 'comparison' ? '比較' : itemHeader.itemLabel}</small><h2>{item.name}</h2></span><ArrowUpRight size={15} /></div><p>{item.kind === 'comparison' ? `基準ビュー「${item.baseViewName}」を1本の軸で振って並べます。表示設定は基準ビューから借ります。` : `ワークスペースに保存された${itemHeader.itemLabel}の設定と表示内容。`}</p><div className="workspace-tags">{item.tags.map((tag) => <span key={tag}>{tag}</span>)}<span>{item.scope}</span></div><footer><span>{index === 0 ? '現在使用中' : '保存済み'}</span><span>最終利用：—</span></footer></div></button>)}</div>
+    {visibleItems.length === 0 && <div className="centred-state"><Search size={24} /><h2>一致する{itemHeader.itemLabel}はありません</h2><p>検索語または絞り込みを変更してください。</p></div>}
   </section>
 }
 
@@ -891,7 +1357,7 @@ function WorkItemPreview({ screen, index }: { screen: ScreenId; index: number })
 type LibrarySource = 'sample' | 'original'
 type LibrarySort = 'default' | 'name-asc' | 'name-desc'
 type LibraryShelfMode = 'collapsed' | 'one-row' | 'expanded'
-type LibraryItem = { id: string; name: string; detail: string; tags: string[]; tone: string; thumbnail?: string }
+type LibraryItem = { id: string; name: string; detail: string; tags: string[]; tone: string; thumbnail?: string; thumbnailMissing?: boolean; scope?: LibraryScope }
 
 const librarySamples: Record<string, LibraryItem[]> = {
   template: [
@@ -909,7 +1375,7 @@ const librarySamples: Record<string, LibraryItem[]> = {
   ],
   materials: [
     { id: 'brushed-steel', name: 'ブラッシュドスチール', detail: '表面表現', tags: ['金属', '標準'], tone: 'neutral', thumbnail: '/materials/brushed-steel.png' },
-    { id: 'stress-steel', name: 'スチール＋応力コンター', detail: '解析データ依存・サンプルデータ', tags: ['応力', 'MaterialX'], tone: 'blue', thumbnail: '/materials/technical-blue.png' },
+    { id: 'stress-steel', name: 'スチール＋応力コンター', detail: '解析データ依存・サンプルデータ', tags: ['応力', 'MaterialX'], tone: 'blue', thumbnail: '/materials/result-sample.png' },
     { id: 'technical-blue', name: 'テクニカルブルー', detail: '表面表現', tags: ['寒色', '標準'], tone: 'blue', thumbnail: '/materials/technical-blue.png' },
     { id: 'neutral-gray', name: 'ニュートラルグレー', detail: '表面表現', tags: ['中立', 'レビュー'], tone: 'neutral', thumbnail: '/materials/neutral-gray.png' },
     { id: 'inspection-orange', name: 'インスペクション', detail: '表面表現', tags: ['暖色', '強調'], tone: 'warm', thumbnail: '/materials/inspection-orange.png' },
@@ -937,6 +1403,40 @@ const librarySamples: Record<string, LibraryItem[]> = {
   ],
 }
 
+// `オリジナル` was an empty branch: the source tab switched and the shelf showed the empty state for
+// every category, so the scope labelling 11_ui.md requires - `このワークスペース` or `共有`, kept out
+// of the サンプル/オリジナル choice - had nothing to label. GL-019: dragging between the two copies.
+type LibraryScope = 'workspace' | 'shared'
+const libraryScopeLabels: Record<LibraryScope, string> = { workspace: 'このワークスペース', shared: '共有' }
+
+const libraryOriginals: Record<string, LibraryItem[]> = {
+  template: [
+    { id: 'own-review', name: '社内レビュー', detail: '保存済みビュー構成', tags: ['レビュー'], tone: 'blue', scope: 'workspace' },
+    { id: 'own-shared-review', name: '部門標準', detail: '共有ライブラリの構成', tags: ['標準'], tone: 'violet', scope: 'shared' },
+  ],
+  objects: [
+    { id: 'own-callouts', name: '注釈セット・改', detail: 'オブジェクトアセット', tags: ['注釈'], tone: 'cyan', scope: 'workspace' },
+  ],
+  materials: [
+    { id: 'own-steel', name: '社内スチール', detail: '表面表現', tags: ['金属'], tone: 'neutral', scope: 'workspace', thumbnail: '/materials/brushed-steel.png' },
+    // AC-076: a thumbnail that does not exist is named as missing. It never borrows another Asset's
+    // sphere, and never falls back to a plausible generic material.
+    { id: 'own-unrendered', name: '試作マテリアル', detail: '表面表現', tags: ['試作'], tone: 'neutral', scope: 'workspace', thumbnailMissing: true },
+  ],
+  background: [
+    { id: 'own-室内', name: '社内スタジオ', detail: '明背景', tags: ['明背景'], tone: 'neutral', scope: 'shared' },
+  ],
+  fonts: [
+    { id: 'own-font', name: '社内書体設定', detail: '日本語対応', tags: ['日本語'], tone: 'blue', scope: 'shared' },
+  ],
+  style: [
+    { id: 'own-style', name: '部門配色', detail: '標準配色', tags: ['標準'], tone: 'violet', scope: 'shared' },
+  ],
+  layout: [
+    { id: 'own-layout', name: '報告書レイアウト', detail: '2カラム', tags: ['文書'], tone: 'blue', scope: 'workspace' },
+  ],
+}
+
 const librarySortLabels: Record<LibrarySort, string> = {
   default: '既定順',
   'name-asc': '名前：昇順',
@@ -956,6 +1456,7 @@ function AssetLibraryShelf({ screen, variant }: { screen: ScreenId; variant: str
   const [tagPanelOpen, setTagPanelOpen] = useState(false)
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [sortPanelOpen, setSortPanelOpen] = useState(false)
+  const [scopeFilter, setScopeFilter] = useState<LibraryScope | 'all'>('all')
   const [sort, setSort] = useState<LibrarySort>('default')
   const [selectedItem, setSelectedItem] = useState<string | null>(variant === 'library-selected' ? 'technical-review' : null)
   const [applyOpen, setApplyOpen] = useState(false)
@@ -967,12 +1468,15 @@ function AssetLibraryShelf({ screen, variant }: { screen: ScreenId; variant: str
   const label = meta.label
   const Icon = meta.icon
   const samples = librarySamples[category] ?? []
-  const libraryTagSuggestions = Array.from(new Set(samples.flatMap((item) => item.tags))).sort((a, b) => a.localeCompare(b, 'ja'))
+  const originals = libraryOriginals[category] ?? []
+  const sourceItems = source === 'sample' ? samples : originals
+  const libraryTagSuggestions = Array.from(new Set(sourceItems.flatMap((item) => item.tags))).sort((a, b) => a.localeCompare(b, 'ja'))
   const sourceLabel = source === 'sample' ? 'サンプル' : 'オリジナル'
-  const hasFilter = query.trim().length > 0 || selectedTags.length > 0
+  const hasFilter = query.trim().length > 0 || selectedTags.length > 0 || (source === 'original' && scopeFilter !== 'all')
   const visibleTags = libraryTagSuggestions.filter((tag) => tag.toLocaleLowerCase('ja').includes(tagQuery.trim().toLocaleLowerCase('ja')))
   const normalizedQuery = query.trim().toLocaleLowerCase('ja')
-  const visibleItems = (source === 'sample' ? samples : [])
+  const visibleItems = sourceItems
+    .filter((item) => source === 'sample' || scopeFilter === 'all' || item.scope === scopeFilter)
     .filter((item) => !normalizedQuery || `${item.name} ${item.detail} ${item.tags.join(' ')}`.toLocaleLowerCase('ja').includes(normalizedQuery))
     .filter((item) => selectedTags.every((tag) => item.tags.includes(tag)))
     .sort((left, right) => sort === 'name-asc' ? left.name.localeCompare(right.name, 'ja') : sort === 'name-desc' ? right.name.localeCompare(left.name, 'ja') : 0)
@@ -1026,7 +1530,7 @@ function AssetLibraryShelf({ screen, variant }: { screen: ScreenId; variant: str
       {mode !== 'collapsed' && <div className="library-shelf-body">
         <div className="template-library">
           <div className="library-filter-bar">
-            <Tabs value={source} onValueChange={(value) => setSource(value as LibrarySource)} className="contents">
+            <Tabs value={source} onValueChange={(value) => { setSource(value as LibrarySource); setSelectedItem(null); setSelectedTags([]) }} className="contents">
               <TabsList className="template-source-tabs" aria-label={`${label}の種類`}>
                 <TabsTrigger value="sample" className={source === 'sample' ? 'active' : ''}>サンプル</TabsTrigger>
                 <TabsTrigger value="original" className={source === 'original' ? 'active' : ''}>オリジナル</TabsTrigger>
@@ -1034,7 +1538,7 @@ function AssetLibraryShelf({ screen, variant }: { screen: ScreenId; variant: str
             </Tabs>
             <div className="template-library-search" role="search" aria-label={`${label}を検索・絞り込み`}>
               <div className="template-search-row">
-                <label className="template-text-search"><Search size={13} aria-hidden="true" /><Input className="h-auto border-0 bg-transparent p-0 text-[9px] shadow-none focus-visible:ring-0" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`${label}を検索`} aria-label={`${label}を検索`} /></label>
+                <label className="template-text-search"><Search size={13} aria-hidden="true" /><Input className="h-auto border-0 bg-transparent p-0 type-body shadow-none focus-visible:ring-0" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`${label}を検索`} aria-label={`${label}を検索`} /></label>
                 <Button
                   variant="outline"
                   size="sm"
@@ -1053,7 +1557,7 @@ function AssetLibraryShelf({ screen, variant }: { screen: ScreenId; variant: str
                 <Popover open={tagPanelOpen} onOpenChange={setTagPanelOpen}>
                   <PopoverContent className="template-tag-popover">
                     <header><b>タグで絞り込み</b>{selectedTags.length > 0 && <Button variant="ghost" size="sm" type="button" onClick={() => setSelectedTags([])}>すべて解除</Button>}</header>
-                    <label className="template-tag-search"><Search size={12} aria-hidden="true" /><Input className="h-auto border-0 bg-transparent p-0 text-[9px] shadow-none focus-visible:ring-0" value={tagQuery} onChange={(event) => setTagQuery(event.target.value)} placeholder="タグを絞り込み" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="template-tag-options" /></label>
+                    <label className="template-tag-search"><Search size={12} aria-hidden="true" /><Input className="h-auto border-0 bg-transparent p-0 type-body shadow-none focus-visible:ring-0" value={tagQuery} onChange={(event) => setTagQuery(event.target.value)} placeholder="タグを絞り込み" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="template-tag-options" /></label>
                     <ul id="template-tag-options" role="listbox" aria-label={`${label}のタグ候補`} aria-multiselectable="true">
                       {visibleTags.length > 0 ? visibleTags.map((tag) => (
                         <li key={tag} role="option" aria-selected={selectedTags.includes(tag)}><button type="button" onClick={() => toggleTag(tag)}><span>{tag}</span>{selectedTags.includes(tag) && <span aria-hidden="true">✓</span>}</button></li>
@@ -1090,14 +1594,20 @@ function AssetLibraryShelf({ screen, variant }: { screen: ScreenId; variant: str
                   </PopoverContent>
                 </Popover>
               </div>
+              {source === 'original' && <div className="library-scope-filter" role="group" aria-label="オリジナルの保存範囲">
+                {([['all', 'すべて'], ['workspace', libraryScopeLabels.workspace], ['shared', libraryScopeLabels.shared]] as const).map(([value, text]) => (
+                  <button type="button" key={value} className={scopeFilter === value ? 'active' : ''} aria-pressed={scopeFilter === value} onClick={() => setScopeFilter(value)}>{text}</button>
+                ))}
+                <small>ドラッグでの移動は複写です。ワークスペースは単独で開けます。</small>
+              </div>}
               {selectedTags.length > 0 && <div className="template-tag-chips" aria-label="選択中のタグ">{selectedTags.map((tag) => <button type="button" className="template-tag-chip" aria-label={`${tag}を解除`} onClick={() => toggleTag(tag)} key={tag}><span>{tag}</span><X size={10} aria-hidden="true" /></button>)}</div>}
             </div>
           </div>
           {visibleItems.length > 0 ? (
             <div className="library-card-grid" role="list" aria-label={`${sourceLabel}の${label}`}>
               {visibleItems.map((item) => <div role="listitem" key={item.id}><button type="button" draggable className={`library-card ${selectedItem === item.id ? 'selected' : ''}`} aria-pressed={selectedItem === item.id} onClick={() => setSelectedItem(item.id)} onDragStart={(event) => event.dataTransfer.setData('text/plain', item.id)}>
-                <span className={`library-card-preview ${item.thumbnail ? 'material-sphere-thumbnail' : `tone-${item.tone}`}`}>{item.thumbnail ? <Image src={item.thumbnail} alt="" width={54} height={54} sizes="54px" aria-hidden="true" /> : <Icon size={20} strokeWidth={1.45} />}</span>
-                <span className="library-card-copy"><b>{item.name}</b><small>{item.detail}</small></span>
+                <span className={`library-card-preview ${item.thumbnailMissing ? 'library-card-preview-missing' : item.thumbnail ? 'material-sphere-thumbnail' : `tone-${item.tone}`}`}>{item.thumbnailMissing ? <span className="library-thumbnail-missing"><AlertTriangle size={13} aria-hidden="true" />サムネイル未生成</span> : item.thumbnail ? <Image src={item.thumbnail} alt="" width={54} height={54} sizes="54px" aria-hidden="true" /> : <Icon size={20} strokeWidth={1.45} />}</span>
+                <span className="library-card-copy"><b>{item.name}</b><small>{item.detail}</small>{item.scope && <em className="library-card-scope">{libraryScopeLabels[item.scope]}</em>}</span>
                 {selectedItem === item.id && <span className="library-card-check" aria-hidden="true">✓</span>}
               </button></div>)}
             </div>
@@ -1108,11 +1618,11 @@ function AssetLibraryShelf({ screen, variant }: { screen: ScreenId; variant: str
               <small>{hasFilter ? `検索条件に一致する${label}はありません。` : `${sourceLabel}の${label}は空です。`}</small>
             </section>
           )}
-          {selectedItem && <footer className="library-selection-bar"><span><small>{applyComplete ? '適用済み' : '選択中'}</small><b>{samples.find((item) => item.id === selectedItem)?.name}</b></span><span>{applyComplete ? 'ワークスペースの変更としてUndo可能' : 'ドラッグして対象へ適用'}</span><button type="button" className="primary-button" onClick={() => { setApplyComplete(false); setApplyOpen(true) }}>適用</button></footer>}
+          {selectedItem && <footer className="library-selection-bar"><span><small>{applyComplete ? '適用済み' : '選択中'}</small><b>{sourceItems.find((item) => item.id === selectedItem)?.name}</b></span><span>{applyComplete ? 'ワークスペースの変更としてUndo可能' : 'ドラッグして対象へ適用'}</span><button type="button" className="primary-button" onClick={() => { setApplyComplete(false); setApplyOpen(true) }}>適用</button></footer>}
         </div>
       </div>
       }
-      <Dialog open={applyOpen} onOpenChange={setApplyOpen}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog library-apply-dialog"><header><span><small>{label}を適用</small><b>{samples.find((item) => item.id === selectedItem)?.name}</b></span><button type="button" aria-label="適用確認を閉じる" onClick={() => setApplyOpen(false)}><X size={15} /></button></header>
+      <Dialog open={applyOpen} onOpenChange={setApplyOpen}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog library-apply-dialog"><header><span><small>{label}を適用</small><b>{sourceItems.find((item) => item.id === selectedItem)?.name}</b></span><button type="button" aria-label="適用確認を閉じる" onClick={() => setApplyOpen(false)}><X size={15} /></button></header>
         {category === 'template' && <section className="workflow-check-list"><p><CheckCircle2 size={13} /><span><b>解決済み</b><small>レイアウトと表示設定</small></span></p><p><AlertTriangle size={13} /><span><b>確認が必要</b><small>数量・ケース・参照アセットは新しい項目で明示的に結び付けます</small></span></p><p><FolderPlus size={13} /><span><b>作成方法</b><small>開いている項目を置換せず、独立した新規項目を作成</small></span></p></section>}
         {category === 'materials' && <section><p className="workflow-trust-note"><MaterialSphereIcon size={13} />アクティブオブジェクトの新しいマテリアルスロットとして追加します。</p><div className="material-target-options" role="radiogroup" aria-label="マテリアルの割り当て先">{([['object','オブジェクト全体'],['part','部品'],['elements','要素セット']] as const).map(([id,text]) => <label key={id}><input type="radio" name="material-target" checked={materialTarget === id} onChange={() => setMaterialTarget(id)} /><span>{text}</span></label>)}</div>{materialTarget !== 'object' && <p className="workflow-selection-mode"><Shapes size={13} /><span><b>適用後に選択モードを開始</b><small>ビューポートまたはアウトライナーで重複しない対象を選択します</small></span></p>}</section>}
         {category === 'objects' && <section className="workflow-check-list"><p><CheckCircle2 size={13} /><span><b>独立オブジェクトを作成</b><small>元アセットの識別子とリビジョンを来歴として記録</small></span></p><p><AlertTriangle size={13} /><span><b>参照解決</b><small>必要なフィールドや座標がなければ作成せず理由を表示</small></span></p></section>}
@@ -1123,11 +1633,15 @@ function AssetLibraryShelf({ screen, variant }: { screen: ScreenId; variant: str
   )
 }
 
-function RightSidebar({ screen, variant, width, setWidth, selectedViewObjects, onViewObjectSelect }: { screen: ScreenId; variant: string; width: number; setWidth: React.Dispatch<React.SetStateAction<number>>; selectedViewObjects: string[]; onViewObjectSelect: (name: string, additive?: boolean) => void }) {
-  const activeViewObjectKind = viewObjectKindByVariant[variant] ?? 'analysis-mesh'
-  const tabs = rightSidebarTabs[screen].filter((tab) => screen !== 'view' || tab.id !== 'text' || viewObjectKinds[activeViewObjectKind].textProperties)
+function RightSidebar({ screen, variant, width, setWidth, selectedViewObjects, onViewObjectSelect, pipelineUnits, onPipelineUnitsChange, selectedUnitId, onSelectUnit, viewItem, onViewItemChange, selectedCase, isComparisonItem, baseViewName, comparison, onComparisonChange }: { screen: ScreenId; variant: string; width: number; setWidth: React.Dispatch<React.SetStateAction<number>>; selectedViewObjects: string[]; onViewObjectSelect: (name: string, additive?: boolean) => void; pipelineUnits: PipelineUnitModel[]; onPipelineUnitsChange: (units: PipelineUnitModel[]) => void; selectedUnitId: string | null; onSelectUnit: (id: string) => void; viewItem: ViewItemState; onViewItemChange: (next: ViewItemState) => void; selectedCase: string; isComparisonItem: boolean; baseViewName: string; comparison: ComparisonModel; onComparisonChange: (next: ComparisonModel) => void }) {
+  const active = activeViewObject(variant, selectedViewObjects)
+  const tabs = rightSidebarTabs[screen].filter((tab) => screen !== 'view' || tab.id !== 'text' || (active.kind !== 'container' && viewObjectKinds[active.kind].textProperties))
+  // XC-202: a comparison owns 全体 and 出力. The others stay in the rail - removing them leaves "where
+  // did the material go" unanswered - but they are marked, so nobody opens six tabs to find the two.
+  const borrowedTabIds = ['camera', 'rendering', 'background', 'objects', 'text', 'materials']
+  const isBorrowed = (tabId: string) => screen === 'view' && isComparisonItem && borrowedTabIds.includes(tabId)
   const [selectedByScreen, setSelectedByScreen] = useState<Partial<Record<ScreenId, string>>>({})
-  const variantTab = variant.startsWith('object-') ? 'objects' : variant.startsWith('material-') ? 'materials' : variant.includes('output-preflight') ? 'output' : variant === 'series-unresolved' || variant === 'commentary-review' ? 'detail' : undefined
+  const variantTab = variant.startsWith('object-') ? 'objects' : variant.startsWith('material-') ? 'materials' : variant === 'steady-result' ? 'output' : variant === 'comparison-borrowed' ? 'materials' : variant === 'cameras' || variant.startsWith('camera-') ? 'camera' : variant === 'output-motion' ? 'output' : variant === 'develop-grade' ? 'rendering' : variant.includes('output-preflight') ? 'output' : variant === 'series-unresolved' || variant === 'commentary-review' ? 'detail' : undefined
   const selectedTab = tabs.find((tab) => tab.id === (selectedByScreen[screen] ?? variantTab)) ?? tabs[0]
 
   if (!selectedTab) return null
@@ -1152,7 +1666,7 @@ function RightSidebar({ screen, variant, width, setWidth, selectedViewObjects, o
 
   return (
     <aside className="right-sidebar" id="right-sidebar">
-      {screen === 'view' && <OutlinerPanel variant={variant} selectedNames={selectedViewObjects} onSelect={onViewObjectSelect} />}
+      {screen === 'view' && <OutlinerPanel variant={variant} selectedNames={selectedViewObjects} onSelect={onViewObjectSelect} borrowedFrom={isComparisonItem ? baseViewName : null} />}
       <div className="sidebar-editor">
         <nav className="sidebar-tab-rail" role="tablist" aria-label={`${screenNames[screen]}の設定`} aria-orientation="vertical">
           {tabs.map((tab, index) => {
@@ -1165,13 +1679,13 @@ function RightSidebar({ screen, variant, width, setWidth, selectedViewObjects, o
                 {startsSelectionGroup && <span className="sidebar-tab-scope-separator" aria-hidden="true" />}
                 <button
                   id={`sidebar-tab-${screen}-${tab.id}`}
-                  className={`sidebar-tab-button ${active ? 'active' : ''}`}
+                  className={`sidebar-tab-button ${active ? 'active' : ''} ${isBorrowed(tab.id) ? 'borrowed' : ''}`}
                   type="button"
                   role="tab"
                   aria-selected={active}
                   aria-controls={`sidebar-panel-${screen}`}
-                  aria-label={scopeLabel ? `${scopeLabel}：${tab.label}` : tab.label}
-                  data-tooltip={tab.label}
+                  aria-label={isBorrowed(tab.id) ? `${tab.label}（基準ビューの設定）` : scopeLabel ? `${scopeLabel}：${tab.label}` : tab.label}
+                  data-tooltip={isBorrowed(tab.id) ? `${tab.label}・基準ビューの設定` : tab.label}
                   tabIndex={active ? 0 : -1}
                   onClick={() => selectTab(tab)}
                   onKeyDown={(event) => moveTabFocus(event, index)}
@@ -1191,9 +1705,10 @@ function RightSidebar({ screen, variant, width, setWidth, selectedViewObjects, o
           <header className="sidebar-tab-panel-title">
             <span className="sidebar-tab-panel-icon"><SelectedTabIcon size={16} strokeWidth={1.8} aria-hidden="true" /></span>
             <span><b>{selectedTab.label}</b></span>
+            {isBorrowed(selectedTab.id) && <em className="sidebar-tab-borrowed-mark">基準ビューの設定</em>}
           </header>
           <p className="sidebar-tab-summary">{selectedTab.description}</p>
-          <PropertyEditor key={`${screen}-${selectedTab.id}`} screen={screen} tab={selectedTab} variant={variant} selectedViewObjects={selectedViewObjects} />
+          <PropertyEditor key={`${screen}-${selectedTab.id}`} screen={screen} tab={selectedTab} variant={variant} activeObject={active} pipelineUnits={pipelineUnits} onPipelineUnitsChange={onPipelineUnitsChange} selectedUnitId={selectedUnitId} onSelectUnit={onSelectUnit} viewItem={viewItem} onViewItemChange={onViewItemChange} selectedCase={selectedCase} isComparisonItem={isComparisonItem} baseViewName={baseViewName} comparison={comparison} onComparisonChange={onComparisonChange} />
         </section>
       </div>
       <button
@@ -1213,12 +1728,18 @@ function RightSidebar({ screen, variant, width, setWidth, selectedViewObjects, o
   )
 }
 
-function PropertyEditor({ screen, tab, variant, selectedViewObjects }: { screen: ScreenId; tab: SidebarTab; variant: string; selectedViewObjects: string[] }) {
-  if (screen === 'pipeline') return <AutomationPropertyEditor tab={tab} />
-  if (screen === 'view' && tab.id === 'objects') return <ViewObjectPropertyEditor variant={variant} selectedViewObjects={selectedViewObjects} />
-  if (screen === 'view' && tab.id === 'materials') return <ViewMaterialPropertyEditor variant={variant} />
-  if (screen === 'view' && tab.id === 'text') return <ViewTextPropertyEditor variant={variant} />
-  if (screen === 'view') return <ViewPropertyEditor tab={tab} variant={variant} />
+function PropertyEditor({ screen, tab, variant, activeObject, pipelineUnits, onPipelineUnitsChange, selectedUnitId, onSelectUnit, viewItem, onViewItemChange, selectedCase, isComparisonItem, baseViewName, comparison, onComparisonChange }: { screen: ScreenId; tab: SidebarTab; variant: string; activeObject: ActiveViewObject; pipelineUnits: PipelineUnitModel[]; onPipelineUnitsChange: (units: PipelineUnitModel[]) => void; selectedUnitId: string | null; onSelectUnit: (id: string) => void; viewItem: ViewItemState; onViewItemChange: (next: ViewItemState) => void; selectedCase: string; isComparisonItem: boolean; baseViewName: string; comparison: ComparisonModel; onComparisonChange: (next: ComparisonModel) => void }) {
+  if (screen === 'pipeline') return <AutomationPropertyEditor tab={tab} variant={variant} units={pipelineUnits} onUnitsChange={onPipelineUnitsChange} selectedUnitId={selectedUnitId} onSelectUnit={onSelectUnit} />
+  // XC-202: a comparison owns 全体 and 出力 only. Every other tab belongs to its base View, and is
+  // named as borrowed rather than shown as an editable copy - a copy would let a user change one pane's
+  //材料 and destroy the one guarantee a comparison makes (XC-182 names the state instead).
+  if (screen === 'view' && isComparisonItem && ['camera', 'rendering', 'background', 'objects', 'text', 'materials'].includes(tab.id)) {
+    return <BorrowedSettingPanel tabLabel={tab.label} tabId={tab.id} baseViewName={baseViewName} />
+  }
+  if (screen === 'view' && tab.id === 'objects') return <ViewObjectPropertyEditor activeObject={activeObject} />
+  if (screen === 'view' && tab.id === 'materials') return <ViewMaterialPropertyEditor variant={variant} activeObject={activeObject} />
+  if (screen === 'view' && tab.id === 'text') return <ViewTextPropertyEditor activeObject={activeObject} />
+  if (screen === 'view') return <ViewPropertyEditor tab={tab} variant={variant} viewItem={viewItem} onViewItemChange={onViewItemChange} selectedCase={selectedCase} isComparisonItem={isComparisonItem} baseViewName={baseViewName} comparison={comparison} onComparisonChange={onComparisonChange} />
   if (screen === 'graph') return <GraphPropertyEditor tab={tab} variant={variant} />
   if (screen === 'report') return <ReportPropertyEditor tab={tab} variant={variant} />
   if (screen === 'simulation') return <SimulationPropertyEditor />
@@ -1228,6 +1749,18 @@ function PropertyEditor({ screen, tab, variant, selectedViewObjects }: { screen:
   // anywhere in this file - unreachable, untypecheckable, and contradicting the decision at once.
   if (screen === 'network') return <NetworkPropertyEditor tab={tab} variant={variant} />
   return null
+}
+
+function BorrowedSettingPanel({ tabLabel, tabId, baseViewName }: { tabLabel: string; tabId: string; baseViewName: string }) {
+  return <div className="property-editor">
+    <div className="sidebar-context-state borrowed-setting">
+      <Columns3 size={22} />
+      <b>この設定は基準ビューが持っています</b>
+      <small>比較は自前の{tabLabel}を持ちません。基準ビュー「{baseViewName}」の設定をそのまま全メンバーへ適用します。ここで直せてしまうと、ペインの差の原因を特定できなくなります。</small>
+      <button type="button" className="primary-button"><ArrowUpRight size={12} />基準ビュー「{baseViewName}」を編集</button>
+    </div>
+    {tabId === 'camera' && <p className="property-editor-note"><ShieldCheck size={12} />カメラそのものを比べたいときは、「全体」の比較グループで変える軸に「カメラ」を選びます。</p>}
+  </div>
 }
 
 function PropertyGroup({ title, children, open = true }: { title: string; children: React.ReactNode; open?: boolean }) {
@@ -1241,7 +1774,265 @@ function OutputPreflightDialog({ open, onOpenChange, title, checks, onStart }: {
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog preflight-dialog"><header><span><small>出力前チェック</small><b>{title}</b></span><button type="button" aria-label="出力前チェックを閉じる" onClick={() => onOpenChange(false)}><X size={15} /></button></header><section className="preflight-checks">{checks.map((check) => <article className={check.status} key={check.label}>{check.status === 'pass' ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}<span><b>{check.label}</b><small>{check.detail}</small></span><em>{check.status === 'pass' ? '合格' : check.status === 'warning' ? '要記載' : '出力不可'}</em></article>)}</section><p className={blocked ? 'workflow-trust-note blocked' : 'workflow-trust-note'}>{blocked ? <AlertTriangle size={13} /> : <ShieldCheck size={13} />}{blocked ? '不足項目を解決するまで通常出力は開始しません。既存成果物は変更されません。' : '新しい実行フォルダーへ保存し、既存成果物を上書きしません。'}</p><footer><button type="button" onClick={() => onOpenChange(false)}>戻る</button><button type="button" className="primary-button" disabled={blocked} onClick={onStart}>出力を開始</button></footer></DialogContent></Dialog>
 }
 
-function ViewPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: string }) {
+// XC-197, on the @Result axis. A bookmark holds a rule, resolves per case, lands on a position that
+// exists, and says when it snapped. `12.0 s` typed into four panes is the thing this replaces.
+type ResultBookmarkModel = {
+  id: string
+  name: string
+  rule:
+    | { kind: 'explicit'; position: number }
+    | { kind: 'extremum'; quantity: string; statistic: '最大' | '最小' }
+    | { kind: 'crossing'; quantity: string; threshold: string; direction: '上昇' | '下降' }
+    | { kind: 'relative'; of: '先頭' | '末尾' }
+}
+
+const seedResultBookmarks: ResultBookmarkModel[] = [
+  { id: 'hold', name: '保持時間', rule: { kind: 'explicit', position: 12 } },
+  { id: 'peak', name: '最大応力時', rule: { kind: 'extremum', quantity: '最大応力', statistic: '最大' } },
+  { id: 'yield', name: '許容応力を超えた時刻', rule: { kind: 'crossing', quantity: '最大応力', threshold: '235 MPa', direction: '上昇' } },
+  { id: 'last', name: '最終ステップ', rule: { kind: 'relative', of: '末尾' } },
+]
+
+function describeBookmarkRule(bookmark: ResultBookmarkModel) {
+  const rule = bookmark.rule
+  if (rule.kind === 'explicit') return '固定した位置'
+  if (rule.kind === 'extremum') return `規則：${rule.quantity}が${rule.statistic}`
+  if (rule.kind === 'crossing') return `規則：${rule.quantity}が${rule.threshold}を${rule.direction}方向に横切る`
+  return `規則：軸の${rule.of}`
+}
+
+// Resolution is recomputed for the case in scope, so the same bookmark puts each pane at its own
+// position. It never lands between stored positions: it snaps and says so (view/AC-033, XC-160).
+function resolveBookmark(bookmark: ResultBookmarkModel, axis: ResultAxisKind, caseName: string, unresolved: boolean) {
+  const definition = resultAxes[axis]
+  const rule = bookmark.rule
+  if (rule.kind === 'explicit') return { state: 'resolved' as const, position: rule.position, snapped: false, at: null as string | null }
+  if (rule.kind === 'relative') return { state: 'resolved' as const, position: rule.of === '先頭' ? definition.minimum : definition.maximum, snapped: false, at: null }
+  if (unresolved) return { state: 'unresolved' as const, position: definition.minimum, snapped: false, at: `${rule.quantity}がケース「${caseName}」にありません` }
+  // The mockup varies the resolved step per case so that the per-case behaviour is visible; it states
+  // the value as a placeholder rather than inventing an analysis number (OPEN-022).
+  const offset = caseName.length % 5
+  const step = definition.storedStep
+  const raw = definition.minimum + (rule.kind === 'crossing' ? 6 + offset : 17 + offset) * step
+  const snappedPosition = Math.round((raw - definition.minimum) / step) * step + definition.minimum
+  return { state: 'resolved' as const, position: Math.min(definition.maximum, snappedPosition), snapped: rule.kind === 'extremum', at: '［値・単位未宣言］' }
+}
+
+// The shared unresolved list: what a template could not apply and why, with the template it came from.
+// XC-063 keeps the source identifier and revision reachable from the item, so prose in a banner is not
+// enough - the reader needs the list and the identity that produced it.
+function UnresolvedList({ title, source, revision, resolved, unresolved }: { title: string; source: string; revision: string; resolved: string[]; unresolved: { item: string; reason: string }[] }) {
+  return (
+    <section className="unresolved-list" aria-label={title}>
+      <header><AlertTriangle size={15} /><span><b>{title}</b><small>{source}・{revision}</small></span></header>
+      <div>
+        <ul className="unresolved-list-resolved" aria-label="解決済み">{resolved.map((item) => <li key={item}><CheckCircle2 size={11} />{item}</li>)}</ul>
+        <ul className="unresolved-list-unresolved" aria-label="未解決">{unresolved.map((entry) => <li key={entry.item}><AlertTriangle size={11} /><span><b>{entry.item}</b><small>{entry.reason}</small></span></li>)}</ul>
+      </div>
+      <footer><ShieldCheck size={12} />未解決の項目は既定値で埋めません。この一覧と参照元テンプレートの識別子・リビジョンは、作成された項目からいつでも参照できます。</footer>
+    </section>
+  )
+}
+
+// The probe readout: a value at a point with its unit, digits, provenance and result position.
+// Keeping it as a @Variable is deliberate and never automatic (11_ui.md, keyboard scheme).
+function ProbeReadout() {
+  const [kept, setKept] = useState(false)
+  const [open, setOpen] = useState(true)
+  if (!open) return null
+  return (
+    <section className="probe-readout" aria-label="プローブ結果">
+      <header>
+        <span><b>プローブ</b><small>節点 12345・未変形座標</small></span>
+        <button type="button" aria-label="プローブを閉じる" onClick={() => setOpen(false)}><X size={13} /></button>
+      </header>
+      <dl>
+        <div><dt>応力</dt><dd><NumberCell value={182.4} unit="MPa" digits={4} provenance="dataset" /></dd></div>
+        <div><dt>変位</dt><dd><NumberCell value={0.00317} unit="m" digits={3} provenance="dataset" /></dd></div>
+        <div><dt>温度</dt><dd><NumberCell value={null} unit={null} digits={4} provenance="dataset" /></dd></div>
+      </dl>
+      <p className="probe-position">結果位置：時刻 12.0 s／点データ・セル平均なし</p>
+      <footer>
+        {kept ? (
+          <>
+            <QuantityChip name="プローブ応力" provenance="dataset" unit="MPa" />
+            <small>変数リストへ追加しました。以降はどの入力にもドラッグできます。</small>
+          </>
+        ) : (
+          <button className="primary-button" type="button" onClick={() => setKept(true)}>変数として保持</button>
+        )}
+      </footer>
+    </section>
+  )
+}
+
+// XC-199: a @View holds several named cameras and several named timelines. A camera is one object -
+// its pose and its lens together - because a saved pose without a lens is half a camera, and keeping
+// the two apart means changing the lens for one saved position changes it for all of them.
+type CameraFocus =
+  | { kind: 'object'; label: string }
+  | { kind: 'selection'; label: string }
+  | { kind: 'position'; label: string }
+  | { kind: 'extremum'; quantity: string; statistic: '最大' | '最小' | '絶対値最大' }
+
+type CameraModel = {
+  id: string
+  name: string
+  pose: 'explicit' | 'framed'
+  focus: CameraFocus | null
+  projection: 'perspective' | 'orthographic'
+  focalLengthMm: number
+  depthOfField: boolean
+}
+
+// XC-200: a @Timeline answers *when* and holds six values. It carried camera work twice - keyframes,
+// then shots - and both blocked the thing comparison needs: replaying the same motion from a different
+// camera. A video output names one timeline and one camera.
+type TimelineModel = {
+  id: string
+  name: string
+  fromBookmarkId: string
+  toBookmarkId: string
+  stride: number
+  speed: number
+  frameRate: number
+  loop: boolean
+}
+
+function cameraRule(camera: CameraModel) {
+  if (camera.pose === 'explicit') return '固定した位置・注視点・上方向'
+  if (!camera.focus) return '対象未設定'
+  if (camera.focus.kind === 'extremum') return `規則：${camera.focus.quantity}の${camera.focus.statistic}へ寄せる`
+  return `規則：${camera.focus.label}を画面に収める`
+}
+
+// Derived for the case in scope and never written back, so four panes show four positions.
+function resolveCamera(camera: CameraModel, unresolved: boolean) {
+  if (camera.pose === 'explicit') return { state: 'resolved' as const, detail: '保存した位置を再現' }
+  if (camera.focus?.kind === 'extremum' && unresolved) {
+    return { state: 'unresolved' as const, detail: `${camera.focus.quantity}がこのケースにありません。カメラは動かしていません` }
+  }
+  if (camera.focus?.kind === 'extremum') {
+    return { state: 'resolved' as const, detail: `解決先：［${camera.focus.quantity}の位置］・値 ［未接続・単位未宣言］` }
+  }
+  return { state: 'resolved' as const, detail: '対象の境界に合わせて画角を決定' }
+}
+
+// XC-198: grading is a group inside 描画, and its default applies no grade at all. A picture cited as
+// evidence is produced with 計測, so the value-to-colour mapping in two screenshots cannot disagree.
+type GradePreset = 'measurement' | 'standard' | 'technicalDocument' | 'presentation' | 'photoreal'
+
+const gradePresets: Record<GradePreset, { label: string; detail: string; tone: string; exposure: string; treatments: string }> = {
+  measurement: { label: '計測', detail: '無補正・既定', tone: 'なし', exposure: '0.0 EV', treatments: '色を変える処理はすべてオフ' },
+  standard: { label: '標準', detail: '穏やかな階調', tone: 'Neutral', exposure: '0.0 EV', treatments: 'アンチエイリアスのみ' },
+  technicalDocument: { label: '技術文書', detail: '明背景の印刷向け', tone: 'Neutral', exposure: '+0.3 EV', treatments: '高コントラスト・環境遮蔽あり' },
+  presentation: { label: 'プレゼン', detail: '説明用', tone: 'Filmic', exposure: '+0.5 EV', treatments: '環境遮蔽・影・軽いブルーム' },
+  photoreal: { label: 'フォトリアル', detail: '対応レンダラーのみ', tone: 'ACES', exposure: '+0.5 EV', treatments: 'レイトレース影・被写界深度・デノイズ' },
+}
+
+const seedCameras: CameraModel[] = [
+  { id: 'cam-front', name: '正面', pose: 'explicit', focus: null, projection: 'orthographic', focalLengthMm: 50, depthOfField: false },
+  { id: 'cam-iso', name: '等角', pose: 'explicit', focus: null, projection: 'perspective', focalLengthMm: 50, depthOfField: false },
+  { id: 'cam-peak', name: '最大応力へ寄せる', pose: 'framed', focus: { kind: 'extremum', quantity: '最大応力', statistic: '最大' }, projection: 'perspective', focalLengthMm: 85, depthOfField: true },
+  { id: 'cam-fixture', name: '固定部の拡大', pose: 'framed', focus: { kind: 'object', label: '［元ファイルの部品名 02］' }, projection: 'perspective', focalLengthMm: 100, depthOfField: false },
+]
+
+const seedTimelines: TimelineModel[] = [
+  { id: 'tl-full', name: '全体再生', fromBookmarkId: 'first', toBookmarkId: 'last', stride: 1, speed: 1, frameRate: 30, loop: false },
+  { id: 'tl-ramp', name: '立ち上がりをゆっくり', fromBookmarkId: 'first', toBookmarkId: 'hold', stride: 1, speed: 0.5, frameRate: 60, loop: true },
+  { id: 'tl-peak', name: '臨界時刻まで', fromBookmarkId: 'first', toBookmarkId: 'peak', stride: 2, speed: 1, frameRate: 30, loop: false },
+]
+
+// XC-202: the second kind of item in the View area. It names a base @View and varies one axis; it owns
+// no objects, materials, lighting, background or guides of its own.
+type ComparisonAxis = 'case' | 'resultPosition' | 'camera' | 'quantity' | 'deformation' | 'representation'
+
+type ComparisonModel = {
+  axis: ComparisonAxis
+  members: string[]
+  // An ordered axis may be divided instead of enumerated: a contact sheet over time should not require
+  // naming every position as a bookmark first (XC-202, E-123's UpdateWholeRange).
+  memberMode: 'enumerate' | 'range'
+  rangeCount: number
+  arrangement: 'grid' | 'overlay'
+  sharedColourMap: boolean
+}
+
+const orderedAxes: ComparisonAxis[] = ['resultPosition', 'deformation']
+
+// Generated members land on positions that exist, and say when they snapped (view/AC-033). Two that
+// snap to the same stored position are reported rather than drawn as two identical panes.
+function rangeMembers(count: number) {
+  const axis = resultAxes.time
+  const span = axis.maximum - axis.minimum
+  const raw = Array.from({ length: count }, (_, index) => axis.minimum + (span * index) / Math.max(1, count - 1))
+  const snapped = raw.map((value) => Math.round((value - axis.minimum) / axis.storedStep) * axis.storedStep + axis.minimum)
+  return snapped.map((value, index) => ({
+    label: axis.format(value),
+    snapped: Math.abs(value - raw[index]) > 1e-9,
+    duplicate: snapped.indexOf(value) !== index,
+  }))
+}
+
+// Three of these are sets of subjects or of the View's own named objects; the last three are published
+// properties of the base View itself. Sweeping a property is what lets stress be compared with
+// temperature, or a surface with a section, without two Views differing in five other ways (XC-202).
+const comparisonAxisLabels: Record<ComparisonAxis, string> = {
+  case: 'ケース',
+  resultPosition: '結果位置（時刻・モード・周波数）',
+  camera: 'カメラ',
+  quantity: '基準ビューのプロパティ：色を付ける数量',
+  deformation: '基準ビューのプロパティ：変形倍率',
+  representation: '基準ビューのプロパティ：表示形式',
+}
+
+const comparisonPropertyAxes: ComparisonAxis[] = ['quantity', 'deformation', 'representation']
+
+// Everything the axis is not is shared, so changing the axis replaces the member list rather than
+// adding a second dimension to it (XC-202).
+function comparisonMembersFor(axis: ComparisonAxis, viewItem: ViewItemState) {
+  if (axis === 'case') return workspaceCases.map((item) => item.name)
+  if (axis === 'camera') return viewItem.cameras.map((item) => item.name)
+  if (axis === 'resultPosition') return viewItem.bookmarks.map((entry) => entry.name)
+  if (axis === 'quantity') return ['最大応力', '変位', '温度']
+  if (axis === 'deformation') return ['×1.0', '×10', '×50']
+  return ['サーフェス', 'サーフェス＋エッジ', 'ワイヤーフレーム']
+}
+
+type ViewItemState = {
+  cameras: CameraModel[]
+  activeCameraId: string
+  timelines: TimelineModel[]
+  activeTimelineId: string
+  bookmarks: ResultBookmarkModel[]
+}
+
+const initialViewItem: ViewItemState = {
+  cameras: seedCameras,
+  activeCameraId: 'cam-peak',
+  timelines: seedTimelines,
+  activeTimelineId: 'tl-peak',
+  bookmarks: seedResultBookmarks,
+}
+
+function ViewPropertyEditor({ tab, variant, viewItem, onViewItemChange, selectedCase, isComparisonItem, baseViewName, comparison, onComparisonChange }: { tab: SidebarTab; variant: string; viewItem: ViewItemState; onViewItemChange: (next: ViewItemState) => void; selectedCase: string; isComparisonItem: boolean; baseViewName: string; comparison: ComparisonModel; onComparisonChange: (next: ComparisonModel) => void }) {
+  const cameraUnresolved = variant === 'camera-unresolved'
+  const [selectedCameraId, setSelectedCameraId] = useState(viewItem.activeCameraId)
+  const [selectedTimelineId, setSelectedTimelineId] = useState(viewItem.activeTimelineId)
+  const [cameraDialogOpen, setCameraDialogOpen] = useState(false)
+  const [newCameraName, setNewCameraName] = useState('')
+  const [newCameraKind, setNewCameraKind] = useState<'explicit' | 'object' | 'selection' | 'extremum'>('extremum')
+  const [grade, setGrade] = useState<GradePreset>('measurement')
+  const hasResultAxis = caseHasResultAxis(selectedCase)
+  const isComparison = isComparisonItem
+  const setComparison = onComparisonChange
+  // One derivation of what the comparison actually draws, so the panel's figures and the canvas cannot
+  // disagree - the panel said three columns while the canvas drew four.
+  const effectiveMembers = comparison.memberMode === 'range' && orderedAxes.includes(comparison.axis)
+    ? rangeMembers(comparison.rangeCount).map((member) => member.label)
+    : comparison.members
+  const comparisonColumns = Math.min(effectiveMembers.length, 4)
+  const comparisonRows = Math.max(1, Math.ceil(effectiveMembers.length / Math.max(1, comparisonColumns)))
   const [backgroundMode, setBackgroundMode] = useState<'solid' | 'gradient' | 'image' | 'environment'>('gradient')
   const [outputMode, setOutputMode] = useState<'image' | 'video'>('image')
   const [renderer, setRenderer] = useState<'vtk' | 'omniverse'>('vtk')
@@ -1249,20 +2040,203 @@ function ViewPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: string
   const [preflightOpen, setPreflightOpen] = useState(variant === 'output-preflight')
   const [outputStarted, setOutputStarted] = useState(false)
 
+  const camera = viewItem.cameras.find((item) => item.id === selectedCameraId) ?? viewItem.cameras[0] ?? null
+  const timeline = viewItem.timelines.find((item) => item.id === selectedTimelineId) ?? viewItem.timelines[0] ?? null
+  const bookmarkName = (id: string) => id === 'first' ? '軸の先頭' : id === 'last' ? '軸の末尾' : viewItem.bookmarks.find((entry) => entry.id === id)?.name ?? '未解決の位置'
+  // A span whose ends are rules can resolve backwards in one case and forwards in another.
+  const timelineReversed = timeline !== null && bookmarkAxisPosition(timeline.toBookmarkId, 'time', selectedCase, viewItem.bookmarks) <= bookmarkAxisPosition(timeline.fromBookmarkId, 'time', selectedCase, viewItem.bookmarks)
+
+  const updateCamera = (patch: Partial<CameraModel>) => {
+    if (!camera) return
+    onViewItemChange({ ...viewItem, cameras: viewItem.cameras.map((item) => item.id === camera.id ? { ...item, ...patch } : item) })
+  }
+  const updateTimeline = (patch: Partial<TimelineModel>) => {
+    if (!timeline) return
+    onViewItemChange({ ...viewItem, timelines: viewItem.timelines.map((item) => item.id === timeline.id ? { ...item, ...patch } : item) })
+  }
+  const addCamera = () => {
+    const focus: CameraFocus | null = newCameraKind === 'explicit' ? null
+      : newCameraKind === 'extremum' ? { kind: 'extremum', quantity: '最大応力', statistic: '最大' }
+      : newCameraKind === 'object' ? { kind: 'object', label: '［選択したオブジェクト］' }
+      : { kind: 'selection', label: '［保存した選択］' }
+    const next: CameraModel = { id: `cam-${viewItem.cameras.length + 1}`, name: newCameraName.trim(), pose: newCameraKind === 'explicit' ? 'explicit' : 'framed', focus, projection: 'perspective', focalLengthMm: 50, depthOfField: false }
+    onViewItemChange({ ...viewItem, cameras: [...viewItem.cameras, next] })
+    setSelectedCameraId(next.id)
+    setNewCameraName('')
+    setCameraDialogOpen(false)
+  }
+  const duplicateCamera = () => {
+    if (!camera) return
+    const next: CameraModel = { ...camera, id: `${camera.id}-copy`, name: `${camera.name}のコピー` }
+    onViewItemChange({ ...viewItem, cameras: [...viewItem.cameras, next] })
+    setSelectedCameraId(next.id)
+  }
+  const removeCamera = () => {
+    if (!camera || viewItem.cameras.length <= 1) return
+    const remaining = viewItem.cameras.filter((item) => item.id !== camera.id)
+    onViewItemChange({
+      ...viewItem,
+      cameras: remaining,
+      activeCameraId: viewItem.activeCameraId === camera.id ? remaining[0].id : viewItem.activeCameraId,
+    })
+    setSelectedCameraId(remaining[0].id)
+  }
+  const addTimeline = () => {
+    const next: TimelineModel = { id: `tl-${viewItem.timelines.length + 1}`, name: `再生プリセット ${viewItem.timelines.length + 1}`, fromBookmarkId: 'first', toBookmarkId: 'last', stride: 1, speed: 1, frameRate: 30, loop: false }
+    onViewItemChange({ ...viewItem, timelines: [...viewItem.timelines, next] })
+    setSelectedTimelineId(next.id)
+  }
+  const removeTimeline = () => {
+    if (!timeline || viewItem.timelines.length <= 1) return
+    const remaining = viewItem.timelines.filter((item) => item.id !== timeline.id)
+    onViewItemChange({ ...viewItem, timelines: remaining, activeTimelineId: viewItem.activeTimelineId === timeline.id ? remaining[0].id : viewItem.activeTimelineId })
+    setSelectedTimelineId(remaining[0].id)
+  }
   if (tab.id === 'overall') return <div className="property-editor">
+    {/* 全体 owns the item and the canvas as a whole. Projection and camera moved to the カメラ tab
+        (XC-196): a section that also holds the lens is a section with no nameable responsibility. */}
     <PropertyGroup title="ビュー">
       <label><span>名前</span><input defaultValue="変形＋応力" /></label>
-      <label><span>レイアウト</span><select defaultValue="single"><option value="single">単一ビュー</option><option value="horizontal">上下分割</option><option value="vertical">左右分割</option><option value="quad">4分割</option></select></label>
-      <label><span>投影</span><select defaultValue="perspective"><option value="perspective">透視投影</option><option value="orthographic">平行投影</option></select></label>
-      <label><span>カメラ</span><select defaultValue="saved"><option value="saved">保存済みカメラ</option><option value="front">正面</option><option value="right">右</option><option value="top">上</option><option value="isometric">等角</option></select></label>
+      <label><span>説明</span><input placeholder="このビューが示す内容" /></label>
     </PropertyGroup>
+    {isComparison && <PropertyGroup title="比較">
+      {/* XC-202: a comparison names a base @View and varies exactly one axis. It owns no objects,
+          materials, lighting, background or guides - all of them come from the base View, so a
+          comparison is edited by editing that View. Six controls, one group, no new rail tab. */}
+      <label><span>基準ビュー</span><select defaultValue="standard"><option value="standard">標準ビュー</option><option value="compare">ケース比較ビュー</option></select></label>
+      {/* Live, unlike a @Template: editing the View changes every pane, which is why the comparison
+          holds nothing of its own (XC-202, against XC-109). */}
+      <label><span>参照の性質</span><input value={`生きた参照・「${baseViewName}」の編集が全ペインに反映`} readOnly /></label>
+      <label><span>変える軸</span><select value={comparison.axis} onChange={(event) => setComparison({ ...comparison, axis: event.target.value as ComparisonAxis, members: comparisonMembersFor(event.target.value as ComparisonAxis, viewItem) })}>{(Object.keys(comparisonAxisLabels) as ComparisonAxis[]).map((axis) => <option value={axis} key={axis}>{comparisonAxisLabels[axis]}</option>)}</select></label>
+      {comparisonPropertyAxes.includes(comparison.axis) && <p className="property-editor-note"><ShieldCheck size={12} />基準ビュー自身のプロパティを振ります。他はすべて共有されるので、差の原因はこのプロパティに限定されます。</p>}
+      {orderedAxes.includes(comparison.axis) && <label><span>メンバーの決め方</span><select value={comparison.memberMode} onChange={(event) => setComparison({ ...comparison, memberMode: event.target.value as ComparisonModel['memberMode'] })}><option value="enumerate">保存した位置から選ぶ</option><option value="range">範囲を等分する</option></select></label>}
+      {comparison.memberMode === 'range' && orderedAxes.includes(comparison.axis) ? <>
+        <label><span>開始</span><select defaultValue="first"><option value="first">軸の先頭</option>{viewItem.bookmarks.map((entry) => <option value={entry.id} key={entry.id}>{entry.name}</option>)}</select></label>
+        <label><span>終了</span><select defaultValue="last"><option value="last">軸の末尾</option>{viewItem.bookmarks.map((entry) => <option value={entry.id} key={entry.id}>{entry.name}</option>)}</select></label>
+        <label><span>分割数</span><input type="number" min={2} max={12} value={comparison.rangeCount} onChange={(event) => setComparison({ ...comparison, rangeCount: Math.max(2, Math.min(12, Number(event.target.value))) })} /></label>
+        <div className="comparison-members" role="group" aria-label="生成されたメンバー">
+          {rangeMembers(comparison.rangeCount).map((member, index) => (
+            <div className={`comparison-member ${member.duplicate ? 'duplicate' : ''}`} key={index}>
+              <span className="comparison-member-index">{index + 1}</span>
+              <b>{member.label}</b>
+              {member.duplicate ? <em className="comparison-member-note">前と同じ保存位置</em> : member.snapped ? <em className="comparison-member-note">保存位置へ丸め</em> : null}
+            </div>
+          ))}
+        </div>
+        {rangeMembers(comparison.rangeCount).some((member) => member.duplicate)
+          ? <div className="property-unresolved"><AlertTriangle size={13} /><span><b>同じ位置に解決するメンバーがあります</b><small>軸の保存位置より細かく分割しています。分割数を減らすまで、同じ絵が並ぶ図を出力しません。</small></span></div>
+          : <p className="property-editor-note"><ShieldCheck size={12} />生成した位置は軸上に実在する保存位置へ丸め、丸めた事実をメンバーごとに示します。</p>}
+      </> : <div className="comparison-members" role="group" aria-label="比較するメンバー">
+        {comparison.members.map((member, index) => (
+          <div className="comparison-member" key={member}>
+            <span className="comparison-member-index">{index + 1}</span>
+            <b>{member}</b>
+            <button type="button" aria-label={`${member}を外す`} disabled={comparison.members.length <= 2} onClick={() => setComparison({ ...comparison, members: comparison.members.filter((item) => item !== member) })}><X size={10} /></button>
+          </div>
+        ))}
+      </div>}
+      {/* "Everything else is shared" is only checkable when the shared values are written down. */}
+      <div className="comparison-shared" aria-label="共有する設定">
+        {comparison.axis !== 'case' && <label><span>共有ケース</span><select defaultValue={workspaceCases[0].name}>{workspaceCases.map((item) => <option value={item.name} key={item.name}>{item.name}</option>)}</select></label>}
+        {comparison.axis !== 'camera' && <label><span>共有カメラ</span><select defaultValue={viewItem.cameras[0]?.id}>{viewItem.cameras.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>}
+        {comparison.axis !== 'resultPosition' && <label><span>共有結果位置</span><select defaultValue="first"><option value="first">軸の先頭</option>{viewItem.bookmarks.map((entry) => <option value={entry.id} key={entry.id}>{entry.name}</option>)}</select></label>}
+      </div>
+      <label><span>配置</span><select value={comparison.arrangement} onChange={(event) => setComparison({ ...comparison, arrangement: event.target.value as ComparisonModel['arrangement'] })}><option value="grid">グリッド</option><option value="overlay">重ね合わせ</option></select></label>
+      {comparison.arrangement === 'grid'
+        ? <><label><span>行×列</span><div className="property-pair"><input value={`${comparisonRows} 行`} readOnly aria-label="行数" /><input value={`${comparisonColumns} 列`} readOnly aria-label="列数" /></div></label>
+            <p className="property-editor-note"><ShieldCheck size={12} />格子はメンバー数から決まります（{effectiveMembers.length}件）。手で決めると、メンバーを増やしたときに絵に出ないペインが生まれます。</p></>
+        : <div className="property-unresolved"><AlertTriangle size={13} /><span><b>結果色を持てるのは1メンバーだけです</b><small>「{comparison.members[0]}」に結果色を割り当て、残りは参照形状として描きます。2つのコンターを重ねた画は値を符号化しません。</small></span></div>}
+      <label className="property-toggle"><span>ラベル</span><input type="checkbox" checked disabled readOnly /></label>
+      <label className="property-toggle"><span>カラーマップを共有</span><input type="checkbox" checked={comparison.sharedColourMap} onChange={(event) => setComparison({ ...comparison, sharedColourMap: event.target.checked })} /></label>
+      {comparison.sharedColourMap
+        ? <p className="property-editor-note"><ShieldCheck size={12} />全メンバーが同じカラーマップと同じ範囲で描かれます。隣り合うペインを目で比べられるのは、これが保証されているときだけです。</p>
+        : <p className="property-editor-note warning"><AlertTriangle size={12} />ペインごとに範囲が変わります。同じ色が別の値を意味するため、図とその書き出しの両方にその旨を明記します。</p>}
+    </PropertyGroup>}
     <PropertyGroup title="ガイド">
       <label className="property-toggle"><span>座標軸</span><input type="checkbox" defaultChecked /></label>
       <label className="property-toggle"><span>グリッド</span><input type="checkbox" defaultChecked /></label>
+      <label className="property-toggle"><span>方位ギズモ</span><input type="checkbox" defaultChecked /></label>
+      <label className="property-toggle"><span>スケールバー</span><input type="checkbox" /></label>
       <label className="property-toggle"><span>凡例</span><input type="checkbox" defaultChecked /></label>
       <label className="property-toggle"><span>選択輪郭</span><input type="checkbox" defaultChecked /></label>
     </PropertyGroup>
-    <p className="property-editor-note"><ShieldCheck size={12} />カメラとガイドは表示状態です。解析値と正規データは変更しません。</p>
+    <p className="property-editor-note"><ShieldCheck size={12} />ガイドは表示状態です。解析値と正規データは変更しません。</p>
+  </div>
+
+  if (tab.id === 'camera') return <div className="property-editor">
+    {/* XC-199: the @View holds several cameras. The list is the object list; the groups below edit the
+        selected one. A pane names the camera it looks through, so four panes can look from four places. */}
+    <PropertyGroup title="カメラ">
+      <div className="named-object-list" role="listbox" aria-label="このビューのカメラ">
+        {viewItem.cameras.map((item) => {
+          const resolution = resolveCamera(item, cameraUnresolved)
+          return (
+            <div className={`named-object-row ${selectedCameraId === item.id ? 'selected' : ''} ${resolution.state}`} key={item.id}>
+              <button type="button" role="option" aria-selected={selectedCameraId === item.id} onClick={() => setSelectedCameraId(item.id)}>
+                <span className="named-object-kind">{item.pose === 'explicit' ? <Crosshair size={12} /> : <Target size={12} />}</span>
+                <span><b>{item.name}</b><small>{cameraRule(item)}</small><em>{resolution.detail}</em></span>
+              </button>
+              <button type="button" className={`named-object-active ${viewItem.activeCameraId === item.id ? 'on' : ''}`} aria-label={`${item.name}を表示中のカメラにする`} aria-pressed={viewItem.activeCameraId === item.id} onClick={() => onViewItemChange({ ...viewItem, activeCameraId: item.id })}><Eye size={12} /></button>
+            </div>
+          )
+        })}
+      </div>
+      <div className="named-object-actions">
+        <button type="button" onClick={() => setCameraDialogOpen(true)}><Plus size={12} />追加</button>
+        <button type="button" disabled={!camera} onClick={duplicateCamera}><Copy size={12} />複製</button>
+        <button type="button" disabled={!camera || viewItem.cameras.length <= 1} onClick={removeCamera}><Trash2 size={12} />削除</button>
+      </div>
+      <p className="property-editor-note"><ShieldCheck size={12} />規則で位置を決めるカメラは座標を保存しません。ケースごとに解決し、解決できないときはカメラを動かしません。</p>
+    </PropertyGroup>
+    {camera ? <>
+      <PropertyGroup title="ポーズ">
+        <label><span>名前</span><input value={camera.name} onChange={(event) => updateCamera({ name: event.target.value })} /></label>
+        <label><span>決め方</span><select value={camera.pose} onChange={(event) => updateCamera({ pose: event.target.value as CameraModel['pose'], focus: event.target.value === 'explicit' ? null : camera.focus ?? { kind: 'extremum', quantity: '最大応力', statistic: '最大' } })}><option value="explicit">現在の位置を固定</option><option value="framed">対象を画面に収める</option></select></label>
+        {camera.pose === 'framed' && <>
+          <label><span>対象</span><select value={camera.focus?.kind ?? 'extremum'} onChange={(event) => updateCamera({ focus: event.target.value === 'extremum' ? { kind: 'extremum', quantity: '最大応力', statistic: '最大' } : event.target.value === 'object' ? { kind: 'object', label: '［選択したオブジェクト］' } : event.target.value === 'selection' ? { kind: 'selection', label: '［保存した選択］' } : { kind: 'position', label: '［座標］' } })}><option value="extremum">数量の極値</option><option value="object">オブジェクト</option><option value="selection">保存した選択</option><option value="position">座標</option></select></label>
+          {camera.focus?.kind === 'extremum' && <>
+            <label><span>数量</span><select value={camera.focus.quantity} onChange={(event) => updateCamera({ focus: { kind: 'extremum', quantity: event.target.value, statistic: camera.focus?.kind === 'extremum' ? camera.focus.statistic : '最大' } })}><option value="最大応力">最大応力</option><option value="変位">変位</option></select></label>
+            <label><span>統計</span><select value={camera.focus.statistic} onChange={(event) => updateCamera({ focus: { kind: 'extremum', quantity: camera.focus?.kind === 'extremum' ? camera.focus.quantity : '最大応力', statistic: event.target.value as '最大' | '最小' | '絶対値最大' } })}><option value="最大">最大</option><option value="最小">最小</option><option value="絶対値最大">絶対値最大</option></select></label>
+          </>}
+          <label><span>余白</span><div className="property-range"><input type="range" min="0" max="50" defaultValue="12" /><output>12%</output></div></label>
+        </>}
+      </PropertyGroup>
+      <PropertyGroup title="レンズ">
+        <label><span>投影</span><select value={camera.projection} onChange={(event) => updateCamera({ projection: event.target.value as CameraModel['projection'] })}><option value="perspective">透視投影</option><option value="orthographic">平行投影</option></select></label>
+        {camera.projection === 'perspective'
+          ? <><label><span>焦点距離</span><div className="property-range"><input type="range" min="14" max="200" value={camera.focalLengthMm} onChange={(event) => updateCamera({ focalLengthMm: Number(event.target.value) })} /><output>{camera.focalLengthMm} mm</output></div></label>
+              <label><span>センサー幅</span><input defaultValue="36 mm" /></label></>
+          : <label><span>表示範囲</span><input defaultValue="［形状に合わせる］" /></label>}
+        <label><span>クリップ</span><div className="property-pair"><input defaultValue="手前 0.01" aria-label="クリップ手前" /><input defaultValue="奥 1000" aria-label="クリップ奥" /></div></label>
+        <label><span>シフト</span><div className="property-pair"><input defaultValue="X 0.00" aria-label="シフトX" /><input defaultValue="Y 0.00" aria-label="シフトY" /></div></label>
+      </PropertyGroup>
+      <PropertyGroup title="被写界深度" open={false}>
+        <label className="property-toggle"><span>使用する</span><input type="checkbox" checked={camera.depthOfField} onChange={(event) => updateCamera({ depthOfField: event.target.checked })} /></label>
+        {camera.depthOfField && <>
+          <label><span>合焦先</span><select defaultValue="focus"><option value="focus">このカメラのフォーカス対象</option><option value="distance">距離を指定</option></select></label>
+          <label><span>F値</span><div className="property-range"><input type="range" min="12" max="220" defaultValue="28" /><output>f/2.8</output></div></label>
+          <label><span>絞り羽根</span><select defaultValue="0"><option value="0">円形</option><option value="6">6枚</option><option value="8">8枚</option></select></label>
+        </>}
+      </PropertyGroup>
+      <PropertyGroup title="操作" open={false}>
+        <label><span>回転中心</span><select defaultValue="selection"><option value="selection">選択中のオブジェクト</option><option value="bounds">形状の中心</option><option value="cursor">注視点</option></select></label>
+        <label className="property-toggle"><span>カーソル方向へズーム</span><input type="checkbox" defaultChecked /></label>
+      </PropertyGroup>
+    </> : <div className="sidebar-context-state"><Camera size={22} /><b>カメラがありません</b><small>追加すると、画面への割り当てとカメラパスで使えます。</small></div>}
+    <Dialog open={cameraDialogOpen} onOpenChange={setCameraDialogOpen}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog compact-workflow-dialog">
+      <header><span><small>カメラ</small><b>カメラを追加</b></span><button type="button" aria-label="カメラ追加を閉じる" onClick={() => setCameraDialogOpen(false)}><X size={15} /></button></header>
+      <div className="settings-fields">
+        <label><span>名前</span><input value={newCameraName} onChange={(event) => setNewCameraName(event.target.value)} placeholder="例：最大応力へ寄せる" /></label>
+        <label><span>ポーズの決め方</span><Select value={newCameraKind} onValueChange={(value) => setNewCameraKind(value as typeof newCameraKind)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
+          <SelectItem value="explicit">現在のカメラを固定する</SelectItem>
+          <SelectItem value="object">オブジェクトを画面に収める</SelectItem>
+          <SelectItem value="selection">選択範囲を画面に収める</SelectItem>
+          <SelectItem value="extremum">数量の極値へ寄せる</SelectItem>
+        </SelectContent></Select></label>
+      </div>
+      <p className="workflow-trust-note"><ShieldCheck size={13} />規則を選んだ場合は条件だけを保存します。座標は保存せず、ケースごとに解決し直します。</p>
+      <footer><button type="button" onClick={() => setCameraDialogOpen(false)}>キャンセル</button><button type="button" className="primary-button" disabled={!newCameraName.trim()} onClick={addCamera}>追加</button></footer>
+    </DialogContent></Dialog>
   </div>
 
   if (tab.id === 'rendering') return <div className="property-editor">
@@ -1281,11 +2255,29 @@ function ViewPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: string
         <label className="property-toggle"><span>環境遮蔽</span><input type="checkbox" defaultChecked /></label>
       </>}
     </PropertyGroup>
-    <PropertyGroup title="画質">
+    {/* 現像 is the second group of 描画, after 照明 (XC-198). Its default applies no grade, and the
+        note below is the rule the reference implementations do not have: a graded picture must not
+        leave the legend saying a different value. */}
+    <PropertyGroup title="現像">
+      <label><span>プリセット</span><select value={grade} onChange={(event) => setGrade(event.target.value as GradePreset)}>{(Object.keys(gradePresets) as GradePreset[]).map((key) => <option value={key} key={key}>{gradePresets[key].label}・{gradePresets[key].detail}</option>)}</select></label>
+      <label><span>露光</span><input value={gradePresets[grade].exposure} readOnly={grade === 'measurement'} /></label>
+      <label><span>トーンマップ</span><input value={gradePresets[grade].tone} readOnly={grade === 'measurement'} /></label>
+      <label><span>画像処理</span><input value={gradePresets[grade].treatments} readOnly /></label>
+      {grade !== 'measurement' && <>
+        <label><span>コントラスト</span><div className="property-range"><input type="range" min="0" max="200" defaultValue="100" /><output>1.00</output></div></label>
+        <label><span>色温度</span><div className="property-range"><input type="range" min="3000" max="9000" defaultValue="6500" /><output>6500 K</output></div></label>
+        <label><span>凡例の扱い</span><select defaultValue="graded"><option value="graded">凡例も同じ補正を通す</option><option value="recorded">補正名とパラメータを出力に記載</option></select></label>
+      </>}
+      {grade === 'photoreal' && <div className="property-unresolved"><AlertTriangle size={13} /><span><b>このレンダラーでは利用できません</b><small>フォトリアル経路は未接続です。VTK経路では影とレイトレースのサンプル数を適用しません。</small></span></div>}
+    </PropertyGroup>
+    <PropertyGroup title="画質" open={false}>
       <label><span>アンチエイリアス</span><select defaultValue="taa"><option value="none">なし</option><option value="fxaa">FXAA</option><option value="taa">TAA</option></select></label>
-      <label><span>トーンマップ</span><select defaultValue="neutral"><option value="neutral">Neutral</option><option value="aces">ACES</option><option value="none">なし</option></select></label>
+      <label><span>サンプル数</span><select defaultValue="8"><option value="1">1</option><option value="8">8</option><option value="64">64</option></select></label>
     </PropertyGroup>
     <p className="property-editor-note"><ShieldCheck size={12} />未対応レンダラーへ黙って切り替えず、利用できない理由を表示します。</p>
+    {grade === 'measurement'
+      ? <p className="property-editor-note"><ShieldCheck size={12} />計測プリセットは無補正です。根拠として引用する画像はこの状態で出力します。</p>
+      : <p className="property-editor-note warning"><AlertTriangle size={12} />補正を掛けた画像は、凡例も同じ補正を通すか、補正名とパラメータを成果物に記載します。値と色の対応が2枚の画像でずれないようにするためです。</p>}
   </div>
 
   if (tab.id === 'background') return <div className="property-editor">
@@ -1303,19 +2295,50 @@ function ViewPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: string
 
   return <div className="property-editor">
     <PropertyGroup title="成果物">
-      <label><span>種類</span><select value={outputMode} onChange={(event) => setOutputMode(event.target.value as typeof outputMode)}><option value="image">画像</option><option value="video">動画</option></select></label>
+      <label><span>種類</span><select value={outputMode} onChange={(event) => setOutputMode(event.target.value as typeof outputMode)}><option value="image">画像</option><option value="video" disabled={!hasResultAxis}>動画{hasResultAxis ? '' : '・この結果には軸がありません'}</option></select></label>
+      {!hasResultAxis && <div className="property-unresolved"><AlertTriangle size={13} /><span><b>ケース「{selectedCase}」は定常結果です</b><small>再生する軸がないため、動画とその再生プリセットは選べません。画像とインタラクティブは通常どおり出力できます。</small></span></div>}
       {outputMode === 'image' ? <>
         <label><span>形式</span><select defaultValue="png"><option value="png">PNG</option><option value="jpeg">JPEG</option><option value="tiff">TIFF</option></select></label>
         <label><span>サイズ</span><select defaultValue="1920x1080"><option value="1920x1080">1920 × 1080</option><option value="3840x2160">3840 × 2160</option><option value="viewport">現在の表示領域</option></select></label>
         <label className="property-toggle"><span>背景を透過</span><input type="checkbox" /></label>
+        <label><span>カメラ</span><select defaultValue={viewItem.activeCameraId}>{viewItem.cameras.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
+        <label><span>結果位置</span><select defaultValue="current"><option value="current">現在の位置</option>{viewItem.bookmarks.map((entry) => <option value={entry.id} key={entry.id}>ブックマーク：{entry.name}</option>)}</select></label>
       </> : <>
         <label><span>形式</span><select defaultValue="mp4"><option value="mp4">MP4</option><option value="webm">WebM</option><option value="frames">PNG連番</option></select></label>
-        <label><span>カメラパス</span><select defaultValue="unresolved"><option value="unresolved">未選択</option></select></label>
-        <label><span>再生軸</span><select defaultValue="result"><option value="result">結果軸</option><option value="camera">カメラのみ</option></select></label>
-        <label><span>速度</span><select defaultValue="1"><option value="0.5">0.5×</option><option value="1">1.0×</option><option value="2">2.0×</option></select></label>
-        <label><span>フレームレート</span><select defaultValue="30"><option value="24">24 fps</option><option value="30">30 fps</option><option value="60">60 fps</option></select></label>
+        {/* Motion belongs to the timeline, not to the file it is written into (XC-196 correction). */}
+        <label><span>タイムライン</span><select value={selectedTimelineId} onChange={(event) => { setSelectedTimelineId(event.target.value); onViewItemChange({ ...viewItem, activeTimelineId: event.target.value }) }}>{viewItem.timelines.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
       </>}
     </PropertyGroup>
+    {outputMode === 'video' && hasResultAxis && <PropertyGroup title="再生プリセット">
+      {/* XC-200: a timeline is six values and carries no camera. The video above names one timeline and
+          one camera, which is what lets the same motion be replayed from somewhere else. */}
+      <div className="named-object-list" role="listbox" aria-label="このビューの再生プリセット">
+        {viewItem.timelines.map((item) => (
+          <div className={`named-object-row ${selectedTimelineId === item.id ? 'selected' : ''}`} key={item.id}>
+            <button type="button" role="option" aria-selected={selectedTimelineId === item.id} onClick={() => setSelectedTimelineId(item.id)}>
+              <span className="named-object-kind"><Film size={12} /></span>
+              <span><b>{item.name}</b><small>{bookmarkName(item.fromBookmarkId)} → {bookmarkName(item.toBookmarkId)}</small><em>{item.speed}×・{item.frameRate} fps{item.loop ? '・繰り返し' : ''}</em></span>
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="named-object-actions">
+        <button type="button" onClick={addTimeline}><Plus size={12} />追加</button>
+        <button type="button" disabled={!timeline || viewItem.timelines.length <= 1} onClick={removeTimeline}><Trash2 size={12} />削除</button>
+      </div>
+      {timeline && <>
+        <label><span>名前</span><input value={timeline.name} onChange={(event) => updateTimeline({ name: event.target.value })} /></label>
+        {timelineReversed && <div className="property-unresolved"><AlertTriangle size={13} /><span><b>終了が開始より手前に解決します</b><small>ケース「{selectedCase}」では終了位置が開始位置より前になります。位置を入れ替えるまで出力を拒否します。</small></span></div>}
+        <label><span>開始</span><select value={timeline.fromBookmarkId} onChange={(event) => updateTimeline({ fromBookmarkId: event.target.value })}><option value="first">軸の先頭</option>{viewItem.bookmarks.map((entry) => <option value={entry.id} key={entry.id}>{entry.name}</option>)}</select></label>
+        <label><span>終了</span><select value={timeline.toBookmarkId} onChange={(event) => updateTimeline({ toBookmarkId: event.target.value })}><option value="last">軸の末尾</option>{viewItem.bookmarks.map((entry) => <option value={entry.id} key={entry.id}>{entry.name}</option>)}</select></label>
+        <label><span>間引き</span><select value={timeline.stride} onChange={(event) => updateTimeline({ stride: Number(event.target.value) })}><option value={1}>保存位置をすべて</option><option value={2}>2つおき</option><option value={5}>5つおき</option></select></label>
+        <label><span>速度</span><select value={timeline.speed} onChange={(event) => updateTimeline({ speed: Number(event.target.value) })}><option value={0.25}>0.25×</option><option value={0.5}>0.5×</option><option value={1}>1.0×</option><option value={2}>2.0×</option><option value={4}>4.0×</option></select></label>
+        <label><span>フレームレート</span><select value={timeline.frameRate} onChange={(event) => updateTimeline({ frameRate: Number(event.target.value) })}><option value={24}>24 fps</option><option value={30}>30 fps</option><option value={60}>60 fps</option></select></label>
+        <label className="property-toggle"><span>繰り返し</span><input type="checkbox" checked={timeline.loop} onChange={(event) => updateTimeline({ loop: event.target.checked })} /></label>
+        <label><span>解決結果</span><input value={cameraUnresolved ? '未解決・規則が参照する数量がありません' : '［開始位置］〜［終了位置］・ケースごとに解決'} readOnly /></label>
+      </>}
+      <p className="property-editor-note"><ShieldCheck size={12} />プリセットは「いつ」だけを持ちます。「どこから」は上のカメラで選ぶため、同じプリセットを別のカメラで再生できます。</p>
+    </PropertyGroup>}
     <PropertyGroup title="保存先">
       <label><span>パターン</span><input value="output/view/<run>/<case>/" readOnly /></label>
       <label><span>既存出力</span><input value="上書きしない" readOnly /></label>
@@ -1335,6 +2358,7 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
   const [graphSeries, setGraphSeries] = useState([{ id: 'series-1', label: '系列 1', quantity: 'unresolved', source: 'dataset' }])
   const [activeSeriesId, setActiveSeriesId] = useState('series-1')
   const activeSeries = graphSeries.find((series) => series.id === activeSeriesId) ?? graphSeries[0]
+  const unresolvedSeries = graphSeries.filter((series) => series.quantity === 'unresolved')
 
   if (tab.id === 'overall') return <div className="property-editor">
     <PropertyGroup title="グラフ">
@@ -1401,7 +2425,7 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
       <div className="compact-definition-list"><div role="listbox" aria-label="グラフ系列">{graphSeries.map((series) => <button type="button" role="option" aria-selected={activeSeriesId === series.id} className={activeSeriesId === series.id ? 'selected' : ''} onClick={() => setActiveSeriesId(series.id)} key={series.id}><span><b>{series.label}</b><small>{series.quantity === 'unresolved' ? '数量未選択' : series.quantity === 'expression' ? '式による計算・解析モジュール' : '数量参照・単位未宣言'}</small></span>{series.quantity === 'unresolved' && <AlertTriangle size={12} />}</button>)}</div><aside><button type="button" aria-label="系列を追加" onClick={() => { const id = `series-${graphSeries.length + 1}`; setGraphSeries((current) => [...current, { id, label: `系列 ${current.length + 1}`, quantity: 'unresolved', source: 'dataset' }]); setActiveSeriesId(id) }}><Plus size={12} /></button><button type="button" aria-label="選択中の系列を削除" disabled={graphSeries.length === 1} onClick={() => { const next = graphSeries.filter((series) => series.id !== activeSeriesId); setGraphSeries(next); setActiveSeriesId(next[0]?.id ?? '') }}><X size={12} /></button></aside></div>
       {activeSeries && <><label><span>X</span><select defaultValue="parameter"><option value="parameter">パラメーターを選択</option><option value="result-axis">結果軸</option></select></label>
         <label><span>Y</span><select value={activeSeries.quantity} onChange={(event) => setGraphSeries((current) => current.map((series) => series.id === activeSeries.id ? { ...series, quantity: event.target.value } : series))}><option value="unresolved">数量を選択</option><option value="dataset">データセットの数量</option><option value="computed">計算済み数量</option><option value="measurement">測定値</option><option value="reference">参考ファイルの値</option><option value="expression">式</option></select></label>
-        {activeSeries.quantity === 'expression' && <label><span>式</span><input placeholder="単位付きの式" /></label>}
+        {activeSeries.quantity === 'expression' && <ExpressionEditor id={`graph-${activeSeries.id}`} label="系列の式" initial="設計許容応力 / 最大応力" />}
         <label><span>単位</span><input value={activeSeries.quantity === 'unresolved' ? '数量の選択後に表示' : '未宣言'} readOnly /></label>
         <label><span>来歴</span><input value={activeSeries.quantity === 'unresolved' ? '数量の選択後に表示' : activeSeries.quantity === 'computed' || activeSeries.quantity === 'expression' ? '計算・式を表示' : activeSeries.quantity === 'reference' ? '参考資料・数値根拠には未使用' : activeSeries.quantity === 'measurement' ? '測定データ' : 'データセット'} readOnly /></label>
         <label><span>欠損</span><select defaultValue="gap"><option value="gap">欠損として表示・凡例に残す</option></select></label></>}
@@ -1427,12 +2451,21 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
     </PropertyGroup>
     <div className="property-panel-action"><button type="button" className="primary-button" onClick={() => setPreflightOpen(true)}><ShieldCheck size={12} />出力前チェック</button></div>
     {outputStarted && <p className="property-editor-note" role="status"><CircleDashed size={12} />出力を開始しました。画面と同じ定義から生成します。</p>}
-    <OutputPreflightDialog open={preflightOpen} onOpenChange={setPreflightOpen} title="グラフ成果物" checks={[{ label: '系列', detail: 'Y数量が未選択です', status: 'blocked' }, { label: '単位', detail: '数量選択後に互換性を検証します', status: 'blocked' }, { label: '保存先', detail: '既存成果物を上書きしない', status: 'pass' }]} onStart={() => { setOutputStarted(true); setPreflightOpen(false) }} />
+    <OutputPreflightDialog open={preflightOpen} onOpenChange={setPreflightOpen} title="グラフ成果物" checks={[
+      unresolvedSeries.length > 0
+        ? { label: '系列', detail: `${unresolvedSeries.map((series) => series.label).join('・')}のY数量が未選択です`, status: 'blocked' as const }
+        : { label: '系列', detail: `${graphSeries.length}系列すべてに数量が選ばれています`, status: 'pass' as const },
+      unresolvedSeries.length > 0
+        ? { label: '単位', detail: '数量の選択後に互換性を検証します', status: 'blocked' as const }
+        : { label: '単位', detail: '未宣言の単位があります。出力には未宣言と明記します', status: 'warning' as const },
+      { label: '保存先', detail: '既存成果物を上書きしない', status: 'pass' as const },
+    ]} onStart={() => { setOutputStarted(true); setPreflightOpen(false) }} />
   </div>
 }
 
 function ReportPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: string }) {
   const [commentary, setCommentary] = useState<'mechanical' | 'generated'>(variant === 'commentary-review' ? 'generated' : 'mechanical')
+  const [search, setSearch] = useState<'off' | 'ask'>('off')
   const [reportOutput, setReportOutput] = useState<'html' | 'pptx' | 'docx' | 'xlsx' | 'csv' | 'image' | 'video' | 'text' | 'markdown'>('html')
   const [preflightOpen, setPreflightOpen] = useState(variant === 'output-preflight')
   const [outputStarted, setOutputStarted] = useState(false)
@@ -1511,7 +2544,7 @@ function ReportPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: stri
     </PropertyGroup>
     <PropertyGroup title="コメント">
       <label><span>方式</span><select value={commentary} onChange={(event) => setCommentary(event.target.value as typeof commentary)}><option value="mechanical">機械的要約のみ</option><option value="generated">生成コメント</option></select></label>
-      {commentary === 'generated' && <><label><span>方向</span><textarea rows={3} placeholder="議論してほしい観点" /></label><label><span>深さ</span><select defaultValue="standard"><option value="brief">簡潔</option><option value="standard">標準</option><option value="detailed">詳細</option></select></label><label><span>モデル</span><input value="未設定" readOnly /></label><label><span>検索</span><input value="許可されていません" readOnly /></label></>}
+      {commentary === 'generated' && <><label><span>方向</span><textarea rows={3} placeholder="議論してほしい観点" /></label><label><span>深さ</span><select defaultValue="standard"><option value="brief">簡潔</option><option value="standard">標準</option><option value="detailed">詳細</option></select></label><label><span>モデル</span><input value="未設定" readOnly /></label><label><span>検索の可否</span><select value={search} onChange={(event) => setSearch(event.target.value as typeof search)}><option value="off">検索しない</option><option value="ask">要求ごとに許可を確認</option></select></label>{search === 'ask' && <p className="property-editor-note"><ShieldCheck size={12} />送信する検索語と送信しない情報を要求ごとに表示し、許可されるまで送信しません。</p>}</>}
     </PropertyGroup>
     {commentary === 'generated' && <div className="property-unresolved"><AlertTriangle size={13} /><span><b>生成コメントは現在利用できません</b><small>モデルと送信範囲を設定し、費用を確認するまで外部通信しません。</small></span></div>}
   </div>
@@ -1554,6 +2587,9 @@ function NetworkPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: str
   const [permissionOpen, setPermissionOpen] = useState(variant === 'request-review')
   const [externalEnabled, setExternalEnabled] = useState(false)
   const [webSearchEnabled, setWebSearchEnabled] = useState(false)
+  const [allowedHosts, setAllowedHosts] = useState<string[]>([])
+  const [hostDraft, setHostDraft] = useState('')
+  const rows = auditRowsFor(variant)
   if (tab.id === 'permissions') return <div className="property-editor">
     <PropertyGroup title="ワークスペース権限">
       <label className="property-toggle"><span>外部通信</span><input type="checkbox" checked={externalEnabled} onChange={() => externalEnabled ? setExternalEnabled(false) : setPermissionOpen(true)} /></label>
@@ -1561,10 +2597,16 @@ function NetworkPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: str
       <label className="property-toggle"><span>生成コメント</span><input type="checkbox" disabled /></label>
       <label className="property-toggle"><span>詳細調査</span><input type="checkbox" disabled /></label>
     </PropertyGroup>
-    <PropertyGroup title="許可先">
-      <label><span>ホスト</span><input value="登録なし" readOnly /></label>
-      <label><span>送信内容</span><input value="送信前に表示" readOnly /></label>
-      <label><span>既定動作</span><input value="拒否" readOnly /></label>
+    <PropertyGroup title="許可ホスト">
+      {/* XC-106: the allow-list is part of the per-workspace permission, so it is edited here. The
+          panel used to echo `登録なし`, `送信前に表示` and `拒否` as read-only text that the centre
+          summary already stated. */}
+      <div className="allowed-host-list">
+        {allowedHosts.map((host) => <span key={host}><b>{host}</b><button type="button" aria-label={`${host}を削除`} onClick={() => setAllowedHosts((current) => current.filter((item) => item !== host))}><X size={10} /></button></span>)}
+        {allowedHosts.length === 0 && <small>登録なし。要求ごとの確認でも、宛先が未登録であれば送信しません。</small>}
+      </div>
+      <label><span>追加</span><input value={hostDraft} placeholder="例：docs.example.org" onChange={(event) => setHostDraft(event.target.value)} /></label>
+      <div className="property-panel-action"><button type="button" disabled={!hostDraft.trim() || !externalEnabled} onClick={() => { setAllowedHosts((current) => [...current, hostDraft.trim()]); setHostDraft('') }}>ホストを許可一覧へ追加</button></div>
     </PropertyGroup>
     <p className="property-editor-note"><ShieldCheck size={12} />許可されるまで通信を試行しません。ケース名、値、パスを含む送信は個別に確認します。</p>
     <Dialog open={permissionOpen} onOpenChange={setPermissionOpen}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog outbound-review-dialog"><header><span><small>ワークスペース権限</small><b>外部通信を許可しますか？</b></span><button type="button" aria-label="権限確認を閉じる" onClick={() => setPermissionOpen(false)}><X size={15} /></button></header><section className="workflow-check-list"><p><ShieldCheck size={13} /><span><b>既定</b><small>要求ごとに正確な送信内容と宛先を確認</small></span></p><p><AlertTriangle size={13} /><span><b>機密情報</b><small>ケース名、値、ファイルパスは要求ごとの追加許可が必要</small></span></p><p><ScrollText size={13} /><span><b>監査</b><small>送信内容、ホスト、日時、判断をローカルに記録</small></span></p></section><footer><button type="button" onClick={() => setPermissionOpen(false)}>オフラインを維持</button><button type="button" className="primary-button" onClick={() => { setExternalEnabled(true); setPermissionOpen(false) }}>確認を必須にして許可</button></footer></DialogContent></Dialog>
@@ -1573,24 +2615,37 @@ function NetworkPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: str
   return <div className="property-editor">
     <PropertyGroup title="通信記録">
       <label><span>期間</span><select defaultValue="workspace"><option value="workspace">このワークスペース</option><option value="session">このセッション</option></select></label>
-      <label><span>結果</span><select defaultValue="all"><option value="all">すべて</option><option value="allowed">許可</option><option value="blocked">拒否</option></select></label>
+      <label><span>保存先</span><input value="ローカル・書き出しは明示操作" readOnly /></label>
     </PropertyGroup>
-    <section className="property-audit-empty"><ScrollText size={20} /><b>外部通信の記録はありません</b><small>オフライン操作は通信として記録されません。</small></section>
+    {/* The centre owns the list. This panel reports the same records it shows - it used to carry its
+        own empty state and contradict the list next to it. */}
+    <section className="property-audit-summary">
+      <b>記録 {rows.length}件</b>
+      <ul>{(Object.keys(auditResultLabels) as AuditResult[]).map((result) => <li key={result}><span>{auditResultLabels[result]}</span><em>{rows.filter((row) => row.result === result).length}件</em></li>)}</ul>
+      <small>端末外へ送信した情報は{rows.filter((row) => row.result === 'allowed').length}件です。オフライン操作は通信として記録されません。</small>
+    </section>
     <div className="property-panel-action"><button type="button"><FileOutput size={12} />監査ログを書き出す</button></div>
   </div>
 }
 
-function ViewObjectPropertyEditor({ variant, selectedViewObjects }: { variant: string; selectedViewObjects: string[] }) {
-  const kind = viewObjectKindByVariant[variant] ?? 'analysis-mesh'
-  const meta = viewObjectKinds[kind]
-  const selectedName = selectedViewObjects.at(-1) ?? meta.name
-
+function ViewObjectPropertyEditor({ activeObject }: { activeObject: ActiveViewObject }) {
+  if (activeObject.kind === 'container') {
+    return (
+      <div className="property-editor">
+        <section className="property-selection object-selection-card">
+          <span><small>選択中の行</small><b>{activeObject.name}</b><em>データセットの入れ物</em></span>
+        </section>
+        <div className="sidebar-context-state"><Boxes size={22} /><b>Viewオブジェクトではありません</b><small>この行は元ファイルの入れ物です。表示設定を持つのはその下の構成要素で、選択するとここに専用の項目が表示されます。</small></div>
+      </div>
+    )
+  }
+  const meta = viewObjectKinds[activeObject.kind]
   return (
     <div className="property-editor">
       <section className="property-selection object-selection-card">
-        <span><small>アクティブオブジェクト</small><b>{selectedName}</b><em>{meta.label}</em></span>
+        <span><small>アクティブオブジェクト</small><b>{activeObject.name}</b><em>{meta.label}</em></span>
       </section>
-      <ObjectTypeProperties kind={kind} />
+      <ObjectTypeProperties key={activeObject.kind} kind={activeObject.kind} />
       <p className="property-editor-note"><ShieldCheck size={12} />オブジェクトの表示定義だけを編集します。元のデータセット、解析値、単位、来歴は変更しません。</p>
     </div>
   )
@@ -1704,9 +2759,8 @@ function MaterialNodeGraph({ expanded = false, resultBinding = false }: { expand
   </div>
 }
 
-function ViewMaterialPropertyEditor({ variant }: { variant: string }) {
-  const kind = viewObjectKindByVariant[variant] ?? 'analysis-mesh'
-  const meta = viewObjectKinds[kind]
+function ViewMaterialPropertyEditor({ variant, activeObject }: { variant: string; activeObject: ActiveViewObject }) {
+  const meta = activeObject.kind === 'container' ? null : viewObjectKinds[activeObject.kind]
   const showFailedBinding = variant === 'material-composition'
   const [materialSlots, setMaterialSlots] = useState([
     { id: 'stress-steel', name: 'スチール＋応力コンター', target: '全体', revision: null as number | null, resultBinding: true, baseColorMode: 'colormap' as BaseColorInputMode, mappingRequired: true, mappingMode: 'objectTriplanar' as TextureMappingMode, sourceFile: 'steel_stress.mtlx' },
@@ -1900,8 +2954,8 @@ function ViewMaterialPropertyEditor({ variant }: { variant: string }) {
     setMaterialSlots(next)
   }
 
-  if (!meta.materialSurface) {
-    return <div className="property-editor material-preview-first"><div className="property-editor-scroll-content"><MaterialPreview available={false} /><div className="sidebar-context-state"><MaterialSphereIcon size={22} /><b>マテリアル設定はありません</b><small>{meta.label}は専用の表示設定を使用します。</small></div></div></div>
+  if (!meta || !meta.materialSurface) {
+    return <div className="property-editor material-preview-first"><div className="property-editor-scroll-content"><MaterialPreview available={false} /><div className="sidebar-context-state"><MaterialSphereIcon size={22} /><b>マテリアル設定はありません</b><small>{meta ? `${meta.label}は専用の表示設定を使用します。` : 'この行は元ファイルの入れ物です。マテリアルを持つ構成要素を選択してください。'}</small></div></div></div>
   }
 
   return (
@@ -2029,10 +3083,8 @@ function ViewMaterialPropertyEditor({ variant }: { variant: string }) {
   )
 }
 
-function ViewTextPropertyEditor({ variant }: { variant: string }) {
-  const kind = viewObjectKindByVariant[variant] ?? 'analysis-mesh'
-
-  if (!viewObjectKinds[kind].textProperties) return null
+function ViewTextPropertyEditor({ activeObject }: { activeObject: ActiveViewObject }) {
+  if (activeObject.kind === 'container' || !viewObjectKinds[activeObject.kind].textProperties) return null
 
   return <div className="property-editor">
     <details className="property-group" open><summary><ChevronRight size={12} /><b>内容</b></summary><div className="property-fields">
@@ -2047,54 +3099,97 @@ function ViewTextPropertyEditor({ variant }: { variant: string }) {
   </div>
 }
 
-function AutomationPropertyEditor({ tab }: { tab: SidebarTab }) {
+function AutomationPropertyEditor({ tab, variant, units, onUnitsChange, selectedUnitId, onSelectUnit }: { tab: SidebarTab; variant: string; units: PipelineUnitModel[]; onUnitsChange: (units: PipelineUnitModel[]) => void; selectedUnitId: string | null; onSelectUnit: (id: string) => void }) {
   const [addedUnit, setAddedUnit] = useState<string | null>(null)
+  const flattened = flattenPipelineUnits(units)
+  const selectedUnit = flattened.find((unit) => unit.id === selectedUnitId) ?? null
+
   if (tab.id === 'unit') {
-    const units = [
-      { label: 'シミュレーション', detail: '保存済み実行定義', icon: <Gauge size={14} /> },
-      { label: 'ケース', detail: '対象セットへ追加', icon: <FolderOpen size={14} /> },
-      { label: 'ビュー', detail: '可視化を生成', icon: <Boxes size={14} /> },
-      { label: 'グラフ', detail: '図を生成', icon: <BarChart3 size={14} /> },
-      { label: 'レポート', detail: '文書を生成', icon: <FileText size={14} /> },
-      { label: '出力', detail: 'ファイルへ書き出し', icon: <FileOutput size={14} /> },
-      { label: 'タグ', detail: 'ケースへ明示的に付与', icon: <Tag size={14} /> },
-      { label: 'クリア', detail: '対象データを解放', icon: <Trash2 size={14} /> },
-      { label: 'ループ', detail: '有限回の反復', icon: <RefreshCw size={14} /> },
-      { label: '変数', detail: '以降のユニットへ束縛', icon: <Variable size={14} /> },
-      { label: '数式', detail: '単位付き式を評価', icon: <Ruler size={14} /> },
-      { label: '条件', detail: '式による分岐', icon: <Waypoints size={14} /> },
-    ]
+    const addUnit = (kind: PipelineUnitKind) => {
+      const meta = pipelineUnitCatalogue[kind]
+      const unit: PipelineUnitModel = { id: `unit-${kind}-${units.length + 1}`, kind, title: `${meta.label}ユニット`, detail: meta.detail, addsCases: kind === 'case' ? 0 : undefined, children: meta.zone ? [] : undefined }
+      onUnitsChange([...units, unit])
+      onSelectUnit(unit.id)
+      setAddedUnit(meta.label)
+    }
     return (
       <div className="automation-property-editor">
         <p>中央の挿入位置へドラッグするか、選択して追加します。</p>
         <div className="automation-unit-palette">
-          {units.map((unit) => <button type="button" onClick={() => setAddedUnit(unit.label)} key={unit.label}><span>{unit.icon}</span><b>{unit.label}</b><small>{unit.detail}</small>{addedUnit === unit.label ? <CheckCircle2 size={12} /> : <Plus size={12} />}</button>)}
+          {(Object.keys(pipelineUnitCatalogue) as PipelineUnitKind[]).map((kind) => {
+            const meta = pipelineUnitCatalogue[kind]
+            const Icon = meta.icon
+            return <button type="button" onClick={() => addUnit(kind)} key={kind}><span><Icon size={14} /></span><b>{meta.label}</b><small>{meta.detail}</small>{addedUnit === meta.label ? <CheckCircle2 size={12} /> : <Plus size={12} />}</button>
+          })}
         </div>
-        {addedUnit && <p className="property-editor-note" role="status"><CheckCircle2 size={12} />{addedUnit}ユニットを選択位置に追加しました。ワークスペース変更としてUndoできます。</p>}
+        {addedUnit && <p className="property-editor-note" role="status"><CheckCircle2 size={12} />{addedUnit}ユニットをパイプラインの末尾に追加しました。ワークスペース変更としてUndoできます。</p>}
       </div>
     )
   }
 
   if (tab.id === 'history') {
+    if (variant !== 'failed') {
+      return (
+        <div className="automation-property-editor">
+          <section className="automation-history-empty"><Clock3 size={22} /><b>実行履歴はありません</b><small>ドライランはファイルを書き込まず、対象と生成物を確認します。</small></section>
+        </div>
+      )
+    }
     return (
       <div className="automation-property-editor">
-        <section className="automation-history-empty"><Clock3 size={22} /><b>実行履歴はありません</b><small>ドライランはファイルを書き込まず、対象と生成物を確認します。</small></section>
+        <section className="property-selection"><span><small>直近の実行</small><b>1ケース失敗・2ケース完了</b></span></section>
+        <RunOutcomeTable units={flattened} failedCase="板厚変更" />
+        <p className="property-editor-note"><ShieldCheck size={12} />失敗したケースの成果物は書き出していません。書込済みの成果物は実行記録から削除できます。</p>
       </div>
     )
   }
 
+  if (!selectedUnit) {
+    return (
+      <div className="automation-property-editor">
+        <section className="sidebar-context-state"><Workflow size={22} /><b>ユニットが選択されていません</b><small>中央のパイプラインでユニットを選ぶと、その条件をここで編集します。</small></section>
+      </div>
+    )
+  }
+
+  const meta = pipelineUnitCatalogue[selectedUnit.kind]
+  const update = (patch: Partial<PipelineUnitModel>) => onUnitsChange(units.map((unit) => unit.id === selectedUnit.id
+    ? { ...unit, ...patch }
+    : { ...unit, children: unit.children?.map((child) => child.id === selectedUnit.id ? { ...child, ...patch } : child) }))
+
   return (
     <div className="automation-property-editor">
-      <section className="property-selection"><span><small>選択中のユニット</small><b>比較グラフ</b></span><button type="button">選択を解除</button></section>
+      <section className="property-selection"><span><small>選択中のユニット</small><b>{selectedUnit.title}</b><em>{meta.label}</em></span></section>
       <details className="property-group" open>
-        <summary><ChevronRight size={12} /><b>参照</b></summary>
+        <summary><ChevronRight size={12} /><b>定義</b></summary>
         <div className="property-fields">
-          <label><span>種類</span><input value="グラフ" readOnly /></label>
-          <label><span>参照元</span><select defaultValue="workspace"><option value="workspace">ワークスペース項目</option><option value="template">テンプレート</option></select></label>
-          <label><span>グラフ</span><select defaultValue="comparison"><option value="comparison">ケース比較</option></select></label>
-          <label><span>リビジョン</span><input value="固定" readOnly /></label>
+          <label><span>名前</span><input value={selectedUnit.title} onChange={(event) => update({ title: event.target.value })} /></label>
+          <label><span>種類</span><input value={meta.label} readOnly /></label>
+          {selectedUnit.kind === 'case' && <label><span>追加ケース数</span><input type="number" min={0} max={9} value={selectedUnit.addsCases ?? 0} onChange={(event) => update({ addsCases: Number(event.target.value) })} /></label>}
+          {(selectedUnit.kind === 'view' || selectedUnit.kind === 'graph' || selectedUnit.kind === 'report') && <>
+            <label><span>参照元</span><select defaultValue="workspace"><option value="workspace">ワークスペース項目</option><option value="template">テンプレート</option></select></label>
+            <label><span>リビジョン</span><input value="固定" readOnly /></label>
+          </>}
         </div>
       </details>
+      {(selectedUnit.kind === 'condition' || selectedUnit.kind === 'formula') && <details className="property-group" open>
+        <summary><ChevronRight size={12} /><b>{selectedUnit.kind === 'condition' ? '条件式' : '数式'}</b></summary>
+        <div className="property-fields">
+          <ExpressionEditor
+            id={`pipeline-${selectedUnit.id}`}
+            label={selectedUnit.kind === 'condition' ? '分岐条件' : '評価式'}
+            initial={selectedUnit.kind === 'condition' ? '最大応力 > 設計許容応力' : '安全率 = 設計許容応力 / 最大応力'}
+          />
+        </div>
+      </details>}
+      {selectedUnit.kind === 'loop' && <details className="property-group" open>
+        <summary><ChevronRight size={12} /><b>反復</b></summary>
+        <div className="property-fields">
+          <label><span>反復元</span><select defaultValue="variable"><option value="variable">変数の値リスト</option><option value="cases">対象ケース</option></select></label>
+          <label><span>回数</span><input value="有限・値リストの要素数" readOnly /></label>
+        </div>
+      </details>}
+      {meta.destructive && <div className="property-unresolved"><AlertTriangle size={13} /><span><b>破壊的ユニットです</b><small>影響するケース数を示す確認を経てのみ実行できます。単一キーのショートカットはありません。</small></span></div>}
       <details className="property-group" open>
         <summary><ChevronRight size={12} /><b>実行条件</b></summary>
         <div className="property-fields">
@@ -2106,7 +3201,26 @@ function AutomationPropertyEditor({ tab }: { tab: SidebarTab }) {
   )
 }
 
-function OutlinerPanel({ variant, selectedNames, onSelect }: { variant: string; selectedNames: string[]; onSelect: (name: string, additive?: boolean) => void }) {
+const outlinerKindIcons: Record<ViewObjectKind | 'container', typeof Boxes> = {
+  container: Boxes,
+  'analysis-mesh': Shapes,
+  'reference-mesh': Square,
+  'scalar-field': Paintbrush,
+  'vector-field': Waypoints,
+  trajectory: Waypoints,
+  'point-cloud': Grid2X2,
+  annotation: Type,
+  effect: Sparkles,
+}
+
+function OutlinerTypeIcon({ name, size = 11 }: { name: string; size?: number }) {
+  const Icon = outlinerKindIcons[outlinerObjectKinds[name] ?? 'container']
+  const kind = outlinerObjectKinds[name]
+  const label = kind && kind !== 'container' ? viewObjectKinds[kind].label : 'データセットの入れ物'
+  return <span className="outliner-kind-icon" title={label} aria-label={label}><Icon size={size} /></span>
+}
+
+function OutlinerPanel({ variant, selectedNames, onSelect, borrowedFrom }: { variant: string; selectedNames: string[]; onSelect: (name: string, additive?: boolean) => void; borrowedFrom: string | null }) {
   const flat = variant === 'outliner-flat'
   const empty = variant === 'outliner-empty'
   const [rootOpen, setRootOpen] = useState(true)
@@ -2129,6 +3243,7 @@ function OutlinerPanel({ variant, selectedNames, onSelect }: { variant: string; 
     <section className="outliner-panel">
       <header className="outliner-header">
         <b>アウトライナー</b>
+        {borrowedFrom && <em className="outliner-borrowed">基準ビュー「{borrowedFrom}」の構成</em>}
       </header>
       <div className="outliner-tools">
         <label><Search size={12} /><input placeholder="構成要素を検索" /></label>
@@ -2143,17 +3258,17 @@ function OutlinerPanel({ variant, selectedNames, onSelect }: { variant: string; 
             <OutlinerRow depth={0} expanded={rootOpen} onToggle={() => setRootOpen((open) => !open)} icon={<HardDrive size={13} />} name="［元ファイルのルート名］" visible={isVisible('［元ファイルのルート名］')} selected={selectedNames.includes('［元ファイルのルート名］')} active={activeName === '［元ファイルのルート名］'} onSelect={onSelect} onVisibility={changeVisibility} />
             {rootOpen && (flat ? (
               <>
-                <OutlinerRow depth={1} icon={<Square size={11} />} name="［元ファイルの部品名 01］" visible={isVisible('［元ファイルの部品名 01］')} selected={selectedNames.includes('［元ファイルの部品名 01］')} active={activeName === '［元ファイルの部品名 01］'} onSelect={onSelect} onVisibility={changeVisibility} />
-                <OutlinerRow depth={1} icon={<Square size={11} />} name="［元ファイルの部品名 02］" visible={isVisible('［元ファイルの部品名 02］')} selected={selectedNames.includes('［元ファイルの部品名 02］')} active={activeName === '［元ファイルの部品名 02］'} onSelect={onSelect} onVisibility={changeVisibility} />
-                <OutlinerRow depth={1} icon={<Grid2X2 size={11} />} name="［元ファイルの領域名］" visible={isVisible('［元ファイルの領域名］')} selected={selectedNames.includes('［元ファイルの領域名］')} active={activeName === '［元ファイルの領域名］'} onSelect={onSelect} onVisibility={changeVisibility} />
+                <OutlinerRow depth={1} icon={<OutlinerTypeIcon name="［元ファイルの部品名 01］" />} name="［元ファイルの部品名 01］" visible={isVisible('［元ファイルの部品名 01］')} selected={selectedNames.includes('［元ファイルの部品名 01］')} active={activeName === '［元ファイルの部品名 01］'} onSelect={onSelect} onVisibility={changeVisibility} />
+                <OutlinerRow depth={1} icon={<OutlinerTypeIcon name="［元ファイルの部品名 02］" />} name="［元ファイルの部品名 02］" visible={isVisible('［元ファイルの部品名 02］')} selected={selectedNames.includes('［元ファイルの部品名 02］')} active={activeName === '［元ファイルの部品名 02］'} onSelect={onSelect} onVisibility={changeVisibility} />
+                <OutlinerRow depth={1} icon={<OutlinerTypeIcon name="［元ファイルの領域名］" />} name="［元ファイルの領域名］" visible={isVisible('［元ファイルの領域名］')} selected={selectedNames.includes('［元ファイルの領域名］')} active={activeName === '［元ファイルの領域名］'} onSelect={onSelect} onVisibility={changeVisibility} />
               </>
             ) : (
               <>
-                <OutlinerRow depth={1} expanded={assemblyOpen} onToggle={() => setAssemblyOpen((open) => !open)} icon={<Boxes size={12} />} name="［元ファイルのアセンブリ名］" visible={isVisible('［元ファイルのアセンブリ名］')} selected={selectedNames.includes('［元ファイルのアセンブリ名］')} active={activeName === '［元ファイルのアセンブリ名］'} onSelect={onSelect} onVisibility={changeVisibility} />
+                <OutlinerRow depth={1} expanded={assemblyOpen} onToggle={() => setAssemblyOpen((open) => !open)} icon={<OutlinerTypeIcon name="［元ファイルのアセンブリ名］" size={12} />} name="［元ファイルのアセンブリ名］" visible={isVisible('［元ファイルのアセンブリ名］')} selected={selectedNames.includes('［元ファイルのアセンブリ名］')} active={activeName === '［元ファイルのアセンブリ名］'} onSelect={onSelect} onVisibility={changeVisibility} />
                 {assemblyOpen && <>
-                  <OutlinerRow depth={2} icon={<Square size={11} />} name="［元ファイルの部品名 01］" visible={isVisible('［元ファイルの部品名 01］')} selected={selectedNames.includes('［元ファイルの部品名 01］')} active={activeName === '［元ファイルの部品名 01］'} onSelect={onSelect} onVisibility={changeVisibility} />
-                  <OutlinerRow depth={2} expanded={partOpen} onToggle={() => setPartOpen((open) => !open)} icon={<Square size={11} />} name="［元ファイルの部品名 02］" visible={isVisible('［元ファイルの部品名 02］')} selected={selectedNames.includes('［元ファイルの部品名 02］')} active={activeName === '［元ファイルの部品名 02］'} onSelect={onSelect} onVisibility={changeVisibility} />
-                  {partOpen && <OutlinerRow depth={3} icon={<Grid2X2 size={11} />} name="［元ファイルの領域名］" visible={isVisible('［元ファイルの領域名］')} selected={selectedNames.includes('［元ファイルの領域名］')} active={activeName === '［元ファイルの領域名］'} onSelect={onSelect} onVisibility={changeVisibility} />}
+                  <OutlinerRow depth={2} icon={<OutlinerTypeIcon name="［元ファイルの部品名 01］" />} name="［元ファイルの部品名 01］" visible={isVisible('［元ファイルの部品名 01］')} selected={selectedNames.includes('［元ファイルの部品名 01］')} active={activeName === '［元ファイルの部品名 01］'} onSelect={onSelect} onVisibility={changeVisibility} />
+                  <OutlinerRow depth={2} expanded={partOpen} onToggle={() => setPartOpen((open) => !open)} icon={<OutlinerTypeIcon name="［元ファイルの部品名 02］" />} name="［元ファイルの部品名 02］" visible={isVisible('［元ファイルの部品名 02］')} selected={selectedNames.includes('［元ファイルの部品名 02］')} active={activeName === '［元ファイルの部品名 02］'} onSelect={onSelect} onVisibility={changeVisibility} />
+                  {partOpen && <OutlinerRow depth={3} icon={<OutlinerTypeIcon name="［元ファイルの領域名］" />} name="［元ファイルの領域名］" visible={isVisible('［元ファイルの領域名］')} selected={selectedNames.includes('［元ファイルの領域名］')} active={activeName === '［元ファイルの領域名］'} onSelect={onSelect} onVisibility={changeVisibility} />}
                 </>}
               </>
             ))}
@@ -2171,14 +3286,14 @@ function OutlinerRow({ depth, expanded, onToggle, icon, name, visible, selected,
   return <div className={`outliner-row ${selected ? 'selected' : ''} ${active ? 'active' : ''}`} role="treeitem" aria-level={depth + 1} aria-expanded={onToggle ? expanded : undefined} aria-selected={selected} aria-current={active ? 'true' : undefined} tabIndex={0} onClick={select} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); select(event) } }} style={{ '--tree-indent': `${depth * 15}px` } as React.CSSProperties}><Button variant="ghost" size="icon" className="outliner-disclosure" aria-label={onToggle ? expanded ? '折りたたむ' : '展開する' : undefined} onClick={(event) => { event.stopPropagation(); onToggle?.() }} disabled={!onToggle}>{onToggle ? expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} /> : <span />}</Button><span className="outliner-type-icon">{icon}</span><b title={name}>{name}</b><Button variant="ghost" size="icon" className="outliner-visibility" aria-label={visible ? `${name}を非表示` : `${name}を表示`} onClick={(event) => { event.stopPropagation(); onVisibility?.(name, event.ctrlKey ? 'isolate' : event.shiftKey ? 'descendants' : 'single') }}>{visible ? <Eye size={13} /> : <EyeOff size={13} />}</Button></div>
 }
 
-function ScreenCanvas({ scenario, draft, onDraftChange, onViewObjectSelect, onScreen }: { scenario: Scenario; draft: string; onDraftChange: (draft: string) => void; onViewObjectSelect: (name: string, additive?: boolean) => void; onScreen: (screen: ScreenId) => void }) {
+function ScreenCanvas({ scenario, draft, onDraftChange, onViewObjectSelect, onScreen, settings, onSettingsChange, pipelineUnits, onPipelineUnitsChange, selectedUnitId, onSelectUnit, selectedCase, viewItem, onViewItemChange, isComparisonItem, comparison, baseViewName }: { scenario: Scenario; draft: string; onDraftChange: (draft: string) => void; onViewObjectSelect: (name: string, additive?: boolean) => void; onScreen: (screen: ScreenId) => void; settings: ConversationSettings; onSettingsChange: (settings: ConversationSettings) => void; pipelineUnits: PipelineUnitModel[]; onPipelineUnitsChange: (units: PipelineUnitModel[]) => void; selectedUnitId: string | null; onSelectUnit: (id: string) => void; selectedCase: string; viewItem: ViewItemState; onViewItemChange: (next: ViewItemState) => void; isComparisonItem: boolean; comparison: ComparisonModel; baseViewName: string }) {
   switch (scenario.screen) {
     case 'simulation': return <SimulationScreen variant={scenario.variant} onAutomation={() => onScreen('pipeline')} />
-    case 'pipeline': return <PipelineScreen variant={scenario.variant} />
-    case 'view': return <ViewScreen variant={scenario.variant} onViewObjectSelect={onViewObjectSelect} />
+    case 'pipeline': return <PipelineScreen variant={scenario.variant} units={pipelineUnits} onUnitsChange={onPipelineUnitsChange} selectedUnitId={selectedUnitId} onSelectUnit={onSelectUnit} />
+    case 'view': return <ViewScreen variant={scenario.variant} onViewObjectSelect={onViewObjectSelect} selectedCase={selectedCase} viewItem={viewItem} onViewItemChange={onViewItemChange} isComparisonItem={isComparisonItem} comparison={comparison} baseViewName={baseViewName} />
     case 'graph': return <GraphScreen variant={scenario.variant} />
     case 'report': return <ReportScreen variant={scenario.variant} />
-    case 'chat': return <ChatScreen variant={scenario.variant} draft={draft} onDraftChange={onDraftChange} />
+    case 'chat': return <ChatScreen variant={scenario.variant} draft={draft} onDraftChange={onDraftChange} settings={settings} onSettingsChange={onSettingsChange} />
     case 'settings': return <SettingsScreen variant={scenario.variant} />
     case 'network': return <NetworkScreen variant={scenario.variant} onSettings={() => onScreen('settings')} />
     default: return null
@@ -2228,56 +3343,359 @@ function SimulationScreen({ variant, onAutomation }: { variant: string; onAutoma
   )
 }
 
-function PipelineScreen({ variant }: { variant: string }) {
-  const [flowState, setFlowState] = useState<'editing' | 'dry-run' | 'confirm-run' | 'running'>(variant === 'dry-run' ? 'dry-run' : variant === 'running' ? 'running' : 'editing')
-  if (variant === 'empty') return <div className="centred-state"><Workflow size={34} /><h2>パイプラインが空です</h2><p>右側から処理を追加し、最初にドライランで対象ケースと生成物を確認します。</p><button className="primary-button"><Plus size={14} /> 最初のユニットを追加</button></div>
-  const banner = flowState === 'running'
-    ? <StatePanel tone="progress" title="パイプライン実行中" detail="閲覧は継続できます。現在のユニット境界までワークスペース編集は停止されます。" />
+// The @Pipeline the Automation centre edits. The unit list lives in the shell because the palette in
+// the right sidebar and the editor in the centre act on one pipeline; two copies would let a unit
+// added on the right never appear in the middle (XC-155).
+type PipelineUnitKind = 'simulation' | 'case' | 'view' | 'graph' | 'report' | 'export' | 'tag' | 'clear' | 'loop' | 'variable' | 'formula' | 'condition'
+
+type PipelineUnitModel = {
+  id: string
+  kind: PipelineUnitKind
+  title: string
+  detail: string
+  addsCases?: number
+  children?: PipelineUnitModel[]
+}
+
+const pipelineUnitCatalogue: Record<PipelineUnitKind, { label: string; detail: string; icon: typeof Boxes; destructive?: boolean; zone?: boolean }> = {
+  simulation: { label: 'シミュレーション', detail: '保存済み実行定義', icon: Gauge, zone: true },
+  case: { label: 'ケース', detail: '対象セットへ追加', icon: FolderOpen },
+  view: { label: 'ビュー', detail: '可視化を生成', icon: Boxes },
+  graph: { label: 'グラフ', detail: '図を生成', icon: BarChart3 },
+  report: { label: 'レポート', detail: '文書を生成', icon: FileText },
+  export: { label: '出力', detail: 'ファイルへ書き出し', icon: FileOutput },
+  tag: { label: 'タグ', detail: 'ケースへ明示的に付与', icon: Tag },
+  clear: { label: 'クリア', detail: '対象データを解放', icon: Trash2, destructive: true },
+  loop: { label: 'ループ', detail: '有限回の反復', icon: RefreshCw, zone: true },
+  variable: { label: '変数', detail: '以降のユニットへ束縛', icon: Variable },
+  formula: { label: '数式', detail: '単位付き式を評価', icon: Ruler },
+  condition: { label: '条件', detail: '式による分岐', icon: Waypoints, zone: true },
+}
+
+const defaultPipelineUnits: PipelineUnitModel[] = [
+  { id: 'unit-cases', kind: 'case', title: 'ケースユニット', detail: '設計スタディの3ケースを明示選択', addsCases: 3 },
+  { id: 'unit-loop', kind: 'loop', title: 'ループ・material_variant', detail: '3反復', children: [
+    { id: 'unit-view', kind: 'view', title: 'ビューテンプレート', detail: '技術資料・標準' },
+    { id: 'unit-graph', kind: 'graph', title: 'グラフテンプレート', detail: '比較図' },
+  ] },
+  { id: 'unit-condition', kind: 'condition', title: '条件・許容応力の超過', detail: '式：最大応力 > 設計許容応力', children: [
+    { id: 'unit-report', kind: 'report', title: 'レポートテンプレート', detail: '設計レビュー' },
+  ] },
+  { id: 'unit-export', kind: 'export', title: '出力ユニット', detail: '新しい実行フォルダーへ書き出し' },
+  { id: 'unit-clear', kind: 'clear', title: 'クリアユニット', detail: '読み込み済みデータを解放し対象セットを空にする' },
+]
+
+// XC-099: the target set accumulates down the list, so the count a unit acts on is invisible unless it
+// is computed here and drawn on every unit - including the ones inside a bounded zone.
+function annotatePipelineTargets(units: PipelineUnitModel[]) {
+  let targets = 0
+  return units.map((unit) => {
+    if (unit.kind === 'case') targets += unit.addsCases ?? 0
+    const row = { unit, acts: targets, children: (unit.children ?? []).map((child) => ({ unit: child, acts: targets })) }
+    if (unit.kind === 'clear') targets = 0
+    return row
+  })
+}
+
+function flattenPipelineUnits(units: PipelineUnitModel[]): PipelineUnitModel[] {
+  return units.flatMap((unit) => [unit, ...(unit.children ?? [])])
+}
+
+const pipelineRunCases = ['基準ケース', '板厚変更', '荷重変更']
+type RunOutcome = 'applied' | 'skipped' | 'failed' | 'refused'
+const runOutcomeLabels: Record<RunOutcome, string> = { applied: '適用', skipped: 'スキップ', failed: '失敗', refused: '不成立' }
+
+// The shared run outcome table: per case and per unit, what happened - and, for a condition that did
+// not hold, the value it evaluated to. Without that last part a refused unit reads the same as one
+// that was never reached.
+function pipelineRunOutcome(units: PipelineUnitModel[], failedCase: string | null) {
+  return pipelineRunCases.map((caseName) => {
+    let broken = false
+    const cells = units.map((unit) => {
+      if (broken) return { unit, outcome: 'skipped' as RunOutcome, note: '先行ユニットの失敗により未実行' }
+      if (failedCase === caseName && unit.kind === 'graph') {
+        broken = true
+        return { unit, outcome: 'failed' as RunOutcome, note: '参照した数量がこのケースにありません' }
+      }
+      if (unit.kind === 'report' && caseName === '基準ケース') {
+        return { unit, outcome: 'refused' as RunOutcome, note: '条件の評価値：false（［最大応力］ ≦ ［設計許容応力］）' }
+      }
+      return { unit, outcome: 'applied' as RunOutcome, note: '' }
+    })
+    return { caseName, cells }
+  })
+}
+
+function RunOutcomeTable({ units, failedCase }: { units: PipelineUnitModel[]; failedCase: string | null }) {
+  const rows = pipelineRunOutcome(units, failedCase)
+  return (
+    <section className="run-outcome-table" aria-label="ケースとユニットごとの実行結果">
+      <header><b>実行結果</b><small>ケース × ユニット。不成立には条件の評価値を併記します</small></header>
+      <div className="run-outcome-scroll">
+        <table>
+          <thead><tr><th scope="col">ケース</th>{units.map((unit) => <th scope="col" key={unit.id}>{unit.title}</th>)}</tr></thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.caseName}>
+                <th scope="row">{row.caseName}</th>
+                {row.cells.map((cell) => (
+                  <td className={`run-outcome-${cell.outcome}`} key={cell.unit.id}>
+                    <b>{runOutcomeLabels[cell.outcome]}</b>
+                    {cell.note && <small>{cell.note}</small>}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
+function PipelineScreen({ variant, units, onUnitsChange, selectedUnitId, onSelectUnit }: { variant: string; units: PipelineUnitModel[]; onUnitsChange: (units: PipelineUnitModel[]) => void; selectedUnitId: string | null; onSelectUnit: (id: string) => void }) {
+  const [flowState, setFlowState] = useState<'editing' | 'dry-run' | 'confirm-run' | 'running' | 'finished'>(variant === 'dry-run' ? 'dry-run' : variant === 'running' ? 'running' : variant === 'failed' ? 'finished' : 'editing')
+  const [scopeUnitId, setScopeUnitId] = useState<string | null>(variant === 'scope-confirmation' ? 'unit-clear' : null)
+  const [authorisedUnitIds, setAuthorisedUnitIds] = useState<string[]>([])
+  const [dropIndex, setDropIndex] = useState<number | null>(null)
+  const [draggedId, setDraggedId] = useState<string | null>(null)
+  const rows = annotatePipelineTargets(units)
+  const flattened = flattenPipelineUnits(units)
+  const destructiveUnits = units.filter((unit) => pipelineUnitCatalogue[unit.kind].destructive)
+  const scopeUnit = units.find((unit) => unit.id === scopeUnitId) ?? null
+  const scopeUnitTargets = rows.find((row) => row.unit.id === scopeUnitId)?.acts ?? 0
+  const unauthorised = destructiveUnits.filter((unit) => !authorisedUnitIds.includes(unit.id))
+  const running = flowState === 'running'
+  const failedCase = variant === 'failed' ? '板厚変更' : null
+
+  const moveUnit = (id: string, direction: -1 | 1) => {
+    const index = units.findIndex((unit) => unit.id === id)
+    const target = index + direction
+    if (index < 0 || target < 0 || target >= units.length) return
+    const next = [...units]
+    const moved = next[index]
+    next[index] = next[target]
+    next[target] = moved
+    onUnitsChange(next)
+  }
+
+  const dropUnit = (index: number) => {
+    setDropIndex(null)
+    if (!draggedId) return
+    const from = units.findIndex((unit) => unit.id === draggedId)
+    setDraggedId(null)
+    if (from < 0) return
+    const without = units.filter((unit) => unit.id !== draggedId)
+    const at = index > from ? index - 1 : index
+    onUnitsChange([...without.slice(0, at), units[from], ...without.slice(at)])
+  }
+
+  const removeUnit = (id: string) => onUnitsChange(units.filter((unit) => unit.id !== id))
+
+  const dropTarget = (index: number) => ({
+    onDragOver: (event: React.DragEvent) => { if (!draggedId || running) return; event.preventDefault(); setDropIndex(index) },
+    onDrop: (event: React.DragEvent) => { event.preventDefault(); if (!running) dropUnit(index) },
+  })
+
+  if (units.length === 0) return <div className="centred-state"><Workflow size={34} /><h2>パイプラインが空です</h2><p>右側のユニットパレットから処理を追加し、最初にドライランで対象ケースと生成物を確認します。</p><button className="primary-button" type="button" onClick={() => onUnitsChange([defaultPipelineUnits[0]])}><Plus size={14} /> 最初のユニットを追加</button></div>
+
+  const banner = running
+    ? <StatePanel tone="progress" title="パイプライン実行中" detail="閲覧は継続できます。実行対象のワークスペースは編集できません。中止はユニット境界です。" />
     : variant === 'failed'
-      ? <StatePanel tone="error" title="1ケースが失敗しました" detail="板厚変更ケースがグラフで失敗しました。このケースのレポートと出力はスキップされ、他ケースは継続します。" />
+      ? <StatePanel tone="error" title="1ケースが失敗しました" detail="板厚変更ケースがグラフユニットで失敗しました。このケースの後続ユニットだけをスキップし、他ケースは継続しています。失敗は通知履歴にも残ります。" />
       : flowState === 'dry-run'
-        ? <StatePanel tone="info" title="ドライランのみ" detail="3ケース、生成物9件、ファイル書込0件。入れ子ユニットと対象数を以下に表示します。" />
+        ? <StatePanel tone="info" title="ドライランのみ" detail={pipelineRunCases.length + 'ケース、ユニット' + flattened.length + '件、ファイル書込0件。各ユニットの累積対象数と入れ子を以下に表示します。'} />
         : null
+
   return (
     <div className="pipeline-canvas">
       {banner}
       <header className="pipeline-editor-header">
         <div><span className="eyebrow">パイプライン</span><b>レポート生成フロー</b><small>上から順に実行・対象セットを累積</small></div>
-        <div className="pipeline-actions"><button disabled={flowState === 'running'} onClick={() => setFlowState('dry-run')}><Play size={14} /> ドライラン</button><button className="primary-button" disabled={flowState === 'running'} onClick={() => setFlowState('confirm-run')}><Play size={14} /> 実行</button>{flowState === 'running' && <button type="button" onClick={() => setFlowState('editing')}><X size={14} />ユニット境界で中止</button>}</div>
+        <div className="pipeline-actions"><button type="button" disabled={running} onClick={() => setFlowState('dry-run')}><Play size={14} /> ドライラン</button><button className="primary-button" type="button" disabled={running} onClick={() => setFlowState('confirm-run')}><Play size={14} /> 実行</button>{running && <button type="button" onClick={() => setFlowState('finished')}><X size={14} />ユニット境界で中止</button>}</div>
       </header>
+      {unauthorised.length > 0 && !running && <p className="pipeline-authorisation-note"><AlertTriangle size={13} /><span>破壊的ユニット「{unauthorised[0].title}」は影響範囲を確認するまで実行できません。</span><button type="button" onClick={() => setScopeUnitId(unauthorised[0].id)}>範囲を確認</button></p>}
       <div className="pipeline-units">
         <div className="pipeline-boundary pipeline-boundary-start"><span>開始</span><small>対象セット 0</small></div>
-        <PipelineUnit icon={<FolderOpen />} title="ケースユニット" detail="3ケース選択" count="対象3" />
-        <div className="bounded-zone"><header><RefreshCw size={14} /><b>ループ・material_variant</b><span>3反復・対象3</span></header><PipelineUnit icon={<Boxes />} title="ビューテンプレート" detail="技術資料・標準" count="対象3" /><PipelineUnit icon={<BarChart3 />} title="グラフテンプレート" detail="比較図" count="対象3" failed={variant === 'failed'} /></div>
-        <PipelineUnit icon={<FileText />} title="レポートテンプレート" detail="設計レビュー" count="対象3" muted={variant === 'failed'} />
-        <button className="pipeline-insert" type="button"><Plus size={13} /> ユニットを追加</button>
+        {rows.map((row, index) => {
+          const meta = pipelineUnitCatalogue[row.unit.kind]
+          const ZoneIcon = meta.icon
+          return (
+            <Fragment key={row.unit.id}>
+              <div className={`pipeline-drop-line ${dropIndex === index ? 'active' : ''}`} aria-hidden="true" {...dropTarget(index)} />
+              {meta.zone ? (
+                <div className={`bounded-zone ${selectedUnitId === row.unit.id ? 'selected' : ''}`} draggable={!running} onDragStart={() => setDraggedId(row.unit.id)} onDragEnd={() => { setDraggedId(null); setDropIndex(null) }}>
+                  <header onClick={() => onSelectUnit(row.unit.id)}><ZoneIcon size={14} /><b>{row.unit.title}</b><span>{row.unit.detail}・対象{row.acts}</span><PipelineUnitControls disabled={running} onUp={() => moveUnit(row.unit.id, -1)} onDown={() => moveUnit(row.unit.id, 1)} onRemove={() => removeUnit(row.unit.id)} title={row.unit.title} /></header>
+                  {row.children.map((child) => {
+                    const ChildIcon = pipelineUnitCatalogue[child.unit.kind].icon
+                    return <PipelineUnit key={child.unit.id} icon={<ChildIcon />} title={child.unit.title} detail={child.unit.detail} count={`対象${child.acts}`} failed={variant === 'failed' && child.unit.kind === 'graph'} muted={variant === 'failed' && child.unit.kind === 'report'} selected={selectedUnitId === child.unit.id} onSelect={() => onSelectUnit(child.unit.id)} />
+                  })}
+                  {row.children.length === 0 && <p className="bounded-zone-empty">このゾーンにユニットがありません。</p>}
+                </div>
+              ) : (
+                <div draggable={!running} onDragStart={() => setDraggedId(row.unit.id)} onDragEnd={() => { setDraggedId(null); setDropIndex(null) }}>
+                  <PipelineUnit
+                    icon={<ZoneIcon />}
+                    title={row.unit.title}
+                    detail={row.unit.detail}
+                    count={`対象${row.acts}`}
+                    failed={variant === 'failed' && row.unit.kind === 'graph'}
+                    muted={variant === 'failed' && row.unit.kind === 'export'}
+                    destructive={meta.destructive}
+                    authorised={authorisedUnitIds.includes(row.unit.id)}
+                    selected={selectedUnitId === row.unit.id}
+                    onSelect={() => onSelectUnit(row.unit.id)}
+                    onScope={meta.destructive ? () => setScopeUnitId(row.unit.id) : undefined}
+                    controls={<PipelineUnitControls disabled={running} onUp={() => moveUnit(row.unit.id, -1)} onDown={() => moveUnit(row.unit.id, 1)} onRemove={() => removeUnit(row.unit.id)} title={row.unit.title} />}
+                  />
+                </div>
+              )}
+            </Fragment>
+          )
+        })}
+        <div className={`pipeline-drop-line ${dropIndex === units.length ? 'active' : ''}`} aria-hidden="true" {...dropTarget(units.length)} />
+        <button className="pipeline-insert" type="button" disabled={running} onClick={() => onUnitsChange([...units, { id: `unit-added-${units.length + 1}`, kind: 'case', title: 'ケースユニット', detail: 'ケースを選択してください', addsCases: 0 }])}><Plus size={13} /> ユニットを追加</button>
         <div className="pipeline-boundary pipeline-boundary-end"><span>完了</span><small>生成物を記録</small></div>
       </div>
-      {variant === 'scope-confirmation' && <ModalCard title="対象セットを消去しますか？" detail="このユニットは3ケースに影響し、読み込み済みデータを解放します。書込済みファイルは削除しません。"><button>キャンセル</button><button className="danger-button">3ケースを消去</button></ModalCard>}
-      {flowState === 'confirm-run' && <Dialog open onOpenChange={(open) => !open && setFlowState('editing')}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog compact-workflow-dialog"><header><span><small>実行前確認</small><b>ドライラン結果の対象で実行</b></span><button type="button" aria-label="実行確認を閉じる" onClick={() => setFlowState('editing')}><X size={15} /></button></header><section className="workflow-check-list"><p><CheckCircle2 size={13} /><span><b>対象セット</b><small>各ユニットの累積対象数を確定済み</small></span></p><p><CheckCircle2 size={13} /><span><b>生成物</b><small>新しい実行フォルダーに保存・上書きなし</small></span></p><p><AlertTriangle size={13} /><span><b>編集ロック</b><small>実行中は閲覧のみ。中止はユニット境界</small></span></p></section><footer><button type="button" onClick={() => setFlowState('editing')}>キャンセル</button><button type="button" className="primary-button" onClick={() => setFlowState('running')}>実行を開始</button></footer></DialogContent></Dialog>}
+      {running && <p className="pipeline-edit-lock" role="status"><AlertTriangle size={13} />実行中はこのワークスペースを編集できません。実行の対象が途中で変わってしまうためです（pipeline/AC-040）。</p>}
+      {(variant === 'failed' || flowState === 'finished') && <RunOutcomeTable units={flattened} failedCase={failedCase} />}
+      {scopeUnit && <ModalCard
+        open
+        onClose={() => setScopeUnitId(null)}
+        title={`${scopeUnit.title}を許可しますか？`}
+        detail={`このユニットは対象セットの${scopeUnitTargets}ケースに影響し、読み込み済みデータを解放します。書込済みファイルは削除しません。同じ数はドライランでも確認できます。`}
+      >
+        <button type="button" onClick={() => setScopeUnitId(null)}>キャンセル</button>
+        <button type="button" className="danger-button" onClick={() => { setAuthorisedUnitIds((current) => [...current, scopeUnit.id]); setScopeUnitId(null) }}>{scopeUnitTargets}ケースの範囲で許可</button>
+      </ModalCard>}
+      {flowState === 'confirm-run' && <Dialog open onOpenChange={(open) => !open && setFlowState('editing')}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog compact-workflow-dialog"><header><span><small>実行前確認</small><b>ドライラン結果の対象で実行</b></span><button type="button" aria-label="実行確認を閉じる" onClick={() => setFlowState('editing')}><X size={15} /></button></header><section className="workflow-check-list"><p><CheckCircle2 size={13} /><span><b>対象セット</b><small>各ユニットの累積対象数を確定済み</small></span></p><p><CheckCircle2 size={13} /><span><b>生成物</b><small>新しい実行フォルダーに保存・上書きなし</small></span></p><p><AlertTriangle size={13} /><span><b>編集ロック</b><small>実行中は閲覧のみ。中止はユニット境界</small></span></p>{unauthorised.length > 0 && <p><AlertTriangle size={13} /><span><b>未許可の破壊的ユニット</b><small>{unauthorised.map((unit) => unit.title).join('・')}の範囲確認が必要です</small></span></p>}</section><footer><button type="button" onClick={() => setFlowState('editing')}>キャンセル</button><button type="button" className="primary-button" disabled={unauthorised.length > 0} onClick={() => setFlowState('running')}>実行を開始</button></footer></DialogContent></Dialog>}
     </div>
   )
 }
 
-function PipelineUnit({ icon, title, detail, count, failed, muted }: { icon: React.ReactNode; title: string; detail: string; count: string; failed?: boolean; muted?: boolean }) {
-  return <div className={`pipeline-unit ${failed ? 'failed' : ''} ${muted ? 'muted' : ''}`}><span>{icon}</span><div><b>{title}</b><small>{detail}</small></div><em>{failed ? '失敗' : muted ? 'スキップ' : count}</em><ChevronRight size={14} /></div>
+function PipelineUnitControls({ disabled, onUp, onDown, onRemove, title }: { disabled: boolean; onUp: () => void; onDown: () => void; onRemove: () => void; title: string }) {
+  return <span className="pipeline-unit-controls">
+    <button type="button" aria-label={`${title}を上へ移動`} disabled={disabled} onClick={(event) => { event.stopPropagation(); onUp() }}><ChevronUp size={12} /></button>
+    <button type="button" aria-label={`${title}を下へ移動`} disabled={disabled} onClick={(event) => { event.stopPropagation(); onDown() }}><ChevronDown size={12} /></button>
+    <button type="button" aria-label={`${title}を削除`} disabled={disabled} onClick={(event) => { event.stopPropagation(); onRemove() }}><X size={12} /></button>
+  </span>
 }
 
-function ViewScreen({ variant, onViewObjectSelect }: { variant: string; onViewObjectSelect: (name: string, additive?: boolean) => void }) {
+function PipelineUnit({ icon, title, detail, count, failed, muted, destructive, authorised, selected, onSelect, onScope, controls }: { icon: React.ReactNode; title: string; detail: string; count: string; failed?: boolean; muted?: boolean; destructive?: boolean; authorised?: boolean; selected?: boolean; onSelect?: () => void; onScope?: () => void; controls?: React.ReactNode }) {
+  return <div className={`pipeline-unit ${failed ? 'failed' : ''} ${muted ? 'muted' : ''} ${destructive ? 'destructive' : ''} ${selected ? 'selected' : ''}`} onClick={onSelect}>
+    <span>{icon}</span>
+    <div><b>{title}</b><small>{detail}</small>{destructive && <em className={authorised ? 'unit-scope authorised' : 'unit-scope'}>{authorised ? '範囲を許可済み' : '実行前に範囲確認が必要'}</em>}</div>
+    <em>{failed ? '失敗' : muted ? 'スキップ' : count}</em>
+    {onScope && <button type="button" className="pipeline-unit-scope-button" onClick={(event) => { event.stopPropagation(); onScope() }}>範囲</button>}
+    {controls}
+    <ChevronRight size={14} />
+  </div>
+}
+
+// XC-131: a @Case is indexed by an axis that is not always time. XC-160 formats the scrubber readout
+// per axis and commits the exact pointer position unless the source axis is itself discrete. The
+// overlay used to print `m:ss` on every variant, so the mode-axis state showed a clock.
+function ViewScreen({ variant, onViewObjectSelect, selectedCase, viewItem, onViewItemChange, isComparisonItem, comparison, baseViewName }: { variant: string; onViewObjectSelect: (name: string, additive?: boolean) => void; selectedCase: string; viewItem: ViewItemState; onViewItemChange: (next: ViewItemState) => void; isComparisonItem: boolean; comparison: ComparisonModel; baseViewName: string }) {
   const [playbackVisible, setPlaybackVisible] = useState(false)
+  const [cameraSync, setCameraSync] = useState(true)
+  const [splitPanes, setSplitPanes] = useState(variant === 'split-two' ? 2 : variant === 'split-three' ? 3 : variant === 'split-four' ? 4 : 1)
+  // Session state, not the item's: a split is thrown away, so what each pane shows is thrown away with
+  // it (XC-202). Holding it on the saved View was the leftover of the group that used to edit it.
+  const [paneBindings, setPaneBindings] = useState(() => ['cam-front', 'cam-iso', 'cam-peak', 'cam-fixture'].map((cameraId, index) => ({
+    caseName: index === 0 ? selectedCase : workspaceCases[index % workspaceCases.length].name,
+    cameraId,
+  })))
+  const bindPane = (index: number, patch: { caseName?: string; cameraId?: string }) =>
+    setPaneBindings((current) => current.map((binding, position) => position === index ? { ...binding, ...patch } : binding))
+  const [promoteOpen, setPromoteOpen] = useState(false)
+  const [promoteAxis, setPromoteAxis] = useState<'case' | 'camera' | 'resultPosition'>('case')
   if (variant === 'empty') return <div className="centred-state"><Boxes size={34} /><h2>表示するケースがありません</h2><p>開始プリセットを選ぶか、ワークスペースへ結果ファイルをドロップします。</p><div className="button-row"><button className="primary-button">開始プリセット</button><button>テンプレート</button></div></div>
   if (variant === 'renderer-error') return <div className="centred-state error-state"><AlertTriangle size={34} /><h2>Omniverseレンダラーを開始できません</h2><p>バックエンドを利用できません。VTK軽量レンダラーは利用できます。</p><button className="primary-button">VTKで続ける</button></div>
-  const panes = variant === 'split-two' ? 2 : variant === 'split-three' ? 3 : variant === 'split-four' ? 4 : 1
+  const comparisonMembers = !isComparisonItem
+    ? []
+    : comparison.memberMode === 'range' && orderedAxes.includes(comparison.axis)
+      ? rangeMembers(comparison.rangeCount).map((member) => member.label)
+      : comparison.members
+  const comparisonOverlay = isComparisonItem && comparison.arrangement === 'overlay'
+  const comparisonGrid = isComparisonItem && comparison.arrangement === 'grid'
+  const panes = comparisonGrid ? comparisonMembers.length : splitPanes
   const deformed = variant === 'deformation'
+  const axis: ResultAxisKind = variant === 'axis-error' ? 'mode' : 'time'
+  // Which case each pane shows. The tree supplies the selected case; the other panes name the case they
+  // compare against, because a split view whose panes are unlabelled is a screenshot nobody can read.
+  const paneCases = comparisonGrid
+    ? comparisonMembers
+    : Array.from({ length: panes }, (_, index) => index === 0 ? selectedCase : paneBindings[index].caseName)
   return (
     <div className="view-canvas" onMouseEnter={() => setPlaybackVisible(true)} onMouseLeave={() => setPlaybackVisible(false)}>
       {variant === 'reduced' && <StatePanel tone="warning" title="表示形状を縮退しています" detail="画面は縮退形状を使用します。表示値とレポート計算は完全データを使用します。" />}
-      {variant === 'unresolved-template' && <StatePanel tone="warning" title="テンプレートを一部解決できません" detail="形状とカメラは解決済みです。フィールド「応力」とマテリアル「スチールブルー」は未解決で、代替値を使用していません。" />}
+      {variant === 'unresolved-template' && <UnresolvedList
+        title="テンプレートを一部解決できません"
+        source="ビューテンプレート「技術資料・標準」"
+        revision="リビジョン 3"
+        resolved={['レイアウト・1画面', 'カメラ・保存済み等角', '背景・スタジオライト']}
+        unresolved={[
+          { item: 'フィールド「応力」', reason: 'このケースに同名のフィールドがありません。代替値は使用しません' },
+          { item: 'マテリアル「スチールブルー」', reason: '参照アセットのリビジョンがこのワークスペースに存在しません' },
+        ]}
+      />}
+      {variant === 'camera-unresolved' && <StatePanel tone="error" title="視点「最大応力へ寄せる」を解決できません" detail="規則が参照する数量「最大応力」がこのケースにありません。カメラは動かしていません。結果軸ブックマークも同じ理由で解決していません。" />}
+      {variant === 'cameras' && <StatePanel tone="info" title="1つのビューが複数のカメラを持ちます" detail="各画面は覗くカメラを名指しします。「最大応力へ寄せる」は座標ではなく規則を保持するため、4分割ではそれぞれのケースの位置に解決します。" />}
+      {variant === 'timelines' && <StatePanel tone="info" title="1つのビューが複数のタイムラインを持ちます" detail="再生範囲・速度・カメラパスの組をそれぞれ保存します。カメラパスは「保存した結果位置 × カメラ」で組み立てるため、同じパスがケースごとに違う瞬間・違う距離になります。" />}
+      {variant === 'develop-grade' && <StatePanel tone="info" title="現像プリセット：計測（無補正）" detail="根拠として引用する画像は無補正で出力します。補正を掛ける場合は、凡例も同じ補正を通すか、補正名とパラメータを成果物に記載します。" />}
+      {variant === 'steady-result' && <StatePanel tone="info" title="定常結果・再生する軸がありません" detail="このケースは結果軸を持ちません。再生オーバーレイは無効な帯として置くのではなく、出しません。動画と再生プリセットは出力タブで利用不可と表示します。" />}
+      {variant === 'result-bookmarks' && <StatePanel tone="info" title="結果軸ブックマーク" detail="固定位置・極値・しきい値交差を登録できます。規則はケースごとに解決し、保存位置の間に落ちたときは丸めた事実を明示します。" />}
       {variant === 'axis-error' && <StatePanel tone="error" title="指定した結果位置がありません" detail="要求されたモード8は存在しません。ビューはモード7のままで、近傍位置への丸めは行っていません。" />}
       {deformed && <StatePanel tone="warning" title="変形を50倍に誇張して表示しています" detail="測定・プローブ・レポートの値は未変形形状から計算します。画面上の形状を定規で測ると誤った寸法になります。" />}
-      <div className={`pane-grid panes-${panes}`}>
-        {Array.from({ length: panes }).map((_, index) => (
+      {/* XC-202: every split control is here, on the canvas it divides. The property rail edits the
+          saved item; a session control sitting there is the confusion that decision removes. */}
+      {!isComparisonItem && <div className={`pane-grid-controls ${panes === 1 ? 'compact' : ''}`}>
+        <div className="split-count" role="group" aria-label="画面分割">
+          {[1, 2, 3, 4].map((count) => (
+            <button type="button" key={count} className={panes === count ? 'active' : ''} aria-pressed={panes === count} aria-label={`${count}画面`} onClick={() => setSplitPanes(count)}>{count}</button>
+          ))}
+        </div>
+        {panes > 1 && <button type="button" className={cameraSync ? 'active' : ''} aria-pressed={cameraSync} onClick={() => setCameraSync((current) => !current)}><Grid2X2 size={12} />カメラ同期{cameraSync ? 'オン' : 'オフ'}</button>}
+        {panes > 1 && <small>各画面のケースとカメラは、画面上部の表示をクリックして選びます。</small>}
+        {panes > 1 && <small className="pane-session-note">この分割は保存されません</small>}
+        {panes > 1 && <button type="button" className="pane-promote" onClick={() => setPromoteOpen(true)}><Save size={12} />この比較を保存</button>}
+      </div>}
+      {comparisonGrid && <div className="pane-grid-controls comparison-bar">
+        <span className="comparison-axis-chip"><Columns3 size={12} />{comparisonAxisLabels[comparison.axis].replace('基準ビューのプロパティ：', '')}で比較・{comparisonMembers.length}メンバー</span>
+        <small>{comparison.sharedColourMap ? '全ペインが同じカラーマップと同じ範囲で描かれます。' : 'ペインごとに範囲が異なります。図にその旨を記載します。'}基準ビュー「{baseViewName}」の設定を共有します。</small>
+      </div>}
+      {comparisonOverlay && <div className="comparison-overlay-note"><Layers3 size={13} /><span><b>重ね合わせ・結果色は1メンバーのみ</b><small>「{comparisonMembers[0]}」が結果色を持ち、{comparisonMembers.slice(1).join('と')}は参照形状として描かれます。カラーマップと範囲は共有です。基準ビュー「{baseViewName}」の設定を使います。</small></span></div>}
+      <div className={`pane-grid panes-${comparisonOverlay ? 1 : panes} ${comparisonGrid ? 'comparison-grid' : ''}`}>
+        {paneCases.map((paneCase, index) => (
           <div className="view-pane" key={index}>
+            {/* The badge is the pane's subject picker: the split bar tells the reader to click it, so
+                it has to be a control rather than a label (XC-202 puts every split control here). */}
+            {comparisonGrid ? (
+              <span className="view-pane-subject">
+                <span><FolderOpen size={11} />{paneCase}</span>
+                <i aria-hidden="true" />
+                <span><Camera size={11} />{viewItem.cameras.find((item) => item.id === viewItem.activeCameraId)?.name ?? '削除されたカメラ'}</span>
+              </span>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" className="view-pane-subject" aria-label={`画面 ${index + 1} のケースとカメラを選ぶ`}>
+                    <span><FolderOpen size={11} />{paneCase}{index === 0 && panes > 1 ? '・ツリー選択' : ''}</span>
+                    <i aria-hidden="true" />
+                    <span><Camera size={11} />{viewItem.cameras.find((item) => item.id === paneBindings[index].cameraId)?.name ?? '削除されたカメラ'}</span>
+                    <ChevronDown size={10} aria-hidden="true" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="center" className="pane-subject-menu">
+                  <div className="pane-subject-section"><small>ケース</small>{workspaceCases.map((item) => (
+                    <DropdownMenuItem key={item.name} onSelect={() => bindPane(index, { caseName: item.name })}><span>{item.name}</span>{paneCase === item.name && <span aria-hidden="true">✓</span>}</DropdownMenuItem>
+                  ))}</div>
+                  <div className="pane-subject-section"><small>カメラ</small>{viewItem.cameras.map((item) => (
+                    <DropdownMenuItem key={item.id} onSelect={() => bindPane(index, { cameraId: item.id })}><span>{item.name}</span>{paneBindings[index].cameraId === item.id && <span aria-hidden="true">✓</span>}</DropdownMenuItem>
+                  ))}</div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             <Viewport paneIndex={index} compact={panes > 1} onObjectSelect={onViewObjectSelect} />
             {/* INV-024: the factor is drawn into the picture, not only into a toolbar. A reader
                 measuring the image never reads the toolbar, and an exported image has none. */}
@@ -2285,62 +3703,161 @@ function ViewScreen({ variant, onViewObjectSelect }: { variant: string; onViewOb
           </div>
         ))}
       </div>
+      {promoteOpen && <Dialog open onOpenChange={setPromoteOpen}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog compact-workflow-dialog">
+        <header><span><small>画面分割</small><b>この比較を保存</b></span><button type="button" aria-label="比較の保存を閉じる" onClick={() => setPromoteOpen(false)}><X size={15} /></button></header>
+        <p>分割はセッションの状態で、保存されません。比較として保存すると、再現でき、パイプラインからケースごとに量産できる項目になります。</p>
+        <div className="settings-fields">
+          <label><span>名前</span><input defaultValue="ケース比較" /></label>
+          <label><span>変える軸</span><Select value={promoteAxis} onValueChange={(value) => setPromoteAxis(value as typeof promoteAxis)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
+            <SelectItem value="case">ケース</SelectItem>
+            <SelectItem value="camera">カメラ</SelectItem>
+            <SelectItem value="resultPosition">結果位置</SelectItem>
+          </SelectContent></Select></label>
+        </div>
+        <p className="workflow-trust-note"><ShieldCheck size={13} />軸に選ばなかったものは全メンバーで共有されます。カラーマップと範囲も共有され、隣り合うペインを目で比べられる状態を保ちます。</p>
+        <footer><button type="button" onClick={() => setPromoteOpen(false)}>キャンセル</button><button type="button" className="primary-button" onClick={() => setPromoteOpen(false)}>比較として保存</button></footer>
+      </DialogContent></Dialog>}
       {variant === 'probe' && <ProbeReadout />}
-      {playbackVisible && <ViewPlaybackOverlay />}
+      {caseHasResultAxis(selectedCase) && (playbackVisible || variant === 'result-bookmarks') && <ViewPlaybackOverlay axis={axis} caseName={selectedCase} bookmarks={viewItem.bookmarks} onBookmarksChange={(next) => onViewItemChange({ ...viewItem, bookmarks: next })} bookmarksOpen={variant === 'result-bookmarks'} bookmarksUnresolved={variant === 'camera-unresolved'} />}
     </div>
   )
 }
 
-// The probe readout: a value at a point with its unit, digits, provenance and result position.
-// Keeping it as a @Variable is deliberate and never automatic (11_ui.md, keyboard scheme).
-function ProbeReadout() {
-  const [kept, setKept] = useState(false)
-  return (
-    <section className="probe-readout" aria-label="プローブ結果">
-      <header>
-        <span><b>プローブ</b><small>節点 12345・未変形座標</small></span>
-        <button type="button" aria-label="プローブを閉じる"><X size={13} /></button>
-      </header>
-      <dl>
-        <div><dt>応力</dt><dd><NumberCell value={182.4} unit="MPa" digits={4} provenance="dataset" /></dd></div>
-        <div><dt>変位</dt><dd><NumberCell value={0.00317} unit="m" digits={3} provenance="dataset" /></dd></div>
-        <div><dt>温度</dt><dd><NumberCell value={null} unit={null} digits={4} provenance="dataset" /></dd></div>
-      </dl>
-      <p className="probe-position">結果位置：時刻 12.0 s／点データ・セル平均なし</p>
-      <footer>
-        {kept ? (
-          <>
-            <QuantityChip name="プローブ応力" provenance="dataset" unit="MPa" />
-            <small>変数リストへ追加しました。以降はどの入力にもドラッグできます。</small>
-          </>
-        ) : (
-          <button className="primary-button" type="button" onClick={() => setKept(true)}>変数として保持</button>
-        )}
-      </footer>
-    </section>
-  )
+type ResultAxisKind = 'time' | 'mode' | 'frequency'
+
+const resultAxes: Record<ResultAxisKind, { discrete: boolean; minimum: number; maximum: number; step: number; storedStep: number; format: (position: number) => string }> = {
+  time: { discrete: false, minimum: 0, maximum: 30, step: 0.1, storedStep: 1, format: (position) => `${Math.floor(position / 60)}:${String(Math.floor(position % 60)).padStart(2, '0')}` },
+  mode: { discrete: true, minimum: 1, maximum: 7, step: 1, storedStep: 1, format: (position) => `モード ${Math.round(position)}・固有振動数 ［未接続］` },
+  frequency: { discrete: false, minimum: 10, maximum: 2000, step: 1, storedStep: 50, format: (position) => `${position.toFixed(1)} Hz・位相 ［保持値未接続］` },
 }
 
-function ViewPlaybackOverlay() {
-  const [currentPercent, setCurrentPercent] = useState(0)
-  const [hoverTime, setHoverTime] = useState<number | null>(null)
-  const [hoverPercent, setHoverPercent] = useState(0)
-  const percentFromPointer = (event: React.MouseEvent<HTMLInputElement>) => {
+// Where a saved position resolves on the axis for the case in scope. Ordering shots by their place in
+// the bookmark list would call a correct timeline broken: the threshold crossing is authored after the
+// extremum and resolves before it.
+function bookmarkAxisPosition(id: string, axis: ResultAxisKind, caseName: string, bookmarks: ResultBookmarkModel[]) {
+  const definition = resultAxes[axis]
+  if (id === 'first') return definition.minimum
+  if (id === 'last') return definition.maximum
+  const bookmark = bookmarks.find((entry) => entry.id === id)
+  if (!bookmark) return definition.minimum
+  return resolveBookmark(bookmark, axis, caseName, false).position
+}
+
+function ViewPlaybackOverlay({ axis, caseName, bookmarks, onBookmarksChange, bookmarksOpen = false, bookmarksUnresolved = false }: { axis: ResultAxisKind; caseName: string; bookmarks: ResultBookmarkModel[]; onBookmarksChange: (next: ResultBookmarkModel[]) => void; bookmarksOpen?: boolean; bookmarksUnresolved?: boolean }) {
+  const definition = resultAxes[axis]
+  const [position, setPosition] = useState(definition.minimum)
+  const [hoverPosition, setHoverPosition] = useState<number | null>(null)
+  const [panelOpen, setPanelOpen] = useState(bookmarksOpen)
+  const [appliedBookmarkId, setAppliedBookmarkId] = useState<string | null>(null)
+  const [ruleOpen, setRuleOpen] = useState(false)
+  const [ruleName, setRuleName] = useState('')
+  const [ruleKind, setRuleKind] = useState<'extremum' | 'crossing' | 'relative'>('extremum')
+  const [ruleQuantity, setRuleQuantity] = useState('最大応力')
+  const [ruleThreshold, setRuleThreshold] = useState('235 MPa')
+  const span = definition.maximum - definition.minimum
+  const commit = (value: number) => setPosition(definition.discrete ? Math.round(value) : value)
+  const positionFromPointer = (event: React.MouseEvent<HTMLInputElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect()
-    return Math.min(100, Math.max(0, ((event.clientX - bounds.left) / bounds.width) * 100))
+    const ratio = Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width))
+    return definition.minimum + ratio * span
   }
-  const handleTimelineMove = (event: React.MouseEvent<HTMLInputElement>) => {
-    const percent = percentFromPointer(event)
-    setHoverPercent(percent)
-    setHoverTime((percent / 100) * 30)
-  }
-  const handleTimelineClick = (event: React.MouseEvent<HTMLInputElement>) => setCurrentPercent(percentFromPointer(event))
-  return <div className="view-playback-overlay" role="toolbar" aria-label="ビュー再生コントロール"><button aria-label="先頭へ"><ChevronsLeft size={13} /></button><button aria-label="前へ"><ChevronLeft size={13} /></button><button className="playback-play" aria-label="再生"><Play size={13} /></button><button aria-label="次へ"><ChevronRight size={13} /></button><button aria-label="末尾へ"><ChevronsRight size={13} /></button><div className="playback-timeline"><input type="range" min="0" max="100" value={currentPercent} aria-label="結果位置" onMouseMove={handleTimelineMove} onMouseLeave={() => setHoverTime(null)} onClick={handleTimelineClick} onChange={(event) => setCurrentPercent(Number(event.target.value))} /><span className="playback-current-marker" style={{ left: `${currentPercent}%` }} aria-hidden="true" />{hoverTime !== null && <><span className="playback-hover-marker" style={{ left: `${hoverPercent}%` }} aria-hidden="true" /><span className="playback-hover-time" style={{ left: `${hoverPercent}%` }}>{formatPlaybackTime(hoverTime)}</span></>}</div><em>{formatPlaybackTime((currentPercent / 100) * 30)}</em><button className="playback-speed" type="button">1× <ChevronDown size={10} /></button></div>
-}
-
-function formatPlaybackTime(seconds: number) {
-  const wholeSeconds = Math.floor(seconds)
-  return `${Math.floor(wholeSeconds / 60)}:${String(wholeSeconds % 60).padStart(2, '0')}`
+  const percent = ((position - definition.minimum) / span) * 100
+  const hoverPercent = hoverPosition === null ? 0 : ((hoverPosition - definition.minimum) / span) * 100
+  const step = (direction: -1 | 1) => commit(Math.min(definition.maximum, Math.max(definition.minimum, position + direction * (definition.discrete ? 1 : span / 30))))
+  const resolved = bookmarks.map((bookmark) => ({ bookmark, resolution: resolveBookmark(bookmark, axis, caseName, bookmarksUnresolved && bookmark.rule.kind !== 'explicit' && bookmark.rule.kind !== 'relative') }))
+  return <div className="view-playback-overlay" role="toolbar" aria-label="ビュー再生コントロール">
+    <button aria-label="先頭へ" onClick={() => commit(definition.minimum)}><ChevronsLeft size={13} /></button>
+    <button aria-label="前へ" onClick={() => step(-1)}><ChevronLeft size={13} /></button>
+    <button className="playback-play" aria-label="再生"><Play size={13} /></button>
+    <button aria-label="次へ" onClick={() => step(1)}><ChevronRight size={13} /></button>
+    <button aria-label="末尾へ" onClick={() => commit(definition.maximum)}><ChevronsRight size={13} /></button>
+    <div className="playback-timeline">
+      <input
+        type="range"
+        min={definition.minimum}
+        max={definition.maximum}
+        step={definition.step}
+        value={position}
+        aria-label="結果位置"
+        aria-valuetext={definition.format(position)}
+        onMouseMove={(event) => setHoverPosition(positionFromPointer(event))}
+        onMouseLeave={() => setHoverPosition(null)}
+        onClick={(event) => commit(positionFromPointer(event))}
+        onChange={(event) => commit(Number(event.target.value))}
+      />
+      {/* Bookmarks are drawn on the axis they index. A rule that did not resolve has no marker, because
+          a marker at position zero would be a plausible default (XC-197). */}
+      {resolved.filter((entry) => entry.resolution.state === 'resolved').map((entry) => (
+        <span
+          className={`playback-bookmark-marker ${appliedBookmarkId === entry.bookmark.id ? 'applied' : ''}`}
+          style={{ left: `${((entry.resolution.position - definition.minimum) / span) * 100}%` }}
+          title={`${entry.bookmark.name}・${definition.format(entry.resolution.position)}`}
+          key={entry.bookmark.id}
+          aria-hidden="true"
+        />
+      ))}
+      <span className="playback-current-marker" style={{ left: `${percent}%` }} aria-hidden="true" />
+      {hoverPosition !== null && <>
+        <span className="playback-hover-marker" style={{ left: `${hoverPercent}%` }} aria-hidden="true" />
+        <span className="playback-hover-time" style={{ left: `${hoverPercent}%` }}>{definition.format(definition.discrete ? Math.round(hoverPosition) : hoverPosition)}</span>
+      </>}
+    </div>
+    <em>{definition.format(position)}</em>
+    <button className="playback-speed" type="button">1× <ChevronDown size={10} /></button>
+    <button type="button" className={panelOpen ? 'playback-bookmark-trigger active' : 'playback-bookmark-trigger'} aria-label="結果軸ブックマーク" aria-expanded={panelOpen} onClick={() => setPanelOpen((open) => !open)}><Bookmark size={13} /></button>
+    {panelOpen && <section className="playback-bookmark-panel" aria-label="結果軸ブックマーク">
+      <header><b>結果軸ブックマーク</b><small>ケース「{caseName}」で解決した位置</small></header>
+      <div>
+        {resolved.map(({ bookmark, resolution }) => (
+          <article className={resolution.state} key={bookmark.id}>
+            <span>
+              <b>{bookmark.name}</b>
+              <small>{describeBookmarkRule(bookmark)}</small>
+              <em>{resolution.state === 'unresolved'
+                ? resolution.at
+                : `${definition.format(resolution.position)}${resolution.snapped ? '・保存位置へ丸め' : ''}${resolution.at ? `・値 ${resolution.at}` : ''}`}</em>
+            </span>
+            <button type="button" disabled={resolution.state === 'unresolved'} onClick={() => { commit(resolution.position); setAppliedBookmarkId(bookmark.id) }}>移動</button>
+              <button type="button" aria-label={`${bookmark.name}を削除`} className="playback-bookmark-remove" onClick={() => onBookmarksChange(bookmarks.filter((entry) => entry.id !== bookmark.id))}><X size={11} /></button>
+          </article>
+        ))}
+      </div>
+      <footer>
+        {/* A saved position is made on the axis it indexes: scrub to the moment and keep it, or state
+            the rule that finds it. Until now the list was fixed and nothing could add to it, while the
+            comparison, the timeline and the output all referenced it (XC-197). */}
+        <div className="playback-bookmark-actions">
+          <button type="button" onClick={() => onBookmarksChange([...bookmarks, { id: `bm-${bookmarks.length + 1}`, name: `位置 ${definition.format(position)}`, rule: { kind: 'explicit', position } }])}><Plus size={11} />現在位置を保存</button>
+          <button type="button" onClick={() => setRuleOpen(true)}><Ruler size={11} />規則で追加</button>
+        </div>
+        <span><ShieldCheck size={11} />規則は座標ではなく条件を保持し、ケースごとに解決します。存在しない位置へは丸めた事実を明示します。</span>
+      </footer>
+    </section>}
+    {ruleOpen && <Dialog open onOpenChange={setRuleOpen}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog compact-workflow-dialog">
+      <header><span><small>結果位置</small><b>規則で追加</b></span><button type="button" aria-label="規則の追加を閉じる" onClick={() => setRuleOpen(false)}><X size={15} /></button></header>
+      <div className="settings-fields">
+        <label><span>名前</span><input value={ruleName} onChange={(event) => setRuleName(event.target.value)} placeholder="例：最大応力時" /></label>
+        <label><span>種類</span><Select value={ruleKind} onValueChange={(value) => setRuleKind(value as typeof ruleKind)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
+          <SelectItem value="extremum">数量の極値</SelectItem>
+          <SelectItem value="crossing">しきい値の交差</SelectItem>
+          <SelectItem value="relative">軸の先頭・末尾</SelectItem>
+        </SelectContent></Select></label>
+        {ruleKind !== 'relative' && <label><span>数量</span><Select value={ruleQuantity} onValueChange={setRuleQuantity}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="最大応力">最大応力</SelectItem><SelectItem value="変位">変位</SelectItem><SelectItem value="温度">温度</SelectItem></SelectContent></Select></label>}
+        {ruleKind === 'crossing' && <label><span>しきい値</span><input value={ruleThreshold} onChange={(event) => setRuleThreshold(event.target.value)} placeholder="例：235 MPa" /></label>}
+      </div>
+      <p className="workflow-trust-note"><ShieldCheck size={13} />条件だけを保存します。ケースごとに解決し、解決できないときは数量を名指しして位置を動かしません。しきい値は宣言済みの単位で比較します。</p>
+      <footer><button type="button" onClick={() => setRuleOpen(false)}>キャンセル</button><button type="button" className="primary-button" disabled={!ruleName.trim() || (ruleKind === 'crossing' && !ruleThreshold.trim())} onClick={() => {
+        const rule: ResultBookmarkModel['rule'] = ruleKind === 'extremum'
+          ? { kind: 'extremum', quantity: ruleQuantity, statistic: '最大' }
+          : ruleKind === 'crossing'
+            ? { kind: 'crossing', quantity: ruleQuantity, threshold: ruleThreshold.trim(), direction: '上昇' }
+            : { kind: 'relative', of: '末尾' }
+        onBookmarksChange([...bookmarks, { id: `bm-${bookmarks.length + 1}`, name: ruleName.trim(), rule }])
+        setRuleName('')
+        setRuleOpen(false)
+      }}>追加</button></footer>
+    </DialogContent></Dialog>}
+  </div>
 }
 
 function GraphScreen({ variant }: { variant: string }) {
@@ -2349,13 +3866,50 @@ function GraphScreen({ variant }: { variant: string }) {
   return <div className="graph-canvas"><div className="graph-heading"><div><span className="eyebrow">グラフ</span><h2>物理量の比較</h2><p>ケース：明示選択・集約方法：未選択</p></div></div><div className="chart-frame"><span className="y-label">物理量A［単位未宣言］</span><div className="chart-grid"><svg viewBox="0 0 600 260" role="img" aria-label="値を含まないグラフ構成モック"><polyline points="40,205 180,150 320,170 460,92 560,110" /><circle cx="40" cy="205" r="5" /><circle cx="180" cy="150" r="5" /><circle cx="320" cy="170" r="5" /><circle cx="460" cy="92" r="5" /><circle cx="560" cy="110" r="5" /></svg><span className="mock-stamp">レイアウトのみ・解析値なし</span></div><span className="x-label">ケース選択</span></div><div className="provenance-row"><span>物理量：データセット</span><span>単位：未宣言</span><span>欠損ケース：データなしとして表示</span></div></div>
 }
 
+// `report.commentary-review`: the generated passages with their statement kind and source, and the
+// omissions the standard produced. XC-104 makes omission a correct outcome and requires it recorded,
+// so a review that showed only the surviving sentences would hide the part a reader must check.
+function ReportCommentaryReview() {
+  const passages: { kind: StatementKind; source: string; text: string }[] = [
+    { kind: 'value', source: 'データセット・最大応力', text: '最大応力は［値・単位未宣言］でした。単位を宣言するまで換算は行いません。' },
+    { kind: 'comparison', source: '計算・安全率 = 設計許容応力 / 最大応力', text: '安全率は設計許容応力との比として算出しています。' },
+    { kind: 'citation', source: '参考資料・設計ノート', text: '設計許容応力 235 MPa は設計ノートの記載です。数値根拠としては使用していません。' },
+    { kind: 'user', source: '利用者の記述・コメント方向', text: '板厚変更ケースの傾向を中心に述べる、という方針を与えられています。' },
+  ]
+  const omissions = [
+    { text: '「十分に安全な設計である」', reason: '主観的表現。1回書き直したうえで基準を満たさず、除外しました。' },
+    { text: '「応力は大幅に低下した」', reason: '定量化されていない比較。数値と単位を伴う記述に置き換えられませんでした。' },
+  ]
+  return (
+    <section className="commentary-review" aria-label="生成コメントの確認">
+      <header><span className="eyebrow">生成コメント</span><h2>公開前の確認</h2><p>生成後に書式基準へ照合した結果です。基準を満たさない文は書き直しを1回試み、それでも満たさなければ除外し、除外そのものを記録します。</p></header>
+      <ol className="commentary-passages">
+        {passages.map((passage) => (
+          <li key={passage.text}>
+            <StatementKindBadge kind={passage.kind} source={passage.source} />
+            <p>{passage.text}</p>
+          </li>
+        ))}
+      </ol>
+      <section className="commentary-omissions" aria-label="除外した記述">
+        <b>除外した記述 {omissions.length}件</b>
+        <ul>{omissions.map((omission) => <li key={omission.text}><AlertTriangle size={11} /><span><b>{omission.text}</b><small>{omission.reason}</small></span></li>)}</ul>
+      </section>
+      <footer className="workflow-trust-note"><ShieldCheck size={13} />確認して取り込むまで、生成文はレポートに入りません。外部モデルへの送信は権限と送信内容の確認を経てのみ行います。</footer>
+    </section>
+  )
+}
+
 function ReportScreen({ variant }: { variant: string }) {
+  if (variant === 'commentary-review') return <div className="report-canvas"><ReportCommentaryReview /></div>
   if (variant === 'blank') return <div className="report-choices"><h2>レポートを作成</h2><p>テンプレートを選ぶか、意図的に空文書から始めます。</p><div>{['学術論文', '技術メモ', '1ページ要約', '設計レビューデッキ', 'ケース間比較', '空文書'].map((item) => <button key={item}><FileText /><b>{item}</b><small>サンプル</small></button>)}</div></div>
   const state = variant === 'exporting' ? <StatePanel tone="progress" title="自己完結HTMLを出力中" detail="同じ対象への二重出力は停止されています。キャンセルは引き続き利用できます。" /> : variant === 'export-error' ? <StatePanel tone="error" title="HTML出力を利用できません" detail="出力先フォルダーは読取専用です。前回の成果物は上書きされていません。" /> : null
   return <div className="report-canvas">{state}<article className="report-page"><span className="eyebrow">設計レビュー・モックアップ</span><h1>解析レポート表題</h1><p className="lede">このプレビューはレイアウト用の仮要素のみを含み、解析結果について何も主張しません。</p><section><div className="report-image"><Boxes /><span>ビュー・結果値なし</span></div><div><h2>判明事項</h2><p>利用可能な場合、データセットの来歴、宣言単位、アルゴリズムを表示します。</p><h2>未判明事項</h2><p>欠損値は欠損のまま維持し、明示します。</p></div></section><footer>入力識別情報・ワークスペース版・アルゴリズム版</footer></article>{variant === 'exporting' && <button className="floating-cancel"><X size={14} /> 出力をキャンセル</button>}</div>
 }
 
-function ChatScreen({ variant, draft, onDraftChange }: { variant: string; draft: string; onDraftChange: (draft: string) => void }) {
+function ChatScreen({ variant, draft, onDraftChange, settings, onSettingsChange }: { variant: string; draft: string; onDraftChange: (draft: string) => void; settings: ConversationSettings; onSettingsChange: (settings: ConversationSettings) => void }) {
+  const [outboundOpen, setOutboundOpen] = useState(variant === 'outbound-request')
+  const [outboundOutcome, setOutboundOutcome] = useState<'pending' | 'kept-offline' | 'allowed-once'>('pending')
   if (variant === 'empty') {
     return (
       <div className="chat-canvas">
@@ -2364,10 +3918,10 @@ function ChatScreen({ variant, draft, onDraftChange }: { variant: string; draft:
           <h2>ワークスペースについて尋ねる</h2>
           <p>質問、操作、レポート構成を同じチャットで続けられます。</p>
           <div className="chat-suggestions">
-            {['利用可能な物理量を一覧にする', 'このテンプレートの未解決項目を確認する', 'パイプラインをドライランする'].map((item) => <button key={item}>{item}<ChevronRight size={13} /></button>)}
+            {['利用可能な物理量を一覧にする', 'このテンプレートの未解決項目を確認する', 'パイプラインをドライランする'].map((item) => <button key={item} type="button" onClick={() => onDraftChange(item)}>{item}<ChevronRight size={13} /></button>)}
           </div>
         </div>
-        <ChatComposer draft={draft} onDraftChange={onDraftChange} />
+        <ChatComposer draft={draft} onDraftChange={onDraftChange} settings={settings} onSettingsChange={onSettingsChange} />
       </div>
     )
   }
@@ -2375,8 +3929,13 @@ function ChatScreen({ variant, draft, onDraftChange }: { variant: string; draft:
   return (
     <div className="chat-canvas">
       <ConversationThread variant={variant} />
-      <ChatComposer draft={draft} onDraftChange={onDraftChange} />
-      {variant === 'outbound-request' && <ModalCard title="外部要求を1回許可しますか？" detail="検索語：「公式ソルバー形式文書」。送信しない情報：ファイル名、形状、値、ワークスペース情報。"><button>オフラインを維持</button><button className="primary-button">今回だけ許可</button></ModalCard>}
+      {variant === 'outbound-request' && outboundOutcome !== 'pending' && <div className="chat-outbound-outcome" role="status">{outboundOutcome === 'kept-offline'
+        ? <><ShieldCheck size={13} /><span><b>オフラインを維持しました</b><small>検索語は送信していません。ワークスペースは変更されていません。</small></span></>
+        : <><Globe2 size={13} /><span><b>今回だけ許可しました</b><small>表示した検索語のみを送信し、ホスト・日時・判断をローカル監査へ記録します。</small></span></>}
+        <button type="button" onClick={() => setOutboundOpen(true)}>要求内容を再表示</button>
+      </div>}
+      <ChatComposer draft={draft} onDraftChange={onDraftChange} settings={settings} onSettingsChange={onSettingsChange} />
+      {variant === 'outbound-request' && <ModalCard open={outboundOpen} onClose={() => setOutboundOpen(false)} title="外部要求を1回許可しますか？" detail="検索語：「公式ソルバー形式文書」。送信しない情報：ファイル名、形状、値、ワークスペース情報。"><button type="button" onClick={() => { setOutboundOutcome('kept-offline'); setOutboundOpen(false) }}>オフラインを維持</button><button type="button" className="primary-button" onClick={() => { setOutboundOutcome('allowed-once'); setOutboundOpen(false) }}>今回だけ許可</button></ModalCard>}
     </div>
   )
 }
@@ -2392,8 +3951,10 @@ function ConversationThread({ variant, compact = false }: { variant?: string; co
         <article className="chat-turn chat-turn-assistant">
           <header><span className="chat-role-mark"><Sparkles size={14} /></span><b>SOLVIA</b><small>ローカルモデル</small></header>
           <div className="chat-turn-body">
-            <p>物理量一覧は、読み込んだデータセットから取得してここに表示します。値や単位は、実データで確認できるまで推測しません。</p>
-            <p>読み込み後は、物理量名、種類、宣言単位、欠損の有無、来歴を順に確認できます。</p>
+            {/* XC-104: a generated statement says which of the four kinds it is and where it came from.
+                Chat is named alongside Report in the shared-components table; it carried no badge. */}
+            <p><StatementKindBadge kind="user" source="利用者の質問・現在のワークスペース" />物理量一覧は、読み込んだデータセットから取得してここに表示します。値や単位は、実データで確認できるまで推測しません。</p>
+            <p><StatementKindBadge kind="citation" source="製品仕様・読み取り時の項目" />読み込み後は、物理量名、種類、宣言単位、欠損の有無、来歴を順に確認できます。</p>
             <aside className="chat-safety-note"><ShieldCheck size={14} /><span><b>操作は行っていません</b><small>ワークスペースは変更されていません。</small></span></aside>
             <footer className="chat-response-actions"><button><Save size={13} /> コピー</button><button><RefreshCw size={13} /> 再生成</button></footer>
           </div>
@@ -2404,7 +3965,7 @@ function ConversationThread({ variant, compact = false }: { variant?: string; co
   )
 }
 
-function AssistantDrawer({ draft, onDraftChange, onClose, onOpenChat }: { draft: string; onDraftChange: (draft: string) => void; onClose: () => void; onOpenChat: () => void }) {
+function AssistantDrawer({ draft, onDraftChange, onClose, onOpenChat, settings, onSettingsChange }: { draft: string; onDraftChange: (draft: string) => void; onClose: () => void; onOpenChat: () => void; settings: ConversationSettings; onSettingsChange: (settings: ConversationSettings) => void }) {
   return (
     <aside className="assistant-drawer" aria-label="アシスタントチャット">
       <header className="assistant-drawer-header">
@@ -2415,51 +3976,31 @@ function AssistantDrawer({ draft, onDraftChange, onClose, onOpenChat }: { draft:
         </div>
       </header>
       <ConversationThread compact />
-      <ChatComposer draft={draft} onDraftChange={onDraftChange} />
+      <ChatComposer draft={draft} onDraftChange={onDraftChange} settings={settings} onSettingsChange={onSettingsChange} />
     </aside>
   )
 }
 
-function ChatComposer({ draft, onDraftChange }: { draft: string; onDraftChange: (draft: string) => void }) {
-  const [model, setModel] = useState('local')
-  const [effort, setEffort] = useState('standard')
+// XC-150: the instruction bar and Chat are two presentations of one conversation, so switching between
+// them preserves the draft *and the conversation settings*. Holding model, effort and search
+// permission inside this component made each surface its own conversation the moment it unmounted.
+type ConversationSettings = { model: string; effort: string; search: 'off' | 'allowed' }
+
+function ChatComposer({ draft, onDraftChange, settings, onSettingsChange }: { draft: string; onDraftChange: (draft: string) => void; settings: ConversationSettings; onSettingsChange: (settings: ConversationSettings) => void }) {
   const [permission, setPermission] = useState<'search' | 'research' | null>(null)
-  return <div className="chat-composer"><textarea rows={2} value={draft} onChange={(event) => onDraftChange(event.target.value)} placeholder="ワークスペースへの質問または操作" /><div><button aria-label="ファイルを追加"><Plus size={16} /></button><label className="chat-inline-select"><span className="sr-only">モデル</span><select value={model} onChange={(event) => setModel(event.target.value)}><option value="local">ローカルモデル</option><option value="remote" disabled>外部モデル・未構成</option></select></label><label className="chat-inline-select"><span className="sr-only">推論の深さ</span><select value={effort} onChange={(event) => setEffort(event.target.value)}><option value="brief">簡潔</option><option value="standard">標準</option><option value="deep">詳細</option></select></label><button type="button" className="chat-search-status" onClick={() => setPermission('search')}><ShieldCheck size={11} />検索オフ</button><button type="button" className="chat-research-button" onClick={() => setPermission('research')}>詳細調査</button><button className="chat-send" aria-label="送信" disabled={!draft.trim()}><Play size={14} /></button></div><small>回答は誤る可能性があります。解析値・単位・来歴は元データで確認してください。</small>
-    <Dialog open={permission !== null} onOpenChange={(open) => !open && setPermission(null)}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog outbound-review-dialog"><header><span><small>外部通信</small><b>{permission === 'research' ? '詳細調査の許可' : 'Web検索の許可'}</b></span><button type="button" aria-label="外部通信確認を閉じる" onClick={() => setPermission(null)}><X size={15} /></button></header><section className="outbound-review"><label><span>送信する検索語</span><textarea rows={2} value={draft.trim() || '［検索語を入力してください］'} readOnly /></label><label><span>送信しない情報</span><input value="ケース名・ファイルパス・形状・解析値" readOnly /></label><label><span>許可ホスト</span><input value="登録なし" readOnly /></label>{permission === 'research' && <><label><span>予定要求数</span><input value="未取得" readOnly /></label><label><span>費用見積</span><input value="未取得" readOnly /></label></>}</section><p className="workflow-trust-note blocked"><AlertTriangle size={13} />許可ホストと{permission === 'research' ? '要求数・費用見積' : '正確な検索語'}を確認できるまで送信しません。</p><footer><button type="button" onClick={() => setPermission(null)}>オフラインを維持</button><button type="button" className="primary-button" disabled>今回だけ許可</button></footer></DialogContent></Dialog>
+  const [host, setHost] = useState('')
+  // XC-106: the query is the data that leaves. Nothing is sent until both the exact query and the host
+  // that will receive it are on screen; deep research additionally has no request count or cost yet.
+  const outboundBlockedReason = !draft.trim()
+    ? '送信する検索語がありません。入力欄に問い合わせを書いてください。'
+    : !host.trim()
+      ? 'このワークスペースで許可するホストが未登録です。'
+      : '要求数と費用見積を取得できるまで詳細調査は送信しません。'
+  const outboundBlocked = !draft.trim() || !host.trim() || permission === 'research'
+  return <div className="chat-composer"><textarea rows={2} value={draft} onChange={(event) => onDraftChange(event.target.value)} placeholder="ワークスペースへの質問または操作" /><div><button aria-label="ファイルを追加"><Plus size={16} /></button><label className="chat-inline-select"><span className="sr-only">モデル</span><select value={settings.model} onChange={(event) => onSettingsChange({ ...settings, model: event.target.value })}><option value="local">ローカルモデル</option><option value="remote" disabled>外部モデル・未構成</option></select></label><label className="chat-inline-select"><span className="sr-only">推論の深さ</span><select value={settings.effort} onChange={(event) => onSettingsChange({ ...settings, effort: event.target.value })}><option value="brief">簡潔</option><option value="standard">標準</option><option value="deep">詳細</option></select></label><button type="button" className="chat-search-status" aria-pressed={settings.search === 'allowed'} onClick={() => setPermission('search')}><ShieldCheck size={11} />{settings.search === 'allowed' ? '検索オン' : '検索オフ'}</button><button type="button" className="chat-research-button" onClick={() => setPermission('research')}>詳細調査</button><button className="chat-send" aria-label="送信" disabled={!draft.trim()}><Play size={14} /></button></div><small>回答は誤る可能性があります。解析値・単位・来歴は元データで確認してください。</small>
+    <Dialog open={permission !== null} onOpenChange={(open) => !open && setPermission(null)}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog outbound-review-dialog"><header><span><small>外部通信</small><b>{permission === 'research' ? '詳細調査の許可' : 'Web検索の許可'}</b></span><button type="button" aria-label="外部通信確認を閉じる" onClick={() => setPermission(null)}><X size={15} /></button></header><section className="outbound-review"><label><span>送信する検索語</span><textarea rows={2} value={draft.trim() || '［検索語を入力してください］'} readOnly /></label><label><span>送信しない情報</span><input value="ケース名・ファイルパス・形状・解析値" readOnly /></label><label><span>許可ホスト</span><Input value={host} onChange={(event) => setHost(event.target.value)} placeholder="例：docs.example.org" aria-label="このワークスペースで許可するホスト" /></label>{permission === 'research' && <><label><span>予定要求数</span><input value="未取得" readOnly /></label><label><span>費用見積</span><input value="未取得" readOnly /></label></>}</section><p className={outboundBlocked ? 'workflow-trust-note blocked' : 'workflow-trust-note'}>{outboundBlocked ? <AlertTriangle size={13} /> : <ShieldCheck size={13} />}{outboundBlocked ? outboundBlockedReason : '表示した検索語だけを、指定したホストへ1回だけ送信します。ホスト・日時・判断はローカル監査に記録されます。'}</p><footer><button type="button" onClick={() => { onSettingsChange({ ...settings, search: 'off' }); setPermission(null) }}>オフラインを維持</button><button type="button" className="primary-button" disabled={outboundBlocked} onClick={() => { onSettingsChange({ ...settings, search: 'allowed' }); setPermission(null) }}>今回だけ許可</button></footer></DialogContent></Dialog>
   </div>
 }
-
-// The keyboard scheme of 11_ui.md, shown where the commands are. "Every command is reachable from the
-// keyboard" was once a promise with nothing behind it; a scheme nobody can find is the same promise.
-// The exact key is a platform decision - what this table fixes is what has a shortcut and what may
-// never have one.
-const shortcutGroups: { group: string; note: string; commands: { name: string; key: string | null; reason?: string }[] }[] = [
-  { group: 'ワークスペース', note: 'プラットフォーム標準の修飾キーに従います', commands: [
-    { name: '新規', key: 'Ctrl + N' }, { name: '開く', key: 'Ctrl + O' }, { name: '保存', key: 'Ctrl + S' }, { name: '名前を付けて保存', key: 'Ctrl + Shift + S' },
-  ] },
-  { group: '取り消しとやり直し', note: '1つの指示は1ステップ。スクリプト全体でも同じです（XC-061）', commands: [
-    { name: '取り消し', key: 'Ctrl + Z' }, { name: 'やり直し', key: 'Ctrl + Y' },
-  ] },
-  { group: '作業モード', note: '6モードに6キー。対象は変わりません', commands: [
-    { name: 'シミュレーション', key: 'Ctrl + 1' }, { name: 'ビュー', key: 'Ctrl + 2' }, { name: 'グラフ', key: 'Ctrl + 3' },
-    { name: 'レポート', key: 'Ctrl + 4' }, { name: '自動化', key: 'Ctrl + 5' }, { name: 'チャット', key: 'Ctrl + 6' },
-  ] },
-  { group: '結果軸', note: '軸が時刻・モード・周波数のいずれでも同じキーです（XC-131）', commands: [
-    { name: '再生／一時停止', key: 'Space' }, { name: '前へ', key: '←' }, { name: '次へ', key: '→' },
-    { name: '先頭', key: 'Home' }, { name: '末尾', key: 'End' },
-  ] },
-  { group: 'ビュー', note: '変形の切り替えがあるからこそ、倍率は常に描き込まれます（INV-024）', commands: [
-    { name: '全体を表示', key: 'F' }, { name: '正投影方向', key: 'Numpad 1 / 3 / 7' }, { name: '変形倍率を1.0と設定値で切替', key: 'D' },
-  ] },
-  { group: '選択とプローブ', note: '保持は常に明示操作で、自動では行いません', commands: [
-    { name: 'カーソル位置をプローブ', key: 'P' }, { name: 'プローブ値を変数として保持', key: 'Ctrl + P' },
-  ] },
-  { group: '破壊的な操作', note: 'いずれも単一キーを持ちません。確認を経由してのみ到達します（XC-062、XC-094）', commands: [
-    { name: 'ケースを削除', key: null, reason: '影響するケース数を示す確認から実行' },
-    { name: '対象集合をクリア', key: null, reason: '対象範囲を示す確認から実行' },
-    { name: '破壊的パイプラインユニットを実行', key: null, reason: '影響範囲の確認から実行' },
-  ] },
-]
 
 function ShortcutSettings() {
   const [query, setQuery] = useState('')
@@ -2506,7 +4047,6 @@ function SettingsScreen({ variant }: { variant: string }) {
 
   return (
     <div className="settings-canvas">
-      {variant === 'invalid' && <StatePanel tone="error" title="設定を拒否しました" detail="表示単位「unknown-unit」は無効です。直前の表示単位を維持しています。" />}
       <aside className="settings-nav" aria-label="設定カテゴリ">
         <header className="settings-nav-header">
           <span className="settings-nav-icon"><Settings size={16} /></span>
@@ -2524,15 +4064,41 @@ function SettingsScreen({ variant }: { variant: string }) {
       <section className="settings-form">
         <span className="settings-scope">{applicationCategories.includes(category) ? 'アプリ全体' : '現在のワークスペース'}</span>
         <span className="eyebrow">{category}</span>
-        <SettingsCategoryPanel category={category} onSupportBundle={() => setSupportOpen(true)} />
+        <SettingsCategoryPanel category={category} invalid={variant === 'invalid'} onSupportBundle={() => setSupportOpen(true)} />
       </section>
       <Dialog open={supportOpen} onOpenChange={setSupportOpen}><DialogOverlay className="modal-backdrop" /><DialogContent className="workflow-dialog support-bundle-dialog"><header><span><small>診断とサポート</small><b>サポートバンドルの内容を確認</b></span><button type="button" aria-label="サポートバンドルを閉じる" onClick={() => setSupportOpen(false)}><X size={15} /></button></header><section className="workflow-check-list"><p><CheckCircle2 size={13} /><span><b>含める</b><small>ローカルログ、製品版、設定、失敗理由コード</small></span></p><p><AlertTriangle size={13} /><span><b>確認が必要</b><small>ケース名と入力ファイルのパス</small></span></p><p><ShieldCheck size={13} /><span><b>含めない</b><small>形状、フィールド値、測定値、参考資料の本文</small></span></p></section><p className="workflow-trust-note"><HardDrive size={13} />作成先はローカルです。送信は別操作で、送信先と内容を再確認します。</p><footer><button type="button" onClick={() => setSupportOpen(false)}>キャンセル</button><button type="button" className="primary-button" onClick={() => setSupportOpen(false)}>ローカルに作成</button></footer></DialogContent></Dialog>
     </div>
   )
 }
 
-function SettingsCategoryPanel({ category, onSupportBundle }: { category: string; onSupportBundle: () => void }) {
-  if (category === '単位') return <><h2>宣言単位と表示単位</h2><p>ファイル内容を信頼できる単位宣言として扱うことはありません。</p><div className="settings-fields"><label>物理量の種類<Select defaultValue="stress"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="stress">応力</SelectItem></SelectContent></Select></label><label>宣言単位<Select defaultValue="undeclared"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="undeclared">未宣言</SelectItem></SelectContent></Select></label><label>表示単位<Select defaultValue="same"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="same">宣言単位と同じ</SelectItem></SelectContent></Select></label></div><div className="setting-note"><ShieldCheck size={15} />単位を宣言するまで変換は無効です。</div><div className="setting-note"><ShieldCheck size={15} />大きさ、フィールド名、書き出したソルバーのいずれからも、ファイルから単位を推測しません。</div><Button className="primary-button">設定を保存</Button></>
+// `settings.invalid`: "invalid setting rejected at entry, previous value kept". The panel showed a
+// banner at the top of the page while the field itself offered only valid options, so the rejection
+// was described somewhere other than where it happened and no previous value was visible.
+const declarableUnits = ['MPa', 'kPa', 'Pa', 'N/mm^2']
+
+function UnitSettings({ invalid }: { invalid: boolean }) {
+  const [displayUnit, setDisplayUnit] = useState(invalid ? 'unknown-unit' : 'MPa')
+  const [acceptedUnit, setAcceptedUnit] = useState('MPa')
+  const valid = declarableUnits.includes(displayUnit.trim())
+  return <>
+    <h2>宣言単位と表示単位</h2>
+    <p>ファイル内容を信頼できる単位宣言として扱うことはありません。</p>
+    <div className="settings-fields">
+      <label>物理量の種類<Select defaultValue="stress"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="stress">応力</SelectItem></SelectContent></Select></label>
+      <label>宣言単位<Select defaultValue="undeclared"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="undeclared">未宣言</SelectItem>{declarableUnits.map((unit) => <SelectItem value={unit} key={unit}>{unit}</SelectItem>)}</SelectContent></Select></label>
+      <label>表示単位<Input value={displayUnit} aria-invalid={!valid} aria-describedby="display-unit-status" onChange={(event) => setDisplayUnit(event.target.value)} /></label>
+    </div>
+    {valid
+      ? <div className="setting-note" id="display-unit-status"><ShieldCheck size={15} />表示単位「{displayUnit}」は宣言単位と次元が一致します。</div>
+      : <div className="setting-note setting-note-rejected" id="display-unit-status" role="alert"><AlertTriangle size={15} /><span><b>表示単位「{displayUnit}」を拒否しました</b><small>この単位は宣言済みの単位系にありません。直前の値「{acceptedUnit}」を維持しています。</small></span></div>}
+    <div className="setting-note"><ShieldCheck size={15} />単位を宣言するまで変換は無効です。</div>
+    <div className="setting-note"><ShieldCheck size={15} />大きさ、フィールド名、書き出したソルバーのいずれからも、ファイルから単位を推測しません。</div>
+    <Button className="primary-button" disabled={!valid} onClick={() => setAcceptedUnit(displayUnit.trim())}>設定を保存</Button>
+  </>
+}
+
+function SettingsCategoryPanel({ category, invalid, onSupportBundle }: { category: string; invalid: boolean; onSupportBundle: () => void }) {
+  if (category === '単位') return <UnitSettings invalid={invalid} />
   if (category === 'ショートカット') return <ShortcutSettings />
   if (category === 'ネットワーク') return <><h2>既定でオフライン</h2><p>ワークスペースごとの許可がない通信は試行しません。</p><div className="settings-fields"><label>外部通信<Select defaultValue="off"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="off">拒否</SelectItem></SelectContent></Select></label><label>検索確認<Select defaultValue="each"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="each">要求ごとに確認</SelectItem></SelectContent></Select></label><label>許可ホスト<Input value="登録なし" readOnly /></label></div><div className="setting-note"><ShieldCheck size={15} />ケース名、値、ファイルパスを含む要求は個別確認します。</div></>
   if (category === '診断とサポート') return <><h2>ローカル診断</h2><p>ログにはフィールド値を含めません。バンドル作成前に収録内容を確認できます。</p><div className="settings-action-list"><button type="button" onClick={onSupportBundle}><FolderPlus size={16} /><span><b>サポートバンドルを作成</b><small>内容を確認してローカルに保存</small></span><ChevronRight size={14} /></button><button type="button"><ScrollText size={16} /><span><b>ローカルログを開く</b><small>外部送信なし</small></span><ChevronRight size={14} /></button></div></>
@@ -2547,13 +4113,48 @@ function SettingsCategoryPanel({ category, onSupportBundle }: { category: string
   return <><h2>全般</h2><p>言語、起動、保存の基本動作を設定します。</p><div className="settings-fields"><label>言語<Select defaultValue="ja"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ja">日本語</SelectItem><SelectItem value="en">English</SelectItem></SelectContent></Select></label><label>起動<Select defaultValue="resume"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="resume">前回のワークスペースを再開</SelectItem></SelectContent></Select></label></div></>
 }
 
+// One audit list, read by both the centre and the right rail. They used to hold separate copies: the
+// centre listed two records while the rail's audit panel said there were none, on the same screen.
+type AuditResult = 'not-sent' | 'local' | 'refused' | 'allowed'
+const auditResultLabels: Record<AuditResult, string> = { 'not-sent': '未送信', local: 'ローカル', refused: '拒否', allowed: '許可' }
+
+const networkAuditRows: { result: AuditResult; title: string; detail: string; variant?: string }[] = [
+  { result: 'not-sent', title: '文書検索', detail: '権限なし・端末外へ送信した情報なし' },
+  { result: 'local', title: 'アシスタント評価', detail: 'ネットワーク依存なし' },
+  { result: 'refused', title: '文書検索・example.invalid', detail: '許可ホストに未登録・要求は送信していません', variant: 'refused' },
+]
+
+function auditRowsFor(variant: string) {
+  return networkAuditRows.filter((row) => !row.variant || row.variant === variant)
+}
+
 function NetworkScreen({ variant, onSettings }: { variant: string; onSettings: () => void }) {
+  const [resultFilter, setResultFilter] = useState<'all' | AuditResult>('all')
   if (variant === 'offline') return <div className="centred-state"><ShieldCheck size={35} /><h2>ネットワークアクセスはオフです</h2><p>検索とリモートアシスタント要求は実行しません。要求ごとの許可は設定画面で付与できます。</p><button onClick={onSettings}>権限設定を開く</button></div>
-  return <div className="network-canvas">{variant === 'refused' && <StatePanel tone="error" title="外部要求を拒否しました" detail="ホスト：example.invalid・要求：文書検索・結果：未送信。" />}<div className="network-summary"><div><Network /><span><small>既定</small><b>オフライン</b></span></div><div><Globe2 /><span><small>許可ホスト</small><b>なし</b></span></div><div><HardDrive /><span><small>監査保存先</small><b>ローカル</b></span></div></div><section className="audit-log"><header><div><span className="eyebrow">ローカル監査</span><h2>外部要求</h2></div><button>監査記録を出力</button></header><div className="audit-row"><span>未送信</span><b>文書検索</b><small>権限なし・端末外へ送信した情報なし</small></div><div className="audit-row"><span>ローカル</span><b>アシスタント評価</b><small>ネットワーク依存なし</small></div></section></div>
+  const rows = auditRowsFor(variant).filter((row) => resultFilter === 'all' || row.result === resultFilter)
+  return <div className="network-canvas">
+    {variant === 'refused' && <StatePanel tone="error" title="外部要求を拒否しました" detail="ホスト：example.invalid・要求：文書検索・結果：未送信。" />}
+    <div className="network-summary"><div><Network /><span><small>既定</small><b>オフライン</b></span></div><div><Globe2 /><span><small>許可ホスト</small><b>なし</b></span></div><div><HardDrive /><span><small>監査保存先</small><b>ローカル</b></span></div></div>
+    <section className="audit-log">
+      <header>
+        <div><span className="eyebrow">ローカル監査</span><h2>外部要求</h2></div>
+        <div className="audit-log-tools">
+          <label className="sr-only" htmlFor="audit-result-filter">結果で絞り込み</label>
+          <select id="audit-result-filter" value={resultFilter} onChange={(event) => setResultFilter(event.target.value as 'all' | AuditResult)}>
+            <option value="all">すべて</option>
+            {(Object.keys(auditResultLabels) as AuditResult[]).map((result) => <option value={result} key={result}>{auditResultLabels[result]}</option>)}
+          </select>
+          <button type="button">監査記録を出力</button>
+        </div>
+      </header>
+      {rows.map((row) => <div className="audit-row" key={row.title}><span>{auditResultLabels[row.result]}</span><b>{row.title}</b><small>{row.detail}</small></div>)}
+      {rows.length === 0 && <div className="audit-row"><span>—</span><b>該当する記録はありません</b><small>絞り込みを変更してください</small></div>}
+    </section>
+  </div>
 }
 
 function InstructionBar({ draft, onDraftChange, onOpen }: { draft: string; onDraftChange: (draft: string) => void; onOpen: () => void }) {
-  return <div className="instruction-bar"><Sparkles size={15} /><Input className="h-auto border-0 bg-transparent p-0 text-[10px] shadow-none focus-visible:ring-0" value={draft} onChange={(event) => onDraftChange(event.target.value)} placeholder="自然言語で操作 — 同じチャットへ送信" /><kbd>Ctrl K</kbd><Button variant="ghost" size="icon" type="button" aria-label="チャットを開く" onClick={onOpen}><MessageSquareText size={14} /></Button></div>
+  return <div className="instruction-bar"><Sparkles size={15} /><Input className="h-auto border-0 bg-transparent p-0 type-body shadow-none focus-visible:ring-0" value={draft} onChange={(event) => onDraftChange(event.target.value)} placeholder="自然言語で操作 — 同じチャットへ送信" /><kbd>{shortcutFor('指示バーへフォーカス')?.key}</kbd><Button variant="ghost" size="icon" type="button" aria-label="チャットを開く" onClick={onOpen}><MessageSquareText size={14} /></Button></div>
 }
 
 function StatePanel({ tone, title, detail }: { tone: 'info' | 'progress' | 'warning' | 'error'; title: string; detail: string }) {
@@ -2561,8 +4162,12 @@ function StatePanel({ tone, title, detail }: { tone: 'info' | 'progress' | 'warn
   return <div className={`state-panel ${tone}`}><Icon size={17} /><div><b>{title}</b><span>{detail}</span></div></div>
 }
 
-function ModalCard({ title, detail, children }: { title: string; detail: string; children: React.ReactNode }) {
-  return <Dialog><DialogOverlay className="modal-backdrop" /><DialogContent className="modal-card"><AlertTriangle size={24} /><h2>{title}</h2><p>{detail}</p><DialogFooter>{children}</DialogFooter></DialogContent></Dialog>
+// A required screen state that renders nothing is a state nobody can review. This dialog was
+// uncontrolled and carried no `open`, so Radix kept it shut: `chat.outbound-request` and
+// `pipeline.scope-confirmation` showed an empty canvas while the catalogue reported them covered.
+// The open state belongs to the caller, which is also the thing that knows how the state is left.
+function ModalCard({ title, detail, open, onClose, children }: { title: string; detail: string; open: boolean; onClose: () => void; children: React.ReactNode }) {
+  return <Dialog open={open} onOpenChange={(next) => { if (!next) onClose() }}><DialogOverlay className="modal-backdrop" /><DialogContent className="modal-card"><AlertTriangle size={24} /><h2>{title}</h2><p>{detail}</p><DialogFooter>{children}</DialogFooter></DialogContent></Dialog>
 }
 
 function ScenarioCatalog({ selected, onSelect }: { selected: Scenario; onSelect: (scenario: Scenario) => void }) {

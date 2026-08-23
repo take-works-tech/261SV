@@ -13,7 +13,7 @@ export function TabsList({ className, ...props }: HTMLAttributes<HTMLDivElement>
 }
 
 export function TabsTrigger({ value, children, className, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { value: string; children: ReactNode }) {
-  return <TabsPrimitive.Trigger value={value} className={cn('inline-flex items-center justify-center rounded px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', className)} {...props}>{children}</TabsPrimitive.Trigger>
+  return <TabsPrimitive.Trigger value={value} className={cn('inline-flex items-center justify-center rounded px-3 py-1.5 type-body font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', className)} {...props}>{children}</TabsPrimitive.Trigger>
 }
 
 export function TabsContent({ value, className, children, ...props }: HTMLAttributes<HTMLDivElement> & { value: string }) {
