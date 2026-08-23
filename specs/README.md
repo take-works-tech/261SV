@@ -49,6 +49,7 @@ coverage:
 | `validate/check_gates_wired.py` | every validator here is invoked by something that runs it |
 | `validate/check_automerge_policy.py` | the automatic-merge workflow still checks every condition XC-218 names, still fails closed, and is present or absent in step with that decision's status |
 | `validate/check_mockup_states.py` | every catalogue state renders, not only typechecks - needs `MOCKUP_BASE_URL` and refuses to report success without it |
+| `ci` job `review wiring matches the secret` | the review's `pull_request` trigger and `CLAUDE_CODE_OAUTH_TOKEN` are both present or both absent (XC-219) - a repository secret is only visible from inside a workflow, so this one cannot live in `validate/` |
 
 ## Format
 

@@ -3,9 +3,20 @@
 # `validate/check_dependency_pins.py` compares every version this specification set declares against
 # the manifest that pins it, so a Dependabot pull request that moves `vtk==` or `numpy==` and does not
 # also move `specs/06_external.md` fails CI by construction. That is the intended behaviour: the two
-# ship together or neither does (spec model 6.5). The pull request is then a prompt to do the rest -
-# re-read the module licence set, and re-run any spike whose measured value described the old version
-# (OPEN-019).
+# ship together or neither does (spec model 6.5).
+#
+# The bot cannot do the rest. It does not edit specifications, cannot re-read a wheel's declared
+# licence set, and cannot re-run a spike - so a pull request bumping one of those two pins is red on
+# the day it opens and red for as long as it stays open, for a reason that has nothing to do with the
+# change anyone is actually reviewing. That is the state XC-188 refused elsewhere: a check that is red
+# for an unrelated reason teaches everyone to read red as normal. Two such pull requests sat open for a
+# day before this was noticed.
+#
+# So **the two pins this specification declares are not proposed by the bot** (XC-220). Moving them is
+# deliberate work with a re-measurement attached - OPEN-019 for VTK, and the wheel's five-licence
+# declaration for NumPy, which feeds XC-025's notices file. Security advisories are unaffected:
+# Dependabot alerts and automated security fixes are enabled at the repository level and do not run
+# through this file.
 
 version: 2
 updates:
@@ -17,6 +28,13 @@ updates:
     labels: [dependencies, needs-spec-change]
     commit-message:
       prefix: deps
+    # Declared in specs/06_external.md, so a pull request that moves only the manifest cannot pass.
+    # Version updates only - a security advisory still reaches these through Dependabot alerts.
+    ignore:
+      - dependency-name: vtk
+        update-types: [version-update:semver-major, version-update:semver-minor, version-update:semver-patch]
+      - dependency-name: numpy
+        update-types: [version-update:semver-major, version-update:semver-minor, version-update:semver-patch]
 
   - package-ecosystem: npm
     directory: /mockups/ui

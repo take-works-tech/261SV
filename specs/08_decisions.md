@@ -2917,7 +2917,9 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: `CLAUDE_CODE_OAUTH_TOKEN` is set as a repository secret, at which point the
   commented triggers in both files are restored and this decision is superseded rather than deleted
-
+- superseded_by: XC-219, which decides what happens on that day - the review returns as a **merge
+  condition**, not merely as a check - and adds the CI job that fails if the secret is set while the
+  trigger is still commented out. This decision stays in force until both are true
 ### XC-187 - A colour, a size or a duration has one definition, and roles are layered
 - decided: 2026-08-22
 - status: active
@@ -3499,3 +3501,65 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: the first working prototype. Also any merge that reaches `main` in a state a person
   would have stopped, which ends the period early
+
+### XC-219 - The Claude review becomes a merge condition, on the day it can authenticate and not before
+- decided: 2026-08-23
+- status: active
+- decision: the automated review runs on every pull request and its result is a **merge condition**:
+  `auto-merge` waits on every check run on the commit (XC-218), so a review that is not green stops the
+  merge. This takes effect when `CLAUDE_CODE_OAUTH_TOKEN` exists as a repository secret and the
+  `pull_request` trigger in `.github/workflows/claude-code-review.yml` is restored - **both, and until
+  then neither**. XC-188 stays in force meanwhile.
+  **The day the secret appears is not left to memory.** `ci` carries a `review wiring matches the
+  secret` job that fails when the secret is present and the trigger is not, and equally when the trigger
+  is present and the secret is not. The secret is only visible from inside a workflow, so the check
+  lives in CI rather than in `validate/`. It is deliberately loud: once the secret is set every run is
+  red until the two commented lines are restored, and while auto-merge is on that red also stops
+  everything merging - which is the point, because the alternative is a review that silently is not one
+- decided_by: the product owner, 2026-08-23
+- rationale: an automated review that nobody has to act on is a comment, and this repository is merging
+  without a human reader for the length of the prototype (XC-218). Making the review a condition is the
+  one thing that puts a reader back in the path, even an imperfect one. Deferring it until the token
+  exists is XC-188's argument unchanged: a check that cannot authenticate fails on every pull request
+  for a reason unrelated to the change, and that teaches everyone to read red as normal
+- what_this_accepts: **a non-deterministic judge becomes a merge condition.** The same change may be
+  passed on Monday and stopped on Tuesday, and a review that fails for a rate limit or a model-side
+  outage stops a pull request for a reason that is not about the code. The answer to that is a re-run,
+  not the `no-auto-merge` label, and not weakening the condition. The alternative - a review whose
+  verdict changes nothing - was rejected because it is indistinguishable from no review at all
+- alternatives: keeping the review advisory and merging on CI alone is what happens today and is what
+  the prototype period already accepts; making the review advisory *permanently* would mean the only
+  reader of an auto-merged change is a set of static gates
+- basis: E-001 (T1), E-129 (T1)
+- affects: .github/workflows/claude-code-review.yml, .github/workflows/ci.yml, 08_decisions.md
+- decidedness: Fixed
+- reversal_trigger: a review that stops correct work more often than it stops incorrect work, measured
+  rather than felt
+
+### XC-220 - The two pins this specification declares are not proposed by a bot
+- decided: 2026-08-23
+- status: active
+- decision: Dependabot does not open version-update pull requests for `vtk` or `numpy`. Both are
+  declared in `specs/06_external.md`, so a pull request that moves only `pyproject.toml` fails
+  `check_dependency_pins.py` by construction and the bot cannot complete it - it does not edit
+  specifications, cannot re-read a wheel's declared licence set, and cannot re-run a spike. Moving
+  either pin is deliberate work with a re-measurement attached. **Security advisories are unaffected**:
+  Dependabot alerts and automated security fixes are enabled at the repository level and do not run
+  through `dependabot.yml`. Every other dependency - development, mockup, GitHub Actions - is still
+  proposed, because no specification declares a version for any of them
+- decided_by: the product owner, 2026-08-23
+- rationale: the two pull requests this closes had been open and red for a day, each failing on the one
+  line the bot is structurally unable to add. A pull request that can never go green is the state
+  XC-188 refused: red for a reason unrelated to the change, teaching everyone to read red as normal.
+  Leaving them open also costs nothing to nobody and quietly raises the cost of every future red
+- correction: `dependabot.yml` already described this failure as "the intended behaviour" and called the
+  pull request "a prompt to do the rest". It is a prompt that arrives monthly, cannot be completed by
+  its author, and sits red in the meantime - which is a different thing from a prompt
+- alternatives: completing each bump by hand as it arrives keeps the notification and pays the
+  re-measurement on the bot's schedule rather than on the project's; VTK's is five measured values and a
+  licence table (OPEN-019), which is not monthly work
+- basis: E-001 (T1)
+- affects: .github/dependabot.yml
+- decidedness: Fixed
+- reversal_trigger: a specification that stops declaring a version for one of these, at which point the
+  bot can complete the change on its own

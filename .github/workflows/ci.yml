@@ -50,6 +50,34 @@ jobs:
       - run: python validate/check_automerge_policy.py
         if: '!cancelled()'
 
+  # XC-219: the review becomes a merge gate on the day the secret exists, and this is what stops that
+  # day passing unnoticed. The secret is only visible from inside a workflow, so the check lives here
+  # rather than in `validate/` - and it is deliberately loud: once the secret is set, every run is red
+  # until the two triggers are restored, which is a two-line change with the lines already written in
+  # the file, commented, where they belong.
+  review-wiring:
+    name: review wiring matches the secret
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: The review runs on pull requests exactly when it can authenticate
+        env:
+          SECRET_PRESENT: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          workflow=.github/workflows/claude-code-review.yml
+          if grep -qE '^\s{2}pull_request:' "$workflow"; then triggered=true; else triggered=false; fi
+          echo "secret present: $SECRET_PRESENT / triggered by pull_request: $triggered"
+          if [ "$SECRET_PRESENT" = "true" ] && [ "$triggered" = "false" ]; then
+            echo "::error::CLAUDE_CODE_OAUTH_TOKEN is set, so the review can run - restore the commented pull_request trigger in $workflow and mark XC-188 superseded (XC-219)."
+            exit 1
+          fi
+          if [ "$SECRET_PRESENT" = "false" ] && [ "$triggered" = "true" ]; then
+            echo "::error::$workflow runs on pull requests with no token to authenticate with, so every pull request would be red for a reason unrelated to it (XC-188)."
+            exit 1
+          fi
+          echo "The review's wiring and its credential agree."
+
   tests:
     name: tests
     runs-on: ubuntu-latest
