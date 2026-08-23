@@ -1917,13 +1917,13 @@ def test_the_data_and_contents_tabs_are_named_for_what_they_hold() -> None:
     the report tab holds the reference scope, the blocks and the commentary."""
     page = CHAT_PAGE.read_text(encoding="utf-8")
 
-    assert "{ id: 'data', label: 'データ'" in page
+    assert "{ id: 'series', label: '系列'" in page
     assert "{ id: 'contents', label: '内容'" in page
     assert "{ id: 'drafting', label: '執筆'" in page
     assert "label: '詳細'" not in page
-    assert "if (tab.id === 'data') return" in page
+    assert "if (tab.id === 'series') return" in page
     assert "if (tab.id === 'contents') return" in page
-    assert "variant === 'series-unresolved' ? 'data'" in page
+    assert "variant === 'series-unresolved' || variant === 'series' ? 'series'" in page
     assert "variant === 'commentary-review' || variant === 'drafting' ? 'drafting'" in page
 
 
@@ -1997,7 +1997,7 @@ def test_the_graph_rail_is_five_sections_and_one_of_them_is_the_axis() -> None:
 
     graph_tabs = page[page.index("  graph: ["):page.index("  report: [")]
     ids = re.findall(r"id: '([\w-]+)'", graph_tabs)
-    assert ids == ["overall", "data", "axes", "style", "output"]
+    assert ids == ["overall", "series", "axes", "style", "output"]
     # one axis is chosen and the same fields serve it, rather than the fields repeating per axis
     assert "const [axis, setAxis] = useState<'x' | 'y' | 'y2'>('x')" in page
     assert "axisNames: Record<'x' | 'y' | 'y2', string>" in page
@@ -2008,22 +2008,47 @@ def test_the_graph_rail_is_five_sections_and_one_of_them_is_the_axis() -> None:
     assert "{!axisAuto && <p className=\"property-editor-note warning\">" in page
 
 
-def test_a_graph_series_carries_its_own_appearance_on_its_own_row() -> None:
-    """XC-213: line, marker and colour are keyed to the series in the measured reference (E-124).
-    Holding them chart-wide meant several series could not be told apart, and meant editing one series
-    in two tabs."""
+def test_a_graph_series_carries_its_own_appearance_and_can_defer_to_the_theme() -> None:
+    """XC-213 keyed appearance to the series, as the measured reference does (E-124). XC-221 fixed what
+    that left behind: the theme's default and the series' override were two identical pickers with no
+    relationship on screen, and the theme's own value - `auto` - was not among its four options, so that
+    control rendered with nothing selected."""
     page = CHAT_PAGE.read_text(encoding="utf-8")
 
-    series = page[page.index('<PropertyGroup title="系列">'):page.index('<PropertyGroup title="集約"')]
+    series = page[page.index("if (tab.id === 'series') return"):page.index("if (tab.id === 'axes') return")]
     assert "<span>色</span>" in series
     assert "<span>軸</span>" in series
-    # line and marker are pictures rather than lists of words (XC-215)
     assert 'label="線" kind="line"' in series
     assert 'label="マーカー" kind="marker"' in series
     assert 'aria-label={`${activeSeries.label}の色`}' in page
-    # what is left chart-wide is named as a default, not as the series' look
+
+    # the first option is the theme's, drawn as the theme resolves it
+    assert "{ value: 'theme', label: 'テーマ', sample: defaultMarker" in page
+    assert "option.sample ?? option.value" in OPTION_SAMPLES.read_text(encoding="utf-8")
+    # one vocabulary for width in both places, and the series can defer
+    assert "テーマに従う（{defaultWidth} px）" in page
+    assert "既定の太さ" not in page
+
+    # the theme's own control can show its own value
+    assert "useState('circle')" in page
+    assert "useState('auto')" not in page
     assert '<PropertyGroup title="系列の既定">' in page
     assert '<PropertyGroup title="プロット">' not in page
+
+
+def test_the_graph_item_tab_holds_which_cases_and_no_two_fields_share_a_name() -> None:
+    """XC-221: a series spans every selected case, so the case selection is the graph's, not a series'.
+    And the item tab had two fields called タイトル - the text and its visibility."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+
+    item = page[page.index("if (tab.id === 'overall') return", page.index("function GraphPropertyEditor(")):page.index("if (tab.id === 'series') return")]
+    assert '<PropertyGroup title="ケース選択">' in item
+    assert '<PropertyGroup title="集約"' in item
+    assert "<span>タイトルを表示</span>" in item
+    assert "<span>凡例を表示</span>" in item
+    labels = re.findall(r"<span>([^<]+)</span>", item)
+    duplicated = {label for label in labels if labels.count(label) > 1}
+    assert not duplicated, f"two fields share a name in one tab: {duplicated}"
 
 
 def test_report_writing_is_a_reviewed_sequence_rather_than_a_group_of_settings() -> None:
@@ -2116,3 +2141,18 @@ def test_every_rail_tab_fed_by_the_library_says_which_category_feeds_it() -> Non
     categories = page[page.index("const libraryCategories"):page.index("const libraryCategoryMeta")]
     assert "graph: ['template', 'style', 'fonts']" in categories
     assert "report: ['template', 'layout', 'style', 'fonts']" in categories
+
+
+def test_the_graph_panels_are_written_in_the_order_the_rail_shows_them() -> None:
+    """XC-221: they were not - overall, style, axes, series against a rail reading overall, series,
+    axes, style - and a test slicing "this tab" by the next tab's marker read an empty string and
+    asserted nothing against it. Twice, in one sitting."""
+    page = CHAT_PAGE.read_text(encoding="utf-8")
+    editor = page[page.index("function GraphPropertyEditor("):page.index("function ReportPropertyEditor(")]
+    written = re.findall(r"if \(tab\.id === '(\w+)'\) return", editor)
+
+    graph_tabs = page[page.index("  graph: ["):page.index("  report: [")]
+    shown = re.findall(r"id: '([\w-]+)'", graph_tabs)
+
+    # the last section is the fallback `return`, so it is not in the written list
+    assert written == shown[:-1], f"written {written} against rail {shown}"

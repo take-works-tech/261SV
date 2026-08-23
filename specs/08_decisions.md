@@ -3565,3 +3565,38 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a specification that stops declaring a version for one of these, at which point the
   bot can complete the change on its own
+
+### XC-221 - The graph rail's sections are named for what they hold, and a default is not a second control
+- decided: 2026-08-23
+- status: active
+- decision: three corrections to XC-213's rail.
+  **`データ` becomes `系列`.** The tab holds each series and, by XC-213, how each series looks - so a name
+  that says "data" described half of it. What genuinely is data and not a series moves to the item tab:
+  **the @Case selection, the iteration handling and the reduction**, because a series spans every
+  selected case and none of the three belongs to one.
+  **The theme's default and the series' override stop being two identical pickers.** Each appearance
+  field on a series offers **the theme's value first**, drawn as the theme currently resolves it, so the
+  relationship is on screen: `テーマ` for the marker with the theme's own shape as its picture, and
+  `テーマに従う（2 px）` for the width. Line width is stated **in px in both places**, where the series
+  said `細い`/`太い` and the theme said a number.
+  **The panels are written in the order the rail shows them**
+- decided_by: the product owner, 2026-08-23
+- rationale: the tab division was reviewed after the product owner observed style controls inside a tab
+  called `データ`, and the review found more than the name. The marker picker existed twice with the same
+  four options and no way to say "follow the default", so the two tabs could disagree with nothing
+  saying which won; and because the theme's own value was `auto` - not one of its four options - that
+  control **rendered with nothing selected**, which is the empty display the owner also saw. XC-213's
+  own basis says appearance is keyed to the series (E-124); it did not say what happens to the value the
+  series does not set, and that gap is what produced the duplicate
+- correction: XC-213 kept a `系列の既定` group in `スタイル` while giving the series the same fields, and
+  called the result "the defaults a new series starts from". They were not defaults: nothing referred to
+  them, and a series set at creation cannot follow a default that changes afterwards
+- alternatives: moving appearance out of the series and back into `スタイル` answers the owner's first
+  observation directly and re-creates what XC-213 removed - one series' look and its quantity edited in
+  two tabs, and several series indistinguishable. Splitting into `データ` and `系列` keeps six tabs to
+  avoid renaming one
+- basis: E-124 (T1), E-127 (T1)
+- affects: 11_ui.md, 16_application_model.md
+- decidedness: Fixed
+- reversal_trigger: a theme that cannot express a default some series needs, which would make the
+  per-series field the only one and the theme group pointless

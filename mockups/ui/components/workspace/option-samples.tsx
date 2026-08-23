@@ -216,7 +216,11 @@ export function OptionSample({ kind, value }: { kind: SampleKind; value: string 
   return <RepresentationSample value={value} />
 }
 
-export type VisualOption = { value: string; label: string; detail?: string }
+/**
+ * `sample` draws something other than the option's own value. It exists for one option: the one that
+ * means "follow the theme", whose picture has to be whatever the theme currently resolves to (XC-221).
+ */
+export type VisualOption = { value: string; label: string; detail?: string; sample?: string }
 
 /**
  * A single-choice control whose options are pictures with their names beneath. It replaces a `<select>`
@@ -257,7 +261,7 @@ export function VisualOptions({
             title={option.detail ?? option.label}
             onClick={() => onChange(option.value)}
           >
-            <span className="visual-option-sample"><OptionSample kind={kind} value={option.value} /></span>
+            <span className="visual-option-sample"><OptionSample kind={kind} value={option.sample ?? option.value} /></span>
             <small>{option.label}</small>
           </button>
         ))}

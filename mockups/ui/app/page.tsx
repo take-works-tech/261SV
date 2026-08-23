@@ -237,8 +237,8 @@ const rightSidebarTabs: Record<ScreenId, SidebarTab[]> = {
     { id: 'materials', label: 'マテリアル', description: '選択中の形状と結果表示に使う外観を設定します。', icon: MaterialSphereIcon, scope: 'selection' },
   ],
   graph: [
-    { id: 'overall', label: 'グラフ', description: '開いているグラフそのもの（名前・種類・凡例）を設定します。', icon: IdCard },
-    { id: 'data', label: 'データ', description: 'このグラフが描くケースと系列を設定します。系列の見え方も同じ行で決めます。', icon: Database },
+    { id: 'overall', label: 'グラフ', description: '開いているグラフそのもの（名前・種類・凡例）と、描く対象のケースを設定します。', icon: IdCard },
+    { id: 'series', label: '系列', description: '系列ごとに、何を描くかと、どう見えるかを1か所で設定します。', icon: Database },
     { id: 'axes', label: '軸', description: '軸を1本選び、その表題・範囲・目盛・グリッドを設定します。', icon: Grid3x3 },
     { id: 'style', label: 'スタイル', description: 'グラフ全体の配色・既定の線とマーカー・書体を設定します。', icon: Paintbrush },
     { id: 'output', label: '出力', description: '画像、ベクター形式、表データの出力条件を設定します。', icon: FileOutput },
@@ -1702,7 +1702,7 @@ function RightSidebar({ screen, variant, width, setWidth, selectedViewObjects, o
   const borrowedTabIds = ['camera', 'rendering', 'background', 'objects', 'text', 'materials']
   const isBorrowed = (tabId: string) => screen === 'view' && isComparisonItem && borrowedTabIds.includes(tabId)
   const [selectedByScreen, setSelectedByScreen] = useState<Partial<Record<ScreenId, string>>>({})
-  const variantTab = variant.startsWith('object-') ? 'objects' : variant.startsWith('material-') ? 'materials' : variant === 'steady-result' ? 'output' : variant === 'comparison-borrowed' ? 'materials' : variant === 'cameras' || variant.startsWith('camera-') ? 'camera' : variant === 'unit-reference' ? 'settings' : variant === 'commentary-review' || variant === 'drafting' ? 'drafting' : variant === 'axes' ? 'axes' : variant === 'style' || variant === 'theme' ? 'style' : variant === 'background' ? 'background' : variant === 'output-motion' || variant === 'split-output' || variant === 'comparison-output' ? 'output' : variant === 'develop-grade' ? 'rendering' : variant.includes('output-preflight') ? 'output' : variant === 'series-unresolved' ? 'data' : undefined
+  const variantTab = variant.startsWith('object-') ? 'objects' : variant.startsWith('material-') ? 'materials' : variant === 'steady-result' ? 'output' : variant === 'comparison-borrowed' ? 'materials' : variant === 'cameras' || variant.startsWith('camera-') ? 'camera' : variant === 'unit-reference' ? 'settings' : variant === 'commentary-review' || variant === 'drafting' ? 'drafting' : variant === 'axes' ? 'axes' : variant === 'style' || variant === 'theme' ? 'style' : variant === 'background' ? 'background' : variant === 'output-motion' || variant === 'split-output' || variant === 'comparison-output' ? 'output' : variant === 'develop-grade' ? 'rendering' : variant.includes('output-preflight') ? 'output' : variant === 'series-unresolved' || variant === 'series' ? 'series' : undefined
   const selectedTab = tabs.find((tab) => tab.id === (selectedByScreen[screen] ?? variantTab)) ?? tabs[0]
 
   if (!selectedTab) return null
@@ -2464,9 +2464,11 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
   const [chartKind, setChartKind] = useState('line')
   const [palette, setPalette] = useState('accessible')
   const [chartBackground, setChartBackground] = useState('light')
-  const [defaultMarker, setDefaultMarker] = useState('auto')
+  const [defaultMarker, setDefaultMarker] = useState('circle')
+  const [defaultWidth, setDefaultWidth] = useState('2')
   const [seriesLine, setSeriesLine] = useState('solid')
-  const [seriesMarker, setSeriesMarker] = useState('circle')
+  const [seriesMarker, setSeriesMarker] = useState('theme')
+  const [seriesWidth, setSeriesWidth] = useState('theme')
   const [outputKind, setOutputKind] = useState<'image' | 'vector' | 'data' | 'animation'>('image')
   const [preflightOpen, setPreflightOpen] = useState(variant === 'output-preflight')
   const [outputStarted, setOutputStarted] = useState(false)
@@ -2506,38 +2508,52 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
     </PropertyGroup>}
     <p className="property-editor-note"><ChartNoAxesCombined size={12} />種類を変えても数量の参照と単位互換性の検証は維持されます。</p>
     <PropertyGroup title="構成">
-      <label className="property-toggle"><span>タイトル</span><input type="checkbox" defaultChecked /></label>
-      <label className="property-toggle"><span>凡例</span><input type="checkbox" defaultChecked /></label>
+      <label className="property-toggle"><span>タイトルを表示</span><input type="checkbox" defaultChecked /></label>
+      <label className="property-toggle"><span>凡例を表示</span><input type="checkbox" defaultChecked /></label>
       <label><span>凡例位置</span><select defaultValue="right"><option value="right">右</option><option value="bottom">下</option><option value="inside">プロット内</option></select></label>
+    </PropertyGroup>
+    {/* XC-221: which cases the graph covers is a property of the graph, not of one series - a series
+        spans every selected case. These sat in the series tab only because it used to be called データ
+        and collected everything data-shaped. */}
+    <PropertyGroup title="ケース選択">
+      <label><span>対象</span><select value={caseSelectionMode} onChange={(event) => setCaseSelectionMode(event.target.value as typeof caseSelectionMode)}><option value="selected">選択中のケース</option><option value="saved">保存済み選択</option><option value="tag">宣言的な条件</option><option value="code">Python選択</option></select></label>
+      {caseSelectionMode === 'saved' && <label><span>選択</span><select defaultValue="unresolved"><option value="unresolved">選択を指定</option></select></label>}
+      {caseSelectionMode === 'tag' && <label><span>条件</span><input placeholder="タグ・状態・変数の条件" /></label>}
+      {caseSelectionMode === 'code' && <><label><span>スクリプト</span><textarea rows={3} defaultValue={'def select(cases):\n    return []'} /></label><p className="property-editor-note"><ShieldCheck size={12} />メタデータだけを受け取り、ファイル・データセット・ネットワークへアクセスしません。失敗は空選択ではなく拒否として報告します。</p></>}
+      <label><span>選択結果</span><input value={caseSelectionMode === 'selected' ? '選択中のケース・1件' : '条件の解決待ち'} readOnly /></label>
+      <label><span>反復</span><select defaultValue="separate"><option value="separate">反復ごとに表示</option><option value="combined">反復を集約</option></select></label>
+    </PropertyGroup>
+    <PropertyGroup title="集約" open={false}>
+      <label><span>方法</span><select defaultValue="none"><option value="none">集約しない</option><option value="weighted">関連量で重み付け</option><option value="unweighted">単純平均・重みなし</option></select></label>
+      <label><span>範囲</span><select defaultValue="whole"><option value="whole">全体</option><option value="selection">選択範囲</option></select></label>
     </PropertyGroup>
     <p className="property-editor-note"><ShieldCheck size={12} />グラフは値のコピーではなく、数量・単位・来歴を参照する定義として保存します。</p>
   </div>
 
-  if (tab.id === 'style') return <div className="property-editor">
-    <PropertyGroup title="スタイル">
-      {/* XC-216: the rail says which library resource is in effect; the shelf is where one is chosen.
-          The field was called アセット here and スタイル in Report - one name for one thing. */}
-      <label><span>適用中</span><select defaultValue="technical"><option value="technical">技術資料・標準</option><option value="workspace">ワークスペース設定</option></select></label>
-      <VisualOptions label="配色" kind="palette" columns={3} value={palette} onChange={setPalette}
-        options={[{ value: 'accessible', label: '識別性優先' }, { value: 'monochrome', label: 'モノクロ' }, { value: 'print', label: '印刷向け' }]} />
-      <VisualOptions label="背景" kind="background" columns={3} value={chartBackground} onChange={setChartBackground}
-        options={[{ value: 'light', label: '明るい' }, { value: 'transparent', label: '透過' }, { value: 'dark', label: '暗い' }]} />
+  if (tab.id === 'series') return <div className="property-editor">
+    <PropertyGroup title="系列">
+      <div className="compact-definition-list"><div role="listbox" aria-label="グラフ系列">{graphSeries.map((series) => <button type="button" role="option" aria-selected={activeSeriesId === series.id} className={activeSeriesId === series.id ? 'selected' : ''} onClick={() => setActiveSeriesId(series.id)} key={series.id}><span><b>{series.label}</b><small>{series.quantity === 'unresolved' ? '数量未選択' : series.quantity === 'expression' ? '式による計算・解析モジュール' : '数量参照・単位未宣言'}</small></span>{series.quantity === 'unresolved' && <AlertTriangle size={12} />}</button>)}</div><aside><button type="button" aria-label="系列を追加" onClick={() => { const id = `series-${graphSeries.length + 1}`; setGraphSeries((current) => [...current, { id, label: `系列 ${current.length + 1}`, quantity: 'unresolved', source: 'dataset' }]); setActiveSeriesId(id) }}><Plus size={12} /></button><button type="button" aria-label="選択中の系列を削除" disabled={graphSeries.length === 1} onClick={() => { const next = graphSeries.filter((series) => series.id !== activeSeriesId); setGraphSeries(next); setActiveSeriesId(next[0]?.id ?? '') }}><X size={12} /></button></aside></div>
+      {activeSeries && <><label><span>X</span><select defaultValue="parameter"><option value="parameter">パラメーターを選択</option><option value="result-axis">結果軸</option></select></label>
+        <label><span>Y</span><select value={activeSeries.quantity} onChange={(event) => setGraphSeries((current) => current.map((series) => series.id === activeSeries.id ? { ...series, quantity: event.target.value } : series))}><option value="unresolved">数量を選択</option><option value="dataset">データセットの数量</option><option value="computed">計算済み数量</option><option value="measurement">測定値</option><option value="reference">参考ファイルの値</option><option value="expression">式</option></select></label>
+        {activeSeries.quantity === 'expression' && <ExpressionEditor id={`graph-${activeSeries.id}`} label="系列の式" initial="設計許容応力 / 最大応力" />}
+        <label><span>単位</span><input value={activeSeries.quantity === 'unresolved' ? '数量の選択後に表示' : '未宣言'} readOnly /></label>
+        {/* XC-213: colour, line and marker belong to the series, not to the chart - the measured
+            reference keys all three to the series (E-124), and splitting them across two tabs meant
+            changing one series' look and its quantity in two places. */}
+        <label><span>色</span><div className="property-pair"><select defaultValue="palette"><option value="palette">パレット順</option><option value="custom">指定色</option></select><input type="color" defaultValue="#2f6df6" aria-label={`${activeSeries.label}の色`} /></div></label>
+        <label><span>パレット</span><span className="palette-readout"><OptionSample kind="palette" value={palette} /><small>この系列は{['1番目','2番目','3番目','4番目','5番目'][graphSeries.indexOf(activeSeries) % 5]}の色を使います</small></span></label>
+        {/* XC-221: the first option is the theme's, drawn as the theme currently resolves it, so the
+            relationship between the two tabs is on screen instead of being two identical pickers. */}
+        <VisualOptions label="線" kind="line" columns={4} value={seriesLine} onChange={setSeriesLine}
+          options={[{ value: 'solid', label: '実線' }, { value: 'dashed', label: '破線' }, { value: 'dotted', label: '点線' }, { value: 'none', label: 'なし' }]} />
+        <label><span>線幅</span><select value={seriesWidth} onChange={(event) => setSeriesWidth(event.target.value)}><option value="theme">テーマに従う（{defaultWidth} px）</option>{['1', '2', '3', '4', '5', '6'].map((w) => <option value={w} key={w}>{w} px</option>)}</select></label>
+        <VisualOptions label="マーカー" kind="marker" columns={5} value={seriesMarker} onChange={setSeriesMarker}
+          options={[{ value: 'theme', label: 'テーマ', sample: defaultMarker, detail: `テーマに従う（${{ circle: '円', square: '四角', triangle: '三角', none: 'なし' }[defaultMarker] ?? defaultMarker}）` }, { value: 'circle', label: '円' }, { value: 'square', label: '四角' }, { value: 'triangle', label: '三角' }, { value: 'none', label: 'なし' }]} />
+        <label><span>軸</span><select defaultValue="left"><option value="left">左（Y）</option><option value="right">右（第2Y）</option></select></label>
+        <label><span>来歴</span><input value={activeSeries.quantity === 'unresolved' ? '数量の選択後に表示' : activeSeries.quantity === 'computed' || activeSeries.quantity === 'expression' ? '計算・式を表示' : activeSeries.quantity === 'reference' ? '参考資料・数値根拠には未使用' : activeSeries.quantity === 'measurement' ? '測定データ' : 'データセット'} readOnly /></label>
+        <label><span>欠損</span><select defaultValue="gap"><option value="gap">欠損として表示・凡例に残す</option></select></label></>}
     </PropertyGroup>
-    {/* XC-213: these are the defaults a new series starts from. What a *particular* series looks like
-        is on that series' row in データ, because the measured reference keys line, marker and colour to
-        the series rather than to the chart (E-124). Grid lines moved to 軸, which is what they mark. */}
-    <PropertyGroup title="系列の既定">
-      <label><span>線幅</span><div className="property-range"><input type="range" min="1" max="6" defaultValue="2" /><output>2 px</output></div></label>
-      <VisualOptions label="マーカー" kind="marker" columns={4} value={defaultMarker} onChange={setDefaultMarker}
-        options={[{ value: 'circle', label: '円' }, { value: 'square', label: '四角' }, { value: 'triangle', label: '三角' }, { value: 'none', label: 'なし' }]} />
-    </PropertyGroup>
-    <PropertyGroup title="書体">
-      <label><span>フォント</span><select defaultValue="workspace"><option value="workspace">ワークスペース設定</option><option value="noto-sans">Noto Sans</option><option value="source-serif">Source Serif</option></select></label>
-      <label><span>タイトル</span><select defaultValue="14"><option value="12">12 pt</option><option value="14">14 pt</option><option value="16">16 pt</option></select></label>
-      <label><span>軸</span><select defaultValue="10"><option value="9">9 pt</option><option value="10">10 pt</option><option value="11">11 pt</option></select></label>
-      <label><span>凡例</span><select defaultValue="9"><option value="8">8 pt</option><option value="9">9 pt</option><option value="10">10 pt</option></select></label>
-    </PropertyGroup>
-    <p className="property-editor-note"><ShieldCheck size={12} />出力では使用文字を検査し、必要な字体をライセンス条件に従って埋め込みます。素材ライブラリの「スタイル」は配色とプロットの既定に、「テキスト」は書体に適用されます。ここでは適用後のこのグラフの状態を調整します。</p>
+        <p className="property-editor-note"><ShieldCheck size={12} />未選択・未宣言・欠損はそのまま表示し、ゼロや近傍値へ置き換えません。</p>
   </div>
 
   if (tab.id === 'axes') return <div className="property-editor">
@@ -2573,40 +2589,35 @@ function GraphPropertyEditor({ tab, variant }: { tab: SidebarTab; variant: strin
     <p className="property-editor-note"><ShieldCheck size={12} />軸の設定は{axisNames[axis]}にだけ適用されます。単位は数量の宣言から取り、ここでは推測しません。</p>
   </div>
 
-  if (tab.id === 'data') return <div className="property-editor">
-    <PropertyGroup title="ケース選択">
-      <label><span>対象</span><select value={caseSelectionMode} onChange={(event) => setCaseSelectionMode(event.target.value as typeof caseSelectionMode)}><option value="selected">選択中のケース</option><option value="saved">保存済み選択</option><option value="tag">宣言的な条件</option><option value="code">Python選択</option></select></label>
-      {caseSelectionMode === 'saved' && <label><span>選択</span><select defaultValue="unresolved"><option value="unresolved">選択を指定</option></select></label>}
-      {caseSelectionMode === 'tag' && <label><span>条件</span><input placeholder="タグ・状態・変数の条件" /></label>}
-      {caseSelectionMode === 'code' && <><label><span>スクリプト</span><textarea rows={3} defaultValue={'def select(cases):\n    return []'} /></label><p className="property-editor-note"><ShieldCheck size={12} />メタデータだけを受け取り、ファイル・データセット・ネットワークへアクセスしません。失敗は空選択ではなく拒否として報告します。</p></>}
-      <label><span>選択結果</span><input value={caseSelectionMode === 'selected' ? '選択中のケース・1件' : '条件の解決待ち'} readOnly /></label>
-      <label><span>反復</span><select defaultValue="separate"><option value="separate">反復ごとに表示</option><option value="combined">反復を集約</option></select></label>
+  if (tab.id === 'style') return <div className="property-editor">
+    <PropertyGroup title="スタイル">
+      {/* XC-216: the rail says which library resource is in effect; the shelf is where one is chosen.
+          The field was called アセット here and スタイル in Report - one name for one thing. */}
+      <label><span>適用中</span><select defaultValue="technical"><option value="technical">技術資料・標準</option><option value="workspace">ワークスペース設定</option></select></label>
+      <VisualOptions label="配色" kind="palette" columns={3} value={palette} onChange={setPalette}
+        options={[{ value: 'accessible', label: '識別性優先' }, { value: 'monochrome', label: 'モノクロ' }, { value: 'print', label: '印刷向け' }]} />
+      <VisualOptions label="背景" kind="background" columns={3} value={chartBackground} onChange={setChartBackground}
+        options={[{ value: 'light', label: '明るい' }, { value: 'transparent', label: '透過' }, { value: 'dark', label: '暗い' }]} />
     </PropertyGroup>
-    <PropertyGroup title="系列">
-      <div className="compact-definition-list"><div role="listbox" aria-label="グラフ系列">{graphSeries.map((series) => <button type="button" role="option" aria-selected={activeSeriesId === series.id} className={activeSeriesId === series.id ? 'selected' : ''} onClick={() => setActiveSeriesId(series.id)} key={series.id}><span><b>{series.label}</b><small>{series.quantity === 'unresolved' ? '数量未選択' : series.quantity === 'expression' ? '式による計算・解析モジュール' : '数量参照・単位未宣言'}</small></span>{series.quantity === 'unresolved' && <AlertTriangle size={12} />}</button>)}</div><aside><button type="button" aria-label="系列を追加" onClick={() => { const id = `series-${graphSeries.length + 1}`; setGraphSeries((current) => [...current, { id, label: `系列 ${current.length + 1}`, quantity: 'unresolved', source: 'dataset' }]); setActiveSeriesId(id) }}><Plus size={12} /></button><button type="button" aria-label="選択中の系列を削除" disabled={graphSeries.length === 1} onClick={() => { const next = graphSeries.filter((series) => series.id !== activeSeriesId); setGraphSeries(next); setActiveSeriesId(next[0]?.id ?? '') }}><X size={12} /></button></aside></div>
-      {activeSeries && <><label><span>X</span><select defaultValue="parameter"><option value="parameter">パラメーターを選択</option><option value="result-axis">結果軸</option></select></label>
-        <label><span>Y</span><select value={activeSeries.quantity} onChange={(event) => setGraphSeries((current) => current.map((series) => series.id === activeSeries.id ? { ...series, quantity: event.target.value } : series))}><option value="unresolved">数量を選択</option><option value="dataset">データセットの数量</option><option value="computed">計算済み数量</option><option value="measurement">測定値</option><option value="reference">参考ファイルの値</option><option value="expression">式</option></select></label>
-        {activeSeries.quantity === 'expression' && <ExpressionEditor id={`graph-${activeSeries.id}`} label="系列の式" initial="設計許容応力 / 最大応力" />}
-        <label><span>単位</span><input value={activeSeries.quantity === 'unresolved' ? '数量の選択後に表示' : '未宣言'} readOnly /></label>
-        {/* XC-213: colour, line and marker belong to the series, not to the chart - the measured
-            reference keys all three to the series (E-124), and splitting them across two tabs meant
-            changing one series' look and its quantity in two places. */}
-        <label><span>色</span><div className="property-pair"><select defaultValue="palette"><option value="palette">パレット順</option><option value="custom">指定色</option></select><input type="color" defaultValue="#2f6df6" aria-label={`${activeSeries.label}の色`} /></div></label>
-        <label><span>パレット</span><span className="palette-readout"><OptionSample kind="palette" value={palette} /><small>この系列は{['1番目','2番目','3番目','4番目','5番目'][graphSeries.indexOf(activeSeries) % 5]}の色を使います</small></span></label>
-        <VisualOptions label="線" kind="line" columns={4} value={seriesLine} onChange={setSeriesLine}
-          options={[{ value: 'solid', label: '実線' }, { value: 'dashed', label: '破線' }, { value: 'dotted', label: '点線' }, { value: 'none', label: 'なし' }]} />
-        <label><span>線幅</span><select defaultValue="default"><option value="default">既定の太さ</option><option value="thin">細い</option><option value="thick">太い</option></select></label>
-        <VisualOptions label="マーカー" kind="marker" columns={4} value={seriesMarker} onChange={setSeriesMarker}
-          options={[{ value: 'circle', label: '円' }, { value: 'square', label: '四角' }, { value: 'triangle', label: '三角' }, { value: 'none', label: 'なし' }]} />
-        <label><span>軸</span><select defaultValue="left"><option value="left">左（Y）</option><option value="right">右（第2Y）</option></select></label>
-        <label><span>来歴</span><input value={activeSeries.quantity === 'unresolved' ? '数量の選択後に表示' : activeSeries.quantity === 'computed' || activeSeries.quantity === 'expression' ? '計算・式を表示' : activeSeries.quantity === 'reference' ? '参考資料・数値根拠には未使用' : activeSeries.quantity === 'measurement' ? '測定データ' : 'データセット'} readOnly /></label>
-        <label><span>欠損</span><select defaultValue="gap"><option value="gap">欠損として表示・凡例に残す</option></select></label></>}
+    {/* XC-213: these are the defaults a new series starts from. What a *particular* series looks like
+        is on that series' row in データ, because the measured reference keys line, marker and colour to
+        the series rather than to the chart (E-124). Grid lines moved to 軸, which is what they mark. */}
+    {/* XC-221: what a series looks like unless it says otherwise. `auto` used to be the value here and
+        was not one of the four options, so the control rendered with nothing selected - and the series
+        tab offered the same four with no way to say "follow this", which made two identical pickers. */}
+    <PropertyGroup title="系列の既定">
+      <label><span>線幅</span><select value={defaultWidth} onChange={(event) => setDefaultWidth(event.target.value)}>{['1', '2', '3', '4', '5', '6'].map((w) => <option value={w} key={w}>{w} px</option>)}</select></label>
+      <VisualOptions label="マーカー" kind="marker" columns={4} value={defaultMarker} onChange={setDefaultMarker}
+        options={[{ value: 'circle', label: '円' }, { value: 'square', label: '四角' }, { value: 'triangle', label: '三角' }, { value: 'none', label: 'なし' }]} />
+      <p className="property-editor-note"><ShieldCheck size={12} />各系列は既定のまま描かれ、系列タブで「テーマ」以外を選んだ系列だけがそこを上書きします。</p>
     </PropertyGroup>
-    <PropertyGroup title="集約" open={false}>
-      <label><span>方法</span><select defaultValue="none"><option value="none">集約しない</option><option value="weighted">関連量で重み付け</option><option value="unweighted">単純平均・重みなし</option></select></label>
-      <label><span>範囲</span><select defaultValue="whole"><option value="whole">全体</option><option value="selection">選択範囲</option></select></label>
+    <PropertyGroup title="書体">
+      <label><span>フォント</span><select defaultValue="workspace"><option value="workspace">ワークスペース設定</option><option value="noto-sans">Noto Sans</option><option value="source-serif">Source Serif</option></select></label>
+      <label><span>タイトル</span><select defaultValue="14"><option value="12">12 pt</option><option value="14">14 pt</option><option value="16">16 pt</option></select></label>
+      <label><span>軸</span><select defaultValue="10"><option value="9">9 pt</option><option value="10">10 pt</option><option value="11">11 pt</option></select></label>
+      <label><span>凡例</span><select defaultValue="9"><option value="8">8 pt</option><option value="9">9 pt</option><option value="10">10 pt</option></select></label>
     </PropertyGroup>
-    <p className="property-editor-note"><ShieldCheck size={12} />未選択・未宣言・欠損はそのまま表示し、ゼロや近傍値へ置き換えません。</p>
+    <p className="property-editor-note"><ShieldCheck size={12} />出力では使用文字を検査し、必要な字体をライセンス条件に従って埋め込みます。素材ライブラリの「スタイル」は配色とプロットの既定に、「テキスト」は書体に適用されます。ここでは適用後のこのグラフの状態を調整します。</p>
   </div>
 
   return <div className="property-editor">
