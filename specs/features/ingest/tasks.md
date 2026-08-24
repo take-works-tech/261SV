@@ -271,6 +271,16 @@ is either missing a requirement or is not work this specification asked for.
   voxel result that carries a length; a hyper-tree grid's expansion is the memory the format exists to
   avoid; a cell grid's high-order basis does not survive at all, so INV-009 forbids reporting a number
   from the converted form
+- done: 2026-08-24, `engine/conversion.py` runs the chain CT-012 names for each of the nine convertible
+  types - not a chain that happens to work - and `domain_core/conversion.py` holds what it cost on the
+  @Dataset that came out.
+  **The cost is read from the source, so it is stated before it is paid.** A structured, rectilinear or
+  image grid knows its cell count from its dimensions and a hyper-tree grid reports 0 cells until it is
+  expanded but knows its leaf count, so `ConversionTooLarge` is raised before the filter runs and the
+  choice is still the user's. Verified on an 11x11x11 image grid: 1,000 cells refused against a budget
+  of 100, and produced when the cost is accepted.
+  Its spacing and origin are captured at conversion time because after the points are explicit nothing
+  remembers them.
 
 ### TASK-030 - A refused type names itself
 - satisfies: AC-021
@@ -280,3 +290,10 @@ is either missing a requirement or is not work this specification asked for.
   it
 - why: a generic read failure tells a user their file is broken. Naming the type tells them what they
   opened, and the difference decides whether they go looking for a corrupt file that does not exist
+- done: 2026-08-24. `src/domain_core/object_compatibility.py` is **generated from CT-012** by
+  `check_object_compatibility.py --write`, and the gate regenerates and compares - so the disposition of
+  a type and the reason it is refused exist once, and a checked-in generated file cannot drift.
+  The test walks the contract rather than a list beside it, and it found something on its first run: 20
+  of the refusals read `as vtkGraph` or `as vtkImageData`. Good prose in a document a person reads, and
+  **nothing at all in an error message**. The generator now resolves a cross-reference to the words it
+  points at, so the contract keeps the reference and the message carries the reason.

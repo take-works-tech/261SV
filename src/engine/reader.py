@@ -46,9 +46,12 @@ from domain_core.frame import (
     FrameDeclaration,
     resolve_frame,
 )
+from domain_core.conversion import ConversionRecord
 from domain_core.mesh import Cells
+from domain_core.object_compatibility import Disposition, handling
 from domain_core.partitions import Partitioning
 from domain_core.parts import LoadedCase, Part
+from engine.conversion import to_unstructured
 
 class UnsupportedFormatError(Exception):
     """Raised for a file this build has no reader for. Names the format rather than failing vaguely."""
@@ -218,15 +221,23 @@ def _walk(node: vtkDataObject, path: tuple[str, ...], found: list[Part], absent:
             _walk(child, path + (name,), found, absent, partitions)
         return
 
-    if isinstance(node, vtkDataSet):
+    # From here on the disposition is CT-012's, read from the contract rather than restated.
+    where = " / ".join(path) or "the root object"
+    row = handling(node.GetClassName())
+
+    if row.disposition is Disposition.READ and isinstance(node, vtkDataSet):
         found.append(Part(name=path[-1], path=path, dataset=_as_dataset(node)))
         return
 
-    where = " / ".join(path) or "the root object"
+    if row.disposition is Disposition.CONVERT:
+        converted, record = to_unstructured(node)
+        found.append(Part(name=path[-1], path=path, dataset=_as_dataset(converted, conversion=record)))
+        return
+
     raise UnsupportedFormatError(
-        f"{where} is a {type(node).__name__}, which CT-012 does not accept as a part of a @Case. "
-        "Naming it is the point: a generic read failure sends a user looking for a corrupt file that "
-        "does not exist"
+        f"{where} is a {node.GetClassName()}, which this product does not read. {row.reason or ''} "
+        "(CT-012). Naming it is the point: a generic read failure sends a user looking for a corrupt "
+        "file that does not exist"
     )
 
 
@@ -259,7 +270,10 @@ def read(path: str | Path) -> Dataset:
     ))
 
 
-def _as_dataset(data: vtkDataSet, *, source: SourceFrame | None = None) -> Dataset:
+def _as_dataset(
+    data: vtkDataSet, *, source: SourceFrame | None = None,
+    conversion: ConversionRecord | None = None,
+) -> Dataset:
     """One `vtkDataSet` as a @Dataset in the canonical frame, with nothing drawn.
 
     Shared by the single-file path and the composite walk so that a part of an assembly and a file on
@@ -277,6 +291,7 @@ def _as_dataset(data: vtkDataSet, *, source: SourceFrame | None = None) -> Datas
         cells=_canonical_cells(data),
         fields=_fields(data),
         source=source,
+        conversion=conversion,
     )
 
 
