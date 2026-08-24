@@ -99,3 +99,30 @@ def write_minimal_cgns(path: Path) -> Path:
     return path
 
 
+def write_transient_cgns(path: Path, values: tuple[float, ...] = (0.0, 0.5)) -> Path:
+    """The same file with a declared sequence: `BaseIterativeData_t` holding `TimeValues`.
+
+    This is the case that matters for GL-036 - the file states the values and states nothing about what
+    they are, and both halves have to survive to the @Case.
+    """
+    write_minimal_cgns(path)
+    with h5py.File(path, "a") as handle:
+        base = handle["Base"]
+        iterative = node(base, "BaseIterativeData", "BaseIterativeData_t",
+                         np.array([len(values)], np.int32), "I4")
+        node(iterative, "TimeValues", "DataArray_t", np.array(values, np.float64), "R8")
+
+        zone = base["Zone"]
+        names = b""
+        for index in range(len(values)):
+            name = "FlowSolution" if index == 0 else f"FlowSolution{index + 1}"
+            names += name.encode("ascii").ljust(32)
+            if index:
+                solution = node(zone, name, "FlowSolution_t")
+                node(solution, "GridLocation", "GridLocation_t", text("Vertex"), "C1")
+                node(solution, "stress", "DataArray_t",
+                     np.array([10.0, 20.0, 90.0, 40.0]) + index, "R8")
+        pointers = node(zone, "ZoneIterativeData", "ZoneIterativeData_t")
+        node(pointers, "FlowSolutionPointers", "DataArray_t",
+             np.frombuffer(names, dtype=np.int8).reshape(len(values), 32), "C1")
+    return path

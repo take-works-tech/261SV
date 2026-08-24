@@ -27,7 +27,7 @@ import numpy as np  # noqa: E402
 
 from domain_core.reported_value import Caveat  # noqa: E402
 from engine import reader  # noqa: E402
-from cgns_fixture import write_minimal_cgns  # noqa: E402
+from cgns_fixture import write_minimal_cgns, write_transient_cgns  # noqa: E402
 
 
 @pytest.fixture
@@ -123,3 +123,38 @@ class TestTheFixtureIsMinimalOnPurpose:
         with h5py.File(minimal, "r") as handle:
             declared = handle["Base"]["DimensionalUnits"][" data"][()]
         assert b"Meter" in np.asarray(declared).tobytes()
+
+
+class TestTheSequenceTheFileDeclares:
+    """GL-036. CGNS states its values in `BaseIterativeData_t` and states nothing about what they are;
+    both halves have to survive to the @Case (E-138)."""
+
+    def test_the_values_arrive(self, tmp_path: Path) -> None:
+        case = reader.read_case(write_transient_cgns(tmp_path / "t.cgns"))
+
+        assert case.contents.axis.positions == (0.0, 0.5)
+        assert case.contents.steps == 2
+
+    def test_the_kind_stays_undeclared(self, tmp_path: Path) -> None:
+        """The file does say - `SimulationType_t` - and the reader exposes no accessor for it, exactly
+        as it exposes none for the units."""
+        from domain_core.case_contents import AxisKind
+
+        case = reader.read_case(write_transient_cgns(tmp_path / "t.cgns"))
+
+        assert case.contents.axis.kind is AxisKind.UNDECLARED
+        assert "何を刻む値か" in case.describe()
+
+    def test_a_steady_file_reports_no_axis_rather_than_a_value_nobody_wrote(
+        self, tmp_path: Path
+    ) -> None:
+        """The reader publishes `TIME_STEPS = [0.0]` for a file with no iterative data at all, while a
+        plain `.vtu` publishes the key not at all. Reporting that 0.0 as a position would put a number
+        in front of a reader that the file never wrote."""
+        from domain_core.case_contents import AxisKind
+
+        case = reader.read_case(write_minimal_cgns(tmp_path / "s.cgns"))
+
+        assert case.contents.axis.kind is AxisKind.NONE
+        assert case.contents.axis.positions is None
+        assert "結果軸なし" in case.describe()

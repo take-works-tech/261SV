@@ -1483,3 +1483,28 @@ Recorded so that nothing silently depends on them:
   (5) The output is a `vtkMultiBlockDataSet` nesting base then zone.
 - justifies: XC-239, ingest/REQ-015, XC-085
 
+### E-138 - How a result sequence reaches this product, and who guesses what it means
+- tier: T1
+- url: https://vtk.org/doc/nightly/html/classvtkExodusIIReader.html
+- verified: 2026-08-24
+- says: measured on 2026-08-24 against **VTK 9.5.2**, with the reader's own documentation read from the
+  wrapped docstring in the shipped build.
+  (1) **The values are universal.** A reader with a sequence publishes it on the pipeline as
+  `vtkStreamingDemandDrivenPipeline::TIME_STEPS`, whatever the format. A CGNS file carrying
+  `BaseIterativeData_t/TimeValues` of `[0.0, 0.5]` came back as exactly that, with `TIME_RANGE` set too.
+  So one key covers every format instead of one method per reader.
+  (2) **`vtkExodusIIReader` guesses the kind, and documents the guess.** `SetHasModeShapes`: *"Set/Get
+  whether the Exodus sequence number corresponds to time steps or mode shapes. By default,
+  HasModeShapes is false unless two time values in the Exodus file are identical, in which case it is
+  true."* And `SetModeShape(val)`: *"Convenience method to set the mode-shape which is same as
+  this->SetTimeStep(val-1)."* The same index, relabelled from a coincidence: two equal values in a
+  transient restart make a run modal.
+  (3) **CGNS declares the kind and the reader does not expose it.** `SimulationType_t` distinguishes
+  TimeAccurate from NonTimeAccurate; searching `vtkCGNSReader` for a method naming it returns only
+  `UseUnsteadyPattern` and `UnsteadySolutionStartTimestep`, neither of which reports what the file said.
+  The same shape of gap as the units (E-137).
+  (4) **A single `[0.0]` is the reader's placeholder, not a declaration.** A CGNS file with no
+  `BaseIterativeData_t` still publishes `TIME_STEPS = [0.0]`, while a plain `.vtu` publishes the key not
+  at all. A product treating that 0.0 as a position would show a number the file never wrote.
+- justifies: XC-240, GL-036, ingest/AC-043
+

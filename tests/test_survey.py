@@ -161,10 +161,21 @@ class TestContentsRefusesToBeInconsistent:
         with pytest.raises(ValueError):
             ResultAxis(AxisKind.NONE, (0.0,))
 
-    def test_positions_without_a_named_axis_are_refused(self) -> None:
-        with pytest.raises(ValueError) as refusal:
-            ResultAxis(AxisKind.UNDECLARED, (0.0, 1.0))
-        assert "say which axis" in str(refusal.value)
+    def test_positions_without_a_named_axis_are_kept(self) -> None:
+        """This asserted a refusal until 2026-08-24 - "positions were read but the axis they belong to
+        was not; say which axis, or carry none" - on the reasoning that positions belong to an axis and
+        one without the other is incoherent.
+
+        Measuring the toolkit showed the combination is the ordinary case rather than an incoherent
+        one. A CGNS file declares its values in `BaseIterativeData_t` and the reader hands them over,
+        while `SimulationType_t` - the node that says what they are - has no accessor at all (E-138).
+        The file gives numbers along an axis and does not say which axis; dropping the numbers and
+        naming the axis are both worse than saying so (XC-240).
+        """
+        axis = ResultAxis(AxisKind.UNDECLARED, (0.0, 1.0))
+
+        assert axis.positions == (0.0, 1.0)
+        assert axis.is_declared is False
 
     def test_a_case_that_loaded_has_at_least_one_step_and_part(self) -> None:
         with pytest.raises(ValueError):
