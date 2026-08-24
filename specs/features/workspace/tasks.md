@@ -408,22 +408,40 @@ updated: 2026-08-22
 - depends_on: TASK-005
 - done_when: inherited variables are read-only in the child and detaching is an explicit action that
   keeps the current value
-
+- done: 2026-08-24, delivered with TASK-008 in `src/service/workspace/variables.py`. Recorded here
+  because a task list where the same work sits under two entries, one of them silent, is one nobody can
+  count.
 ### TASK-044 - Case state machine
 - satisfies: AC-045
 - depends_on: TASK-001
 - done_when: only the transitions of XC-136 are permitted and the tree shows the state
-
+- done: 2026-08-24, `src/service/workspace/case_state.py`. XC-136's transitions are a **table**
+  rather than conditions spread through the callers, and a move absent from it is refused naming both
+  states and where it could have gone. Permitting anything and asking each caller to be careful produces
+  a case that is `loading` after a failure - which nothing displays sensibly and nothing recovers from.
+  A case that says nothing is **unloaded**, not unresolved: a new case with no files yet is not a case
+  whose files are missing, and showing it as broken would be the product complaining about its own empty
+  state.
 ### TASK-045 - Missing inputs move to unresolved
 - satisfies: AC-046
 - depends_on: TASK-044
 - done_when: a removed or changed input moves the case to unresolved, keeping its definitions
-
+- done: 2026-08-24. Unresolved is reachable from every state, because it is not a decision the
+  product makes - it is something that happened to the files while nobody was looking. **Every
+  definition is kept**: the user's views, graphs and reports are not wrong because a file moved, and
+  discarding them would turn a restorable situation into lost work.
+  The reason is recorded beside the state and **cleared when the state moves on**. A stale reason next
+  to a current state is worse than none, because it describes something that is no longer true.
 ### TASK-046 - Pipelines read the state
 - satisfies: AC-047
 - depends_on: TASK-044, pipeline/TASK-013
 - done_when: skipping decisions come from the case state, not a separate check
-
+- done: 2026-08-24. `may_run` reads the state and re-derives nothing. That is the whole reason the
+  states exist (AC-047): a pipeline deciding from files on disk answers a slightly different question
+  from the one the case tree is showing, and the two disagree at exactly the moment somebody is watching
+  a long run.
+  A **partial** case runs. Loaded with gaps is loaded, and skipping it would discard a result the user
+  can act on because part of it is absent.
 ### TASK-047 - Packing a workspace
 - satisfies: AC-048
 - depends_on: TASK-001
