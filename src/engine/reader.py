@@ -21,6 +21,7 @@ from pathlib import Path
 
 import numpy as np
 from vtkmodules.util.numpy_support import vtk_to_numpy
+from vtkmodules.vtkCommonCore import vtkStringArray
 from vtkmodules.vtkCommonDataModel import (
     vtkCompositeDataSet,
     vtkDataObject,
@@ -47,6 +48,7 @@ from domain_core.frame import (
     resolve_frame,
 )
 from domain_core.conversion import ConversionRecord
+from domain_core.identifiers import SourceIdentifiers
 from domain_core.mesh import Cells
 from domain_core.object_compatibility import Disposition, handling
 from domain_core.partitions import Partitioning
@@ -152,16 +154,66 @@ def _canonical_cells(data: vtkDataSet) -> Cells:
     )
 
 
+def _identifier_names(container) -> set[str]:
+    """The names of the arrays this container has marked as identifiers rather than as data.
+
+    Read from the attribute roles the file declared - `<PointData GlobalIds="GlobalNodeId">` - and not
+    from the array's name, because a writer may call an identifier anything and a data array may be
+    called `GlobalNodeId` by somebody who meant it (E-135).
+    """
+    names: set[str] = set()
+    for array in (container.GetGlobalIds(), container.GetPedigreeIds()):
+        if array is not None and array.GetName():
+            names.add(array.GetName())
+    return names
+
+
+def _identifiers(container) -> SourceIdentifiers | None:
+    """What the file called each entry, or None where it called them nothing."""
+    global_array = container.GetGlobalIds()
+    pedigree_array = container.GetPedigreeIds()
+    if global_array is None and pedigree_array is None:
+        return None
+
+    global_ids = None
+    if global_array is not None:
+        # int64 and not the float the fields use: an identifier's exactness is the whole of its value,
+        # and float64 stops being exact above 2^53.
+        global_ids = vtk_to_numpy(global_array).astype(np.int64, copy=True).reshape(-1)
+
+    pedigree_ids = None
+    if pedigree_array is not None:
+        if isinstance(pedigree_array, vtkStringArray):
+            pedigree_ids = tuple(
+                pedigree_array.GetValue(i) for i in range(pedigree_array.GetNumberOfValues())
+            )
+        else:
+            pedigree_ids = tuple(str(v) for v in vtk_to_numpy(pedigree_array).reshape(-1).tolist())
+
+    return SourceIdentifiers(
+        global_ids=global_ids,
+        pedigree_ids=pedigree_ids,
+        global_name=global_array.GetName() if global_array is not None else None,
+        pedigree_name=pedigree_array.GetName() if pedigree_array is not None else None,
+    )
+
+
 def _fields(data: vtkDataSet) -> dict[str, Field]:
-    """Every array on the dataset, with the association the file gave it and no declared unit."""
+    """Every array that is data, with the association the file gave it and no declared unit.
+
+    Identifier arrays are **not** fields and are left out here: an identifier is not a physical
+    quantity, and offering `GlobalNodeId` in the list a user picks a @Variable from invites a plot of
+    node numbers against node numbers (GL-034, INV-023).
+    """
     found: dict[str, Field] = {}
     for association, container in (
         (Association.POINT, data.GetPointData()),
         (Association.CELL, data.GetCellData()),
     ):
+        identifiers = _identifier_names(container)
         for index in range(container.GetNumberOfArrays()):
             array = container.GetArray(index)
-            if array is None:
+            if array is None or array.GetName() in identifiers:
                 continue
             values = vtk_to_numpy(array).astype(np.float64, copy=True)
             name = array.GetName() or f"{association.value}_array_{index}"
@@ -290,6 +342,14 @@ def _as_dataset(
         points_m=points if scale == CANONICAL_SCALE else points * scale,
         cells=_canonical_cells(data),
         fields=_fields(data),
+        identifiers={
+            association: found
+            for association, container in (
+                (Association.POINT, data.GetPointData()),
+                (Association.CELL, data.GetCellData()),
+            )
+            if (found := _identifiers(container)) is not None
+        },
         source=source,
         conversion=conversion,
     )

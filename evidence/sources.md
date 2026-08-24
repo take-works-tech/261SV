@@ -1417,3 +1417,21 @@ Recorded so that nothing silently depends on them:
   (`spike/results.json`, `decimated_10pct`). Both are far above a frame.
 - justifies: XC-235, ingest/TASK-015, ingest/TASK-017
 
+### E-135 - How a file says which array is an identifier, and what a pedigree identifier may hold
+- tier: T1
+- url: spike/measure_object_types.py
+- verified: 2026-08-24
+- says: measured on 2026-08-24 against **VTK 9.5.2**, writing a grid with identifiers and reading it
+  back through the XML reader.
+  (1) The attribute role is **written into the file**, not inferred from the array's name: a `.vtu`
+  carrying global identifiers has `<PointData GlobalIds="GlobalNodeId">` and
+  `<CellData GlobalIds="GlobalElementId">` in its header, and `GetGlobalIds()` returns the array after
+  a round trip. So a reader reads the declared role; a data array a user happened to call
+  `GlobalNodeId` is not an identifier, and an identifier a writer called something else still is one.
+  (2) Both point and cell global identifiers survive the round trip.
+  (3) **A pedigree identifier may be text.** `SetPedigreeIds` accepts a `vtkStringArray` and returns
+  it as one, so no numeric array can hold a pedigree identifier and `vtk_to_numpy` cannot read it.
+  (4) The identifier arrays appear in `GetNumberOfArrays()` alongside the data arrays, so a reader that
+  takes every array takes the identifiers too - which is what this build did until 2026-08-24.
+- justifies: INV-023, XC-236
+

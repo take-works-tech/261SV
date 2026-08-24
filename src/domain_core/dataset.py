@@ -20,6 +20,7 @@ import numpy as np
 from domain_core.association import Association, AssociationError
 from domain_core.case_contents import CaseContents
 from domain_core.conversion import ConversionRecord
+from domain_core.identifiers import SourceIdentifiers, location_of
 from domain_core.mesh import Cells, DisplayGeometry
 from domain_core.partitions import Aggregate, Partitioning, counted
 from domain_core.reported_value import DIMENSIONLESS, Caveat, Provenance, ReportedValue
@@ -105,6 +106,10 @@ class Dataset:
     # quantity and does not belong in the list a user picks a @Variable from, and the point one and the
     # cell one share a name, so a dictionary keyed by name could only ever hold one of them.
     ghosts: dict[Association, np.ndarray] = dataclass_field(default_factory=dict)
+    # What the file called each point and each cell (GL-034). Apart from `fields` for the same reason
+    # the ghost arrays are: an identifier is not a physical quantity, its exactness is integer, and a
+    # pedigree identifier may be text - none of which a float64 field can hold or should offer.
+    identifiers: dict[Association, SourceIdentifiers] = dataclass_field(default_factory=dict)
     partitioning: Partitioning = dataclass_field(default_factory=Partitioning)
     source: SourceFrame | None = None
     # What CT-012 conversion produced this, where one did. Held rather than logged because three of
@@ -229,6 +234,13 @@ class Dataset:
                 "残りだけで計算した値は、全体の値として読まれます（INV-011, XC-001）。"
             )
 
+        # Where the extremum is, in the source's own words. Taken against the **unmasked** field so
+        # that the index is the dataset's own, not a position within the filtered view.
+        location: str | None = None
+        if aggregate is Aggregate.EXTREMUM:
+            position = int(np.argmax(field.values if mask is None else np.where(mask, field.values, -np.inf)))
+            location = location_of(self.identifiers.get(field.association), position)
+
         result = {
             Aggregate.EXTREMUM: lambda: float(np.max(values)),
             Aggregate.TOTAL: lambda: float(np.sum(values)),
@@ -237,7 +249,7 @@ class Dataset:
         }[aggregate]()
         return ReportedValue(
             value=result, unit=unit, digits=field.significant_digits,
-            provenance=Provenance.COMPUTED, caveats=caveats, formula=formula,
+            provenance=Provenance.COMPUTED, caveats=caveats, formula=formula, location=location,
         )
 
     def counted_entries(self, name: str) -> ReportedValue:

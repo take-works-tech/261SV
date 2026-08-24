@@ -88,17 +88,17 @@ class LoadedCase:
         arithmetically fine and means nothing (XC-234).
         """
         found = [
-            part.dataset.maximum(field)
+            (part, part.dataset.maximum(field))
             for part in self.present
             if part.dataset is not None and field in part.dataset.fields
         ]
-        usable = [value for value in found if not value.is_missing]
+        usable = [(part, value) for part, value in found if not value.is_missing]
         if not usable:
             reason = (
                 f"'{field}' を持つパートがありません"
                 if not found
                 else "この量を報告できるパートがありません：" + "；".join(
-                    value.missing_because or "理由不明" for value in found
+                    f"{part.label}：{value.missing_because or '理由不明'}" for part, value in found
                 )
             )
             return ReportedValue.unavailable(
@@ -106,17 +106,20 @@ class LoadedCase:
                 formula=f"extremum({field}) over parts",
             )
 
-        largest = max(usable, key=lambda value: value.value or float("-inf"))
-        caveats = frozenset().union(*(value.caveats for value in usable))
+        holder, largest = max(usable, key=lambda pair: pair[1].value or float("-inf"))
+        caveats = frozenset().union(*(value.caveats for _, value in usable))
         if self.is_partial:
             caveats = caveats | {Caveat.PARTIAL_DATASET}
         return ReportedValue(
             value=largest.value,
             unit=largest.unit,
-            digits=min(value.digits for value in usable),
+            digits=min(value.digits for _, value in usable),
             provenance=Provenance.COMPUTED,
             caveats=caveats,
             formula=f"extremum({field}) over {len(usable)} parts",
+            # Which part, then where in it. A location naming only the node is unusable in an assembly
+            # where every part numbers its own nodes from one.
+            location=f"{holder.label}：{largest.location}" if largest.location else holder.label,
         )
 
     def describe(self) -> str:

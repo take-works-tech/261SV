@@ -71,6 +71,9 @@ class ReportedValue:
     # Why the value is not there, when it is not. A refusal that gives no reason reads as an oversight,
     # and the reader then supplies their own explanation - usually a wrong one.
     missing_because: str | None = None
+    # Where the value is, in the source's own words - "GlobalNodeId 1003". Never an array index: an
+    # index is a number a reader takes to the solver and fails to find (INV-023, GL-034).
+    location: str | None = None
 
     def __post_init__(self) -> None:
         if self.provenance is Provenance.COMPUTED and not self.formula:

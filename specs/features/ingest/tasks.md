@@ -188,11 +188,25 @@ is either missing a requirement or is not work this specification asked for.
 - satisfies: AC-035
 - depends_on: TASK-001
 - done_when: global and pedigree identifiers survive reading and reach extreme-value reporting
+- done: 2026-08-24, `domain_core/identifiers.py` and `Dataset.identifiers`, with `maximum()` reporting
+  the location. Verified end to end: a `.vtu` carrying `GlobalNodeId` reports its maximum at
+  `GlobalNodeId 1003`, and in an assembly at `asm / gasket：node 3` - the part first, because every part
+  may number its own nodes from one.
+  The reader was **offering identifiers as variables**. `_fields` took every array on the dataset, and
+  the identifier arrays are in that list (E-135), so `GlobalNodeId` arrived as a @Field with no declared
+  unit - a physical quantity as far as anything downstream could tell, cast to float64 and plottable
+  against itself. Now the attribute role the file declared decides, and identifiers are held apart
+  (XC-236).
 
 ### TASK-019 - Absent identifiers stated
 - satisfies: AC-036
 - depends_on: TASK-018
 - done_when: a file without identifiers reports their absence and no index is shown as one
+- done: 2026-08-24. `NO_IDENTIFIER` is one sentence stated once, so two reports of the same absence
+  agree, and it is phrased as a fact about the file rather than a failure of the reader - only one of
+  the two can be fixed, by asking the solver to write identifiers. The test asserts that the index of
+  the maximum does not appear anywhere in what is said, which is the failure mode: a plausible number
+  in a sentence about location is one somebody takes to the solver and fails to find.
 
 ### TASK-020 - Measurement data import
 - satisfies: AC-037
