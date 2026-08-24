@@ -188,8 +188,15 @@ applies the matching row; the class it chose is visible in settings, and can be 
 - open: OPEN-017
 
 ### LIM-012 - Output before the product asks about it
-- value: 20
-- unit: gigabytes of run output in one @Workspace
+- value: 21474836480
+- unit: bytes
+- human_value: 20 GiB of run output in one @Workspace
+- source_of_truth: src/engine/limits.py:MAX_OUTPUT_BYTES
+- correction: this said `value: 20` with `unit: gigabytes` and named no source of truth, so nothing
+  compared it against code. That is one step from the defect recorded in `limits.py` itself, where
+  `MAX_DATASET_BYTES = 8` passed the parity check against a specification that also said 8 - both
+  literally 8, a billion-fold apart. Stated in the internal unit with the readable form beside it, and
+  linked to the constant, so the two cannot drift
 - rationale: output grows by one folder per run and is never overwritten (XC-113), so it grows without
   limit. This is not a refusal - it is the point at which the product says how much space is in use and
   offers to prune by run (XC-141). Twenty gigabytes is roughly a forty-case study exported many times
