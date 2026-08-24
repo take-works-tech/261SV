@@ -29,6 +29,7 @@ from dataclasses import dataclass, field as dataclass_field
 from enum import Enum
 from typing import Any, Iterable, Iterator
 
+from engine.analysis.expression import ExpressionError, check
 from engine.limits import MAX_PIPELINE_DEPTH
 
 
@@ -67,6 +68,24 @@ ACT_ON_TARGETS = frozenset({Kind.VIEW, Kind.GRAPH, Kind.REPORT, Kind.EXPORT, Kin
 
 #: The kinds whose definition must be pinned to something that exists.
 NEED_DEFINITION = frozenset({Kind.VIEW, Kind.GRAPH, Kind.REPORT, Kind.SIMULATION})
+
+#: The kinds that carry an @Expression, and therefore get checked when they are written rather than
+#: when they run (AC-032).
+CARRY_EXPRESSION = frozenset({Kind.FORMULA, Kind.CONDITION})
+
+#: The kinds that bind a name for the units below them (AC-029).
+BIND_A_NAME = frozenset({Kind.VARIABLE, Kind.FORMULA})
+
+#: What a loop counts. XC-100 fixes the count before the loop begins, and these are the three sources
+#: it may come from - there is no `while` and no user-written early exit.
+COUNT_LITERAL = "count"
+COUNT_FROM_VARIABLE = "countFromVariable"
+COUNT_PER_CASE = "countPerCase"
+COUNT_SOURCES = (COUNT_LITERAL, COUNT_FROM_VARIABLE, COUNT_PER_CASE)
+
+#: What a loop calls its index where the unit does not say. Written here rather than defaulted at each
+#: reader, so a pipeline that omits the name still means one thing.
+DEFAULT_INDEX_NAME = "index"
 
 
 class PipelineError(Exception):
@@ -168,11 +187,159 @@ def artefact_unit(
     return unit
 
 
+def variable_unit(
+    unit_id: str,
+    name: str,
+    *,
+    value: float | None = None,
+    values: Iterable[float] | None = None,
+    unit_symbol: str | None = None,
+    quantity_kind: str | None = None,
+    to_workspace: bool = False,
+) -> dict[str, Any]:
+    """A unit that binds a name for the units below it (AC-029).
+
+    It does **not** change the @Workspace's own variables unless `to_workspace` says to. A pipeline that
+    quietly rewrote a workspace variable would change every other pipeline that reads it, and the change
+    would be invisible from the pipeline that made it.
+
+    `values` is the several-valued form, which is what a loop counts over (XC-100).
+
+    `quantity_kind` is INV-028's absolute-or-difference, and it is written under **`quantityKind`**
+    rather than `kind`. A unit already has a `kind` - `variable`, `formula`, `loop` - and handing the
+    whole unit to a reader of quantity kinds made it read "variable" as a temperature scale and refuse.
+    Two meanings of one word in one document is the kind of collision that is invisible until it is a
+    wrong number.
+    """
+    if (value is None) == (values is None):
+        raise PipelineError(
+            f"変数ユニット '{unit_id}' には value か values のどちらか一方が要ります"
+        )
+    unit: dict[str, Any] = {"id": unit_id, "kind": Kind.VARIABLE.value, "name": name}
+    if values is not None:
+        listed = [float(item) for item in values]
+        if not listed:
+            raise PipelineError(f"変数ユニット '{unit_id}' の values が空です")
+        unit["values"] = listed
+    else:
+        unit["value"] = float(value)  # type: ignore[arg-type]
+    if unit_symbol:
+        unit["unit"] = unit_symbol
+    if quantity_kind:
+        unit["quantityKind"] = quantity_kind
+    if to_workspace:
+        unit["toWorkspace"] = True
+    return unit
+
+
+def formula_unit(unit_id: str, name: str, expression: str) -> dict[str, Any]:
+    """A unit that evaluates an @Expression and binds the result **with the unit it produced** (AC-030)."""
+    return {
+        "id": unit_id, "kind": Kind.FORMULA.value, "name": name, "expression": expression
+    }
+
+
+def condition_unit(unit_id: str, expression: str) -> dict[str, Any]:
+    """A container whose contents run when its @Expression is true and are recorded when it is false."""
+    return {"id": unit_id, "kind": Kind.CONDITION.value, "expression": expression, "units": []}
+
+
+def loop_unit(
+    unit_id: str,
+    *,
+    count: int | None = None,
+    over_variable: str | None = None,
+    per_case: bool = False,
+    index_name: str = DEFAULT_INDEX_NAME,
+) -> dict[str, Any]:
+    """A container that repeats its contents a number of times fixed before it begins (XC-100).
+
+    Exactly one of the three sources. Accepting more than one would mean the product choosing which
+    count a pipeline meant, and the two would disagree on the day somebody edited only one of them.
+    """
+    stated = [count is not None, over_variable is not None, per_case]
+    if sum(stated) != 1:
+        raise PipelineError(
+            f"ループ '{unit_id}' の回数の指定は 1 つだけです"
+            f"（{COUNT_LITERAL}／{COUNT_FROM_VARIABLE}／{COUNT_PER_CASE}）"
+        )
+    unit: dict[str, Any] = {
+        "id": unit_id, "kind": Kind.LOOP.value, "indexName": index_name, "units": []
+    }
+    if count is not None:
+        if count < 1:
+            raise PipelineError(f"ループ '{unit_id}' の回数は 1 以上です（{count} が来ました）")
+        unit[COUNT_LITERAL] = int(count)
+    elif over_variable is not None:
+        unit[COUNT_FROM_VARIABLE] = over_variable
+    else:
+        unit[COUNT_PER_CASE] = True
+    return unit
+
+
+def names_bound_before(
+    pipeline: dict[str, Any], unit_id: str, *, outside: Iterable[str] = ()
+) -> tuple[str, ...]:
+    """Every name in scope at the position a unit sits at.
+
+    In scope means: bound by a variable or formula unit **above** it at the same level or at an enclosing
+    one, plus the index name of every loop it is inside, plus whatever the workspace supplies. A name
+    bound inside a sibling container is not in scope, which is the point - a formula that read one would
+    work until somebody made that branch conditional.
+    """
+    found: list[str] = list(outside)
+
+    def walk_level(units: list[dict[str, Any]]) -> bool:
+        for unit in units:
+            if str(unit.get("id", "")) == unit_id:
+                return True
+            contained = unit.get("units") or []
+            if contained:
+                depth = len(found)
+                if kind_of(unit) is Kind.LOOP:
+                    if unit.get("indexName"):
+                        found.append(str(unit["indexName"]))
+                    # A loop over a variable's values binds that name to the value of this iteration,
+                    # and only inside itself. Outside it there is no single value the name could mean.
+                    if unit.get(COUNT_FROM_VARIABLE):
+                        found.append(str(unit[COUNT_FROM_VARIABLE]))
+                if walk_level(contained):
+                    return True
+                del found[depth:]
+            if kind_of(unit) in BIND_A_NAME and unit.get("name"):
+                if kind_of(unit) is Kind.VARIABLE and "values" in unit:
+                    continue  # several-valued: it is what a loop counts over, not a value to read
+                found.append(str(unit["name"]))
+        return False
+
+    walk_level(pipeline.get("units", []))
+    return tuple(dict.fromkeys(found))
+
+
+def _check_expression_here(
+    pipeline: dict[str, Any], unit: dict[str, Any], *, outside: Iterable[str]
+) -> None:
+    """Refuse an expression naming something not bound at this point, when it is written (AC-032).
+
+    At edit time rather than at run time. A study that fails at midnight on a name somebody could have
+    seen was wrong is what this removes; the same expression a level higher may be perfectly valid, so
+    the check has to know where the unit sits.
+    """
+    expression = unit.get("expression")
+    if not expression:
+        raise PipelineError(f"ユニット '{unit.get('id')}' に式がありません")
+    try:
+        check(str(expression), bound=names_bound_before(pipeline, str(unit.get("id", "")), outside=outside))
+    except ExpressionError as error:
+        raise PipelineError(f"ユニット '{unit.get('id')}' の式：{error}") from None
+
+
 def add(
     pipeline: dict[str, Any],
     unit: dict[str, Any],
     *,
     inside: str | None = None,
+    outside: Iterable[str] = (),
 ) -> dict[str, Any]:
     """Add a unit, or refuse the drop with the reason (AC-001).
 
@@ -205,6 +372,14 @@ def add(
             f"入れ子が {deepest} 段になり、上限 {MAX_PIPELINE_DEPTH} 段を超えます（LIM-007）。"
             "一目で読めないパイプラインは、誰も予測できず、データを消す許可を与えられないものです"
         )
+    if kind_of(unit) in CARRY_EXPRESSION:
+        # Checked with the unit in place, because "bound at this point" is a question about where it
+        # sits. A refused edit then leaves the pipeline exactly as it was.
+        try:
+            _check_expression_here(pipeline, unit, outside=outside)
+        except PipelineError:
+            target.pop()
+            raise
     return unit
 
 

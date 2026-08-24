@@ -22,6 +22,8 @@ from service.pipeline.document import (
     add,
     add_cases_unit,
     artefact_unit,
+    condition_unit,
+    loop_unit,
 )
 from service.pipeline.run import (
     DESTRUCTIVE,
@@ -96,20 +98,20 @@ class TestADryRunChangesNothingAndSaysEverything:
         assert "act" not in inspect.signature(dry_run).parameters
 
     def test_a_loop_states_its_iteration_count(self) -> None:
-        """AC-024. Fixed before the run, so a dry run that omitted it would be describing a different
-        execution from the one that follows."""
+        """AC-024, resolved from the document rather than supplied. Fixed before the run, so a dry run
+        that omitted it would be describing a different execution from the one that follows."""
         document = a_pipeline()
-        add(document, {"id": "unit:loop", "kind": Kind.LOOP.value, "units": []})
+        add(document, loop_unit("unit:loop", count=7))
 
-        plan = dry_run(document, cases=CASES, iterations={"unit:loop": 7})
+        plan = dry_run(document, cases=CASES)
 
         assert "繰り返し 7 回" in plan.steps[-1].describe()
 
     def test_a_condition_states_its_value(self) -> None:
         document = a_pipeline()
-        add(document, {"id": "unit:if", "kind": Kind.CONDITION.value, "units": []})
+        add(document, condition_unit("unit:if", "2 m > 3 m"))
 
-        plan = dry_run(document, cases=CASES, conditions={"unit:if": False})
+        plan = dry_run(document, cases=CASES)
 
         assert "条件は 偽" in plan.steps[-1].describe()
 

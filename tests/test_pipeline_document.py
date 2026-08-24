@@ -23,6 +23,8 @@ from service.pipeline.document import (
     add,
     add_cases_unit,
     artefact_unit,
+    condition_unit,
+    loop_unit,
     depth_of,
     may_run,
     reference_of,
@@ -38,6 +40,15 @@ def pipeline() -> dict[str, Any]:
 
 
 def container(unit_id: str, kind: Kind = Kind.LOOP) -> dict[str, Any]:
+    """A container of each kind, built the way its own constructor builds it.
+
+    A loop needs one of the three count sources and a condition needs an expression, so a bare
+    `{"kind": ..., "units": []}` is no longer a unit this product would accept.
+    """
+    if kind is Kind.LOOP:
+        return loop_unit(unit_id, count=1)
+    if kind is Kind.CONDITION:
+        return condition_unit(unit_id, "true")
     return {"id": unit_id, "kind": kind.value, "units": []}
 
 

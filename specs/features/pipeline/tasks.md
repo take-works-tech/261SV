@@ -120,33 +120,59 @@ updated: 2026-08-25
 - satisfies: AC-029
 - depends_on: TASK-011
 - done_when: a binding is visible to the units below and leaves the workspace's own variables alone
-
+- done: 2026-08-25. A variable unit binds its name for the units below it and **leaves the
+  workspace's own variables alone** unless it says otherwise: a pipeline that quietly rewrote one would
+  change every other pipeline that reads it, and the change would be invisible from the pipeline that
+  made it. A formula unit binds the result with the unit the expression produced (AC-030) - `span /
+  duration` binds `0.05 m·s^-1`, not a number with a unit somebody typed beside it.
+  A collision found and fixed at the cause: the quantity kind of INV-028 is written under
+  **`quantityKind`**, because a unit already has a `kind` - `variable`, `formula`, `loop` - and handing
+  the whole unit to a reader of quantity kinds made it read "variable" as a temperature scale and
+  refuse. Two meanings of one word in one document is the kind of collision that stays invisible until
+  it is a wrong number.
+  A several-valued variable binds **nothing**: it is what a loop counts over, and outside that loop
+  there is no single value its name could mean.
 ### TASK-015 - Condition units
 - satisfies: AC-033
 - depends_on: TASK-011, TASK-008
 - done_when: contents run when the expression is true and are skipped when it is false
-
+- done: 2026-08-25. Contents run when the expression is true and are skipped when it is
+  false, with the condition's own value recorded either way.
 ### TASK-016 - A false condition is recorded, not omitted
 - satisfies: AC-034
 - depends_on: TASK-015
 - done_when: skipped contents carry the value the expression evaluated to
-
+- done: 2026-08-25. The skipped contents are recorded individually, each carrying the
+  expression and the value it evaluated to (AC-034). Leaving them out of the record would make a report
+  never written look identical to one never asked for, and the second is fine while the first needs
+  somebody to look.
 ### TASK-017 - Loop units
 - satisfies: AC-026
 - depends_on: TASK-008
 - done_when: all three sources of the count work, the count is resolved before the loop starts, and
   which source was used is recorded
-
+- done: 2026-08-25. All three sources of the count work - a literal, the number of values a
+  variable holds, and one iteration per case in the target set - and naming more than one is refused:
+  accepting both would mean the product choosing which count a pipeline meant, and the two would
+  disagree the day somebody edited only one of them.
+  The count is resolved **before anything runs**, on the same pass the dry run uses, so the ceiling
+  check and the plan cannot disagree. Which source was used is recorded: two loops that ran three times
+  for different reasons behave differently the next time a case is added, and afterwards the record is
+  the only place that difference survives.
 ### TASK-018 - The loop index
 - satisfies: AC-027
 - depends_on: TASK-017
 - done_when: contained units see the index under the declared name
-
+- done: 2026-08-25. Under the name the unit declares, and under `index` where it declares
+  none - written in one place rather than defaulted at each reader, so a pipeline that omits the name
+  still means one thing. The index leaves scope with the loop.
 ### TASK-019 - The iteration ceiling
 - satisfies: AC-028
 - depends_on: TASK-017
 - done_when: a count above LIM-008 is refused before the run, naming the unit and the count
-
+- done: 2026-08-25. Refused before the run starts, naming the unit and the count it
+  resolved to (AC-028). Asserted with a run that would have acted: nothing was touched before the
+  refusal.
 ### TASK-020 - Interpreter over the command surface
 - satisfies: AC-021
 - depends_on: TASK-008
@@ -172,6 +198,16 @@ updated: 2026-08-25
 - done: 2026-08-24, both stated. Until TASK-015 and TASK-017 land the iteration count and the
   condition value are **supplied by the caller** rather than computed from the pipeline - the dry run
   states what it was told, and cannot yet derive it.
+- correction: 2026-08-25, and the caveat above is now wrong in both halves. The loop count and the
+  condition value are **resolved from the document**, and the two parameters that let a caller supply
+  them were removed rather than left as a second way to say it - a count passed in would be a second
+  answer to a question XC-100 says the document settles, and the two would disagree the day somebody
+  edited only one.
+  What replaced the caveat is a narrower and truer one: a step **inside a loop** is reported as
+  undetermined with the reason, because binding the index to its first value would let a formula and a
+  condition there resolve to the answer for iteration zero, stated as though it were the answer for all
+  of them. A condition reading `i > 0` would be planned as false and run as true twice out of three
+  times - and the plan is what somebody authorises a destructive step against.
 ### TASK-023 - Destructive authorisation
 - satisfies: AC-009
 - depends_on: TASK-021
