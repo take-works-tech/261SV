@@ -152,7 +152,10 @@ touches a file, a device or a clock.
 - paths: src/service/pipeline
 - owns: the registered flows of a @Workspace (CT-009) - editing, case resolution, dry run, execution
   with per-case isolation, the run record, and the headless entry point
-- depends_on: domain-core, workspace, command
+- depends_on: domain-core, workspace, command, analysis
+  (`analysis` because a formula, a condition and a variable-driven loop count are expressions, and
+  MOD-004 owns what an expression evaluates to. MOD-011 decides only *when* one runs; an evaluator of
+  its own here would be a second answer to the same question)
 - decidedness: Fixed
 - basis: E-001 (T1)
 
