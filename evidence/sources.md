@@ -1354,3 +1354,29 @@ Recorded so that nothing silently depends on them:
   points on the interfaces are repeated.
 - justifies: INV-010, XC-231, XC-232
 
+### E-132 - VTK's data object types, and what surface extraction does to a point set
+- tier: T1
+- url: spike/measure_object_types.py
+- verified: 2026-08-24
+- says: measured first-hand on 2026-08-24 by running `spike/measure_object_types.py` against **VTK
+  9.5.2**, the pinned version (XC-185); the record is `spike/object_types.json`.
+  (1) `vtkDataObjectTypes` names **50** types in 9.5.2, of which **10** are `vtkDataSet` subclasses -
+  `vtkPolyData`, `vtkStructuredPoints`, `vtkStructuredGrid`, `vtkRectilinearGrid`,
+  `vtkUnstructuredGrid`, `vtkImageData`, `vtkPointSet`, `vtkUniformGrid`, `vtkPath`,
+  `vtkExplicitStructuredGrid` - **8** are `vtkCompositeDataSet` subclasses, and **17** more are
+  instantiable data objects that are **neither**, including `vtkTable`, `vtkHyperTreeGrid`,
+  `vtkUniformHyperTreeGrid`, `vtkMolecule`, `vtkCellGrid` and `vtkSelection`. A reader may therefore
+  return something no `vtkDataSet` code path can accept, and `vtkHyperTreeGrid` - an AMR type this
+  product's users meet - is one of them.
+  (2) `vtkCellTypes` knows **64** cell types: 3 zero-dimensional, 8 curves, 21 surfaces, 32 volumes.
+  (3) **Surface extraction is a different point set, not a subset.** A 3x3x3 block of points meshed as
+  8 hexahedra has 27 points; `vtkDataSetSurfaceFilter` followed by `vtkTriangleFilter` yields **26**
+  points and 48 triangles, and the origin of the first ten surface points is
+  `0, 1, 10, 9, 3, 4, 12, 2, 11, 5` - neither the same count nor the same order. The point fields are
+  carried through and re-indexed to the surface, so a field read from the original grid and geometry
+  read from the surface disagree at every index.
+  (4) The map back exists but is off by default: `PassThroughPointIdsOn()` and `PassThroughCellIdsOn()`
+  add `vtkOriginalPointIds` and `vtkOriginalCellIds`, and without them nothing recovers which dataset
+  point a display vertex was.
+- justifies: INV-001, XC-233
+

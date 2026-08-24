@@ -32,9 +32,9 @@ from vtkmodules.vtkIOXML import (
 )
 
 from domain_core.dataset import Association, Dataset, Field, SourceFrame
+from domain_core.mesh import Cells, DisplayGeometry
 from domain_core.frame import (
     CANONICAL_SCALE,
-    CANONICAL_UP,
     FORMATS_CARRYING_UNIT_INFORMATION,
     FrameDeclaration,
     resolve_frame,
@@ -96,13 +96,64 @@ def supported_suffixes() -> list[str]:
 
 
 def _as_surface(data: vtkDataSet) -> vtkPolyData:
-    """Triangulated surface of a dataset, for display only - never for reported numbers (INV-001)."""
+    """Triangulated surface of a dataset, for display only - never for reported numbers (INV-001).
+
+    Both pass-throughs are on because the surface is a **different point set**, not a subset in the same
+    order: a 27-point block of hexahedra extracts to 26 surface points whose origins begin 0, 1, 10, 9, 3
+    (E-132). Without the map back, a picked vertex answers with a real value from the wrong place.
+    """
     surface = vtkDataSetSurfaceFilter()
     surface.SetInputData(data)
+    surface.PassThroughPointIdsOn()
+    surface.PassThroughCellIdsOn()
     triangles = vtkTriangleFilter()
     triangles.SetInputConnection(surface.GetOutputPort())
     triangles.Update()
     return triangles.GetOutput()
+
+
+def _canonical_cells(data: vtkDataSet) -> Cells:
+    """The connectivity the file declared, in the toolkit's own layout and with nothing tessellated.
+
+    An unstructured grid hands over its three arrays directly. Anything else - an image, a rectilinear
+    or structured grid - has implicit connectivity rather than stored connectivity, and this build has
+    no reader for one, so the case is refused by name instead of being approximated by its surface.
+    """
+    if isinstance(data, vtkUnstructuredGrid):
+        cells = data.GetCells()
+        return Cells(
+            offsets=vtk_to_numpy(cells.GetOffsetsArray()).astype(np.int64, copy=True),
+            connectivity=vtk_to_numpy(cells.GetConnectivityArray()).astype(np.int64, copy=True),
+            types=vtk_to_numpy(data.GetCellTypesArray()).astype(np.uint8, copy=True),
+        )
+    if isinstance(data, vtkPolyData):
+        # A surface file is already the thing it draws. Its four cell arrays are read in the order VTK
+        # stores them so that a cell index means the same here as it does in the file.
+        offsets = [np.zeros(1, np.int64)]
+        connectivity: list[np.ndarray] = []
+        types: list[np.ndarray] = []
+        base = 0
+        for array, cell_type in (
+            (data.GetVerts(), 1), (data.GetLines(), 4), (data.GetPolys(), 7), (data.GetStrips(), 6),
+        ):
+            if array.GetNumberOfCells() == 0:
+                continue
+            piece = vtk_to_numpy(array.GetOffsetsArray()).astype(np.int64, copy=True)
+            offsets.append(piece[1:] + base)
+            entries = vtk_to_numpy(array.GetConnectivityArray()).astype(np.int64, copy=True)
+            connectivity.append(entries)
+            types.append(np.full(array.GetNumberOfCells(), cell_type, np.uint8))
+            base += entries.size
+        return Cells(
+            offsets=np.concatenate(offsets),
+            connectivity=np.concatenate(connectivity) if connectivity else np.zeros(0, np.int64),
+            types=np.concatenate(types) if types else np.zeros(0, np.uint8),
+        )
+    raise UnreadableFileError(
+        f"{type(data).__name__} stores no explicit connectivity; this build reads only the two types "
+        "that do, and approximating the rest by its surface would put display geometry where the "
+        "canonical geometry belongs (INV-001)"
+    )
 
 
 def _fields(data: vtkDataSet) -> dict[str, Field]:
@@ -122,13 +173,30 @@ def _fields(data: vtkDataSet) -> dict[str, Field]:
     return found
 
 
-def _cells_as_indices(surface: vtkPolyData) -> np.ndarray:
+def _display_geometry(surface: vtkPolyData, scale: float) -> DisplayGeometry:
+    """The drawn surface, with the map back to the points and cells it was made from."""
     connectivity = vtk_to_numpy(surface.GetPolys().GetConnectivityArray())
     offsets = vtk_to_numpy(surface.GetPolys().GetOffsetsArray())
     sizes = np.diff(offsets)
     if sizes.size and not np.all(sizes == 3):
         raise UnreadableFileError("surface extraction produced cells that are not triangles")
-    return connectivity.reshape(-1, 3).astype(np.int64, copy=False)
+    triangles = connectivity.reshape(-1, 3).astype(np.int64, copy=False)
+
+    source_points = surface.GetPointData().GetArray("vtkOriginalPointIds")
+    source_cells = surface.GetCellData().GetArray("vtkOriginalCellIds")
+    if source_points is None or source_cells is None:
+        raise UnreadableFileError(
+            "surface extraction returned no map back to the original points; without it a picked "
+            "vertex answers with a value belonging to a different place (INV-001)"
+        )
+
+    points = vtk_to_numpy(surface.GetPoints().GetData()).astype(np.float64, copy=True)
+    return DisplayGeometry(
+        points_m=points if scale == CANONICAL_SCALE else points * scale,
+        triangles=triangles,
+        source_points=vtk_to_numpy(source_points).astype(np.int64, copy=True),
+        source_cells=vtk_to_numpy(source_cells).astype(np.int64, copy=True),
+    )
 
 
 def read(path: str | Path) -> Dataset:
@@ -158,15 +226,15 @@ def read(path: str | Path) -> Dataset:
     up_axis, scale = resolve_frame(_declared_frame(location, data))
 
     fields = _fields(data)
-    surface = _as_surface(data)
-    points = vtk_to_numpy(surface.GetPoints().GetData()).astype(np.float64, copy=True)
+    points = vtk_to_numpy(data.GetPoints().GetData()).astype(np.float64, copy=True)
 
     # One multiplication, at one point, and only when it changes the value. XC-230: a conversion happens
     # once at a stated place, and `* 1.0` on every coordinate of every dataset is an operation that can
     # only lose precision and never adds any.
     return Dataset(
         points_m=points if scale == CANONICAL_SCALE else points * scale,
-        cells=_cells_as_indices(surface),
+        cells=_canonical_cells(data),
+        display=_display_geometry(_as_surface(data), scale),
         fields=fields,
         source=SourceFrame(
             up_axis=up_axis,

@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-21
+updated: 2026-08-24
 ---
 
 # Invariants
@@ -14,9 +14,20 @@ it. An invariant that cannot be judged is not an invariant - it is a wish.
 - rationale: display geometry is scaled, decimated and tessellated to make a picture; measuring it
   produces a number that is wrong in a way that looks right
 - checked_by: a test that renders a case at two zoom levels and two decimation settings and asserts
-  every reported value is bit-identical
+  every reported value is bit-identical; and a test that reads a volume mesh and asserts that a field
+  index and a geometry index name the same point, which the two-triangle fixture could never show
+  because its surface is itself
+- correction: the invariant was right and the code was not, which is recorded here because the two
+  looked alike for four tasks. The reader stored the extracted display surface as the @Dataset's
+  geometry while reading the fields from the original grid, so `points_m` was display geometry by
+  construction - 26 points against 27 field values on a 3x3x3 block of hexahedra, in a different order
+  (E-132). Every reported **aggregate** stayed correct, because the fields came from the full grid,
+  which is why nothing failed; anything computed from a **coordinate** came from display geometry, and
+  a probe would have returned a real value belonging to another point. Fixed at the structure rather
+  than at the reader: a @Dataset now holds both geometries and refuses a field whose length belongs to
+  neither (XC-233)
 - decidedness: Fixed
-- basis: E-001 (T1)
+- basis: E-001 (T1), E-132 (T1)
 
 ### INV-002 - Renderer choice does not change numbers
 - statement: switching @Renderer backend changes pixels only; every reported value is unchanged

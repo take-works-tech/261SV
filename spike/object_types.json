@@ -1,0 +1,512 @@
+{
+  "vtk_version": "9.5.2",
+  "data_object_types": [
+    {
+      "id": 0,
+      "class": "vtkPolyData",
+      "instantiable": true,
+      "is_dataset": true,
+      "is_composite": false,
+      "is_pointset": true
+    },
+    {
+      "id": 1,
+      "class": "vtkStructuredPoints",
+      "instantiable": true,
+      "is_dataset": true,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 2,
+      "class": "vtkStructuredGrid",
+      "instantiable": true,
+      "is_dataset": true,
+      "is_composite": false,
+      "is_pointset": true
+    },
+    {
+      "id": 3,
+      "class": "vtkRectilinearGrid",
+      "instantiable": true,
+      "is_dataset": true,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 4,
+      "class": "vtkUnstructuredGrid",
+      "instantiable": true,
+      "is_dataset": true,
+      "is_composite": false,
+      "is_pointset": true
+    },
+    {
+      "id": 5,
+      "class": "vtkPiecewiseFunction",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 6,
+      "class": "vtkImageData",
+      "instantiable": true,
+      "is_dataset": true,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 7,
+      "class": "vtkDataObject",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 8,
+      "class": "vtkDataSet",
+      "instantiable": false,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 9,
+      "class": "vtkPointSet",
+      "instantiable": true,
+      "is_dataset": true,
+      "is_composite": false,
+      "is_pointset": true
+    },
+    {
+      "id": 10,
+      "class": "vtkUniformGrid",
+      "instantiable": true,
+      "is_dataset": true,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 11,
+      "class": "vtkCompositeDataSet",
+      "instantiable": false,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 12,
+      "class": "vtkMultiGroupDataSet",
+      "instantiable": false,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 13,
+      "class": "vtkMultiBlockDataSet",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": true,
+      "is_pointset": false
+    },
+    {
+      "id": 14,
+      "class": "vtkHierarchicalDataSet",
+      "instantiable": false,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 15,
+      "class": "vtkHierarchicalBoxDataSet",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": true,
+      "is_pointset": false
+    },
+    {
+      "id": 16,
+      "class": "vtkGenericDataSet",
+      "instantiable": false,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 17,
+      "class": "vtkHyperOctree",
+      "instantiable": false,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 18,
+      "class": "vtkTemporalDataSet",
+      "instantiable": false,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 19,
+      "class": "vtkTable",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 20,
+      "class": "vtkGraph",
+      "instantiable": false,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 21,
+      "class": "vtkTree",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 22,
+      "class": "vtkSelection",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 23,
+      "class": "vtkDirectedGraph",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 24,
+      "class": "vtkUndirectedGraph",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 25,
+      "class": "vtkMultiPieceDataSet",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": true,
+      "is_pointset": false
+    },
+    {
+      "id": 26,
+      "class": "vtkDirectedAcyclicGraph",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 27,
+      "class": "vtkArrayData",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 28,
+      "class": "vtkReebGraph",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 29,
+      "class": "vtkUniformGridAMR",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": true,
+      "is_pointset": false
+    },
+    {
+      "id": 30,
+      "class": "vtkNonOverlappingAMR",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": true,
+      "is_pointset": false
+    },
+    {
+      "id": 31,
+      "class": "vtkOverlappingAMR",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": true,
+      "is_pointset": false
+    },
+    {
+      "id": 32,
+      "class": "vtkHyperTreeGrid",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 33,
+      "class": "vtkMolecule",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 34,
+      "class": "vtkPistonDataObject",
+      "instantiable": false,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 35,
+      "class": "vtkPath",
+      "instantiable": true,
+      "is_dataset": true,
+      "is_composite": false,
+      "is_pointset": true
+    },
+    {
+      "id": 36,
+      "class": "vtkUnstructuredGridBase",
+      "instantiable": false,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 37,
+      "class": "vtkPartitionedDataSet",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": true,
+      "is_pointset": false
+    },
+    {
+      "id": 38,
+      "class": "vtkPartitionedDataSetCollection",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": true,
+      "is_pointset": false
+    },
+    {
+      "id": 39,
+      "class": "vtkUniformHyperTreeGrid",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 40,
+      "class": "vtkExplicitStructuredGrid",
+      "instantiable": true,
+      "is_dataset": true,
+      "is_composite": false,
+      "is_pointset": true
+    },
+    {
+      "id": 41,
+      "class": "vtkDataObjectTree",
+      "instantiable": false,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 42,
+      "class": "vtkAbstractElectronicData",
+      "instantiable": false,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 43,
+      "class": "vtkOpenQubeElectronicData",
+      "instantiable": false,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 44,
+      "class": "vtkAnnotation",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 45,
+      "class": "vtkAnnotationLayers",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 46,
+      "class": "vtkBSPCuts",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 47,
+      "class": "vtkGeoJSONFeature",
+      "instantiable": false,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 48,
+      "class": "vtkImageStencilData",
+      "instantiable": false,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    },
+    {
+      "id": 49,
+      "class": "vtkCellGrid",
+      "instantiable": true,
+      "is_dataset": false,
+      "is_composite": false,
+      "is_pointset": false
+    }
+  ],
+  "surface_extraction": {
+    "volume_points": 27,
+    "volume_cells": 8,
+    "surface_points": 26,
+    "surface_triangles": 48,
+    "field_length": 27,
+    "length_matches_geometry": false,
+    "surface_point_order_matches_volume_prefix": false,
+    "first_ten_origins": [
+      0,
+      1,
+      10,
+      9,
+      3,
+      4,
+      12,
+      2,
+      11,
+      5
+    ],
+    "carries_original_ids": false,
+    "field_carried_through": true
+  },
+  "surface_with_original_ids": {
+    "point_ids_available": true,
+    "point_id_array": "vtkOriginalPointIds",
+    "cell_ids_available": true,
+    "count": 26
+  },
+  "cell_types": {
+    "count": 64,
+    "by_dimension": {
+      "0": [
+        "vtkEmptyCell",
+        "vtkVertex",
+        "vtkPolyVertex"
+      ],
+      "1": [
+        "vtkLine",
+        "vtkPolyLine",
+        "vtkQuadraticEdge",
+        "vtkCubicLine",
+        "vtkParametricCurve",
+        "vtkHigherOrderEdge",
+        "vtkLagrangeCurve",
+        "vtkBezierCurve"
+      ],
+      "2": [
+        "vtkTriangle",
+        "vtkTriangleStrip",
+        "vtkPolygon",
+        "vtkPixel",
+        "vtkQuad",
+        "vtkQuadraticTriangle",
+        "vtkQuadraticQuad",
+        "vtkBiQuadraticQuad",
+        "vtkQuadraticLinearQuad",
+        "vtkBiQuadraticTriangle",
+        "vtkQuadraticPolygon",
+        "vtkParametricSurface",
+        "vtkParametricTriSurface",
+        "vtkParametricQuadSurface",
+        "vtkHigherOrderTriangle",
+        "vtkHigherOrderQuad",
+        "vtkHigherOrderPolygon",
+        "vtkLagrangeQuadrilateral",
+        "vtkLagrangeTriangle",
+        "vtkBezierQuadrilateral",
+        "vtkBezierTriangle"
+      ],
+      "3": [
+        "vtkTetra",
+        "vtkVoxel",
+        "vtkHexahedron",
+        "vtkWedge",
+        "vtkPyramid",
+        "vtkPentagonalPrism",
+        "vtkHexagonalPrism",
+        "vtkQuadraticTetra",
+        "vtkQuadraticHexahedron",
+        "vtkQuadraticWedge",
+        "vtkQuadraticPyramid",
+        "vtkTriQuadraticHexahedron",
+        "vtkQuadraticLinearWedge",
+        "vtkBiQuadraticQuadraticWedge",
+        "vtkBiQuadraticQuadraticHexahedron",
+        "vtkTriQuadraticPyramid",
+        "vtkConvexPointSet",
+        "vtkPolyhedron",
+        "vtkParametricTetraRegion",
+        "vtkParametricHexRegion",
+        "vtkHigherOrderTetrahedron",
+        "vtkHigherOrderWedge",
+        "vtkHigherOrderPyramid",
+        "vtkHigherOrderHexahedron",
+        "vtkLagrangeTetra",
+        "vtkLagrangeHexahedron",
+        "vtkLagrangeWedge",
+        "vtkLagrangePyramid",
+        "vtkBezierTetra",
+        "vtkBezierHexahedron",
+        "vtkBezierWedge",
+        "vtkBezierPyramid"
+      ],
+      "unknown": []
+    }
+  }
+}

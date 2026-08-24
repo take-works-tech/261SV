@@ -145,6 +145,14 @@ is either missing a requirement or is not work this specification asked for.
 - satisfies: AC-030
 - depends_on: TASK-001
 - done_when: a @Dataset above LIM-002 displays reduced and the view says so
+- partly done: 2026-08-24, the **separation** exists - `domain_core/mesh.py` holds `Cells` (the
+  connectivity the file declared) and `DisplayGeometry` (the triangulated surface with its map back to
+  the dataset's own points and cells), and `reader.read` fills both. Found while measuring the toolkit
+  for a compatibility specification: the reader had been storing the extracted surface **as** the
+  dataset's geometry while reading the fields from the original grid, so on a volume mesh every index
+  correspondence was wrong (E-132, XC-233, INV-001's correction). What remains for this task is the
+  reduction itself - decimation above LIM-002 and the view saying so; `DisplayGeometry.reduced` is the
+  flag it will set, and nothing sets it yet.
 
 ### TASK-016 - Numbers computed on the full dataset
 - satisfies: AC-031
