@@ -501,15 +501,23 @@ class TestAutoMergePolicy:
         return tmp_path
 
     def test_a_dropped_condition_fails(self, tmp_path: pathlib.Path) -> None:
+        """The gate notices when the workflow stops checking something.
+
+        Until 2026-08-24 this mutated the deny-list that refused a pull request touching `.github/`,
+        `validate/` or `.claude/`, on the grounds that it was the condition that mattered most - without
+        it the gate can merge a change to itself. XC-238 removed that condition deliberately, so the
+        test now mutates the one that matters most of those remaining: querying **every** check run on
+        the commit rather than only the workflow that triggered this run. Without it a pull request
+        merges while another workflow is still red.
+        """
         project = self.automerge_project(tmp_path)
         workflow = project / ".github" / "workflows" / "auto-merge.yml"
-        # the deny-list is the one that matters most: without it the gate can merge a change to itself
-        text = workflow.read_text(encoding="utf-8").replace("^(\.github/|validate/|\.claude/)", "^(nothing/)")
+        text = workflow.read_text(encoding="utf-8").replace("commits/$SHA/check-runs", "commits/$SHA/nothing")
         workflow.write_text(text, encoding="utf-8")
 
         result = run("check_automerge_policy.py", cwd=project)
         assert result.returncode == 1
-        assert "not merged by the gate" in result.stdout
+        assert "every check run on the commit" in result.stdout
 
     def test_a_workflow_that_no_longer_fails_closed_fails(self, tmp_path: pathlib.Path) -> None:
         project = self.automerge_project(tmp_path)

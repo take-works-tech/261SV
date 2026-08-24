@@ -47,8 +47,11 @@ REQUIRED_CONDITIONS: list[tuple[str, str]] = [
     ("a commit with no other checks is refused", "nothing verified it"),
     ("a check still running stops the merge", '$2 != "completed"'),
     ("only success, skipped and neutral count as green", '$3 != "success" && $3 != "skipped" && $3 != "neutral"'),
-    ("the whole file list is visible before the deny-list is applied", '"$file_count" -lt 100'),
-    ("a change to the gate is not merged by the gate", r"^(\.github/|validate/|\.claude/)"),
+    ("the whole file list is visible before anything is decided from it", '"$file_count" -lt 100'),
+    # No longer a refusal (XC-238): every path merges, including this file and this check. What is
+    # still required is that a change to the merging machinery is **written to the log**, because
+    # nobody sees it beforehand and the log is the only place it can be found afterwards.
+    ("a change to the merge machinery is recorded in the log", "merging unread"),
     ("the merge is a squash", "--squash"),
 ]
 

@@ -17,13 +17,17 @@ name: auto-merge
 # branch protection is available it is structurally safer, because a pull request cannot edit it.
 #
 # WHAT THIS ACCEPTS, STATED RATHER THAN DISCOVERED LATER.
-#   * A pull request touching `.github/`, `validate/` or `.claude/` is refused below, because those
-#     decide whether anything else may merge and a gate that merges its own weakening is not a gate.
-#   * Everything else merges with **nobody reading it**. That includes `specs/`, `AGENTS.md` and
-#     `evidence/` - the documents that authorise all of this. A change that rewrites the rules is
-#     stopped only if it also touches one of the three directories above. That is the hole this
-#     arrangement has, it is open on purpose for the length of the prototype, and the brake on any one
-#     pull request is the `no-auto-merge` label.
+#   * **No path is refused. Every directory merges, including this one.** A pull request that edits
+#     this file, deletes a check in `validate/`, or removes the `gh pr merge` deny from
+#     `.claude/settings.json` merges like any other once its checks are green - so **this gate will
+#     merge its own weakening, and can merge its own removal**. Those three directories were held back
+#     until 2026-08-24 for exactly that reason; the product owner lifted it deliberately, having been
+#     told what it means (XC-238). Written here rather than left to be discovered.
+#   * Everything else merges with **nobody reading it** too - `specs/`, `AGENTS.md`, `evidence/`, the
+#     documents that authorise all of this. Nothing is read by a person before it lands.
+#   * The two brakes that remain are both outside any pull request, which is the only reason they are
+#     still brakes: the `no-auto-merge` label on one pull request, and
+#     `gh variable set AUTO_MERGE_ENABLED --body false` for all of them.
 #   * Nothing here enforces that work arrives by pull request at all: a direct push to `main` skips
 #     every condition below. Only the agreement in AGENTS.md says otherwise.
 #
@@ -118,15 +122,17 @@ jobs:
             stop "not green: $(printf '%s' "$bad" | awk -F'\t' '{print $1 "=" $3}' | tr '\n' ' ')"
           fi
 
-          # 5. A change to the gate is not merged by the gate.
+          # 5. No path is refused (XC-238). The size guard stays: a change this job cannot enumerate
+          #    is one it has not checked, and the count is what the log records as having merged unread.
           files=$(gh pr view "$pr" --repo "$REPO" --json files --jq '.files[].path')
           file_count=$(printf '%s' "$files" | grep -c . || true)
-          # The list is paginated; at the page size this job cannot see the whole change, and a
-          # deny-list checked against part of a change is not a check.
+          # The list is paginated; at the page size this job cannot see the whole change.
           [ "$file_count" -lt 100 ] || stop "PR #$pr changes $file_count files, too many to read here"
-          denied=$(printf '%s\n' "$files" | grep -E '^(\.github/|validate/|\.claude/)' || true)
-          if [ -n "$denied" ]; then
-            stop "PR #$pr changes the gate itself: $(printf '%s' "$denied" | tr '\n' ' ')"
+          machinery=$(printf '%s\n' "$files" | grep -E '^(\.github/|validate/|\.claude/)' || true)
+          if [ -n "$machinery" ]; then
+            # Not a refusal any more. Recorded so that a change to the merging machinery is findable
+            # in the log afterwards, since nobody saw it beforehand.
+            echo "NOTE: PR #$pr changes the merge machinery and is merging unread: $(printf '%s' "$machinery" | tr '\n' ' ')"
           fi
 
           echo "PR #$pr: $other_count checks completed green, merging."

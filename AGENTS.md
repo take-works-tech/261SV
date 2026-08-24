@@ -86,19 +86,25 @@ ran. Every gate in `validate/` runs in `.github/workflows/ci.yml`, and
 - **Automatic merge is on, and it ends at the first working prototype** (XC-218). Work lands through a
   branch and a pull request; `.github/workflows/auto-merge.yml` squash-merges it once **every** check on
   that commit has finished green, and **no person reads it first**. Say what that means rather than
-  implying otherwise: a change to `specs/`, to this file, or to `evidence/` merges unread. Only three
-  directories are held back - `.github/`, `validate/`, `.claude/` - because they decide whether anything
-  else may merge. **Nothing enforces any of this**: there is no branch protection on this plan (E-129,
+  implying otherwise: a change to `specs/`, to this file, or to `evidence/` merges unread. Since
+  2026-08-24 **no directory is held back either** (XC-238): a pull request that edits the merge workflow,
+  deletes a check in `validate/`, or removes the `gh pr merge` deny from `.claude/settings.json` merges
+  the same way, so **the gate will merge its own weakening and can merge its own removal**. A change to
+  those three is written to the workflow log as having merged unread, which is the only place it can be
+  found afterwards. **Nothing enforces any of this**: there is no branch protection on this plan (E-129,
   OPEN-020), so a direct push to `main` skips every check. Judgement is still required and nothing
-  compels it.
+  compels it - and it is now the only thing standing between a green pull request and the machinery
+  that decides what green means.
   A pull request **in conflict receives no checks at all** and therefore never merges - GitHub does not
   run `pull_request` workflows while the merge commit cannot be computed. It looks like the mechanism
   failing; merge `main` into the branch (never rebase) and the checks appear.
   To stop one pull request: the `no-auto-merge` label. To stop all of them:
   `gh variable set AUTO_MERGE_ENABLED --body false` - one command, no diff, no pull request, because a
-  temporary measure that needs a pull request to end becomes a permanent one. An agent may open a pull
-  request and may not land it: `gh pr merge` is denied in `.claude/settings.json`, and that deny is what
-  keeps the workflow the only thing that merges. At the prototype boundary the variable goes to `false`,
+  temporary measure that needs a pull request to end becomes a permanent one. **Those two are the only
+  brakes left, and they are brakes only because neither can be set from inside a pull request.** An agent
+  may open a pull request and may not land it: `gh pr merge` is denied in `.claude/settings.json`, and
+  that deny is what keeps the workflow the only thing that merges - it is no longer protected from being
+  edited, so keeping it is a matter of judgement rather than of structure. At the prototype boundary the variable goes to `false`,
   the workflow file is deleted, and XC-218 becomes `superseded` - `check_automerge_policy.py` fails if
   those disagree, so the period cannot end in the document alone.
 - Edits stay inside this directory.

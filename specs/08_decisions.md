@@ -3459,7 +3459,8 @@ model or the prompt, never in a description that quietly went stale.
   commit as its head; that pull request is open, not a draft, based on `main`, and still at that commit;
   it does not carry `no-auto-merge`; its merge state is not dirty, blocked or undecided; **every check
   run on the commit** - not only the workflow that triggered this one - has completed with success,
-  skipped or neutral; and it touches nothing under `.github/`, `validate/` or `.claude/`.
+  skipped or neutral. **The path condition was removed on 2026-08-24 (XC-238)**; the sentence that stood
+  here required the change to touch nothing under `.github/`, `validate/` or `.claude/`.
   **Every branch leaves without merging.** An answer the job cannot read, a check still running, a count
   it did not expect: each ends the run having merged nothing. An error in the job merges nothing at all.
   **A pull request in conflict receives no checks at all**, so it never reaches those conditions: GitHub
@@ -3468,11 +3469,11 @@ model or the prompt, never in a description that quietly went stale.
   ran normally; the cause was `mergeStateStatus: DIRTY`, and merging `main` into the branch produced the
   event. This is correct - a conflicted change must not merge - and it reads exactly like the mechanism
   being broken, so it is written down here rather than rediscovered.
-  **What this accepts, stated rather than discovered later.** Everything outside those three directories
-  merges unread - including `specs/`, `AGENTS.md` and `evidence/`, the documents that authorise the
-  arrangement. And nothing enforces that work arrives by pull request: a direct push to `main` skips
-  every condition above, because there is no branch protection to prevent it (E-129, OPEN-020). Both are
-  open on purpose for the length of the prototype.
+  **What this accepts, stated rather than discovered later.** Every path merges unread since XC-238 -
+  including `specs/`, `AGENTS.md`, `evidence/` and the merging machinery itself. And nothing enforces
+  that work arrives by pull request: a direct push to `main` skips every condition above, because there
+  is no branch protection to prevent it (E-129, OPEN-020). Both are open on purpose for the length of the
+  prototype.
   **The agent does not merge.** `.claude/settings.json` denies `gh pr merge` - `ask` was not that rule,
   because an unattended run has nobody to answer a prompt. An agent opens the pull request; the workflow
   lands it.
@@ -4170,4 +4171,36 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a toolkit release whose Exodus reader reads its results by default, which would be
   measured rather than assumed from a changelog
+
+### XC-238 - No directory is held back from automatic merge
+- decided: 2026-08-24
+- status: active
+- decision: the path condition of XC-218 is removed. **Every path merges unread**, including
+  `.github/workflows/auto-merge.yml` itself, the checks in `validate/`, and `.claude/settings.json`.
+  A pull request touching those three is still detected and is **written to the workflow log** as
+  having merged unread, because nobody sees it beforehand and the log is the only place it can be found
+  afterwards.
+  Two brakes remain, and they are brakes only because neither can be set from inside a pull request:
+  the `no-auto-merge` label on one, and `gh variable set AUTO_MERGE_ENABLED --body false` on all
+- decided_by: the product owner, 2026-08-24, asked for it, was told what it removes, and confirmed
+- rationale: the owner's reason is throughput - three of the last five pull requests needed a manual
+  merge for touching a gate or a workflow, and the manual step was the slowest part of the loop.
+  The reason it was not this way before is unchanged and is the thing to keep in view: **this gate will
+  now merge its own weakening, and can merge its own removal.** A pull request that deletes a check in
+  `validate/`, or removes the `gh pr merge` deny that stops an agent merging directly, lands the same
+  way as a typo fix. The three directories were the structural part of the arrangement; what is left in
+  their place is judgement, which is not nothing but is not a mechanism either.
+  Written here at length rather than settled quietly, because XC-218's own standard is to state what
+  the period accepts rather than only what it stops, and this is the largest thing it now accepts
+- alternatives: keeping a single-file guard on `.claude/settings.json` - the deny that stops an agent
+  merging directly - would have kept the smallest structural piece at almost no cost to throughput. It
+  was offered and not taken; the owner asked for no exceptions. Requiring a label to *permit* a
+  machinery change, rather than a label to stop it, inverts the default at the price of a step on every
+  such change
+- basis: E-129 (T1)
+- affects: XC-218, AGENTS.md, OPEN-020
+- decidedness: Fixed
+- reversal_trigger: a merge that weakens the merging machinery and is noticed only afterwards in the
+  log - which is the event this decision makes possible and the one that would settle whether the
+  throughput was worth it
 
