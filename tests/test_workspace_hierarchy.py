@@ -19,6 +19,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from conftest import FIXED_INSTANT
 
 from service.workspace.hierarchy import (
     HierarchyError,
@@ -41,7 +42,7 @@ from service.workspace.variables import (
     set_value,
 )
 
-WHEN = "2026-08-24T12:00:00Z"
+WHEN = FIXED_INSTANT
 
 
 def workspace() -> dict[str, Any]:

@@ -4294,3 +4294,31 @@ model or the prompt, never in a description that quietly went stale.
 - affects: CT-001, CT-004, CT-005, CT-006, workspace/REQ-003, MOD-007
 - decidedness: Open
 
+### XC-241 - A lock is never broken automatically, and liveness fails towards keeping it
+- decided: 2026-08-24
+- status: active
+- decision: a @Workspace lock records who took it - process, host, user and when - and is **never broken
+  by the product**. A second open succeeds read-only and names the holder; a lock whose process cannot
+  be found is reported as stale, read-only is offered, and the file is left where it is.
+  Liveness is decided in one direction only: **anything not clearly dead counts as alive**. A pid on
+  another host is never examined at all
+- decided_by: the product owner, 2026-08-24
+- rationale: the two answers a product usually gives are both wrong here. Refusing to open leaves a user
+  who knows the other window is theirs, on the other monitor, with nothing to do. Opening twice for
+  editing loses whichever save happens second, and loses it silently.
+  The asymmetry in the liveness rule is the part with a measurement behind it. A pid says less than it
+  appears to: ids are reused, protected processes cannot be signalled, and on Windows a missing process
+  raises `OSError` with `winerror == 87` rather than `ProcessLookupError`, while pid 4 raises
+  `SystemError` (E-139). A probe written for POSIX finds every lock alive here, and one that treats any
+  error as "gone" declares the System process dead. Since neither error distinguishes the cases, the
+  choice is which way to be wrong - and **a lock wrongly called stale is the failure that opens a second
+  editor**, while a lock wrongly kept costs somebody a read-only window and a question
+- alternatives: a heartbeat written into the lock would let staleness be judged by time rather than by
+  pid, and it makes a machine that suspends look dead; breaking a lock older than some age is the same
+  bet with a longer fuse
+- basis: E-139 (T1)
+- affects: MOD-007, workspace/AC-028, workspace/AC-029
+- decidedness: Fixed
+- reversal_trigger: a lock mechanism the operating system enforces - an exclusive file handle held open
+  for the session - which would replace the judgement with a fact
+

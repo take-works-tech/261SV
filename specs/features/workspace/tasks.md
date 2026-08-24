@@ -251,22 +251,42 @@ updated: 2026-08-22
 - satisfies: AC-026
 - depends_on: TASK-001
 - done_when: every change is appended beside the file, which is itself untouched
-
+- done: 2026-08-24, `src/service/workspace/journal.py`. Appended beside the workspace file, one line
+  per change, flushed and synced per entry - an entry in the file but not on the platform is an entry a
+  crash loses, which is the one case this exists for. The workspace file is not touched: rewriting it on
+  every change would put the one file the user cannot lose in the path of every keystroke.
 ### TASK-026 - Recovery on start
 - satisfies: AC-027
 - depends_on: TASK-025
 - done_when: journalled work is offered after an abnormal exit and applied only on acceptance
-
+- done: 2026-08-24. Journalled work is **offered**, never replayed: replaying automatically would
+  mean a crash silently changes a saved file, and the crash may have been caused by the change being
+  replayed.
+  A truncated last line is the ordinary shape of a crash rather than a corrupt journal, so the replay
+  stops at that line, keeps what came before, and **says it stopped**. Accepting or declining both
+  retire the journal under a new name rather than deleting it - the first thing anybody wants after a
+  bad recovery is what was there before it.
 ### TASK-027 - Workspace lock
 - satisfies: AC-028
 - depends_on: TASK-001
 - done_when: a second open is read-only and names the holding process
-
+- done: 2026-08-24, `src/service/workspace/lock.py`. A second open is read-only and names the
+  holder - process, host, user and when - because "in use by something" is not an answer anyone can act
+  on. Taken by exclusive creation, so two processes racing produce one holder and one reader rather than
+  two winners. A lock belonging to another process is never released by this one.
 ### TASK-028 - Stale locks
 - satisfies: AC-029
 - depends_on: TASK-027
 - done_when: an unreadable or orphaned lock is reported and read-only is offered
-
+- done: 2026-08-24, and the rule is asymmetric on purpose (XC-241). **Anything not clearly dead
+  counts as alive**, and a stale lock is reported rather than broken.
+  The measurement behind it: on Windows a missing process makes `os.kill(pid, 0)` raise `OSError` with
+  `winerror == 87` and **not** `ProcessLookupError`, while pid 4 raises `SystemError` (E-139). A probe
+  written for POSIX finds every lock alive here; one treating any error as "gone" declares the System
+  process dead. Since neither distinguishes the cases, the choice is which way to be wrong - and a lock
+  wrongly called stale is the failure that opens a second editor, while a lock wrongly kept costs
+  somebody a read-only window and a question.
+  A pid from another host is never examined, because it says nothing about this machine.
 ### TASK-029 - Workspace items and templates stored separately
 - satisfies: AC-030
 - depends_on: TASK-001
