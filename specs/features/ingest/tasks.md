@@ -91,6 +91,19 @@ is either missing a requirement or is not work this specification asked for.
 - depends_on: TASK-001
 - done_when: a series or partitioned set presents as one @Case with a time axis and states how many
   steps and parts it found
+- done: 2026-08-24, `domain_core/case_contents.py` and `engine/survey.py`. Surveying is separate from
+  reading: it answers what is present from manifests and filenames, before anything is loaded, so an
+  interface can state the extent up front.
+  **The axis is not always time, and this build cannot read one.** GL-036 already said the first;
+  E-130 establishes the second - no format read here declares a time value. A directory of numbered
+  files therefore reports `UNDECLARED` with no positions, because a modal run and a transient run are
+  the same directory of numbered files and calling the third one `t = 3` states something false about
+  the physics. `AxisKind.UNDECLARED` exists for exactly that and is not a fifth kind of physics.
+  **The piece manifest is parsed here rather than taken from the toolkit**, because reporting a part
+  that is *missing* (AC-027) needs what the file claimed: a reader that returns the pieces it opened
+  cannot describe the one it did not. A `<Piece>` with no `Source` counts as missing rather than being
+  skipped - the manifest said a piece was there.
+  No VTK is imported, so all 12 tests run on a machine with no engine environment
 
 ### TASK-013 - Partial sets marked, and the mark propagated
 - satisfies: AC-027

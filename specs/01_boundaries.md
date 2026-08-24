@@ -43,7 +43,7 @@ touches a file, a device or a clock.
 
 ### MOD-002 - dataset-io
 - layer: engine
-- paths: src/engine/reader.py, src/engine/dataset_io
+- paths: src/engine/reader.py, src/engine/survey.py, src/engine/dataset_io
 - owns: reading result files into a @Dataset, time steps, multi-block and partitioned files, and the
   conversion into the canonical frame. Also writing @Dataset out as USD and VDB for the export path
 - depends_on: domain-core
