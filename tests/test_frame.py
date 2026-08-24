@@ -65,3 +65,25 @@ def test_it_never_falls_back_to_the_canonical_value(declaration: FrameDeclaratio
 
 def test_a_declared_axis_is_accepted_in_either_case() -> None:
     assert resolve_frame(FrameDeclaration(up_axis="y")) == ("Y", CANONICAL_SCALE)
+
+
+class TestUnreadUnitInformation:
+    """ingest/AC-034: a field whose file carried unit information the reader did not read is still
+    undeclared - and the interface says the information was there. The difference matters: "the file
+    said nothing" is fixed by asking the solver, "we did not read it" is fixed by us."""
+
+    def test_only_the_format_measured_to_carry_units_is_listed(self) -> None:
+        """Measured from the shipped library, not recalled (E-130). Listing a format that carries
+        nothing would make every reader for it claim a gap it does not have; omitting one that does
+        carry units lets a unit disappear silently, which is the failure AC-034 is about."""
+        from domain_core.frame import FORMATS_CARRYING_UNIT_INFORMATION
+
+        assert FORMATS_CARRYING_UNIT_INFORMATION == {
+            ".cgns": "LengthUnits and DimensionalExponents",
+        }
+
+    def test_the_formats_this_build_reads_carry_none(self) -> None:
+        from domain_core.frame import FORMATS_CARRYING_UNIT_INFORMATION
+
+        for suffix in (".vtu", ".pvtu", ".vtp", ".stl"):
+            assert suffix not in FORMATS_CARRYING_UNIT_INFORMATION

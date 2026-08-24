@@ -158,3 +158,47 @@ def test_geometry_is_float_and_three_dimensional(tmp_path: Path) -> None:
 
     assert dataset.points_m.shape == (4, 3)
     assert np.isfinite(dataset.points_m).all()
+
+
+class TestUnreadUnitInformation:
+    """ingest/AC-034, at the reader table. The rule is enforced when the table is built, so a reader
+    added for a format that carries units cannot be added silently.
+
+    The other half of AC-034 - the unit staying undeclared whatever the file carried - is
+    `test_no_unit_is_declared_on_load` above, which already asserts it for AC-023. One assertion rather
+    than two: a duplicate passes while the original is deleted.
+    """
+
+    def test_a_reader_for_a_format_carrying_units_must_state_the_gap(self) -> None:
+        from engine.reader import ReaderChoice
+
+        with pytest.raises(ValueError) as refusal:
+            ReaderChoice(".cgns", object, "Verified")
+        assert "LengthUnits" in str(refusal.value)
+        assert "AC-034" in str(refusal.value)
+
+    def test_stating_the_gap_is_enough_to_add_one(self) -> None:
+        from engine.reader import ReaderChoice
+
+        choice = ReaderChoice(".cgns", object, "Verified",
+                              unread_unit_information="the file declares LengthUnits; this reader does not read it")
+        assert "LengthUnits" in choice.unread_unit_information
+
+    def test_the_gap_reaches_the_surface_that_reports_gaps(self, tmp_path: Path) -> None:
+        """It is reported through support_level, beside the other known gaps, rather than in a place of
+        its own that an interface would have to know to ask about (AC-032)."""
+        import engine.reader as reader_module
+
+        choice = reader_module.ReaderChoice(
+            ".cgns", object, "Verified", known_gaps="one gap",
+            unread_unit_information="the file declares LengthUnits; this reader does not read it")
+        original = dict(reader_module._READERS)
+        reader_module._READERS[".cgns"] = choice
+        try:
+            level, gaps = reader_module.support_level(tmp_path / "case.cgns")
+        finally:
+            reader_module._READERS.clear()
+            reader_module._READERS.update(original)
+
+        assert level == "Verified"
+        assert "one gap" in gaps and "LengthUnits" in gaps
