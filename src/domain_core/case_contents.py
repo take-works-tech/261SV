@@ -60,8 +60,14 @@ class CaseContents:
     parts: int
     axis: ResultAxis
     missing_parts: tuple[str, ...] = ()
+    # The `GhostLevel` a piece manifest declared: how many layers of cells each piece carries beyond
+    # its own. It decides whether *cells* can be repeated across pieces as well as points, which is a
+    # different question with a different answer (INV-010, `domain_core.partitions`).
+    ghost_level: int = 0
 
     def __post_init__(self) -> None:
+        if self.ghost_level < 0:
+            raise ValueError("a piece cannot carry a negative number of ghost layers")
         if self.steps < 1 or self.parts < 1:
             raise ValueError("a case that loaded has at least one step and at least one part")
         declared = self.axis.positions
@@ -90,6 +96,8 @@ class CaseContents:
         line = f"{steps}・{parts}・{axis}"
         if self.axis.kind is not AxisKind.NONE and self.axis.positions is None:
             line += "（位置の値はファイルにありません）"
+        if self.ghost_level:
+            line += f"・ゴースト層 {self.ghost_level}"
         if self.is_partial:
             line += f"・不足パート {len(self.missing_parts)} 件：{', '.join(self.missing_parts)}"
         return line

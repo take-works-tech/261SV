@@ -128,6 +128,18 @@ is either missing a requirement or is not work this specification asked for.
 - satisfies: AC-027
 - depends_on: TASK-012
 - done_when: an integral over a partitioned dataset equals the same dataset in one piece (INV-010)
+- done: 2026-08-24, `domain_core/partitions.py` (the ghost vocabulary and the mask),
+  `Dataset.maximum/total/mean/counted_entries`, `CaseContents.ghost_level`, and the `GhostLevel` read in
+  `engine/survey.py`. 18 tests in `tests/test_partitions.py`, none needing VTK.
+  Measuring the toolkit corrected INV-010 rather than confirming it (E-131). Two findings changed the
+  shape of the task: an **extremum has no duplicates to exclude**, so promising that it excludes them
+  described work that is not done; and a `.pvtu` at the writer's default `GhostLevel="0"` **carries no
+  ghost array at all**, so in the common case the duplicates cannot be identified and the affected sums
+  and means are refused with the reason rather than reported (XC-232). Cells are repeated only above
+  ghost level 0, so a cell quantity over a flat partitioning is already exact.
+  `Association` moved to its own module: the ghost vocabulary needs it because the same bit means
+  `HIDDENPOINT` for a point and `HIGHCONNECTIVITYCELL` for a cell, and a word two modules share is not
+  owned by whichever was written first (XC-231).
 
 ### TASK-015 - Reduction for display, marked
 - satisfies: AC-030

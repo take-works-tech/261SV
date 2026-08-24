@@ -26,13 +26,22 @@ from domain_core.case_contents import AxisKind, CaseContents, ResultAxis
 _STEP_SUFFIX = re.compile(r"^(?P<stem>.+?)[._-](?P<index>\d+)$")
 
 
-def _pieces(manifest: Path) -> tuple[list[str], list[str]]:
-    """The piece files a `.pvtu` names, split into those present and those absent.
+def _pieces(manifest: Path) -> tuple[list[str], list[str], int]:
+    """The piece files a `.pvtu` names, split into present and absent, and its declared ghost level.
 
     A piece with no `Source` is a malformed manifest, and it is reported as a missing part rather than
     skipped: the file said there was a piece there.
+
+    The ghost level is read here because nothing downstream can recover it: it is the difference
+    between "only the interface points are repeated" and "whole cells are repeated too", and the two
+    invalidate different numbers (INV-010).
     """
     root = ElementTree.parse(manifest).getroot()
+    ghost_level = 0
+    for element in root.iter():
+        declared = element.get("GhostLevel")
+        if declared is not None:
+            ghost_level = max(ghost_level, int(declared))
     present: list[str] = []
     absent: list[str] = []
     for piece in root.iter("Piece"):
@@ -41,7 +50,7 @@ def _pieces(manifest: Path) -> tuple[list[str], list[str]]:
             absent.append("<Piece> with no Source attribute")
             continue
         (present if (manifest.parent / source).exists() else absent).append(source)
-    return present, absent
+    return present, absent, ghost_level
 
 
 def _series_members(path: Path) -> list[Path]:
@@ -72,12 +81,13 @@ def survey(path: str | Path) -> CaseContents:
     location = Path(path)
 
     if location.suffix.lower() == ".pvtu":
-        present, absent = _pieces(location)
+        present, absent, ghost_level = _pieces(location)
         return CaseContents(
             steps=1,
             parts=max(len(present), 1),
             axis=ResultAxis(AxisKind.NONE),
             missing_parts=tuple(absent),
+            ghost_level=ghost_level,
         )
 
     members = _series_members(location)

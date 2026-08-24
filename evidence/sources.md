@@ -1331,3 +1331,26 @@ Recorded so that nothing silently depends on them:
   class of hardware would produce a number that looks measured and is not
 - the earlier failed attempts at rendering measurement are kept in `spike/measure_capacity.py`, which
   refuses to report rather than repeating them
+
+### E-131 - The ghost vocabulary, and which bits an integral excludes
+- tier: T1
+- url: https://raw.githubusercontent.com/Kitware/VTK/master/Common/DataModel/vtkDataSetAttributes.h
+- verified: 2026-08-24
+- says: read first-hand from the VTK sources on 2026-08-24, together with
+  `Common/DataModel/vtkFieldData.h`, `Filters/Parallel/vtkIntegrateAttributes.cxx`,
+  `IO/XML/vtkXMLPUnstructuredDataReader.cxx` and `IO/ParallelXML/vtkXMLPDataObjectWriter.cxx`.
+  (1) The ghost array is named `vtkGhostType` (`vtkFieldData::GhostArrayName`, one static returning that
+  literal) and it is unsigned bytes of flags; the same name is used on point data and on cell data.
+  (2) `PointGhostTypes` is DUPLICATEPOINT=1, HIDDENPOINT=2. `CellGhostTypes` is DUPLICATECELL=1,
+  HIGHCONNECTIVITYCELL=2, LOWCONNECTIVITYCELL=4, REFINEDCELL=8, EXTERIORCELL=16, HIDDENCELL=32 - so
+  **bit 2 means HIDDEN for a point and HIGH_CONNECTIVITY for a cell**, and the two vocabularies are not
+  interchangeable although the arrays share a name.
+  (3) `vtkIntegrateAttributes` skips a cell whose ghost byte has `DUPLICATECELL | HIDDENCELL` set and
+  tests no other bit; it reads `GetCellGhostArray()` only and never consults the point ghost array.
+  (4) `vtkXMLPUnstructuredDataReader.cxx` contains no locator and no merge step - grepping it for
+  merge/locator returns nothing - confirming E-039 from the reader side.
+  (5) The `GhostLevel` attribute a `.pvtu` carries is the writer's `UPDATE_NUMBER_OF_GHOST_LEVELS`,
+  and `vtkXMLPDataObjectWriter` initialises it to **0**. At 0 no cell belongs to two pieces; only the
+  points on the interfaces are repeated.
+- justifies: INV-010, XC-231, XC-232
+

@@ -3871,3 +3871,65 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a quantity whose definition genuinely requires a longer chain, which is recorded as
   part of that quantity rather than as an exception to this
+
+### XC-231 - Which entries a reported number is computed over is read from the ghost array
+- decided: 2026-08-24
+- status: active
+- decision: the entries a count, sum or mean is computed over are the ones **not** marked in the
+  `vtkGhostType` array, and the bits that exclude an entry are exactly the ones VTK's own integrator
+  excludes: `DUPLICATECELL | HIDDENCELL` for a cell and `DUPLICATEPOINT | HIDDENPOINT` for a point
+  (E-131). No other bit disqualifies an entry.
+  **The mask cannot be built without the association.** The point array and the cell array carry the
+  same name and the same byte width, and bit 2 means `HIDDENPOINT` for a point and
+  `HIGHCONNECTIVITYCELL` for a cell. `counted()` therefore takes the association and has no default for
+  it, and a @Dataset holds the two ghost arrays in a mapping keyed by association rather than among the
+  fields - which is also the only way to hold both, since a dictionary keyed by name could hold one
+- decided_by: the product owner, 2026-08-24
+- rationale: the exclusion set is not a judgement to make here. It is what the toolkit that produced the
+  file already means by those bits, and choosing differently would make this product's integral disagree
+  with ParaView's over the same file for no stated reason. Reading it from `vtkIntegrateAttributes`
+  rather than from documentation is what makes it checkable.
+  The association requirement exists because of a specific silent failure: a mask built with the point
+  vocabulary over a cell array drops every high-connectivity cell from the integral. The result is a
+  number a few per cent low, with nothing about it that looks wrong
+- alternatives: excluding `REFINEDCELL` as well is defensible for an AMR hierarchy, where counting a
+  coarse cell and its refinements double-counts the volume. It is not done here because the integrator
+  does not do it, and diverging from the reference on a case this product cannot yet produce would be a
+  difference nobody could test. Recorded as the reversal trigger
+- basis: E-131 (T1)
+- affects: 02_invariants.md, 01_boundaries.md, features/ingest/tasks.md
+- decidedness: Fixed
+- reversal_trigger: this product reads an AMR hierarchy, at which point whether `REFINEDCELL` is
+  excluded has to be settled against a measured integral rather than assumed
+
+### XC-232 - An unmarked partitioned set refuses the affected numbers rather than merging by coordinate
+- decided: 2026-08-24
+- status: active
+- decision: when a @Dataset is in more than one part and no ghost array marks the duplicates, the sums,
+  means and counts over the affected association are **not reported**; each comes back as a missing
+  value carrying the reason. Nothing merges points by coordinate to recover them.
+  Which numbers are affected is not all of them, and the difference is stated rather than assumed:
+  - an **extremum is reported**, because the largest of a set is the largest of that set with part of it
+    written twice;
+  - **cell quantities are reported when the manifest declares `GhostLevel="0"`**, because at zero ghost
+    layers a cell belongs to exactly one piece - an interface repeats points, not cells (E-131);
+  - **point counts, sums and means are refused** whenever there is more than one part, at any ghost
+    level, because an interface always repeats its points
+- decided_by: the product owner, 2026-08-24
+- rationale: `GhostLevel="0"` is the writer's default (E-131), so the file with no ghost array is the
+  common case rather than an edge one, and this decision governs most partitioned runs this product will
+  meet. Merging by coordinate is the obvious alternative and it is the dangerous one: it needs a
+  tolerance, and a tolerance welds together the coincident points that a crack face, a contact pair or a
+  shell-solid interface exists to keep apart. That trades a visible over-count for an invisible change of
+  geometry, which is the worse of the two by this product's own standard.
+  Refusing costs less than it appears to, because the number an engineer reports from a stress result is
+  the maximum, and the maximum survives duplication untouched
+- alternatives: reporting the sum with a caveat was considered and rejected - the error is a fraction of
+  a per cent, which is exactly the size that a caveat does not stop anyone acting on. Refusing the
+  number is the only form of the warning that cannot be read past
+- basis: E-131 (T1), E-039 (T1)
+- affects: 02_invariants.md, features/ingest/tasks.md
+- decidedness: Fixed
+- reversal_trigger: a way to identify the duplicates that does not need a tolerance - a global point ID
+  array, which some writers emit - at which point those numbers are computable and are computed
+
