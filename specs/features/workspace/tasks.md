@@ -522,36 +522,49 @@ updated: 2026-08-22
 - depends_on: TASK-001
 - done_when: the two-row shell offers the six menu groups and switches between Workspace and Workspace
   list without mislabelling the latter as cases
-
+- blocked: there is no shell. `src/ui/shell` (MOD-009) does not exist, and the mockup is a design
+  state, never evidence of implemented behaviour.
 ### TASK-055 - Workspace list
 - satisfies: AC-056
 - depends_on: TASK-054
 - done_when: search, filters, grid/list controls, create action and cards all operate on workspaces and
   no preview invents analysis values
-
+- blocked: as TASK-054. The service half - what a workspace list would show, and the rule that no
+  preview invents an analysis value - waits on somewhere to show it.
 ### TASK-056 - Reopenable side panels
 - satisfies: AC-057
 - depends_on: TASK-054
 - done_when: panel toggles remain at the outer toolbar edges while their panels open and close
-
+- blocked: as TASK-054. Panel geometry is shell work with no service half at all.
 ### TASK-057 - Create an independent item from a template
 - satisfies: AC-061
 - depends_on: TASK-029, view/TASK-010, graph/TASK-013
 - done_when: resolution is previewed before acceptance, a new workspace item records its source
   template id and revision, and later edits on either side do not propagate
-
+- done: 2026-08-24. The resolution is **shown before anything is created**, and `apply_template`
+  takes the preview rather than a template id - so an item cannot exist without a resolution result
+  having been produced. The same shape as `prune`, which takes the plan it showed.
+  Producing the item and reporting the gaps afterwards is a different product: the user would be
+  reading the list with the thing already in their workspace.
+  The source template's id and revision travel with the item, and neither side propagates to the other
+  (delivered with TASK-031).
 ### TASK-058 - Workspace item lists
 - satisfies: AC-062
 - depends_on: TASK-029
 - done_when: View, Graph and Report lists open, create, duplicate, rename and delete concrete items and
   never label them as templates; Simulation remains the later-release placeholder
-
+- blocked: the service half is done - `items.py` creates, finds, edits and names items under the
+  collections XC-109 fixed, and refuses to call any of them a template. Opening, duplicating and
+  deleting them from a list is shell work waiting on TASK-054.
 ### TASK-059 - Template revisions remain independent
 - satisfies: AC-063
 - depends_on: TASK-031, TASK-057
 - done_when: updating a template creates a later revision and leaves every item created from an earlier
   revision unchanged
-
+- done: 2026-08-24, delivered with TASK-031 and asserted there: saving again makes the next
+  revision, and an item created from an earlier one keeps the definition it was created with. The
+  definition is copied at both boundaries, so there is no shared structure for a later edit to travel
+  along.
 ### TASK-060 - Shared material-library composition
 - satisfies: AC-060
 - depends_on: TASK-056

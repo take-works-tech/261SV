@@ -24,7 +24,7 @@ Specification: XC-109, GL-019, workspace/AC-030, AC-031, AC-032, AC-061, CT-001.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterable
 
 from service.workspace.hierarchy import walk
 from service.workspace.naming import NamingError, Registry, registry_of
@@ -117,27 +117,80 @@ def edit(document: dict[str, Any], kind: str, item_id: str, definition: dict[str
     return item
 
 
-def apply_template(
+@dataclass(frozen=True, slots=True)
+class Application:
+    """What applying a template here would produce, shown before anything is created (AC-061).
+
+    A preview rather than a return value from the act: XC-090 says the resolution result is shown and
+    the item is created **only after acceptance**. Producing the item and reporting the gaps afterwards
+    is a different product - the user would be reading the list with the thing already in their
+    workspace.
+    """
+
+    template_id: str
+    revision: int
+    definition: dict[str, Any]
+    resolved: tuple[str, ...]
+    unresolved: tuple[str, ...]
+
+    @property
+    def resolves_completely(self) -> bool:
+        return not self.unresolved
+
+    def describe(self) -> str:
+        line = f"'{self.template_id}' 第 {self.revision} 版を適用します"
+        if self.resolves_completely:
+            return line + "。参照はすべて解決します"
+        return (
+            f"{line}。{len(self.resolved)} 件は解決し、{len(self.unresolved)} 件は解決しません："
+            f"{'、'.join(self.unresolved)}。"
+            "解決した分は反映され、残りは名前で残ります（XC-090）"
+        )
+
+
+def preview_application(
     document: dict[str, Any],
     kind: str,
     template_id: str,
-    item_id: str,
-    name: str,
-) -> dict[str, Any]:
-    """Create a new independent item from a template, carrying where it came from (AC-061).
-
-    The definition is **copied**. A shared structure here would make a later template edit reach into a
-    report somebody already sent.
-    """
+    *,
+    available: Iterable[str] = (),
+) -> Application:
+    """What a template would resolve to here, without creating anything."""
+    have = set(available)
     for template in templates_of(document, kind):
         if template.get("id") == template_id:
-            revision = int(template.get("revision", 1))
-            return create(
-                document, kind, item_id, name,
-                dict(template.get("definition", {})),
-                source=SourceTemplate(template_id, revision),
+            stated = [str(item.get("name", "")) for item in template.get("requirements", [])]
+            return Application(
+                template_id=template_id,
+                revision=int(template.get("revision", 1)),
+                definition=dict(template.get("definition", {})),
+                resolved=tuple(name for name in stated if name in have),
+                unresolved=tuple(name for name in stated if name not in have),
             )
     raise ItemError(f"テンプレート '{template_id}' が {COLLECTIONS[kind]} にありません")
+
+
+def apply_template(
+    document: dict[str, Any],
+    kind: str,
+    item_id: str,
+    name: str,
+    *,
+    accepted: Application,
+) -> dict[str, Any]:
+    """Create a new independent item from a previewed application (AC-061).
+
+    Takes the preview rather than a template id, so an item cannot be created without a resolution
+    result having existed - the same shape as `prune`, which takes the plan it showed.
+
+    The definition is **copied**. A shared structure would make a later template edit reach into a
+    report somebody already sent.
+    """
+    return create(
+        document, kind, item_id, name,
+        dict(accepted.definition),
+        source=SourceTemplate(accepted.template_id, accepted.revision),
+    )
 
 
 def save_as_template(
