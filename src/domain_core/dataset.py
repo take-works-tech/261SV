@@ -95,10 +95,11 @@ class Dataset:
     points_m: np.ndarray
     cells: Cells
     fields: dict[str, Field] = dataclass_field(default_factory=dict)
-    # The tessellated surface a picture is drawn from. Held here and kept separate rather than replacing
-    # the geometry above, because INV-001 is a statement about two point sets and a product holding one
-    # of them cannot honour it whichever one it holds.
-    display: DisplayGeometry | None = None
+    # Display geometry, by the triangle budget it was built for. A cache and not a field: producing it
+    # is MOD-003's work, it costs 22 seconds for a million-point surface, and it is derived entirely from
+    # the geometry above - so it belongs to the object it is derived from and dies with it (XC-230,
+    # ingest/TASK-017). Keyed by budget because two views of one @Case may have different ones.
+    display_by_budget: dict[int, DisplayGeometry] = dataclass_field(default_factory=dict)
     # The ghost arrays, held apart from `fields` for two reasons: `vtkGhostType` is not a physical
     # quantity and does not belong in the list a user picks a @Variable from, and the point one and the
     # cell one share a name, so a dictionary keyed by name could only ever hold one of them.

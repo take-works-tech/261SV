@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-20
+updated: 2026-08-24
 ---
 
 # Capacity limits
@@ -66,8 +66,12 @@ applies the matching row; the class it chose is visible in settings, and can be 
   ceiling rather than the twenty million previously carried, which was extrapolated from a published
   benchmark on a discrete card (E-020), which remains the only indication of what the workstation class
   can do and is not treated as a measurement of it
-- on_exceed: a reduced representation is displayed and marked as reduced, while reported numbers stay
-  computed on the full @Dataset (ingest/AC-030, ingest/AC-031)
+- on_exceed: a reduced representation is displayed and marked as reduced - with **how much** was left
+  out, because "reduced" alone does not distinguish a view showing a tenth of its triangles from one
+  showing 99% - while reported numbers stay computed on the full @Dataset (ingest/AC-030, ingest/AC-031). The
+  reduction is `vtkDecimatePro`, which keeps the map back to the dataset's own points, and it is
+  computed once per budget and cached: it costs 2.63 s at a million triangles and 22.34 s at 2.25
+  million, against a frame of about 23 ms (E-134, XC-235)
 - decidedness: Fixed
 - basis: E-063 (T1)
 

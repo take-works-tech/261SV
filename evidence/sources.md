@@ -1380,3 +1380,22 @@ Recorded so that nothing silently depends on them:
   point a display vertex was.
 - justifies: INV-001, XC-233
 
+### E-134 - Which decimator keeps the map back to the dataset
+- tier: T1
+- url: spike/measure_object_types.py
+- verified: 2026-08-24
+- says: measured on 2026-08-24 against **VTK 9.5.2**. A sphere triangulated to 489,300 points and
+  977,200 triangles was given a `vtkOriginalPointIds` array and reduced to a tenth by each candidate
+  decimator, with `SetTargetReduction(0.9)`.
+  **`vtkDecimatePro`** (with `PreserveTopologyOn`, splitting off, boundary-vertex deletion off) returned
+  49,560 points and 97,720 triangles in **2.63 s**, **carried `vtkOriginalPointIds` through**, and moved
+  **none** of the surviving points - every one was bit-identical to its original position.
+  **`vtkQuadricDecimation`** returned 48,990 points and 97,719 triangles in 4.31 s and **dropped the id
+  array entirely**, so nothing remains that says which dataset point a surviving vertex was.
+  The two are therefore not interchangeable on quality grounds: only one of them leaves a reduced
+  surface able to answer a pick at all.
+  Scale, for the caching question: this 977,200-triangle reduction took 2.63 s here, while the export
+  spike measured 22.34 s to reduce a 2,251,442-cell mesh by the same fraction with the same filter
+  (`spike/results.json`, `decimated_10pct`). Both are far above a frame.
+- justifies: XC-235, ingest/TASK-015, ingest/TASK-017
+

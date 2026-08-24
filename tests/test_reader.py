@@ -267,26 +267,12 @@ class TestTheGeometryAFieldBelongsTo:
         assert dataset.points_m[13].tolist() == [1.0, 1.0, 1.0]
         assert dataset.fields["stress"].values[13] == 130.0
 
-    def test_the_interior_point_is_in_the_dataset_and_not_in_the_picture(self, tmp_path: Path) -> None:
+    def test_reading_draws_nothing(self, tmp_path: Path) -> None:
+        """Display geometry is MOD-003's work and is produced when a view asks for it. What the reader
+        returns is the file, in the canonical frame - see tests/test_display.py for the rest."""
         write_block(tmp_path / "block.vtu")
 
-        dataset = reader.read(tmp_path / "block.vtu")
-
-        assert dataset.display is not None
-        assert dataset.display.points_m.shape[0] == 26
-        assert 13 not in dataset.display.source_points.tolist()
-
-    def test_a_display_point_resolves_to_its_own_value_through_the_map(self, tmp_path: Path) -> None:
-        """Surface extraction reorders as well as drops: display point 3 is dataset point 9. Reading
-        the field at the display index would return a real value belonging to somewhere else."""
-        write_block(tmp_path / "block.vtu")
-
-        dataset = reader.read(tmp_path / "block.vtu")
-        display = dataset.display
-        assert display is not None
-
-        for display_index, source in enumerate(display.source_points.tolist()):
-            assert display.points_m[display_index].tolist() == dataset.points_m[source].tolist()
+        assert reader.read(tmp_path / "block.vtu").display_by_budget == {}
 
     def test_the_cells_are_the_hexahedra_and_not_their_triangles(self, tmp_path: Path) -> None:
         write_block(tmp_path / "block.vtu")
@@ -295,8 +281,6 @@ class TestTheGeometryAFieldBelongsTo:
 
         assert set(dataset.cells.types.tolist()) == {12}  # VTK_HEXAHEDRON
         assert dataset.cells.points_of(0).size == 8
-        assert dataset.display is not None
-        assert dataset.display.triangles.shape == (48, 3)
 
     def test_the_maximum_is_the_interior_point_the_picture_never_shows(self, tmp_path: Path) -> None:
         """INV-001, stated as a number: the largest value in this block is at its centre."""
