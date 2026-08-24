@@ -515,3 +515,117 @@ class TestIdentifiersSurviveReading:
         assert value.value == 90.0
         assert "識別子" in (value.location or "")
         assert reader.read(tmp_path / "plain.vtu").identifiers == {}
+
+
+def write_exodus(path: Path, *, results: bool = True) -> None:
+    """A two-triangle Exodus file, written by the toolkit's own writer (XC-085)."""
+    from vtkmodules.vtkIOExodus import vtkExodusIIWriter
+
+    points = vtkPoints()
+    for x, y in ((0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)):
+        points.InsertNextPoint(x, y, 0.0)
+    grid = vtkUnstructuredGrid()
+    grid.SetPoints(points)
+    for triangle in ([0, 1, 2], [1, 3, 2]):
+        grid.InsertNextCell(VTK_TRIANGLE, 3, triangle)
+
+    if results:
+        for name, values in (("stress", [10.0, 20.0, 90.0, 40.0]), ("temp", [1.0, 2.0, 3.0, 4.0])):
+            array = numpy_to_vtk(np.array(values), deep=True)
+            array.SetName(name)
+            grid.GetPointData().AddArray(array)
+        cells = numpy_to_vtk(np.array([7.0, 8.0]), deep=True)
+        cells.SetName("elem_stress")
+        grid.GetCellData().AddArray(cells)
+
+    writer = vtkExodusIIWriter()
+    writer.SetFileName(str(path))
+    writer.SetInputData(grid)
+    writer.WriteAllTimeStepsOn()
+    writer.Write()
+
+
+class TestExodusReadsItsResults:
+    """The toolkit's Exodus reader returns **no results at all** unless every array is switched on by
+    name, across 27 categories that all start off (E-136). A file read with the defaults comes back as
+    geometry with no numbers, and says nothing about it."""
+
+    def test_every_result_the_file_holds_arrives(self, tmp_path: Path) -> None:
+        write_exodus(tmp_path / "case.ex2")
+
+        case = reader.read_case(tmp_path / "case.ex2")
+        dataset = case.present[0].dataset
+
+        assert sorted(dataset.fields) == ["elem_stress", "stress", "temp"]
+
+    def test_the_defaults_would_have_dropped_them(self, tmp_path: Path) -> None:
+        """Not a test of this product - a demonstration that the switching is load-bearing. Without it
+        the same file yields no result arrays at all."""
+        from vtkmodules.vtkIOExodus import vtkExodusIIReader
+
+        write_exodus(tmp_path / "case.ex2")
+        plain = vtkExodusIIReader()
+        plain.SetFileName(str(tmp_path / "case.ex2"))
+        plain.Update()
+        leaf = plain.GetOutput().GetBlock(0).GetBlock(0)
+
+        names = {
+            leaf.GetPointData().GetArrayName(i) for i in range(leaf.GetPointData().GetNumberOfArrays())
+        }
+        assert "stress" not in names
+
+    def test_a_result_that_did_not_arrive_stops_the_read(self, tmp_path: Path) -> None:
+        """The check is the guarantee, not the switching: a category added to a future toolkit release
+        fails loudly instead of costing a user their results."""
+        from engine.exodus import ExodusResultsLost, check_nothing_was_dropped
+        from vtkmodules.vtkIOExodus import vtkExodusIIReader
+
+        write_exodus(tmp_path / "case.ex2")
+        prepared = vtkExodusIIReader()
+        prepared.SetFileName(str(tmp_path / "case.ex2"))
+        prepared.UpdateInformation()
+        prepared.Update()  # information read, nothing enabled
+
+        with pytest.raises(ExodusResultsLost) as refusal:
+            check_nothing_was_dropped(prepared, prepared.GetOutput())
+        assert "stress" in str(refusal.value)
+
+    def test_it_is_one_case_of_named_parts(self, tmp_path: Path) -> None:
+        write_exodus(tmp_path / "case.ex2")
+
+        case = reader.read_case(tmp_path / "case.ex2")
+
+        assert case.contents.parts == 1
+        assert "Element Blocks" in case.present[0].label
+
+    def test_the_block_number_is_not_offered_as_a_quantity(self, tmp_path: Path) -> None:
+        """Exodus writes `ObjectId` onto every cell. It is a block identity carrying no identifier role,
+        so nothing else would keep it out of the list a user picks a @Variable from."""
+        write_exodus(tmp_path / "case.ex2")
+
+        assert "ObjectId" not in reader.read_case(tmp_path / "case.ex2").present[0].dataset.fields
+
+    def test_the_identifiers_exodus_generates_are_read(self, tmp_path: Path) -> None:
+        write_exodus(tmp_path / "case.ex2")
+
+        dataset = reader.read_case(tmp_path / "case.ex2").present[0].dataset
+
+        assert dataset.identifiers[Association.POINT].global_name == "GlobalNodeId"
+        assert dataset.identifiers[Association.CELL].global_name == "GlobalElementId"
+        assert "GlobalNodeId" in (dataset.maximum("stress").location or "")
+
+    def test_the_format_names_the_gap_it_has(self, tmp_path: Path) -> None:
+        """AC-033: a user is entitled to know that this format needed handling the others did not."""
+        level, gaps = reader.support_level(tmp_path / "case.ex2")
+
+        assert level == "Verified"
+        assert "enabled by name" in gaps
+
+    def test_a_composite_format_refuses_the_single_dataset_entry_point(self, tmp_path: Path) -> None:
+        """`read` returns one @Dataset and Exodus holds parts; answering with one of them would be a
+        silent choice of which (XC-234)."""
+        write_exodus(tmp_path / "case.ex2")
+
+        with pytest.raises(reader.UnsupportedFormatError) as refusal:
+            reader.read(tmp_path / "case.ex2")
+        assert "read_case" in str(refusal.value)

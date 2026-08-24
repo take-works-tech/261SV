@@ -1435,3 +1435,28 @@ Recorded so that nothing silently depends on them:
   takes every array takes the identifiers too - which is what this build did until 2026-08-24.
 - justifies: INV-023, XC-236
 
+### E-136 - The Exodus reader's default is to read no results at all
+- tier: T1
+- url: spike/measure_object_types.py
+- verified: 2026-08-24
+- says: measured on 2026-08-24 against **VTK 9.5.2**, writing an Exodus file with `vtkExodusIIWriter`
+  and reading it back.
+  (1) A file written with the point results `stress` and `temp` and the cell result `elem_stress` comes
+  back, after `SetFileName` and `Update` alone, carrying geometry, one `ObjectId` cell array and
+  **zero results**. `UpdateInformation()` reports all three under
+  `GetNumberOfPointResultArrays` / `GetNumberOfElementResultArrays`, and every status is **0**. There is
+  no error and no warning: a whole result file reads as an empty mesh.
+  (2) `vtkExodusIIReader` exposes **27** array categories, counted from its `GetNumberOf*Arrays`
+  methods. Twenty-six have a plain count/name/status triple; `Object` takes an object-type argument and
+  is a view over the others. All start off.
+  (3) With every category enabled and `SetGenerateGlobalNodeIdArray` /
+  `SetGenerateGlobalElementIdArray` on, the leaf carries `stress`, `temp`, `GlobalNodeId` and
+  `PedigreeNodeId` on its points and `elem_stress`, `ObjectId`, `GlobalElementId` and
+  `PedigreeElementId` on its cells, with the GLOBALIDS and PEDIGREEIDS roles set.
+  (4) The output is a `vtkMultiBlockDataSet` with a fixed eight-branch skeleton - Element Blocks, Face
+  Blocks, Edge Blocks, Element Sets, Side Sets, Face Sets, Edge Sets, Node Sets - of which seven are
+  empty for a simple file. An empty branch is a category the file has none of, not a missing part.
+  (5) `ObjectId` is the element-block number written onto every cell. It carries **no** identifier
+  attribute role, so nothing in the toolkit distinguishes it from a measurement.
+- justifies: XC-237, ingest/REQ-015
+

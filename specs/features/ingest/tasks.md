@@ -13,13 +13,13 @@ is either missing a requirement or is not work this specification asked for.
 - depends_on: none
 - done_when: one call takes a path and returns a @Dataset with geometry, fields and their association,
   with the reader that ran recorded on it
-
+- done: recorded 2026-08-24 for work already in place. `engine/reader.read` and `read_case` return a @Dataset, and a @Case with its parts, with geometry, fields and their association, and the reader that ran on `Dataset.source`.
 ### TASK-002 - Canonical frame conversion on load
 - satisfies: AC-028
 - depends_on: TASK-001
 - done_when: geometry arrives in metres with Z up, the source frame and scale applied are recorded, and
   a unit test asserts the transform to 1e-12 relative
-
+- done: recorded 2026-08-24 for work already in place. `domain_core/frame.py` resolves the frame and `reader.read` applies the scale once, at one point, recording it in `SourceFrame`.
 ### TASK-003 - Refuse frames the reader does not support
 - satisfies: AC-029
 - depends_on: TASK-002
@@ -37,40 +37,40 @@ is either missing a requirement or is not work this specification asked for.
 - depends_on: TASK-001
 - done_when: every field is listed with point or cell association, and a test asserts a cell field is
   still cell-associated after load (INV-003)
-
+- done: recorded 2026-08-24 for work already in place. `Field.association` with `as_point_data`/`as_cell_data` refusing the other, covered by tests/test_reader.py.
 ### TASK-005 - Undeclared units everywhere
 - satisfies: AC-024
 - depends_on: TASK-004
 - done_when: a value requested in a unit while none is declared refuses the conversion and names the
   reason; no code path infers a unit
-
+- done: recorded 2026-08-24 for work already in place. `domain_core/units.py` raises `UndeclaredUnitError` rather than converting, covered by tests/test_units.py.
 ### TASK-006 - Undeclared marker survives display and export
 - satisfies: AC-025
 - depends_on: TASK-005
 - done_when: a field with no declared unit exports as a bare number carrying the marker
-
+- blocked: no export path exists yet, so the half of this task that is about export cannot be written or tested. The marker itself is carried (`Caveat.UNDECLARED_UNIT` on every `ReportedValue` with no unit); what is missing is a writer to carry it through.
 ### TASK-007 - Drop to load in the shell
 - satisfies: AC-020
 - depends_on: TASK-001
 - done_when: dropping supported files on the window creates or updates a @Case and lists its fields
-
+- blocked: there is no shell. The engine half is `reader.read_case`; the drop target is UI work and the mockup is a design state, never evidence of implemented behaviour.
 ### TASK-008 - Unsupported and unreadable files
 - satisfies: AC-021
 - depends_on: TASK-007
 - done_when: an unsupported format names itself and creates no partial @Case; a truncated file reports
   the failure and leaves the @Workspace unchanged (AC-022)
-
+- partly done: recorded 2026-08-24. The engine half is in place - `UnsupportedFormatError` names the format and `UnreadableFileError` the failure, both covered by tests. "Creates no partial @Case" needs the shell that TASK-007 waits for.
 ### TASK-009 - Support level table and its display
 - satisfies: AC-032
 - depends_on: TASK-007
 - done_when: the level of the detected format - Verified, Offered or Absent - is shown with the loaded
   @Case, generated from the table in XC-049 rather than typed twice
-
+- partly done: recorded 2026-08-24. `reader.support_level` returns the level and the gaps; showing it alongside the loaded @Case is UI work.
 ### TASK-010 - Named gaps for Offered formats
 - satisfies: AC-033
 - depends_on: TASK-009
 - done_when: an Offered format shows the specific documented gaps of its reader, not a generic warning
-
+- partly done: recorded 2026-08-24. Each `ReaderChoice` carries its own gap text - the partitioned reader's duplicated boundary points, STL's absent fields, Exodus's arrays that must be enabled by name - and `support_level` returns them. Displaying them is UI work.
 ### TASK-011 - Units present in the file but unread
 - satisfies: AC-034
 - depends_on: TASK-005, TASK-009
@@ -311,3 +311,18 @@ is either missing a requirement or is not work this specification asked for.
   of the refusals read `as vtkGraph` or `as vtkImageData`. Good prose in a document a person reads, and
   **nothing at all in an error message**. The generator now resolves a cross-reference to the words it
   points at, so the contract keeps the reference and the message carries the reason.
+
+### TASK-031 - Exodus, with every result it holds
+- satisfies: AC-032
+- depends_on: TASK-028
+- done_when: an Exodus file loads as one @Case of named parts carrying **every** result the file holds,
+  and a result the file offered that did not arrive stops the read
+- done: 2026-08-24, `engine/exodus.py`. The first Verified-tier format beyond the VTK XML family, and
+  the one that exercises what TASK-018 and TASK-028 built: it arrives as a `vtkMultiBlockDataSet` of
+  named element blocks and it carries global and pedigree identifiers.
+  The reader's default is to read **no results at all** - 27 array categories, all off, no error
+  (E-136). This product switches every one on and then checks that every result the file offered
+  arrived, by name, refusing the read if one did not (XC-237). The check rather than the switching is
+  the guarantee.
+  `ObjectId`, the element-block number Exodus writes onto every cell, carries no identifier role, so
+  nothing in the toolkit would have kept it out of the list a user picks a @Variable from.
