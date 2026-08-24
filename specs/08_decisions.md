@@ -3933,3 +3933,71 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a way to identify the duplicates that does not need a tolerance - a global point ID
   array, which some writers emit - at which point those numbers are computable and are computed
 
+### OPEN-023 - How a background and its environment cross the renderer paths
+- question: XC-119 settles what any background must obey and leaves the set of kinds to implementation
+  (OPEN-016). Neither says how one crosses a renderer boundary. An HDRI environment has a defined
+  meaning in vtk.js, in native VTK and in USD (`UsdLuxDomeLight`), and the three do not agree on how
+  rotation, display strength and camera visibility are expressed. Which representation is canonical,
+  how the others map onto it, and what happens on a path that cannot carry it, is undecided
+- why_open: the gap is between two things that are each settled. AC-089 specifies the **interface** for
+  the background and its environment - one Asset, one rotation, a display strength independent of the
+  lighting strength, and camera visibility - and CT-011 specifies the **transport** of a material across
+  the same boundary in full. Nothing specifies the transport of a background. `UsdLux` appears nowhere
+  in this specification set, checked 2026-08-24, so the USD end of it is not merely undecided but
+  unwritten. Deciding it by whichever renderer is implemented first would make that renderer's
+  convention canonical by accident, which is how a background ends up rotated differently in the report
+  than in the view it was composed in
+- blocks: nothing today - MOD-003 does not exist. It blocks the first background that is not a solid
+  colour, because a solid colour is the one kind on which the three paths cannot disagree
+- closes_when: a background Asset contract exists that names the canonical representation and classifies
+  every path's support for it the way CT-011 classifies a material's - `exact`, `baked` or
+  `unsupported` - measured against what each renderer does with an environment on the hardware class of
+  E-063, not decided in advance
+- affects: view/REQ-002, view/REQ-008, view/REQ-013, CT-004, CT-008, MOD-003, XC-119, OPEN-016, OPEN-024
+- decidedness: Open
+
+### OPEN-024 - What the interactive path and the offscreen path guarantee about the picture
+- question: XC-087 ships three rendering paths - vtk.js on WebGL2 for the interactive view, the native
+  toolkit offscreen for large datasets **and for report images**, and WebGPU marked experimental. Every
+  guarantee written about them is about numbers: XC-087's reversal trigger fires when the paths disagree
+  on a reported value, and view/AC-005 requires identical values across a renderer switch. What the
+  product promises about the **picture** - which a user composes on one path and receives on another -
+  is not stated anywhere
+- why_open: this is not a request for pixel equality, which no two renderers give. It is that the
+  difference is currently unnamed, and an unnamed difference is discovered by the recipient of a report.
+  The mechanism to name it already exists and is already restricted to one asset kind: CT-011 gives
+  native VTK and vtk.js **separate versioned capability manifests** and classifies every material
+  feature `exact`, `baked` or `unsupported`. Backgrounds, lighting and the composed View have no
+  equivalent, so a View is currently a thing whose material half can state its own fidelity and whose
+  other half cannot
+- blocks: nothing today. It blocks report/REQ work that embeds a rendered image, because the image in
+  the deliverable is the one rendered on the path the user did not use
+- closes_when: the capability classification is defined for a whole @View rather than for a material
+  alone, and a stated difference between the composing path and the rendering path is reported before
+  the image is produced rather than after
+- affects: view/REQ-002, view/REQ-007, report/REQ-001, CT-011, MOD-003, INV-002, XC-087, OPEN-023
+- decidedness: Open
+
+### OPEN-025 - What an imported 3D prop carries, and whether it may be imported at all
+- question: view/AC-037 requires that placing an imported 3D model state its cost against LIM-009, and
+  XC-119 lists prop models as a candidate background kind. Neither says what the Asset **is**. Three
+  things are unanswered: what the prop's own materials are, and how they relate to CT-011 - a glTF or
+  OBJ prop arrives with materials that are not MaterialX graphs, and preserving, converting or ignoring
+  them are three different products; what the prop's unit and scale are on import; and which formats may
+  be read at all
+- why_open: the third part is already decided in a way that constrains the other two. XC-047 disables by
+  default any format whose reader carries an unfixed advisory, and four heap-overflow and use-after-free
+  advisories at CVSS 7.5 affect VTK's glTF loader with no fixed version indicated (E-033). The obvious
+  prop format is therefore the one this product has already decided not to open by default, and a prop
+  contract written without settling that would specify an import path that XC-047 refuses.
+  The scale question is separate from the one already solved: `domain_core/frame.py` resolves the frame
+  of a **result** file, where XC-003 forbids inferring a unit. A prop is not a result and carries no
+  reported number, so the same prohibition may not be the right answer - but the canonical frame is
+  Z-up metres either way, and a prop placed at the wrong scale is a picture that misleads about size
+- blocks: nothing today. It blocks view/AC-037, which cannot be implemented past a cost statement
+- closes_when: a prop Asset contract exists stating its permitted formats against XC-047, the treatment
+  of its own materials against CT-011, and how its unit and scale are established - declared, read, or
+  refused
+- affects: view/REQ-013, CT-008, CT-011, MOD-002, MOD-003, XC-047, XC-119, OPEN-016
+- decidedness: Open
+
