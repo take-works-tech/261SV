@@ -348,27 +348,46 @@ updated: 2026-08-22
 - satisfies: AC-036
 - depends_on: TASK-029
 - done_when: a promoted template is visible in every workspace and the origin still opens alone
-
+- done: 2026-08-24, `src/service/workspace/templates.py`. Promotion copies the definition outward
+  and leaves the origin standing alone - it does not make the originating workspace depend on the
+  library. The `sample` scope is refused as a promotion target, because it ships with the product and is
+  never edited in place (GL-019).
 ### TASK-036 - Requirements written down on promotion
 - satisfies: AC-037
 - depends_on: TASK-035
 - done_when: field, unit, variable, part and entry references are collected and reported
-
+- done: 2026-08-24. Fields, units, variables, parts and entries are collected and **recorded on the
+  template**, not just returned: whoever applies it next year reads the template, not the call that
+  promoted it.
+  Something resolvable only inside the origin is **reported and not refused** (AC-037). Refusing turns a
+  shareable template into an unshareable one over a detail the user may be happy to accept.
+  The requirement keys are written out rather than discovered by walking for anything name-shaped: a
+  template's requirements are a promise to its user, and a promise assembled by pattern-matching is one
+  that changes when somebody renames a key.
 ### TASK-037 - Self-contained export
 - satisfies: AC-038
 - depends_on: TASK-036
 - done_when: one file carries the definition and embeddable assets; the rest are listed by name
-
+- done: 2026-08-24. Embedding is expressed as an **allowance rather than a denial**: an asset
+  nobody has cleared is listed by name and not included, whatever its size. A template that quietly
+  embeds a font somebody redistributed is a licence problem the user finds out about from someone else
+  (XC-025), and the refusal has to be the default rather than a check somebody remembers.
 ### TASK-038 - Import
 - satisfies: AC-039
 - depends_on: TASK-037
 - done_when: an imported template lands in the chosen scope with its origin and unresolved list
-
+- done: 2026-08-24. The origin is recorded on the imported template - one that arrives anonymous is
+  one nobody can go back to when its numbers are questioned. What does not resolve is **listed rather
+  than failing the import** (XC-090): a template exists to cross studies, and refusing one that does not
+  fit exactly defeats it. A file that is not a template export is refused by naming what it is.
 ### TASK-039 - Arity enforced
 - satisfies: AC-040
 - depends_on: TASK-029
 - done_when: a contradicting use is refused with the arity named
-
+- done: 2026-08-24. A single-case template applied to a set, or the reverse, is refused with the
+  arity named. Not a near miss: it is a different operation with a different answer, and guessing which
+  the user meant produces the answer nobody asked for. An arity value this build does not recognise is
+  refused rather than treated as "either".
 ### TASK-040 - Tag proposals from readable signals
 - satisfies: AC-041
 - depends_on: ingest/TASK-001

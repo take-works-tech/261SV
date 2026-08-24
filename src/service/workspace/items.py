@@ -66,8 +66,13 @@ def _collection(document: dict[str, Any], kind: str) -> list[dict[str, Any]]:
     return document.setdefault("workspaceItems", {}).setdefault(kind, [])
 
 
-def _templates(document: dict[str, Any], kind: str) -> list[dict[str, Any]]:
-    # The serialized field keeps the historical name `templates` for version-4 compatibility (CT-001).
+def templates_of(document: dict[str, Any], kind: str) -> list[dict[str, Any]]:
+    """The workspace-scoped reusable entries of one kind.
+
+    The serialized field keeps the historical name `templates` for version-4 compatibility (CT-001).
+    Public because `templates.py` legitimately needs it: one accessor, so the compatibility quirk is
+    known in one place rather than spelled out at each use.
+    """
     return document.setdefault("templates", {}).setdefault(kind, [])
 
 
@@ -124,7 +129,7 @@ def apply_template(
     The definition is **copied**. A shared structure here would make a later template edit reach into a
     report somebody already sent.
     """
-    for template in _templates(document, kind):
+    for template in templates_of(document, kind):
         if template.get("id") == template_id:
             revision = int(template.get("revision", 1))
             return create(
@@ -158,7 +163,7 @@ def save_as_template(
             "ここに書くとワークスペースを配っただけで共有ライブラリが増えます（CT-001）"
         )
     item = find(document, kind, item_id)
-    existing = [t for t in _templates(document, kind) if t.get("id") == template_id]
+    existing = [t for t in templates_of(document, kind) if t.get("id") == template_id]
     revision = max((int(t.get("revision", 1)) for t in existing), default=0) + 1
     template = {
         "id": template_id,
@@ -167,7 +172,7 @@ def save_as_template(
         "scope": scope,
         "definition": dict(item["definition"]),
     }
-    _templates(document, kind).append(template)
+    templates_of(document, kind).append(template)
     return template
 
 
