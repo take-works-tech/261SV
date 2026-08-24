@@ -211,22 +211,42 @@ updated: 2026-08-22
 - depends_on: TASK-001
 - done_when: every object carries an identifier that is never reused, and no stored reference contains
   a name
-
+- done: 2026-08-24, `src/service/workspace/naming.py`. An identifier is a kind, a colon and an
+  opaque suffix, so a reference read out of a file says **what** it referred to even when the object is
+  gone: `case:7f3a` is a case somebody deleted, and `7f3a` is nothing anybody can act on.
+  A retired identifier is remembered and never issued again - not after a delete, not after an undo. A
+  reference held outside this workspace resolves to the object it meant or to nothing, and never to
+  whatever took its place. A retired **name**, by contrast, is free again: the identifier is the thing
+  that must not repeat.
 ### TASK-022 - Duplicate names refused
 - satisfies: AC-023
 - depends_on: TASK-021
 - done_when: a colliding create or rename is refused with the holder named, for every kind
-
+- done: 2026-08-24, with the holder named and no suffix appended. "baseline (2)" beside "baseline"
+  is a pair of objects nobody can tell apart in a report, created by a product that decided not to
+  bother the user. Two different kinds may share a name; renaming something to the name it already has
+  is allowed, or a form that saves every field would refuse every save.
 ### TASK-023 - Lookup returns one or fails
 - satisfies: AC-024
 - depends_on: TASK-022
 - done_when: name lookup never returns a collection, and a miss reports what was searched
-
+- done: 2026-08-24. A miss reports what was searched among - "not found" alone leaves the user
+  guessing whether they misspelled it or are looking in the wrong place. A duplicate is reported as a
+  document edited outside this product, because creation refuses collisions and so it cannot have
+  happened here.
+  Never a list: returning one moves the choice to a caller with less information than this layer has,
+  and every caller that takes the first element is a bug nobody will find.
 ### TASK-024 - Rename keeps references working
 - satisfies: AC-025
 - depends_on: TASK-021
 - done_when: renaming an object leaves views, pipelines and expressions resolving to it
-
+- done: 2026-08-24, and asserted as a property of the whole document rather than of one code path -
+  `references_in` walks a document for identifier-shaped strings, so a test can say "nothing stored
+  holds a name" about all of it at once.
+  One thing the task did not anticipate: a document written by another version, or edited outside this
+  product, may hold identifiers this build would not issue and names it would not have allowed.
+  Refusing to load them would lose the user's work over a rule about how they were made, so they are
+  adopted as they are and the checks apply to what happens next.
 ### TASK-025 - Change journal
 - satisfies: AC-026
 - depends_on: TASK-001
