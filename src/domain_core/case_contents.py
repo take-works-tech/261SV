@@ -41,7 +41,16 @@ class AxisKind(str, Enum):
 
 @dataclass(frozen=True, slots=True)
 class ResultAxis:
-    """The axis, and the positions along it the files declared - `None` when they declared none."""
+    """The axis, and the positions along it the files declared - `None` when they declared none.
+
+    **A kind of `UNDECLARED` may carry positions.** An earlier version of this refused that combination,
+    on the reasoning that positions belong to an axis and one without the other is incoherent. Measuring
+    the toolkit showed the combination is the ordinary case rather than an incoherent one: a CGNS file
+    declares its values in `BaseIterativeData_t` and the reader hands them over, while the node that
+    says what they *are* - `SimulationType_t` - has no accessor at all (E-138). The file gives numbers
+    along an axis and does not say which axis, and dropping the numbers or naming the axis are both
+    worse than saying so.
+    """
 
     kind: AxisKind
     positions: tuple[float, ...] | None = None
@@ -49,14 +58,52 @@ class ResultAxis:
     def __post_init__(self) -> None:
         if self.kind is AxisKind.NONE and self.positions:
             raise ValueError("a steady case has no axis, so it cannot carry positions")
-        if self.kind is AxisKind.UNDECLARED and self.positions:
-            raise ValueError(
-                "positions were read but the axis they belong to was not; say which axis, or carry none"
-            )
+        if self.positions is not None and len(self.positions) < 1:
+            raise ValueError("an axis with no positions carries None, not an empty sequence")
 
     @property
     def is_declared(self) -> bool:
         return self.kind not in (AxisKind.UNDECLARED, AxisKind.NONE)
+
+
+_AXIS_WORD = {
+    AxisKind.TIME: "時刻",
+    AxisKind.MODE: "モード",
+    AxisKind.FREQUENCY: "周波数",
+    AxisKind.UNDECLARED: "宣言なし",
+}
+
+
+def differing_axes(*axes: ResultAxis) -> str | None:
+    """What must be said when results from these axes are put together, or None when nothing must.
+
+    ingest/AC-044. Two results side by side in a @Graph or a @Report read as comparable, and a mode
+    number beside a time is not - the horizontal position means a different thing in each. The statement
+    is produced here rather than at each display site because a site that forgets it produces a chart
+    that looks ordinary.
+
+    An **undeclared** axis is the case this exists for, and it produces a statement whatever it sits
+    beside - including another undeclared axis carrying the same values. Two files that both say
+    "0, 0.5" and neither of which says what that is may be one transient run and one modal one.
+    """
+    kinds = {axis.kind for axis in axes}
+    kinds.discard(AxisKind.NONE)  # a steady result has no positions to disagree about
+    if AxisKind.UNDECLARED in kinds:
+        # Any undeclared axis, even beside another undeclared one carrying the same values. Two files
+        # that both say "0, 0.5" and neither of which says what that is may be one transient run and
+        # one modal one, and silence here would be read as a statement that they agree.
+        others = kinds - {AxisKind.UNDECLARED}
+        beside = "".join(
+            f"（他方は{_AXIS_WORD[kind]}）" for kind in sorted(others, key=lambda k: k.value)
+        )
+        return (
+            f"並べた結果のうち、軸の種類がファイルに宣言されていないものがあります{beside}。"
+            "同じ軸である保証はありません"
+        )
+    if len(kinds) < 2:
+        return None
+    named = "、".join(_AXIS_WORD[kind] for kind in sorted(kinds, key=lambda k: k.value))
+    return f"異なる結果軸の値を並べています（{named}）。横軸の意味が結果ごとに異なります"
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,6 +168,10 @@ class CaseContents:
             line += f"（{self.partitions} パーティションに分割）"
         if self.axis.kind is not AxisKind.NONE and self.axis.positions is None:
             line += "（位置の値はファイルにありません）"
+        elif self.axis.kind is AxisKind.UNDECLARED and self.axis.positions is not None:
+            shown = "、".join(f"{value:g}" for value in self.axis.positions[:4])
+            more = " …" if len(self.axis.positions) > 4 else ""
+            line += f"（値は {shown}{more}。何を刻む値かはファイルが述べていません）"
         if self.ghost_level:
             line += f"・ゴースト層 {self.ghost_level}"
         if self.is_partial:

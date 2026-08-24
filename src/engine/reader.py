@@ -42,7 +42,7 @@ from vtkmodules.vtkIOXML import (
     vtkXMLUnstructuredGridReader,
 )
 
-from domain_core.case_contents import AxisKind, CaseContents, ResultAxis
+from domain_core.case_contents import CaseContents
 from domain_core.dataset import Association, Dataset, Field, SourceFrame
 from domain_core.frame import (
     CANONICAL_SCALE,
@@ -58,6 +58,7 @@ from domain_core.partitions import Partitioning
 from domain_core.parts import LoadedCase, Part
 from engine.conversion import to_unstructured
 from engine import cgns, exodus
+from engine.result_axis import axis_of
 from engine.exodus import BLOCK_ID_ARRAY
 
 class UnsupportedFormatError(Exception):
@@ -490,12 +491,16 @@ def read_case(path: str | Path) -> LoadedCase:
             if absent
             else f"{location.name} holds no part this build can read"
         )
+    # The sequence the file declared, read from the pipeline rather than from any one reader's method,
+    # and its **kind left undeclared**: no reader in this build surfaces a statement of what the values
+    # mean, and one of them will guess if asked (E-138, XC-240).
+    axis = axis_of(reader)
     return LoadedCase(
         parts=tuple(found),
         contents=CaseContents(
-            steps=1,
+            steps=len(axis.positions) if axis.positions else 1,
             parts=len(found),
-            axis=ResultAxis(AxisKind.NONE),
+            axis=axis,
             missing_parts=tuple(absent),
             partitions=max(partitions or [1]),
         ),

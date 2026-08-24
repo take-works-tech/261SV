@@ -4237,3 +4237,39 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a third format whose reader reads everything by default, which would make this a
   two-format special case rather than a rule - measured, not assumed
 
+### XC-240 - The values of a result sequence are read; what they mean is not guessed
+- decided: 2026-08-24
+- status: active
+- decision: a @Case's sequence **values** are read from the pipeline's `TIME_STEPS` key, which every
+  reader with a sequence publishes. Its **kind** is `UNDECLARED` unless a file states it in a way this
+  product can read, and today none does - so every sequence this build reads is undeclared, carrying its
+  values.
+  Three consequences, each of which had to be decided rather than fallen into:
+  - **`ResultAxis` may carry positions with an undeclared kind.** An earlier version refused that
+    combination; it is the ordinary case.
+  - **A lone `[0.0]` is discarded as the reader's placeholder**, so a steady case reports no axis rather
+    than a position nobody wrote.
+  - **Any undeclared axis put beside another result produces a statement** (ingest/AC-044), including
+    beside another undeclared one carrying the same values
+- decided_by: the product owner, 2026-08-24
+- rationale: `vtkExodusIIReader` will answer the question if asked, and its answer is a guess it
+  documents: mode shapes are inferred from two time values being identical (E-138). Two equal values in
+  a transient restart would make a run modal, and `SetModeShape(n)` is `SetTimeStep(n-1)` - the same
+  index with a different label. GL-036 exists for exactly this: a modal run and a transient run are the
+  same numbers in the same shape of file, and calling mode 3 three seconds is a figure that is wrong
+  about the physics while looking entirely right.
+  Reading the values while refusing the kind is not half an answer. The values are what a file states
+  and the kind is what it does not, and a product that showed one without the other would be choosing
+  which of the two to invent
+- alternatives: adopting the toolkit's guess makes this product agree with ParaView on the same file,
+  including where ParaView is wrong, and agreeing with a known hazard is not compatibility (the same
+  argument as XC-123); dropping the values because the kind is unknown throws away what the file did
+  state; asking the user to name the axis on import is right and is a later task - it does not change
+  what is read
+- basis: E-138 (T1)
+- affects: MOD-002, GL-036, features/ingest/tasks.md, XC-123
+- decidedness: Fixed
+- reversal_trigger: a reader that surfaces a file's own statement of its axis kind - CGNS's
+  `SimulationType_t` is the nearest - at which point the kind is read from it and this product stops
+  reporting undeclared for that format
+

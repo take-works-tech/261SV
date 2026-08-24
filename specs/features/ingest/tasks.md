@@ -232,22 +232,42 @@ is either missing a requirement or is not work this specification asked for.
 - satisfies: AC-041
 - depends_on: TASK-001
 - done_when: modes are indexed by number and each carries its eigenfrequency
-
+- blocked: 2026-08-24, and the blocker is measured rather than assumed. The half about **indexing**
+  is done - a sequence is read and carried with its values. The half about **eigenfrequency** cannot be:
+  no reader in this build reports that a sequence is modal, and the one that will answer if asked
+  guesses it from two time values being identical (E-138). Until a file's own statement is reachable -
+  CGNS's `SimulationType_t` is the nearest - a mode number and its frequency are indistinguishable from
+  a step number and its time, and this product says undeclared rather than choosing (XC-240).
 ### TASK-025 - Harmonic results stay complex
 - satisfies: AC-042
 - depends_on: TASK-024
 - done_when: real and imaginary parts are kept together and indexed by frequency
-
+- blocked: 2026-08-24, on the same measurement as TASK-024. Keeping the real and imaginary parts
+  together is straightforward; knowing that a pair of arrays **is** a complex result, and that the
+  sequence indexing it is frequency, requires a declaration no reader surfaces.
 ### TASK-026 - Unknown result kinds
 - satisfies: AC-043
 - depends_on: TASK-024
 - done_when: an ambiguous index reports unknown rather than being called time
-
+- done: 2026-08-24. `engine/result_axis.py` reads the values and reports the kind as `UNDECLARED`,
+  and a test asserts that `axis_of` mentions no axis kind at all - the claim being about the code rather
+  than about a loaded module, so it holds on a machine with no engine environment.
+  Two things had to be settled that the task did not anticipate. `ResultAxis` **refused** positions
+  without a kind, which measurement showed to be the ordinary case rather than an incoherent one
+  (E-138); the refusal is now a correction recorded in the test that used to assert it. And a lone
+  `[0.0]` is the CGNS reader's placeholder rather than a declaration, so it is discarded - a steady case
+  reports no axis instead of a position nobody wrote.
 ### TASK-027 - Mixed axes are stated
 - satisfies: AC-044
 - depends_on: TASK-025
 - done_when: combining results of different axes carries a statement
-
+- done: 2026-08-24, `domain_core.case_contents.differing_axes`. The statement is produced in
+  domain-core rather than at each display site, because a site that forgets it produces a chart that
+  looks ordinary.
+  **An undeclared axis produces a statement whatever it sits beside**, including another undeclared one
+  carrying the same values: two files that both say "0, 0.5" and neither of which says what that is may
+  be one transient run and one modal one, and silence would be read as a statement that they agree. A
+  steady result has no positions to disagree about and produces none.
 ### TASK-028 - A composite is read as the parts of one Case
 - satisfies: AC-026
 - depends_on: TASK-012
