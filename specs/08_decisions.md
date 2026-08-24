@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-22
+updated: 2026-08-24
 ---
 
 # Decisions and open questions
@@ -4322,3 +4322,24 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a lock mechanism the operating system enforces - an exclusive file handle held open
   for the session - which would replace the judgement with a fact
 
+
+### OPEN-027 - Whether a linter is one of the gates, and which rules it would enforce
+- question: `ruff` is not a declared dependency, carries no configuration in this repository, and is run
+  by no workflow. It runs only when whoever is working happens to have it installed, which is how two
+  findings - an unused import and an unused local - stood in `tests/` across several merges without
+  anything noticing. Either lint is a gate like the other ten, pinned and wired into
+  `.github/workflows/ci.yml`, or it is not part of this project and should stop being run ad hoc
+- why_open: the choice is not "lint: yes or no" but **which rules**, and a rule set adopted wholesale
+  rewrites files for reasons nobody here chose. This project's existing gates each encode a stated
+  reason - one definition per value, one implementation per shared component, evidence tiers - and a
+  linter's default set does not. Two of its habits actively conflict with how this code is written:
+  line-length reflow would break the comment paragraphs that carry the rationale, and import-order
+  rewriting would move the `requires_vtk()` call that must run before the VTK imports beneath it.
+  There is also a cost the other gates do not have: a pinned linter version turns a new release's new
+  rule into a red build on a commit that changed nothing
+- blocks: nothing. The tree is lint-clean as of 2026-08-24 and stays so by hand until this is settled
+- closes_when: either a pinned `ruff` with an explicit rule selection is wired into CI and
+  `check_gates_wired.py` sees it, or the decision is recorded that lint is not a gate here and the
+  ad-hoc runs stop
+- affects: pyproject.toml, .github/workflows/ci.yml, validate/check_gates_wired.py
+- decidedness: Open

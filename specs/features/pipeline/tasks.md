@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-21
+updated: 2026-08-24
 ---
 
 # Tasks: pipeline
@@ -133,48 +133,71 @@ updated: 2026-08-21
 - depends_on: TASK-020
 - done_when: the interpreter runs with execution disabled, reports the target set and artefacts per
   unit, and a test asserts the dry-run list equals what the real run then does
-
+- done: 2026-08-24, `src/service/pipeline/run.py`. The dry-run list is asserted **equal to what the
+  real run then does**, and the first version of that test failed: the plan credited the addCases unit
+  with three cases and the run recorded it as acting on none. A dry run that describes a different
+  execution from the one that follows is worse than no dry run, because the authorisation was given for
+  the first one. Fixed at the structure - a step's `cases` is what it acts on, and the size of the
+  target set afterwards is a separate `set_size`.
+  `dry_run` has **no parameter** for the callable that performs a unit, so there is nothing for it to
+  call even by mistake; the test asserts that rather than watching a callback stay untouched.
 ### TASK-022 - Dry run states loop counts and condition values
 - satisfies: AC-024
 - depends_on: TASK-021, TASK-017, TASK-015
 - done_when: the dry run of a pipeline with loops and conditions states both
-
+- done: 2026-08-24, both stated. Until TASK-015 and TASK-017 land the iteration count and the
+  condition value are **supplied by the caller** rather than computed from the pipeline - the dry run
+  states what it was told, and cannot yet derive it.
 ### TASK-023 - Destructive authorisation
 - satisfies: AC-009
 - depends_on: TASK-021
 - done_when: a run with a clear unit requires one authorisation naming the unit and its case count
-
+- done: 2026-08-24. One authorisation naming the unit and its case count (XC-094), produced from
+  the dry run so the two figures cannot drift. Confirming per case is safer for one case and unusable
+  for forty, which is how people learn to click through confirmations. An authorisation for three cases
+  does not cover thirty: the number is what the user weighed.
+  Which kinds are destructive is a stated list rather than a guess from the name, so a kind called
+  `cleanup` does not become destructive by spelling.
 ### TASK-024 - Declined authorisation
 - satisfies: AC-010
 - depends_on: TASK-023
 - done_when: declining runs the non-destructive units and reports the rest as not authorised
-
+- done: 2026-08-24. Declining runs everything else and reports the destructive unit as not
+  authorised (AC-010), rather than refusing the whole run for one step somebody declined.
 ### TASK-025 - Per-case failure isolation
 - satisfies: AC-011
 - depends_on: TASK-020
 - done_when: a failing case skips its own remaining units and every other case completes
-
+- done: 2026-08-24. XC-095's shape: forty cases with one truncated file produce thirty-nine
+  results and one clear failure. The failed case skips **its own** remaining units - continuing within
+  it would build a report on a state nobody checked.
 ### TASK-026 - No partial exports
 - satisfies: AC-012
 - depends_on: TASK-025
 - done_when: a report whose input failed is not written, and the skip is recorded with its reason
-
+- done: 2026-08-24. The skip is recorded with its reason and the reason is readable per case.
+  A document with a hole in it is a document somebody sends.
 ### TASK-027 - Stop on first failure, when chosen
 - satisfies: AC-013
 - depends_on: TASK-025
 - done_when: the chosen mode stops at the first failure and reports what was already written
-
+- done: 2026-08-24. Continuing is the default and stopping is a mode somebody picks (AC-013);
+  the record names the unit it stopped at and lists what had already been written.
 ### TASK-028 - Cancellation
 - satisfies: AC-014
 - depends_on: TASK-025
 - done_when: cancelling stops at a unit boundary, keeps completed work, and names where it stopped
-
+- done: 2026-08-24. Cancellation arrives at this layer as a **unit boundary** to stop after,
+  keeping completed work and naming where it stopped.
 ### TASK-029 - Run record
 - satisfies: AC-015
 - depends_on: TASK-025
 - done_when: pipeline, version, resolved cases, per-case per-unit outcome and target-set size are
   recorded
-
+- done: 2026-08-24. Pipeline, revision, resolved cases, and one result per unit per case with
+  its outcome and the target-set size it acted on. The record also holds the map from a produced case to
+  the unit that produced it (TASK-031), which nothing fills yet because no unit produces cases until the
+  simulation unit exists.
 ### TASK-030 - Reproducible reruns
 - satisfies: AC-016
 - depends_on: TASK-029
