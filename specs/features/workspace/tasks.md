@@ -487,17 +487,36 @@ updated: 2026-08-22
 - satisfies: AC-052
 - depends_on: pipeline/TASK-029
 - done_when: passing the limit reports the size and offers pruning by run
-
+- done: 2026-08-24, `src/service/workspace/output.py`. Passing LIM-012 is **an ask, not a
+  refusal** - the wording of the report says so, because a product that stops working when a folder
+  grows is one people work around.
 ### TASK-052 - Pruning keeps the record
 - satisfies: AC-053
 - depends_on: TASK-051
 - done_when: artefacts go, run records and input data stay, and nothing is deleted unnamed
-
+- done: 2026-08-24. Three refusals hold the shape. **Nothing goes unnamed**: the plan lists every
+  file, because "freed 4.2 GB" tells the user a number and not what it cost them. **Input data is never
+  touched** - it is not this product's to delete. And **the run record survives its artefacts**, so a
+  deleted image stays reproducible (XC-046); pruning removes what can be regenerated and keeps what
+  cannot.
+  `prune` takes the plan rather than the runs, so what is deleted is what was shown. A function that
+  recomputed the list would be free to delete something the user never saw.
+  The newest run is never pruned by size: a size-driven rule that removes it is a rule that deletes the
+  thing somebody just made.
 ### TASK-053 - Times in UTC with the offset
 - satisfies: AC-054
 - depends_on: TASK-001
 - done_when: stored times are UTC plus offset and are displayed in the reader's zone
-
+- done: 2026-08-24, `src/domain_core/recorded_time.py`. A recorded time is **two facts** - the
+  instant, and where the person who caused it was standing. Storing only the instant loses the second;
+  storing only the local time loses the first, and "17:00" in a record is only useful if you know whose
+  five o'clock it was.
+  A time with no zone is refused: a naive datetime is a local time with the zone forgotten, which looks
+  complete and cannot be ordered against another office's.
+  The offset is held in **minutes**, because several zones are not whole hours and a field that cannot
+  hold +05:45 quietly rounds somebody. A time shown in a zone other than the one it was recorded in
+  names the recording zone, since a time silently restated is one two people disagree about while both
+  reading the same record.
 ### TASK-054 - Workspace shell navigation
 - satisfies: AC-055, AC-058
 - depends_on: TASK-001

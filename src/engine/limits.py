@@ -33,3 +33,10 @@ MAX_LOOP_ITERATIONS = 1000
 # specs/05_limits.md LIM-009: background content per view. Appearance must not spend the frame budget
 # the result itself needs, so this sits below the interactive ceiling rather than sharing it.
 MAX_BACKGROUND_PRIMITIVES = 4000000
+
+# specs/05_limits.md LIM-012: run output in one @Workspace before the product asks about it. Twenty
+# gigabytes, in the internal unit (GL-020) - the specification states it in gigabytes and a name that
+# does not carry its unit is how `MAX_DATASET_BYTES = 8` happened. Not a refusal: the point at which
+# the workspace says how much space is in use and offers to prune by run (XC-141).
+MAX_OUTPUT_BYTES = 21474836480
+
