@@ -118,12 +118,14 @@ updated: 2026-08-22
 - satisfies: AC-009
 - depends_on: TASK-007
 - done_when: dropping a @Variable onto a numeric input binds it, and later changes reach the input
-
+- blocked: OPEN-026. No contract has a place to record a variable bound to a numeric input, and the
+  two candidate shapes decide three contracts at once.
 ### TASK-012 - Unit mismatch refused at binding
 - satisfies: AC-010
 - depends_on: TASK-011
 - done_when: binding a variable whose unit differs from the input's is refused naming both units
-
+- blocked: OPEN-026, with TASK-011. The refusal itself is decided - name both units, convert
+  nothing - and is waiting only on somewhere to record the binding it would refuse.
 ### TASK-013 - Missing and changed input files
 - satisfies: AC-012
 - depends_on: TASK-001
@@ -158,12 +160,13 @@ updated: 2026-08-22
 - depends_on: TASK-005, ingest/TASK-007
 - done_when: importing several files proposes a hierarchy from a deterministic signal, names the signal
   it used, and applies nothing until accepted (XC-081)
-
+- deferred: REQ-006 is phase `later` and priority COULD. Not started rather than blocked.
 ### TASK-016 - Rejected proposals are not repeated
 - satisfies: AC-017
 - depends_on: TASK-015
 - done_when: a rejected grouping is not proposed again in the same session
-
+- deferred: with TASK-015. The session rule itself exists and is tested for tags
+  (`tag_proposals.Session`), so what remains is the grouping proposal it would apply to.
 ### TASK-017 - One quantity list with provenance
 - satisfies: AC-018
 - depends_on: TASK-005
@@ -392,17 +395,34 @@ updated: 2026-08-22
 - satisfies: AC-041
 - depends_on: ingest/TASK-001
 - done_when: proposals come from solver, mesh size and differing variables, applied only on acceptance
-
+- done: 2026-08-24, `src/service/workspace/tag_proposals.py`. Signals are **handed in** rather than
+  read here, so the module is exercisable without a @Dataset and no language model ever sees a field
+  value (XC-229).
+  Mesh size is proposed as a **band**, not a count. "1,043,221 points" is not a tag anybody filters by
+  and it stops matching the moment the mesh is refined; "large-mesh" survives that and is what a person
+  would have written.
+  Every proposal says what it was read from: "steel" with no reason is a tag a user must either trust or
+  check by hand. Acceptance applies the whole set in one action - a user reviewing eleven proposals and
+  clicking eleven times stops reviewing at the fourth.
 ### TASK-041 - Model-inferred tags
 - satisfies: AC-042
 - depends_on: TASK-040
 - done_when: name-inferred proposals appear marked as inferred
-
+- done: 2026-08-24. A name is what somebody typed and a solver record is what the run contained, so
+  the two do not deserve equal confidence and the inferred ones are marked and listed last. A tag
+  produced by both signals is offered once, under the **deterministic** one.
 ### TASK-042 - Rejected proposals stay rejected
 - satisfies: AC-043
 - depends_on: TASK-041
 - done_when: a rejected proposal is not repeated in the session
-
+- done: 2026-08-24, and this is the clause that makes the feature bearable: a suggestion that
+  returns every time you decline it is one you learn to click past, and a user who clicks past
+  suggestions accepts a wrong one eventually.
+  Two boundaries the task did not name. A rejection is about a **proposal**, not a word: declining
+  "steel" read from the solver does not decline somebody later inferring it from the name, because that
+  is a different claim with a different confidence. And it is **session-scoped** - "not now", not
+  "never". Persisting it would mean a tag declined once in March is unavailable in June with nothing on
+  screen saying why.
 ### TASK-043 - Per-variable inheritance state
 - satisfies: AC-044
 - depends_on: TASK-005
@@ -572,6 +592,7 @@ updated: 2026-08-22
   `サンプル`/`オリジナル`, search, `タグ`, sort and result/empty-state composition, while Simulation
   exposes no material-library shelf
 
+- blocked: shell composition. `src/ui/shell` and `src/ui/shared` (MOD-009, MOD-010) do not exist, and the mockup catalogue is a design state rather than evidence of behaviour.
 ### TASK-061 - Work-area header names the new workspace item
 - satisfies: AC-064
 - depends_on: TASK-058
@@ -580,6 +601,7 @@ updated: 2026-08-22
   persistent Template or Save-as-template button, while Simulation continues to state its r1
   unavailability and the centre-bottom Template library category remains present where specified
 
+- blocked: shell composition. `src/ui/shell` and `src/ui/shared` (MOD-009, MOD-010) do not exist, and the mockup catalogue is a design state rather than evidence of behaviour.
 ### TASK-062 - Bottom material shelf and current-state properties
 - satisfies: AC-065
 - depends_on: TASK-060
@@ -592,6 +614,7 @@ updated: 2026-08-22
   above the instruction bar with narrow-width drawer behaviour, selection, drag and explicit apply;
   right rails edit current state only and rename Template to `全体`; Chat shows no shelf
 
+- blocked: shell composition. `src/ui/shell` and `src/ui/shared` (MOD-009, MOD-010) do not exist, and the mockup catalogue is a design state rather than evidence of behaviour.
 ### TASK-063 - Dock boundary resizing
 - satisfies: AC-066
 - depends_on: TASK-062
@@ -603,6 +626,7 @@ updated: 2026-08-22
   remains viewport-bounded without application-level vertical scrolling, centre usability bounds stop
   the drag, hidden panels expose no splitter and no content data changes
 
+- blocked: shell composition. `src/ui/shell` and `src/ui/shared` (MOD-009, MOD-010) do not exist, and the mockup catalogue is a design state rather than evidence of behaviour.
 ### TASK-064 - Put Graph and Report Output last
 - satisfies: AC-067
 - depends_on: TASK-057
@@ -610,22 +634,28 @@ updated: 2026-08-22
   with the ordinary preceding-tab gap and no physical-bottom anchoring, while shared selected-name,
   tooltip and tab semantics remain intact
 
+- blocked: shell composition. `src/ui/shell` and `src/ui/shared` (MOD-009, MOD-010) do not exist, and the mockup catalogue is a design state rather than evidence of behaviour.
 ### TASK-065 - Store multiple Simulation flows on the Workspace
 - satisfies: AC-068, AC-069, AC-070, AC-071
 - depends_on: TASK-001, pipeline/TASK-001
 - done_when: `シミュレーション一覧` manages multiple independently identified and revisioned flows;
   each executable flow holds one or more explicit external-solver execution conditions, round-trips
   without invented outputs, and a Pipeline reference stays pinned to its chosen Simulation revision
-
+- deferred: REQ-018 is phase `later`. Running a Simulation is later-release under XC-091, and
+  storing flows for something that cannot run yet would be a shape decided without the thing that uses
+  it.
 ### TASK-066 - Separate Object controls from Asset lifecycle language
 - satisfies: AC-072
 - depends_on: TASK-060, TASK-062, view/TASK-052
 - done_when: View current-state controls use Object, its reusable library category is Object, and Asset
   remains the term for scope, revision, import, export and reuse
 
+- blocked: shell composition. `src/ui/shell` and `src/ui/shared` (MOD-009, MOD-010) do not exist, and the mockup catalogue is a design state rather than evidence of behaviour.
 ### TASK-067 - Keep peer-tab widths stable and equal
 - satisfies: AC-073
 - depends_on: TASK-060, TASK-061, TASK-062
 - done_when: top work-area tabs and each material-library category group use one stable width per group;
   the top group becomes equal-width icon tabs at its narrow breakpoint, and an overflowing library group
   scrolls without unequal or truncated labels
+
+- blocked: shell composition. `src/ui/shell` and `src/ui/shared` (MOD-009, MOD-010) do not exist, and the mockup catalogue is a design state rather than evidence of behaviour.
