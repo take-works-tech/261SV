@@ -57,19 +57,42 @@ updated: 2026-08-20
 - satisfies: AC-005
 - depends_on: TASK-005
 - done_when: no direction is chosen without the user naming the target dataset
-
+- done: 2026-08-24, `src/engine/analysis/resample.py` and `cross_mesh_difference`. The basis must
+  name one of the two cases and is never chosen here: the two directions give different numbers, and a
+  product that picks one has made an engineering decision on the user's behalf (AC-005).
+  Cell data is refused rather than resampled as points - treating a cell value as a point value asserts
+  it was at the centroid, which nothing said.
 ### TASK-008 - Cross-mesh disclosure
 - satisfies: AC-006
 - depends_on: TASK-007
 - done_when: direction, outside-point count and round-trip error travel with the result
-
+- done: 2026-08-24. All four of XC-038's disclosures travel with the result: direction, outside
+  count **and proportion**, round-trip error in the field's own unit, and the statement that three
+  contributions are in the number.
+  The round-trip error is **measured, not estimated** - the field is carried onto the target and back,
+  and compared with what was there before. A point that fell outside on either hop is excluded rather
+  than counted as zero error, which would make a barely-overlapping pair of meshes look like a perfect
+  one.
 ### TASK-009 - Outside points are missing
 - satisfies: AC-007
 - depends_on: TASK-007
 - done_when: a point outside the source is missing, never extrapolated
-
+- done: 2026-08-24, and this is where the measurement mattered. `vtkResampleWithDataSet` marks a
+  point outside the source in `vtkValidPointMask` **and writes 0.0 into the field there** (E-140). A
+  product returning the array as it comes hands an engineer a page of zeros where its mesh did not
+  reach, and zero in a difference reads as "these agree".
+  That is the behaviour E-056 records Tecplot having, arriving here as the toolkit's default with the
+  mask available and unapplied. The mask is applied and those points are missing.
 ### TASK-010 - The report says what is in the number
 - satisfies: AC-008
 - depends_on: TASK-008, report/TASK-024
 - done_when: a cross-mesh diff in a report states that physical difference and interpolation are both
   present in the value
+- done: 2026-08-24. `disclosure()` is one sentence a report carries **with** the number rather than
+  as a footnote: the value is physical difference plus discretisation plus interpolation, and a reader
+  who is not told that reads it as the first alone.
+  It also carries XC-038's fifth rule, which the task list does not name: where the difference is no
+  larger than the round-trip error that produced it, the region is **undetermined**. A difference
+  smaller than its own interpolation is not a small difference - it is a number the method cannot
+  resolve, and shading it faintly says "almost no change here" when the honest statement is "this method
+  cannot tell".
