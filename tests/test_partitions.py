@@ -15,6 +15,7 @@ import pytest
 from domain_core.association import Association
 from domain_core.case_contents import AxisKind, CaseContents, ResultAxis
 from domain_core.dataset import Dataset, Field
+from domain_core.mesh import Cells
 from domain_core.partitions import (
     GHOST_ARRAY_NAME,
     Aggregate,
@@ -35,6 +36,16 @@ SPLIT_VALUES = np.array([10.0, 20.0, 30.0, 30.0, 40.0, 50.0])
 SPLIT_GHOSTS = np.array([0, 0, 0, PointGhost.DUPLICATE, 0, 0], dtype=np.uint8)
 
 
+def line_cells(points: int) -> Cells:
+    """`points - 1` line cells joining consecutive points. VTK type 3 is VTK_LINE."""
+    segments = points - 1
+    return Cells(
+        offsets=np.arange(segments + 1, dtype=np.int64) * 2,
+        connectivity=np.repeat(np.arange(points, dtype=np.int64), 2)[1:-1],
+        types=np.full(segments, 3, np.uint8),
+    )
+
+
 def bar(
     values: np.ndarray,
     *,
@@ -46,7 +57,7 @@ def bar(
     count = values.size
     return Dataset(
         points_m=np.array([[float(i), 0.0, 0.0] for i in range(count)]),
-        cells=np.array([[i, i + 1] for i in range(count - 1)]),
+        cells=line_cells(count),
         fields={"stress": Field("stress", Association.POINT, values, unit=unit)},
         ghosts={} if ghosts is None else {Association.POINT: ghosts},
         partitioning=Partitioning(parts=parts, ghost_level=ghost_level),
@@ -155,7 +166,7 @@ class TestTheSurveyIsTheAuthorityOnTheParts:
         numbers get refused."""
         dataset = Dataset(
             points_m=np.zeros((2, 3)),
-            cells=np.array([[0, 1]]),
+            cells=line_cells(2),
             contents=CaseContents(steps=1, parts=4, axis=ResultAxis(AxisKind.NONE), ghost_level=2),
             partitioning=Partitioning(parts=1),
         )

@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-22
+updated: 2026-08-24
 ---
 
 # Modules and dependency direction
@@ -36,7 +36,9 @@ touches a file, a device or a clock.
 - layer: domain-core
 - paths: src/domain_core, src/engine/limits.py, src/engine/render_limits.py
 - owns: the vocabulary of glossary section 1 as types - @Workspace, @Case, @Variable, @Field, units,
-  the canonical frame, ID rules, and the invariants that guard them
+  the canonical frame, ID rules, and the invariants that guard them. Including the **two** geometries
+  a @Dataset holds - the connectivity the file declared and the surface it is drawn as, which INV-001
+  requires be distinguishable rather than merely distinguished by convention (XC-233)
 - depends_on: nothing
 - decidedness: Fixed
 - basis: E-001 (T1)

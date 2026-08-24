@@ -12,6 +12,7 @@ import pytest
 
 from domain_core.case_contents import AxisKind, CaseContents, ResultAxis
 from domain_core.dataset import Association, Dataset, Field
+from domain_core.mesh import Cells
 from domain_core.reported_value import (
     DIMENSIONLESS,
     Caveat,
@@ -21,11 +22,15 @@ from domain_core.reported_value import (
 )
 
 
+# One triangle over the three points. VTK type 5 is VTK_TRIANGLE.
+TRIANGLE = Cells(np.array([0, 3], np.int64), np.arange(3, dtype=np.int64), np.array([5], np.uint8))
+
+
 def partial_dataset() -> Dataset:
     """A dataset whose manifest named three parts and whose third was not there."""
     return Dataset(
         points_m=np.zeros((3, 3)),
-        cells=np.array([[0, 1, 2]]),
+        cells=TRIANGLE,
         fields={"stress": Field("stress", Association.POINT, np.array([1.0, 2.0, np.nan]))},
         contents=CaseContents(
             steps=1, parts=2, axis=ResultAxis(AxisKind.NONE), missing_parts=("run_2.vtu",),
@@ -55,7 +60,7 @@ class TestTheMarkTravels:
     def test_a_complete_dataset_adds_no_mark(self) -> None:
         complete = Dataset(
             points_m=np.zeros((3, 3)),
-            cells=np.array([[0, 1, 2]]),
+            cells=TRIANGLE,
             fields={"stress": Field("stress", Association.POINT, np.array([1.0, 2.0, 3.0]), unit="MPa")},
             contents=CaseContents(steps=1, parts=3, axis=ResultAxis(AxisKind.NONE)),
         )
@@ -66,7 +71,7 @@ class TestTheMarkTravels:
     def test_a_dataset_that_was_never_surveyed_claims_nothing(self) -> None:
         """Absent contents is not a claim of completeness - it is the absence of a survey, and it adds
         no caveat rather than asserting there is none to add."""
-        unsurveyed = Dataset(points_m=np.zeros((1, 3)), cells=np.array([[0]]))
+        unsurveyed = Dataset(points_m=np.zeros((1, 3)), cells=Cells.empty())
 
         assert unsurveyed.is_partial is False
         assert unsurveyed.caveats() == frozenset()
@@ -139,7 +144,7 @@ class TestTheTwoSourcesOfIncompleteness:
     the other source does not see."""
 
     def test_a_recorded_incompleteness_marks_it_too(self) -> None:
-        dataset = Dataset(points_m=np.zeros((1, 3)), cells=np.array([[0]]),
+        dataset = Dataset(points_m=np.zeros((1, 3)), cells=Cells.empty(),
                           fields={"s": Field("s", Association.POINT, np.array([1.0]), unit="MPa")})
         dataset.mark_partial("読み込み中に打ち切られました")
 
@@ -151,6 +156,6 @@ class TestTheTwoSourcesOfIncompleteness:
         assert "run_2.vtu" in (partial_dataset().incompleteness or "")
 
     def test_a_complete_dataset_has_nothing_to_say(self) -> None:
-        dataset = Dataset(points_m=np.zeros((1, 3)), cells=np.array([[0]]))
+        dataset = Dataset(points_m=np.zeros((1, 3)), cells=Cells.empty())
 
         assert dataset.incompleteness is None

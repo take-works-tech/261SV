@@ -202,3 +202,104 @@ class TestUnreadUnitInformation:
 
         assert level == "Verified"
         assert "one gap" in gaps and "LengthUnits" in gaps
+
+
+def write_block(path: Path, n: int = 3) -> np.ndarray:
+    """An n x n x n block of points meshed with hexahedra, with a point field equal to the index.
+
+    A volume mesh, unlike the two-triangle grid above, has points that are not on its surface - which
+    is the case the reader was silently wrong about.
+    """
+    from vtkmodules.vtkCommonDataModel import VTK_HEXAHEDRON
+
+    points = vtkPoints()
+    index: dict[tuple[int, int, int], int] = {}
+    for k in range(n):
+        for j in range(n):
+            for i in range(n):
+                index[(i, j, k)] = points.GetNumberOfPoints()
+                points.InsertNextPoint(float(i), float(j), float(k))
+
+    grid = vtkUnstructuredGrid()
+    grid.SetPoints(points)
+    for k in range(n - 1):
+        for j in range(n - 1):
+            for i in range(n - 1):
+                grid.InsertNextCell(VTK_HEXAHEDRON, 8, [
+                    index[(i, j, k)], index[(i + 1, j, k)], index[(i + 1, j + 1, k)], index[(i, j + 1, k)],
+                    index[(i, j, k + 1)], index[(i + 1, j, k + 1)], index[(i + 1, j + 1, k + 1)],
+                    index[(i, j + 1, k + 1)],
+                ])
+
+    values = np.arange(grid.GetNumberOfPoints(), dtype=np.float64) * 10.0
+    array = numpy_to_vtk(values, deep=True)
+    array.SetName("stress")
+    grid.GetPointData().AddArray(array)
+
+    writer = vtkXMLUnstructuredGridWriter()
+    writer.SetFileName(str(path))
+    writer.SetInputData(grid)
+    writer.Write()
+    return values
+
+
+class TestTheGeometryAFieldBelongsTo:
+    """INV-001 is a statement about two point sets. Until `Cells` and `DisplayGeometry` existed the
+    reader kept only the drawn one and hung the fields off it, so a field index and a geometry index
+    named different places (E-132). The two-triangle grid above could never show it: its surface is
+    itself."""
+
+    def test_the_dataset_keeps_the_points_the_file_declared(self, tmp_path: Path) -> None:
+        values = write_block(tmp_path / "block.vtu")
+
+        dataset = reader.read(tmp_path / "block.vtu")
+
+        assert dataset.point_count == values.size == 27
+        assert dataset.cell_count == 8
+
+    def test_a_field_index_and_a_geometry_index_name_the_same_point(self, tmp_path: Path) -> None:
+        """The centre of the block is point 13 at (1, 1, 1) and its value is 130. Before the fix,
+        `points_m[13]` was a surface point and `stress[13]` was this one."""
+        write_block(tmp_path / "block.vtu")
+
+        dataset = reader.read(tmp_path / "block.vtu")
+
+        assert dataset.points_m[13].tolist() == [1.0, 1.0, 1.0]
+        assert dataset.fields["stress"].values[13] == 130.0
+
+    def test_the_interior_point_is_in_the_dataset_and_not_in_the_picture(self, tmp_path: Path) -> None:
+        write_block(tmp_path / "block.vtu")
+
+        dataset = reader.read(tmp_path / "block.vtu")
+
+        assert dataset.display is not None
+        assert dataset.display.points_m.shape[0] == 26
+        assert 13 not in dataset.display.source_points.tolist()
+
+    def test_a_display_point_resolves_to_its_own_value_through_the_map(self, tmp_path: Path) -> None:
+        """Surface extraction reorders as well as drops: display point 3 is dataset point 9. Reading
+        the field at the display index would return a real value belonging to somewhere else."""
+        write_block(tmp_path / "block.vtu")
+
+        dataset = reader.read(tmp_path / "block.vtu")
+        display = dataset.display
+        assert display is not None
+
+        for display_index, source in enumerate(display.source_points.tolist()):
+            assert display.points_m[display_index].tolist() == dataset.points_m[source].tolist()
+
+    def test_the_cells_are_the_hexahedra_and_not_their_triangles(self, tmp_path: Path) -> None:
+        write_block(tmp_path / "block.vtu")
+
+        dataset = reader.read(tmp_path / "block.vtu")
+
+        assert set(dataset.cells.types.tolist()) == {12}  # VTK_HEXAHEDRON
+        assert dataset.cells.points_of(0).size == 8
+        assert dataset.display is not None
+        assert dataset.display.triangles.shape == (48, 3)
+
+    def test_the_maximum_is_the_interior_point_the_picture_never_shows(self, tmp_path: Path) -> None:
+        """INV-001, stated as a number: the largest value in this block is at its centre."""
+        write_block(tmp_path / "block.vtu")
+
+        assert reader.read(tmp_path / "block.vtu").maximum("stress").value == 260.0

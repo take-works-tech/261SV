@@ -4001,3 +4001,41 @@ model or the prompt, never in a description that quietly went stale.
 - affects: view/REQ-013, CT-008, CT-011, MOD-002, MOD-003, XC-047, XC-119, OPEN-016
 - decidedness: Open
 
+### XC-233 - A dataset holds the geometry it was read from and the geometry it is drawn as, separately
+- decided: 2026-08-24
+- status: active
+- decision: a @Dataset carries **two geometries**. `points_m` and `cells` are what the file declared,
+  in the toolkit's own three-array connectivity layout - offsets, connectivity and cell types - with
+  nothing tessellated and nothing dropped. `display` is the triangulated surface, and it carries the
+  index of the dataset point and dataset cell each of its own entries came from.
+  **A field is checked against the geometry it is attached to when the @Dataset is constructed.** A
+  point field whose length is not the point count, or a cell field whose length is not the cell count,
+  is refused rather than stored.
+  A format that stores no explicit connectivity - an image, a rectilinear or a structured grid - is
+  refused by name rather than approximated by its surface
+- decided_by: the product owner, 2026-08-24, on a measured defect rather than on preference
+- rationale: INV-001 is a statement about **two point sets**, and a product that keeps one of them
+  cannot honour it whichever one it keeps. Until this decision the reader kept the drawn one: it stored
+  the extracted surface as the dataset's geometry while reading the fields from the original grid. That
+  is not a near miss. Measured on a 3x3x3 block of hexahedra (E-132), the dataset came back with 26
+  points, 27 field values and 48 triangles where the file had 27 points and 8 cells, and the surface
+  points arrive in the order 0, 1, 10, 9, 3 - so `points_m[3]` was at (0, 0, 1) while `stress[3]` was
+  the value of the point at (0, 1, 0). **Every index correspondence was wrong, and every value returned
+  was a real value from somewhere else** - the shape of error this product exists to prevent. Reported
+  aggregates happened to stay correct, because the fields were read from the full grid; anything
+  computed from a coordinate was not.
+  The connectivity layout is the toolkit's rather than one chosen here so that reading is a copy in
+  each direction. A product storing triangles as `(n, 3)` has to decide what to do the first time it
+  meets a hexahedron, and the decision it reaches for is to triangulate - which is the display path
+  wearing the canonical path's name
+- alternatives: keeping one geometry and a flag saying which it is was the shape that produced the
+  defect; deriving display geometry on demand and never storing it repeats a reduction measured at 22
+  seconds for a million-point surface (ingest/TASK-017); merging the surface back onto the original
+  points needs a tolerance, and E-132 shows the map is available for free from the filter that already
+  ran
+- basis: E-132 (T1)
+- affects: 02_invariants.md, MOD-001, MOD-002, features/ingest/tasks.md, INV-001, INV-009
+- decidedness: Fixed
+- reversal_trigger: a reader for a format whose connectivity is implicit, at which point what `cells`
+  means for it is decided rather than assumed - not by extracting its surface
+

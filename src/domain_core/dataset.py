@@ -19,13 +19,15 @@ import numpy as np
 
 from domain_core.association import Association, AssociationError
 from domain_core.case_contents import CaseContents
+from domain_core.mesh import Cells, DisplayGeometry
 from domain_core.partitions import Aggregate, Partitioning, counted
 from domain_core.reported_value import DIMENSIONLESS, Caveat, Provenance, ReportedValue
 
 from domain_core.precision import format_value, significant_digits
 
 __all__ = [
-    "Association", "AssociationError", "Dataset", "Field", "SourceFrame",
+    "Association", "AssociationError", "Cells", "Dataset", "DisplayGeometry", "Field",
+    "SourceFrame",
 ]
 
 
@@ -91,8 +93,12 @@ class Dataset:
     """Geometry and fields in the canonical frame: right-handed, Z up, metres (GL-021)."""
 
     points_m: np.ndarray
-    cells: np.ndarray
+    cells: Cells
     fields: dict[str, Field] = dataclass_field(default_factory=dict)
+    # The tessellated surface a picture is drawn from. Held here and kept separate rather than replacing
+    # the geometry above, because INV-001 is a statement about two point sets and a product holding one
+    # of them cannot honour it whichever one it holds.
+    display: DisplayGeometry | None = None
     # The ghost arrays, held apart from `fields` for two reasons: `vtkGhostType` is not a physical
     # quantity and does not belong in the list a user picks a @Variable from, and the point one and the
     # cell one share a name, so a dictionary keyed by name could only ever hold one of them.
@@ -155,6 +161,19 @@ class Dataset:
     def __post_init__(self) -> None:
         if self.points_m.ndim != 2 or self.points_m.shape[1] != 3:
             raise ValueError("points must be an (n, 3) array of metres in the canonical frame")
+        # A field is indexed by the points or the cells it is attached to. Checking it here is what
+        # turns a whole class of silent wrongness into a refusal at construction: a field that is a
+        # point longer than the geometry is not off by one entry, it is a different point set, and
+        # every index into it after that names the wrong place (E-132).
+        for field in self.fields.values():
+            expected = self.point_count if field.association is Association.POINT else self.cell_count
+            if field.values.shape[0] != expected:
+                raise ValueError(
+                    f"'{field.name}' has {field.values.shape[0]} {field.association.value} values for "
+                    f"{expected} {field.association.value}s. A field of the wrong length is not a field "
+                    "with a gap - it belongs to a different geometry, and reading it against this one "
+                    "returns real values from the wrong places (INV-001)"
+                )
         if self.contents is not None:
             # The survey counted the parts; a caller restating them could restate them wrongly, and a
             # partitioning that disagrees with the manifest decides which numbers get refused.
@@ -242,7 +261,7 @@ class Dataset:
 
     @property
     def cell_count(self) -> int:
-        return int(self.cells.shape[0])
+        return self.cells.count
 
     def field(self, name: str) -> Field:
         try:
