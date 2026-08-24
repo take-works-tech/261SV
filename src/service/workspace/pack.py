@@ -27,6 +27,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Iterable
 
+from domain_core.locale_format import bytes_as_text
 from service.workspace.case_state import CaseState
 from service.workspace.hierarchy import walk
 
@@ -74,7 +75,7 @@ class Plan:
 
     def describe(self) -> str:
         """The line a user reads **before** deciding, which is the only time it is useful."""
-        size = _human(self.total_bytes)
+        size = bytes_as_text(self.total_bytes)
         line = f"パックの大きさは約 {size}（文書 + {len(self.included)} 件）です"
         if not self.with_data:
             line += "。入力データは含みません"
@@ -82,13 +83,6 @@ class Plan:
             names = "、".join(item.describe() for item in self.omitted)
             line += f"。持って行けないもの {len(self.omitted)} 件：{names}"
         return line
-
-
-def _human(size: int) -> str:
-    for unit, step in (("GB", 1 << 30), ("MB", 1 << 20), ("kB", 1 << 10)):
-        if size >= step:
-            return f"{size / step:.1f} {unit}"
-    return f"{size} B"
 
 
 def plan(

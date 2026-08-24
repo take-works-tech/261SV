@@ -273,13 +273,37 @@ updated: 2026-08-25
 - depends_on: TASK-008
 - done_when: the target set is emptied and loaded data released, with source files hash-identical
   before and after
-
+- done: 2026-08-25, `src/service/pipeline/memory.py`. A clear unit empties the target set and
+  releases every case the run was holding, and the release is recorded on the unit.
+  What "touches no source file" is verified by is narrow and worth stating: the ledger holds integers
+  and case identifiers and names no path type at all, asserted against its own source. Hashing two files
+  either side of a run confirms the behaviour; the structural check is what makes it stay true.
+  Releasing a hold means the pipeline stops counting that case against the budget. It does not claim to
+  free memory - a module reporting an outcome it cannot observe is worse than one that says less.
 ### TASK-033 - Memory ceiling
 - satisfies: AC-019
 - depends_on: TASK-032
 - done_when: exceeding the limit stops that case with required-versus-available stated, and the process
   survives
-
+- done: 2026-08-25. A hold past the budget is refused with **both** numbers - what was needed
+  and what was available (AC-019) - and the refusal travels the path a per-case failure already travels,
+  so the case stops, the rest of its units skip, and the study continues. The process returns a record
+  rather than being killed, which is the whole point.
+  `budget_bytes` and `size_of` are supplied together or not at all: a budget with nothing to measure
+  measures nothing, and a size with no budget has nothing to refuse against. Neither is defaulted -
+  see the correction below.
+  A defect found here and fixed at the cause, before it could produce a wrong number: `limits.py` said
+  in its module docstring that **every** constant in the file was the integrated-graphics class. That is
+  right for LIM-002 and wrong for LIM-001, whose rationale is a 32 GB workstation - so this ceiling,
+  the constant's first consumer, would have allowed a laptop twice what LIM-001 permits, in the
+  direction that ends with the operating system killing the process. The one sentence for the whole file
+  is now a statement per constant, the split is a table derived from the constant rather than a second
+  literal, and `dataset_budget_bytes(machine)` makes asking for the budget require saying which machine
+  it is for.
+  Also fixed at the cause on the way past: the byte formatter existed **twice**, in
+  `workspace/output.py` and `workspace/pack.py`, identical and both labelling binary steps with decimal
+  names - 1 GiB printed as "1.0 GB". One implementation now, in `domain_core/locale_format.py`, spelling
+  it the way the limits spell their own human values.
 ### TASK-034 - Headless entry point
 - satisfies: AC-022
 - depends_on: TASK-020, TASK-029

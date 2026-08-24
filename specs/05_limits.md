@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-24
+updated: 2026-08-25
 ---
 
 # Capacity limits
@@ -42,7 +42,17 @@ applies the matching row; the class it chose is visible in settings, and can be 
 - value: 8589934592
 - unit: bytes
 - human_value: 8 GiB, which at the measured 103.8 bytes per point is about 77 million points
-- value_by_class: half this on the integrated-graphics class, this value on the workstation class
+- value_by_class: half this on the integrated-graphics class, this value on the workstation class.
+  Held as a table in `src/engine/limits.py:MAX_DATASET_BYTES_BY_CLASS`, derived from the constant below
+  so the two cannot be edited apart, and reached through `dataset_budget_bytes(machine)` so that asking
+  for the budget requires saying which machine it is for
+- correction: 2026-08-25. The module docstring of `src/engine/limits.py` said every constant in the
+  file was the integrated-graphics class. That is right for LIM-002 and **wrong for this limit**, whose
+  rationale is a 32 GB workstation - so a build reading the constant on a laptop would have allowed
+  twice what this limit permits, in the direction that ends with the operating system killing the
+  process rather than the product refusing the load. Nothing consumed the constant yet, so no wrong
+  number was ever shown; it was found while building the memory ceiling that would have been the first
+  consumer. The one sentence for the whole file is replaced by a statement per constant
 - source_of_truth: src/engine/limits.py:MAX_DATASET_BYTES
 - rationale: a budget for a 32 GB workstation running the shell, the engine and the user's other
   tools. Measured here, a triangulated surface with one field costs 103.8 bytes per point, stable from

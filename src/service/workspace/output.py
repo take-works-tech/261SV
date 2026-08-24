@@ -24,6 +24,7 @@ from dataclasses import dataclass, field as dataclass_field
 from pathlib import Path
 from typing import Iterable
 
+from domain_core.locale_format import bytes_as_text
 from engine.limits import MAX_OUTPUT_BYTES
 
 #: What a run folder holds that must survive pruning: the record of how the run was made. Named here
@@ -69,10 +70,10 @@ class OutputSize:
         return self.total_bytes > self.limit_bytes
 
     def describe(self) -> str:
-        line = f"出力は {_human(self.total_bytes)}（{self.run_count} 実行分）です"
+        line = f"出力は {bytes_as_text(self.total_bytes)}（{self.run_count} 実行分）です"
         if self.over_limit:
             line += (
-                f"。上限 {_human(self.limit_bytes)} を超えています。"
+                f"。上限 {bytes_as_text(self.limit_bytes)} を超えています。"
                 "古い実行から順に整理できます — 拒否ではなく、確認のお願いです"
             )
         return line
@@ -94,7 +95,7 @@ class PrunePlan:
         names = "、".join(run.identifier for run in self.runs)
         lines = [
             f"{len(self.runs)} 実行分（{names}）から {len(self.files)} ファイル、"
-            f"{_human(self.freed_bytes)} を削除します"
+            f"{bytes_as_text(self.freed_bytes)} を削除します"
         ]
         lines += [f"  - {path.name}" for path in self.files]
         lines.append(
@@ -102,13 +103,6 @@ class PrunePlan:
             "作り方の記録が残っていれば、消した成果物は作り直せます（XC-046）"
         )
         return "\n".join(lines)
-
-
-def _human(size: int) -> str:
-    for unit, step in (("GB", 1 << 30), ("MB", 1 << 20), ("kB", 1 << 10)):
-        if size >= step:
-            return f"{size / step:.1f} {unit}"
-    return f"{size} B"
 
 
 def size_of(runs: Iterable[Run], *, limit_bytes: int = MAX_OUTPUT_BYTES) -> OutputSize:

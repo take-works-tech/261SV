@@ -49,7 +49,9 @@ class TestTheSizeIsStatedBeforeAnythingIsWritten:
 
         line = plan(document, root=tmp_path, document_bytes=2_000_000, with_data=True).describe()
 
-        assert "MB" in line
+        # MiB rather than MB: 1 << 20 bytes is a mebibyte, and the limits state their own human
+        # values in GiB. One formatter, one spelling (domain_core.locale_format.bytes_as_text).
+        assert "MiB" in line
 
     def test_leaving_the_data_out_says_so(self, tmp_path: Path) -> None:
         document = workspace(tmp_path, sources=["run.vtu"])

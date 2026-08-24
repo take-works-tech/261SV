@@ -4,17 +4,52 @@ These are the values `specs/05_limits.md` declares, and the specification linter
 every run: a number changed here without changing the specification, or the reverse, fails the build.
 That is the point of the file - not to centralise constants, but to make the specification testable.
 
-Two machine classes are supported (XC-086). The values below are the integrated-graphics class, which
-is what has been measured; the workstation class is unmeasured and inherits them, which understates it.
+Two machine classes are supported (XC-086), and **which class a constant below belongs to differs from
+constant to constant** - a sentence that answered it once for the whole file was wrong for LIM-001 and
+right for LIM-002. The measurements were taken on the integrated-graphics class (E-051, E-053), so
+LIM-002's ceiling is that class's and the workstation inherits it unmeasured; LIM-001's budget is
+written for a 32 GB workstation and the integrated class gets half. Each constant now says which, and
+the split that used to live in a docstring is a table.
 """
 
 from __future__ import annotations
+
+from enum import Enum
+
+
+class MachineClass(str, Enum):
+    """The two classes of XC-086, probed at first start and overridable by the user.
+
+    There is no default. A limit read without saying which machine it is for is how the
+    integrated-graphics class would be handed the workstation's budget - twice what LIM-001 allows,
+    in the direction that gets a process killed by the operating system rather than refused by us.
+    """
+
+    INTEGRATED = "integrated-graphics"
+    WORKSTATION = "workstation"
 
 # specs/05_limits.md LIM-001: dataset held in memory per case. 8 GiB, written in the internal unit -
 # the glossary makes bytes the internal unit for memory, and a name carrying its unit is the rule
 # (GL-020). An earlier version of this line read `MAX_DATASET_BYTES = 8`, which the parity check
 # accepted because the specification also said 8: both were literally 8, a billion-fold apart.
 MAX_DATASET_BYTES = 8589934592
+
+#: LIM-001's `value_by_class`, held as a table rather than as prose. The workstation figure is the
+#: constant above; the integrated-graphics class gets half of it, derived here so the two can never
+#: be edited apart.
+MAX_DATASET_BYTES_BY_CLASS = {
+    MachineClass.WORKSTATION: MAX_DATASET_BYTES,
+    MachineClass.INTEGRATED: MAX_DATASET_BYTES // 2,
+}
+
+
+def dataset_budget_bytes(machine: MachineClass) -> int:
+    """The per-case memory budget for a machine class (LIM-001).
+
+    A function rather than a bare constant at the call sites, so that asking for the budget requires
+    saying which machine it is for.
+    """
+    return MAX_DATASET_BYTES_BY_CLASS[machine]
 
 # specs/05_limits.md LIM-002: measured on integrated graphics with every frame verified distinct
 MAX_INTERACTIVE_TRIANGLES = 10000000

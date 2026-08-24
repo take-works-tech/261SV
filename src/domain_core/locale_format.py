@@ -121,3 +121,23 @@ def convention_note(convention: NumberConvention = MACHINE) -> str:
     return CONVENTION_NOTE.format(
         decimal=convention.decimal, grouping=convention.grouping or "none"
     )
+
+
+#: The steps a byte count is reported in, largest first. **Binary** steps with **binary names**: 1 << 30
+#: bytes is a gibibyte, and calling it a gigabyte overstates nothing and misnames it by 7 per cent -
+#: which is the kind of small, confident wrongness this product exists not to produce. The limits say
+#: GiB in their own `human_value` (LIM-001, LIM-012), so this is also the spelling that agrees with them.
+BYTE_STEPS = (("GiB", 1 << 30), ("MiB", 1 << 20), ("KiB", 1 << 10))
+
+
+def bytes_as_text(size: int) -> str:
+    """A byte count for a person to read.
+
+    One implementation, in one place. There were two - `service/workspace/output.py` and
+    `service/workspace/pack.py` each carried their own copy, identical and both mislabelled - which is
+    the arrangement where one gets fixed and the other keeps printing the old answer.
+    """
+    for name, step in BYTE_STEPS:
+        if size >= step:
+            return f"{size / step:.1f} {name}"
+    return f"{size} B"
