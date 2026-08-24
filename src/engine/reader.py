@@ -21,7 +21,16 @@ from pathlib import Path
 
 import numpy as np
 from vtkmodules.util.numpy_support import vtk_to_numpy
-from vtkmodules.vtkCommonDataModel import vtkDataSet, vtkPolyData, vtkUnstructuredGrid
+from vtkmodules.vtkCommonDataModel import (
+    vtkCompositeDataSet,
+    vtkDataObject,
+    vtkDataSet,
+    vtkMultiBlockDataSet,
+    vtkPartitionedDataSet,
+    vtkPartitionedDataSetCollection,
+    vtkPolyData,
+    vtkUnstructuredGrid,
+)
 from vtkmodules.vtkIOGeometry import vtkSTLReader
 from vtkmodules.vtkIOXML import (
     vtkXMLPolyDataReader,
@@ -29,14 +38,17 @@ from vtkmodules.vtkIOXML import (
     vtkXMLUnstructuredGridReader,
 )
 
+from domain_core.case_contents import AxisKind, CaseContents, ResultAxis
 from domain_core.dataset import Association, Dataset, Field, SourceFrame
-from domain_core.mesh import Cells
 from domain_core.frame import (
     CANONICAL_SCALE,
     FORMATS_CARRYING_UNIT_INFORMATION,
     FrameDeclaration,
     resolve_frame,
 )
+from domain_core.mesh import Cells
+from domain_core.partitions import Partitioning
+from domain_core.parts import LoadedCase, Part
 
 class UnsupportedFormatError(Exception):
     """Raised for a file this build has no reader for. Names the format rather than failing vaguely."""
@@ -154,6 +166,70 @@ def _fields(data: vtkDataSet) -> dict[str, Field]:
     return found
 
 
+# CT-012's dispositions, as the reader applies them. A composite is taken apart into the parts of one
+# @Case; a dataset is read; anything else names itself and stops.
+_PARTITION_CONTAINERS = (vtkPartitionedDataSet,)
+
+
+def _block_name(parent: vtkCompositeDataSet, index: int, fallback: str) -> str:
+    """The name the file gave a block, or a generated one that says it was generated."""
+    metadata = parent.GetMetaData(index)
+    if metadata is not None and metadata.Has(vtkMultiBlockDataSet.NAME()):
+        name = metadata.Get(vtkMultiBlockDataSet.NAME())
+        if name:
+            return str(name)
+    return fallback
+
+
+def _walk(node: vtkDataObject, path: tuple[str, ...], found: list[Part], absent: list[str],
+          partitions: list[int]) -> None:
+    """Collect the leaves of a composite as parts, keeping absent ones as absences.
+
+    An empty leaf is a named `None` (E-133's measurement companion): the file said there was a part
+    there and there is not, which is exactly what AC-027 asks be reported rather than skipped.
+    """
+    if isinstance(node, _PARTITION_CONTAINERS):
+        # Partitions of one part: they recombine, so this is one part with a piece count (XC-234).
+        pieces = [node.GetPartition(i) for i in range(node.GetNumberOfPartitions())]
+        present = [piece for piece in pieces if piece is not None]
+        partitions.append(max(len(present), 1))
+        if not present:
+            absent.append(" / ".join(path) or "unnamed partitioned dataset")
+            return
+        found.append(Part(name=path[-1], path=path, dataset=_combine(present)))
+        return
+
+    if isinstance(node, vtkCompositeDataSet):
+        count = (
+            node.GetNumberOfPartitionedDataSets()
+            if isinstance(node, vtkPartitionedDataSetCollection)
+            else node.GetNumberOfBlocks()
+        )
+        for index in range(count):
+            child = (
+                node.GetPartitionedDataSet(index)
+                if isinstance(node, vtkPartitionedDataSetCollection)
+                else node.GetBlock(index)
+            )
+            name = _block_name(node, index, f"block {index}")
+            if child is None:
+                absent.append(" / ".join(path + (name,)))
+                continue
+            _walk(child, path + (name,), found, absent, partitions)
+        return
+
+    if isinstance(node, vtkDataSet):
+        found.append(Part(name=path[-1], path=path, dataset=_as_dataset(node)))
+        return
+
+    where = " / ".join(path) or "the root object"
+    raise UnsupportedFormatError(
+        f"{where} is a {type(node).__name__}, which CT-012 does not accept as a part of a @Case. "
+        "Naming it is the point: a generic read failure sends a user looking for a corrupt file that "
+        "does not exist"
+    )
+
+
 def read(path: str | Path) -> Dataset:
     """Read a result file into a @Dataset in the canonical frame.
 
@@ -178,22 +254,112 @@ def read(path: str | Path) -> Dataset:
     if data is None or data.GetNumberOfPoints() == 0:
         raise UnreadableFileError(f"{location.name} was read by {choice.factory.__name__} but contains no points")
 
-    up_axis, scale = resolve_frame(_declared_frame(location, data))
+    return _as_dataset(data, source=SourceFrame(
+        *resolve_frame(_declared_frame(location, data)), reader=choice.factory.__name__
+    ))
 
-    fields = _fields(data)
+
+def _as_dataset(data: vtkDataSet, *, source: SourceFrame | None = None) -> Dataset:
+    """One `vtkDataSet` as a @Dataset in the canonical frame, with nothing drawn.
+
+    Shared by the single-file path and the composite walk so that a part of an assembly and a file on
+    its own go through the same conversion - a second path here is a second set of rounding.
+    """
+    if data.GetNumberOfPoints() == 0:
+        raise UnreadableFileError(f"a {type(data).__name__} was read and contains no points")
+    scale = source.scale_to_metres if source is not None else CANONICAL_SCALE
     points = vtk_to_numpy(data.GetPoints().GetData()).astype(np.float64, copy=True)
-
     # One multiplication, at one point, and only when it changes the value. XC-230: a conversion happens
     # once at a stated place, and `* 1.0` on every coordinate of every dataset is an operation that can
     # only lose precision and never adds any.
     return Dataset(
         points_m=points if scale == CANONICAL_SCALE else points * scale,
         cells=_canonical_cells(data),
+        fields=_fields(data),
+        source=source,
+    )
+
+
+def _combine(pieces: list[vtkDataSet]) -> Dataset:
+    """The partitions of one part, as the one mesh they were cut from.
+
+    They are concatenated and **not merged**: the reader performs no point merging (E-039), so the
+    interface points arrive twice and stay twice. Which is right - INV-010 governs them from there, and
+    welding them here would need a tolerance (XC-232).
+    """
+    if len(pieces) == 1:
+        return _as_dataset(pieces[0])
+    datasets = [_as_dataset(piece) for piece in pieces]
+    offset = 0
+    points, offsets, connectivity, types = [], [np.zeros(1, np.int64)], [], []
+    base = 0
+    for dataset in datasets:
+        points.append(dataset.points_m)
+        offsets.append(dataset.cells.offsets[1:] + base)
+        connectivity.append(dataset.cells.connectivity + offset)
+        types.append(dataset.cells.types)
+        base += dataset.cells.connectivity.size
+        offset += dataset.point_count
+    fields: dict[str, Field] = {}
+    shared = set.intersection(*(set(dataset.fields) for dataset in datasets)) if datasets else set()
+    for name in sorted(shared):
+        first = datasets[0].fields[name]
+        fields[name] = Field(
+            name=name,
+            association=first.association,
+            values=np.concatenate([dataset.fields[name].values for dataset in datasets]),
+            unit=first.unit,
+        )
+    return Dataset(
+        points_m=np.concatenate(points),
+        cells=Cells(np.concatenate(offsets), np.concatenate(connectivity), np.concatenate(types)),
         fields=fields,
-        source=SourceFrame(
-            up_axis=up_axis,
-            scale_to_metres=scale,
-            reader=choice.factory.__name__,
+        partitioning=Partitioning(partitions=len(pieces)),
+    )
+
+
+def read_case(path: str | Path) -> LoadedCase:
+    """Read a file as one @Case, however many parts it turns out to hold (ingest/AC-026, AC-027).
+
+    A composite is taken apart into named parts; a single dataset is one part named after its file.
+    Either way what comes back states how many parts were found, how many pieces they were cut into,
+    and which named parts were not there.
+    """
+    location = Path(path)
+    choice = _READERS.get(location.suffix.lower())
+    if choice is None:
+        raise UnsupportedFormatError(
+            f"'{location.suffix}' is not a format this build reads; it reads {supported_suffixes()}"
+        )
+    if not location.exists():
+        raise UnreadableFileError(f"{location} does not exist")
+
+    reader = choice.factory()
+    reader.SetFileName(str(location))
+    reader.Update()
+    data = reader.GetOutputDataObject(0)
+    if data is None:
+        raise UnreadableFileError(f"{location.name} was read by {choice.factory.__name__} and is empty")
+
+    found: list[Part] = []
+    absent: list[str] = []
+    partitions: list[int] = []
+    _walk(data, (location.stem,), found, absent, partitions)
+
+    if not found:
+        raise UnreadableFileError(
+            f"{location.name} named {len(absent)} part(s) and none of them is there"
+            if absent
+            else f"{location.name} holds no part this build can read"
+        )
+    return LoadedCase(
+        parts=tuple(found),
+        contents=CaseContents(
+            steps=1,
+            parts=len(found),
+            axis=ResultAxis(AxisKind.NONE),
+            missing_parts=tuple(absent),
+            partitions=max(partitions or [1]),
         ),
     )
 

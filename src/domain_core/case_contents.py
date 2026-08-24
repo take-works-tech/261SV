@@ -1,8 +1,15 @@
-"""What one @Case turned out to contain: how many steps, how many parts, and what indexes the steps.
+"""What one @Case turned out to contain: how many steps, how many parts and partitions, and what
+indexes the steps.
 
 A @Case is not a file (GL-002). A transient run arrives as a directory of files, a decomposed run as a
 manifest naming its pieces, and both are **one** @Case with a stated shape - not many cases, and not one
 case whose extent nobody counted (ingest/AC-026).
+
+**A part and a partition are counted separately** (XC-234). A partition is one dataset cut up for
+parallel input and output: its pieces recombine, their interface points are duplicates of each other,
+and INV-010 governs them. A part is a distinct thing in the model - an element block, a side set, a
+material - whose points are nobody else's duplicates and across which nothing is summed unless it was
+asked for. A `.pvtu` names partitions; a `vtkMultiBlockDataSet` names parts.
 
 The shape is reported, never inferred. In particular a series of numbered files gives an **order** and
 no values: nothing in it says the third file is at three seconds, so the axis carries positions only
@@ -59,7 +66,13 @@ class CaseContents:
     steps: int
     parts: int
     axis: ResultAxis
+    # Named parts the file declared and that were not there (ingest/AC-027).
     missing_parts: tuple[str, ...] = ()
+    # How many pieces the parts are cut into for parallel input and output. Separate from `parts`
+    # because the two invalidate different numbers: a missing partition leaves a hole in one part's
+    # mesh, a missing part leaves a whole component out of the case (XC-234).
+    partitions: int = 1
+    missing_partitions: tuple[str, ...] = ()
     # The `GhostLevel` a piece manifest declared: how many layers of cells each piece carries beyond
     # its own. It decides whether *cells* can be repeated across pieces as well as points, which is a
     # different question with a different answer (INV-010, `domain_core.partitions`).
@@ -68,8 +81,10 @@ class CaseContents:
     def __post_init__(self) -> None:
         if self.ghost_level < 0:
             raise ValueError("a piece cannot carry a negative number of ghost layers")
-        if self.steps < 1 or self.parts < 1:
-            raise ValueError("a case that loaded has at least one step and at least one part")
+        if self.steps < 1 or self.parts < 1 or self.partitions < 1:
+            raise ValueError(
+                "a case that loaded has at least one step, one part and one partition"
+            )
         declared = self.axis.positions
         if declared is not None and len(declared) != self.steps:
             raise ValueError(
@@ -79,8 +94,16 @@ class CaseContents:
 
     @property
     def is_partial(self) -> bool:
-        """Whether a part the manifest named could not be found (ingest/AC-027)."""
-        return bool(self.missing_parts)
+        """Whether anything the file named could not be found - a part or a partition (AC-027)."""
+        return bool(self.missing_parts or self.missing_partitions)
+
+    @property
+    def absences(self) -> tuple[str, ...]:
+        """Everything named and not found, parts first, each saying which kind it is."""
+        return tuple(
+            [f"パート {name}" for name in self.missing_parts]
+            + [f"パーティション {name}" for name in self.missing_partitions]
+        )
 
     def describe(self) -> str:
         """One line a user can read, stating the counts rather than implying completeness."""
@@ -94,10 +117,13 @@ class CaseContents:
             AxisKind.UNDECLARED: "軸の種類は宣言されていません",
         }[self.axis.kind]
         line = f"{steps}・{parts}・{axis}"
+        if self.partitions > 1:
+            line += f"（{self.partitions} パーティションに分割）"
         if self.axis.kind is not AxisKind.NONE and self.axis.positions is None:
             line += "（位置の値はファイルにありません）"
         if self.ghost_level:
             line += f"・ゴースト層 {self.ghost_level}"
         if self.is_partial:
-            line += f"・不足パート {len(self.missing_parts)} 件：{', '.join(self.missing_parts)}"
+            absences = self.absences
+            line += f"・不足 {len(absences)} 件：{', '.join(absences)}"
         return line

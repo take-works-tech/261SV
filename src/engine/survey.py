@@ -82,11 +82,15 @@ def survey(path: str | Path) -> CaseContents:
 
     if location.suffix.lower() == ".pvtu":
         present, absent, ghost_level = _pieces(location)
+        # A `.pvtu` names **partitions**, not parts: its pieces recombine into the one mesh they were
+        # cut from, and their interface points are duplicates of each other (XC-234, INV-010). An
+        # earlier version of this counted them as parts, which is the other multiplicity entirely.
         return CaseContents(
             steps=1,
-            parts=max(len(present), 1),
+            parts=1,
             axis=ResultAxis(AxisKind.NONE),
-            missing_parts=tuple(absent),
+            partitions=max(len(present), 1),
+            missing_partitions=tuple(absent),
             ghost_level=ghost_level,
         )
 

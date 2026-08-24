@@ -32,13 +32,18 @@ def write_manifest(path: Path, sources: list[str], *, create: list[str] | None =
 
 
 class TestPartitionedSet:
-    def test_a_manifest_is_one_case_with_its_parts_counted(self, tmp_path: Path) -> None:
+    """A `.pvtu` names **partitions**, not parts (XC-234). Its pieces recombine into the one mesh they
+    were cut from and their interface points are duplicates of each other, which is a different fact
+    about the case than "it has three components" and invalidates different numbers."""
+
+    def test_a_manifest_is_one_part_cut_into_pieces(self, tmp_path: Path) -> None:
         manifest = write_manifest(tmp_path / "run.pvtu", ["run_0.vtu", "run_1.vtu", "run_2.vtu"])
 
         contents = survey(manifest)
 
         assert contents.steps == 1
-        assert contents.parts == 3
+        assert contents.parts == 1
+        assert contents.partitions == 3
         assert contents.is_partial is False
 
     def test_a_named_piece_that_is_absent_is_reported_not_skipped(self, tmp_path: Path) -> None:
@@ -52,10 +57,11 @@ class TestPartitionedSet:
 
         contents = survey(manifest)
 
-        assert contents.parts == 2
+        assert contents.partitions == 2
         assert contents.is_partial is True
-        assert contents.missing_parts == ("run_1.vtu",)
-        assert "run_1.vtu" in contents.describe()
+        assert contents.missing_partitions == ("run_1.vtu",)
+        assert contents.missing_parts == ()
+        assert "パーティション run_1.vtu" in contents.describe()
 
     def test_the_declared_ghost_level_is_read(self, tmp_path: Path) -> None:
         """It decides whether cells are repeated as well as points, and the two invalidate different
@@ -78,7 +84,7 @@ class TestPartitionedSet:
 
         assert survey(manifest).ghost_level == 0
 
-    def test_a_piece_with_no_source_is_a_missing_part(self, tmp_path: Path) -> None:
+    def test_a_piece_with_no_source_is_a_missing_partition(self, tmp_path: Path) -> None:
         """The manifest said there was a piece there; silence about it would be this product deciding
         the file meant something other than what it says."""
         (tmp_path / "run.pvtu").write_text(
@@ -91,7 +97,7 @@ class TestPartitionedSet:
         contents = survey(tmp_path / "run.pvtu")
 
         assert contents.is_partial is True
-        assert "no Source" in contents.missing_parts[0]
+        assert "no Source" in contents.missing_partitions[0]
 
 
 class TestNumberedSeries:
@@ -103,6 +109,7 @@ class TestNumberedSeries:
 
         assert contents.steps == 4
         assert contents.parts == 1
+        assert contents.partitions == 1
 
     def test_the_order_is_not_read_as_a_time(self, tmp_path: Path) -> None:
         """GL-036 and E-130: nothing this build reads declares a time value, so a fourth file is the

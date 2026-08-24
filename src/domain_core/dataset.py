@@ -176,9 +176,10 @@ class Dataset:
                     "returns real values from the wrong places (INV-001)"
                 )
         if self.contents is not None:
-            # The survey counted the parts; a caller restating them could restate them wrongly, and a
-            # partitioning that disagrees with the manifest decides which numbers get refused.
-            self.partitioning = Partitioning(self.contents.parts, self.contents.ghost_level)
+            # The survey counted the pieces; a caller restating them could restate them wrongly, and a
+            # partitioning that disagrees with the manifest decides which numbers get refused. It is the
+            # **partition** count that belongs here: a part's points are nobody's duplicates (XC-234).
+            self.partitioning = Partitioning(self.contents.partitions, self.contents.ghost_level)
         for association, ghosts in self.ghosts.items():
             expected = self.point_count if association is Association.POINT else self.cell_count
             if ghosts.shape != (expected,):
