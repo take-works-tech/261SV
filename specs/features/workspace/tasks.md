@@ -446,22 +446,43 @@ updated: 2026-08-22
 - satisfies: AC-048
 - depends_on: TASK-001
 - done_when: document, workspace assets and optionally data are packed, with the size stated first
-
+- done: 2026-08-24, `src/service/workspace/pack.py`. The plan reads sizes and writes nothing: the
+  decision about the user's disk and their licences is made **before a single byte is copied**, because
+  a user asking for a workspace with its data is asking for something that may be forty gigabytes, and
+  finding that out from a full disk is finding it out too late.
 ### TASK-048 - What a pack could not take
 - satisfies: AC-049
 - depends_on: TASK-047
 - done_when: linked folders and non-redistributable assets are named rather than dropped
-
+- done: 2026-08-24. Everything left behind is **named**, not counted - "3 items omitted" tells the
+  recipient that something is missing and not which thing, and the recipient is the person who cannot
+  ask.
+  Four reasons, kept apart because they call for different actions: outside the workspace, licence,
+  not found, and not requested. A file the user deliberately left out is a different message from one
+  that could not be found, and only the first tells the recipient what to ask for.
+  A linked folder outside the workspace is named and **not followed**: following it would put files from
+  outside the project into a pack the user believes holds their project.
 ### TASK-049 - Opening a pack without data
 - satisfies: AC-050
 - depends_on: TASK-047, TASK-044
 - done_when: every case opens unresolved rather than appearing to work
-
+- done: 2026-08-24. Every case with inputs opens unresolved, with a line saying how to resolve it.
+  XC-136 already had the state for exactly this, which is the whole reason it is a state rather than a
+  flag on a loader.
+  A case with **no** inputs is left alone: it has nothing missing, and marking it unresolved would be
+  the product reporting a problem it invented.
 ### TASK-050 - Absolute and difference declarations
 - satisfies: AC-051
 - depends_on: TASK-001
 - done_when: a declaration records which it is and conversion follows the matching rule
-
+- done: 2026-08-24. `convert` already took a `difference` flag; what INV-028 asks for is that the
+  **quantity declares** it and the conversion follows. `convert_declared` does that, and `kind_of` reads
+  it from a @Variable, a @Field or a raw mapping alike so no caller has to know which it is holding.
+  A call-site flag is right at every site somebody thought about and wrong at the one they did not - and
+  the wrong direction here is the one that **stays in a plausible range**: a temperature difference
+  converted with the offset is inflated by 273.15 and looks like a temperature.
+  A kind value this build does not recognise is refused rather than defaulted, because a typo in a
+  stored document must not silently choose the conversion rule.
 ### TASK-051 - Output size and pruning
 - satisfies: AC-052
 - depends_on: pipeline/TASK-029

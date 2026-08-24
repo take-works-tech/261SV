@@ -93,3 +93,46 @@ def test_the_difference_flag_changes_nothing_for_a_pure_factor() -> None:
 def test_an_undeclared_unit_is_still_refused_for_a_difference() -> None:
     with pytest.raises(UndeclaredUnitError):
         convert(10.0, None, "K", difference=True)
+
+
+class TestTheQuantityDeclaresWhichItIs:
+    """INV-028: "A quantity is declared as one or the other, and a quantity declared as neither is
+    treated as absolute." Declared - not chosen at each conversion. A call-site flag is right at every
+    site somebody thought about and wrong at the one they did not, and the wrong direction here stays in
+    a plausible range: a temperature difference converted with the offset is inflated by 273.15 and
+    looks like a temperature."""
+
+    def test_an_absolute_declaration_gets_the_offset(self) -> None:
+        from domain_core.units import convert_declared
+
+        assert convert_declared(10.0, "degC", "K", {"kind": "absolute"}) == pytest.approx(283.15)
+
+    def test_a_difference_declaration_does_not(self) -> None:
+        from domain_core.units import convert_declared
+
+        assert convert_declared(10.0, "degC", "K", {"kind": "difference"}) == pytest.approx(10.0)
+
+    def test_a_declaration_that_says_nothing_is_absolute(self) -> None:
+        """Fixed by the invariant rather than left to a default argument."""
+        from domain_core.units import DEFAULT_KIND, Kind, convert_declared
+
+        assert DEFAULT_KIND is Kind.ABSOLUTE
+        assert convert_declared(10.0, "degC", "K", {}) == pytest.approx(283.15)
+
+    def test_a_field_answers_the_same_way_as_a_mapping(self) -> None:
+        """A @Variable, a @Field and a raw mapping read from a document all state it the same way, so
+        no caller has to know which it is holding."""
+        from types import SimpleNamespace
+
+        from domain_core.units import Kind, kind_of
+
+        assert kind_of(SimpleNamespace(kind="difference")) is Kind.DIFFERENCE
+        assert kind_of({"kind": "difference"}) is Kind.DIFFERENCE
+
+    def test_a_kind_this_build_does_not_recognise_is_refused(self) -> None:
+        """A typo in a stored document must not silently choose the conversion."""
+        from domain_core.units import UndeclaredUnitError, kind_of
+
+        with pytest.raises(UndeclaredUnitError) as refusal:
+            kind_of({"kind": "relatve"})
+        assert "INV-028" in str(refusal.value)
