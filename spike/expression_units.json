@@ -1,0 +1,22 @@
+{
+  "degC at 20": {
+    "doubled_then_converted": 313.15,
+    "converted_then_doubled": 586.3,
+    "gap": 273.15
+  },
+  "degF at 68": {
+    "doubled_then_converted": 330.92777777777775,
+    "converted_then_doubled": 586.3,
+    "gap": 255.3722222222222
+  },
+  "K at 293.15": {
+    "doubled_then_converted": 586.3,
+    "converted_then_doubled": 586.3,
+    "gap": 0.0
+  },
+  "mm at 20": {
+    "doubled_then_converted": 0.04,
+    "converted_then_doubled": 0.04,
+    "gap": 0.0
+  }
+}
