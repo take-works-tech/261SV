@@ -577,7 +577,8 @@ class TestExodusReadsItsResults:
     def test_a_result_that_did_not_arrive_stops_the_read(self, tmp_path: Path) -> None:
         """The check is the guarantee, not the switching: a category added to a future toolkit release
         fails loudly instead of costing a user their results."""
-        from engine.exodus import ExodusResultsLost, check_nothing_was_dropped
+        from engine.completeness import ResultsLost
+        from engine.exodus import verify
         from vtkmodules.vtkIOExodus import vtkExodusIIReader
 
         write_exodus(tmp_path / "case.ex2")
@@ -586,8 +587,8 @@ class TestExodusReadsItsResults:
         prepared.UpdateInformation()
         prepared.Update()  # information read, nothing enabled
 
-        with pytest.raises(ExodusResultsLost) as refusal:
-            check_nothing_was_dropped(prepared, prepared.GetOutput())
+        with pytest.raises(ResultsLost) as refusal:
+            verify(prepared, prepared.GetOutput())
         assert "stress" in str(refusal.value)
 
     def test_it_is_one_case_of_named_parts(self, tmp_path: Path) -> None:

@@ -21,6 +21,12 @@ dev = [
     # pytest is a development requirement and is not in the distribution closure, so no notice
     # obligation attaches to it (XC-025).
     "pytest==9.1.1",
+    # Writes the CGNS fixture, and nothing else. CGNS is the one Verified format the toolkit ships no
+    # writer for (E-137), so its test file is built straight into the CGNS/HDF5 node layout rather than
+    # collected from outside - which keeps XC-085's rule intact for six of six formats instead of five.
+    # A development requirement, not in the distribution closure, so no notice obligation attaches
+    # (XC-025). Nothing under src/ imports it.
+    "h5py==3.16.0",
 ]
 
 [build-system]
