@@ -248,7 +248,23 @@ is either missing a requirement or is not work this specification asked for.
 - satisfies: AC-040
 - depends_on: TASK-001
 - done_when: values at integration points are not extrapolated by this product
-
+- done: 2026-08-24. XC-123 in code: the extrapolation is not unimplemented, it is **unwritable** - it
+  depends on the element formulation and the file does not carry it, so there is no correct version of
+  it. `as_point_data` and `as_cell_data` refuse an integration-point field and say that, naming the file
+  rather than the product: a user can act on "the file does not carry the element formulation" and
+  cannot act on "unsupported".
+  The structural half mattered as much. `Association` had two members, so an integration-point field had
+  **nowhere truthful to sit** - anything holding one would have called it cell data, and every rule
+  about cell data would then have applied to it wrongly. It is now a third association that must say how
+  many points per cell, because a mesh of n cells with 8 points each and one of 8n cells with one each
+  hold the same number of values.
+  Two aggregates are refused with it: a sum and a mean need the **quadrature weights** of the rule the
+  solver used, and the file does not carry those either. The extremum is reported - it is exactly the
+  peak value the solver evaluated, with no weighting and no interpolation - and so is a count, which is
+  a fact about the array rather than about the physics.
+  Declared, never inferred: solvers name these arrays `sigma_xx_1` through `_8` by convention, and
+  reading a convention as a fact is how eight independent results become one quantity nobody asked to
+  combine.
 ### TASK-024 - Modal results
 - satisfies: AC-041
 - depends_on: TASK-001

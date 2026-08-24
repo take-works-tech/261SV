@@ -27,6 +27,23 @@ from domain_core.reported_value import DIMENSIONLESS, Caveat, Provenance, Report
 
 from domain_core.precision import format_value, significant_digits
 
+#: XC-123, in the words a user sees. The extrapolation is not merely unimplemented: it depends on the
+#: element formulation, and the file does not carry it - so there is no correct version of it to write.
+_NO_EXTRAPOLATION = (
+    "'{name}' は積分点の値です。節点への外挿は要素定式化に依存し、その情報はファイルにありません。"
+    "この製品は積分点の値を書かれたまま読み、外挿しません（XC-123）"
+)
+
+#: The aggregates that need quadrature weights when taken over integration-point values. A count does
+#: not - it counts entries, which is a fact about the array rather than about the physics.
+_NEEDS_WEIGHTS = frozenset({Aggregate.TOTAL, Aggregate.MEAN})
+_AGGREGATE_WORD = {
+    Aggregate.TOTAL: "合計",
+    Aggregate.MEAN: "平均",
+    Aggregate.EXTREMUM: "極値",
+    Aggregate.COUNT: "件数",
+}
+
 __all__ = [
     "Association", "AssociationError", "Cells", "Dataset", "DisplayGeometry", "Field",
     "SourceFrame",
@@ -44,8 +61,29 @@ class Field:
     association: Association
     values: np.ndarray
     unit: str | None = None
+    #: How many quadrature points each cell holds. Required for an integration-point field and refused
+    #: for any other: it is what makes the array's length mean something, and it cannot be inferred
+    #: from the length alone because a mesh of n cells with 8 points each and one of 8n cells with one
+    #: each are the same number of values.
+    points_per_cell: int | None = None
+
+    def __post_init__(self) -> None:
+        at_integration_points = self.association is Association.INTEGRATION_POINT
+        if at_integration_points and not self.points_per_cell:
+            raise AssociationError(
+                f"'{self.name}' is at integration points and does not say how many per cell; without "
+                "that the array's length says nothing about which cell a value belongs to"
+            )
+        if not at_integration_points and self.points_per_cell is not None:
+            raise AssociationError(
+                f"'{self.name}' is {self.association.value} data and cannot have points per cell"
+            )
+        if self.points_per_cell is not None and self.points_per_cell < 1:
+            raise AssociationError("a cell holds at least one integration point")
 
     def as_point_data(self) -> np.ndarray:
+        if self.association is Association.INTEGRATION_POINT:
+            raise AssociationError(_NO_EXTRAPOLATION.format(name=self.name))
         if self.association is not Association.POINT:
             raise AssociationError(
                 f"'{self.name}' is cell data; converting it to point data changes its values and must be asked for"
@@ -53,11 +91,22 @@ class Field:
         return self.values
 
     def as_cell_data(self) -> np.ndarray:
+        if self.association is Association.INTEGRATION_POINT:
+            raise AssociationError(_NO_EXTRAPOLATION.format(name=self.name))
         if self.association is not Association.CELL:
             raise AssociationError(
                 f"'{self.name}' is point data; converting it to cell data changes its values and must be asked for"
             )
         return self.values
+
+    def at_integration_points(self, points_per_cell: int) -> "Field":
+        """Declare that this field's values sit at quadrature points, as a person states a unit.
+
+        Declared and never inferred. Solvers name these arrays by convention - `sigma_xx_1` through
+        `_8` - and reading a convention as a fact is how eight independent results become one quantity
+        nobody asked to combine.
+        """
+        return Field(self.name, Association.INTEGRATION_POINT, self.values, self.unit, points_per_cell)
 
     @property
     def missing_count(self) -> int:
@@ -176,7 +225,12 @@ class Dataset:
         # point longer than the geometry is not off by one entry, it is a different point set, and
         # every index into it after that names the wrong place (E-132).
         for field in self.fields.values():
-            expected = self.point_count if field.association is Association.POINT else self.cell_count
+            if field.association is Association.INTEGRATION_POINT:
+                expected = self.cell_count * (field.points_per_cell or 0)
+            elif field.association is Association.POINT:
+                expected = self.point_count
+            else:
+                expected = self.cell_count
             if field.values.shape[0] != expected:
                 raise ValueError(
                     f"'{field.name}' has {field.values.shape[0]} {field.association.value} values for "
@@ -217,6 +271,15 @@ class Dataset:
             return ReportedValue.unavailable(
                 reason, unit=unit, digits=field.significant_digits,
                 provenance=Provenance.COMPUTED, caveats=caveats, formula=formula,
+            )
+
+        if field.association is Association.INTEGRATION_POINT and aggregate in _NEEDS_WEIGHTS:
+            # An unweighted mean of quadrature-point values is not the cell's average, and their sum is
+            # not its integral: both need the weights of the rule the solver used, and the file does not
+            # carry it. The extremum is exactly the peak value the solver evaluated, and is reported.
+            return refuse(
+                f"'{name}' は積分点の値です。{_AGGREGATE_WORD[aggregate]}には求積則の重みが必要で、"
+                "その情報はファイルにありません。重みなしで計算した値はセルの値ではありません（XC-123）"
             )
 
         mask = self.counted(field.association)
