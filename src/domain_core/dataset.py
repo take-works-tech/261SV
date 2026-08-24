@@ -19,6 +19,7 @@ import numpy as np
 
 from domain_core.association import Association, AssociationError
 from domain_core.case_contents import CaseContents
+from domain_core.conversion import ConversionRecord
 from domain_core.mesh import Cells, DisplayGeometry
 from domain_core.partitions import Aggregate, Partitioning, counted
 from domain_core.reported_value import DIMENSIONLESS, Caveat, Provenance, ReportedValue
@@ -106,6 +107,9 @@ class Dataset:
     ghosts: dict[Association, np.ndarray] = dataclass_field(default_factory=dict)
     partitioning: Partitioning = dataclass_field(default_factory=Partitioning)
     source: SourceFrame | None = None
+    # What CT-012 conversion produced this, where one did. Held rather than logged because three of
+    # the conversions lose something no later step can recover - an image grid's spacing above all.
+    conversion: ConversionRecord | None = None
     # What the survey found: how many steps and parts, and whether a part the manifest named was
     # absent. Held on the dataset so that a value read from it can carry the mark without the call
     # site having to remember to ask (ingest/AC-027).

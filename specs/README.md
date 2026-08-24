@@ -46,7 +46,7 @@ coverage:
 | `validate/check_constant_duplication.py` | the same constant defined in two files: contradictions, and copies that will become contradictions |
 | `validate/check_context_budget.py` | the instruction layer paid on every turn - CLAUDE.md and what it imports, AGENTS.md, rules, output styles - and the path-scoped layer, both charged |
 | `validate/check_dependency_pins.py` | declared dependency versions against the manifests that pin them, in both directions - check 7 compares `SYMBOL = literal` in source files, and a pin inside a TOML array matches nothing it looks at (XC-185) |
-| `validate/check_object_compatibility.py` | CT-012's tables are total: every VTK data object type the toolkit declares has a disposition, every class the reader accepts is one the contract says it accepts, and all 64 ordered pairs of View object types are allowed or refused with a reason |
+| `validate/check_object_compatibility.py` | CT-012's tables are total: every VTK data object type the toolkit declares has a disposition, every class the reader accepts is one the contract says it accepts, and all 64 ordered pairs of View object types are allowed or refused with a reason. `--write` regenerates `src/domain_core/object_compatibility.py`, which the gate then compares - a generated file that cannot drift |
 | `validate/check_gates_wired.py` | every validator here is invoked by something that runs it |
 | `validate/check_automerge_policy.py` | the automatic-merge workflow still checks every condition XC-218 names, still fails closed, and is present or absent in step with that decision's status |
 | `validate/check_mockup_states.py` | every catalogue state renders, not only typechecks - needs `MOCKUP_BASE_URL` and refuses to report success without it |
