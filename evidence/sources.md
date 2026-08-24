@@ -1522,3 +1522,19 @@ Recorded so that nothing silently depends on them:
   two cases apart on its own.
 - justifies: workspace/AC-029, XC-241
 
+### E-140 - What the resampling filter puts at a point outside the source
+- tier: T1
+- url: spike/measure_object_types.py
+- verified: 2026-08-24
+- says: measured on 2026-08-24 against **VTK 9.5.2**. `vtkResampleWithDataSet` and `vtkProbeFilter`
+  both write a `vtkValidPointMask` array marking each target point 1 inside the source and 0 outside -
+  and at the points marked 0 they write **0.0 into the field itself**. Not NaN, not the field's range,
+  not left untouched: zero.
+  So a product that takes the returned array as the resampled field hands back a page of zeros wherever
+  its mesh did not reach, and in a difference zero reads as "these agree". This is the behaviour E-056
+  records Tecplot having - "only 'do not change' or 'constant' for outside points, with no validity
+  mask" - arriving here as the toolkit's default with a mask available and unapplied.
+  Interpolation at an interior point is linear and exact for a linear field: a target at 0.5 between
+  source values 0 and 10 came back as 5.0.
+- justifies: XC-038, diff/AC-007
+

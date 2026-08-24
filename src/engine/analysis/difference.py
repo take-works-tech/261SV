@@ -218,3 +218,100 @@ def relative_difference(
 
 def _unit_word(unit: str | None) -> str:
     return unit if unit else "未宣言"
+
+
+@dataclass(frozen=True, slots=True)
+class CrossMeshDifference:
+    """A difference computed through a resampling, with everything XC-038 requires beside it.
+
+    Four disclosures, and the fifth rule is `undetermined`: **where the difference is the same order as
+    the round-trip error, the region is not coloured.** A difference smaller than the interpolation that
+    produced it is not a small difference - it is a number the method cannot resolve, and shading it
+    faintly says "almost no change here" when the honest statement is "this method cannot tell".
+    """
+
+    field: Field
+    left_case: str
+    right_case: str
+    onto: str
+    outside_count: int
+    outside_fraction: float
+    round_trip_error: float
+    #: True where the difference is not larger than the round-trip error that produced it.
+    undetermined: np.ndarray
+
+    @property
+    def undetermined_count(self) -> int:
+        return int(self.undetermined.sum())
+
+    @property
+    def provenance(self) -> str:
+        return f"{self.left_case} − {self.right_case}（{self.onto} 上に再サンプリング）"
+
+    def disclosure(self) -> str:
+        """The sentence a @Report must carry with the number (AC-008).
+
+        Not a footnote. The number itself is physical difference plus discretisation plus
+        interpolation, and a reader who is not told that reads it as the first alone.
+        """
+        return (
+            f"{self.provenance}。"
+            f"範囲外 {self.outside_count} 点（{self.outside_fraction * 100:.1f}%）は欠測。"
+            f"往復補間誤差 {self.round_trip_error:g}{f' {self.field.unit}' if self.field.unit else ''}。"
+            f"判定できない領域 {self.undetermined_count} 点。"
+            "**この差には、物理的な差・離散化・補間の三つが同時に入っています**"
+        )
+
+
+def cross_mesh_difference(
+    left: Dataset,
+    right: Dataset,
+    name: str,
+    *,
+    left_case: str,
+    right_case: str,
+    onto: str,
+) -> CrossMeshDifference:
+    """Compare two cases whose meshes differ, onto a basis the caller named (AC-005 to AC-008).
+
+    `onto` must name one of the two cases. Nothing here chooses: the two directions give different
+    numbers, and a product that picks one has made an engineering decision on the user's behalf.
+    """
+    from engine.analysis.resample import resample, round_trip_error  # local: VTK stays out of import
+
+    if onto not in (left_case, right_case):
+        raise DiffError(
+            f"再サンプリング先 '{onto}' は比較する二つのケース（{left_case}、{right_case}）の"
+            "どちらでもありません。方向はこちらでは決めません — "
+            "二つの向きは別の数値を出すので、選べばそれは利用者に代わって下した技術判断です（XC-038）"
+        )
+
+    basis, other = (left, right) if onto == left_case else (right, left)
+    other_case = right_case if onto == left_case else left_case
+    carried = resample(other, basis, name, from_case=other_case, onto=onto)
+
+    kept = basis.field(name)
+    if kept.unit != other.field(name).unit:
+        raise DiffError(
+            f"'{name}' の単位が異なります（{_unit_word(kept.unit)} と "
+            f"{_unit_word(other.field(name).unit)}）。再サンプリングの前に単位を揃えてください"
+        )
+
+    values = kept.values.astype(np.float64) - carried.values
+    if onto == right_case:
+        values = -values  # the difference is always left minus right, whichever mesh it sits on
+
+    largest_error, _ = round_trip_error(other, basis, name)
+    undetermined = np.abs(values) <= (largest_error if largest_error == largest_error else 0.0)
+    undetermined &= np.isfinite(values)
+
+    return CrossMeshDifference(
+        field=Field(f"Δ{name}", Association.POINT, values, unit=kept.unit),
+        left_case=left_case,
+        right_case=right_case,
+        onto=onto,
+        outside_count=carried.outside_count,
+        outside_fraction=carried.outside_fraction,
+        round_trip_error=largest_error,
+        undetermined=undetermined,
+    )
