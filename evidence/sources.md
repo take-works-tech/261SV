@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-22
+updated: 2026-08-25
 ---
 
 # Sources
@@ -1538,3 +1538,18 @@ Recorded so that nothing silently depends on them:
   source values 0 and 10 came back as 5.0.
 - justifies: XC-038, diff/AC-007
 
+
+### E-141 - What multiplication does to a unit that carries an offset
+- tier: T1
+- url: spike/measure_expression_units.py
+- verified: 2026-08-25
+- says: measured on 2026-08-25 against this product's own converter (`domain_core.units.convert`).
+  Doubling a value and then converting it, versus converting it and then doubling, give the **same**
+  number for every unit that is a pure scale factor and **different** numbers for every unit that
+  carries an offset: mm at 20 and K at 293.15 agree exactly (gap 0.0), degC at 20 gives 313.15 K one way
+  and 586.3 K the other (gap **273.15 K**), and degF at 68 gives 330.93 K against 586.3 K (gap
+  **255.37 K**).
+  The gap is the offset itself, which is the point: "twice this temperature" has no single answer, so
+  any answer an evaluator produced would be one it invented. The same argument covers division, powers
+  and every function that is not addition or comparison.
+- justifies: XC-242, pipeline/AC-030, pipeline/AC-031

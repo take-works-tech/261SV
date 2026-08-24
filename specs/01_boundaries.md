@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-24
+updated: 2026-08-25
 ---
 
 # Modules and dependency direction
@@ -74,7 +74,9 @@ touches a file, a device or a clock.
 - layer: engine
 - paths: src/engine/analysis
 - owns: derived quantities - @Diff between cases, expressions over @Field values, statistics used by
-  graphs and by recommendations. Every number a user is shown that was not read from a file is computed here
+  graphs and by recommendations. Every number a user is shown that was not read from a file is computed here.
+  The expression language of [13_scripting.md](13_scripting.md) is evaluated here, dimensions and all
+  (XC-242); MOD-011 decides *when* an expression runs and never *what* it evaluates to
 - depends_on: domain-core, dataset-io
 - decidedness: Fixed
 - basis: E-001 (T1)

@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-24
+updated: 2026-08-25
 ---
 
 # Decisions and open questions
@@ -4343,3 +4343,53 @@ model or the prompt, never in a description that quietly went stale.
   ad-hoc runs stop
 - affects: pyproject.toml, .github/workflows/ci.yml, validate/check_gates_wired.py
 - decidedness: Open
+
+### XC-242 - A unit travels through an expression as a dimension, and an offset unit does not travel at all
+- decided: 2026-08-25
+- status: active
+- decision: a value in the expression language carries a **dimension** - integer exponents over mass,
+  length, time and temperature - together with the factor that takes it to the internal unit of that
+  dimension. Not a unit symbol, and not a member of an enumeration of quantities.
+  What each operator does with it:
+  - `+ -`, every comparison, and `min max sum mean median std clamp` require **equal dimensions** and
+    refuse otherwise, naming both units (INV-002, pipeline/AC-031)
+  - `* /` add and subtract the exponents; `**` accepts only an integer literal exponent; `sqrt` halves
+    them and refuses an odd exponent rather than producing a fractional one
+  - `exp log log10 sin cos tan` require a **dimensionless** argument; `atan2` requires its two arguments
+    to agree and returns a dimensionless value
+  - `abs floor ceil round` keep the dimension they were given
+  A result's unit is reported as the registered symbol whose dimension it matches - `Pa` for
+  (1, -1, -2, 0) - and otherwise as a symbol composed from the internal base symbols in a fixed order,
+  `m·s^-1`.
+  **A unit that carries an offset may not be multiplied, divided, raised to a power, or passed to any
+  function that is not `abs min max clamp`.** Absolute and difference (INV-028) then decide addition:
+  absolute minus absolute is a difference, absolute plus or minus a difference is an absolute,
+  difference plus difference is a difference, and **absolute plus absolute is refused**.
+  **A bare number is dimensionless and undeclared** (XC-003). It may scale - `2 * p` is a pressure - and
+  it may not be added to, subtracted from, or **compared with** a declared quantity: `stress > 200` is
+  refused naming the unit the other side declared
+- decided_by: the product owner, 2026-08-25
+- rationale: the specification requires a length divided by a time to yield a velocity, which rules out
+  an enumeration of quantities: a closed list cannot hold an open set of products, and every new
+  combination would be a code change rather than an expression somebody wrote.
+  The offset rule is the part with a measurement behind it. Doubling a value and converting it, against
+  converting it and doubling it, agree exactly for every pure scale factor and differ by the offset for
+  every unit that has one: 273.15 K for degC, 255.37 K for degF, 0.0 for K and for mm (E-141). So
+  "twice this temperature" has no single answer, and whichever the evaluator returned would be one it
+  invented - the failure this product exists to not commit.
+  Refusing `stress > 200` is the expensive half of this decision and it is deliberate. A threshold
+  written without a unit is the mistake that reads as correct: the comparison succeeds, the verdict
+  prints, and whether it meant 200 Pa or 200 MPa is nowhere in the record. The cost is a unit somebody
+  has to type once; the alternative cost is a wrong pass or a wrong fail with a plausible label
+- alternatives: enumerating the derived quantities keeps the existing `Quantity` shape and cannot
+  express an arbitrary product, so it fails the specification's own example. Treating units as opaque
+  strings and requiring exact matches refuses `length / time`, which the language must support.
+  A third-party unit library would supply all of this and brings a dependency into the distribution
+  closure with the notice obligation that attaches to it (XC-025), and its defaults are the wrong ones
+  here - the usual behaviour is to treat a bare number as matching whatever it is combined with
+- basis: E-141 (T1)
+- affects: MOD-004, MOD-011, pipeline/AC-030, pipeline/AC-031, pipeline/AC-033, specs/13_scripting.md
+- decidedness: Fixed
+- reversal_trigger: a unit these four exponents cannot express - a plane angle treated as dimensioned,
+  an amount of substance, or a per-object unit such as "per cell" - which would need the dimension to
+  carry more than the four

@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-24
+updated: 2026-08-25
 ---
 
 # Tasks: pipeline
@@ -81,17 +81,41 @@ updated: 2026-08-24
 - depends_on: analysis module
 - done_when: the language of 13_scripting.md evaluates without a Python interpreter, and the result
   carries the unit the expression produced
-
+- done: 2026-08-25, `src/engine/analysis/expression.py` and `src/domain_core/dimension.py`.
+  A tokeniser, a precedence-climbing parser and an evaluator, with **no `eval`, `exec` or `compile`** -
+  asserted structurally against the module's own source, because a behavioural test only covers the
+  attempts somebody thought of (XC-101).
+  Units travel as a **dimension** rather than as a symbol (XC-242): a length over a time is
+  `m·s^-1`, and Pa is reported as `Pa` rather than as the correct and unreadable `kg·m^-1·s^-2`.
+  A value is held in the internal unit and **labelled with the internal unit**. The first version
+  labelled it with the symbol the user wrote, so `max(1 MPa, 200 kPa)` printed `1e+06 MPa` while holding
+  1e6 Pa - a number shown in one unit and labelled with another, which is the failure this product
+  exists not to commit. Fixed by splitting the one field into two: `unit_name` is what the magnitude is
+  in, `written_unit` is what to quote back in a refusal.
+  The syntax is spelled the way the language table spells it - `and or not`, `**`, and `X if C else Y`.
+  Chained comparisons are refused rather than reinterpreted: `a < b < c` reads as a range to a person
+  and as `(a < b) < c` in the language the syntax comes from.
 ### TASK-012 - Incompatible units refused
 - satisfies: AC-031
 - depends_on: TASK-011
 - done_when: a length added to a time is refused with both units named
-
+- done: 2026-08-25, naming both (INV-002). The rule is dimensional rather than textual, so
+  `1 MPa + 200 kPa` adds and `1 m + 1 s` is refused.
+  Two refusals here cost the user something and were taken deliberately. **`stress > 200` is refused**
+  because a threshold with no unit is the mistake that reads as correct - the comparison succeeds, the
+  verdict prints, and whether it meant 200 Pa or 200 MPa is nowhere in the record (XC-003). And **a unit
+  with an offset may not be multiplied**: doubling 20 degC gives 313.15 K one way and 586.3 K the other,
+  and the gap is the offset itself (E-141), so any answer would be one the product invented. Subtracting
+  two of them cancels the offsets and yields a difference, which may then be scaled.
 ### TASK-013 - Unbound references refused at edit time
 - satisfies: AC-032
 - depends_on: TASK-011
 - done_when: an expression naming something not bound at that point is refused when it is written
-
+- done: 2026-08-25. `check(source, bound=...)` parses, resolves every name against what is
+  bound at that position, and checks each function's arity - before the run. A study that fails at
+  midnight on a name somebody could have seen was wrong is the failure this removes.
+  What it does **not** check is whether the units combine: that needs the values, and this pass has only
+  the names. Said here rather than left to be discovered.
 ### TASK-014 - Variable and formula units
 - satisfies: AC-029
 - depends_on: TASK-011
