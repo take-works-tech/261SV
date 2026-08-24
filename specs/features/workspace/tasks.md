@@ -309,17 +309,25 @@ updated: 2026-08-22
 - satisfies: AC-033
 - depends_on: TASK-001
 - done_when: displayed numbers follow the interface language
-
+- done: 2026-08-24, `src/domain_core/locale_format.py`. A language this build does not know is
+  formatted the plain way rather than like a similar one - a near miss on a decimal separator is the
+  whole of the hazard, so guessing is worse than plain.
 ### TASK-033 - Locale-independent output
 - satisfies: AC-034
 - depends_on: TASK-032
 - done_when: machine-readable output is byte-identical across locales
-
+- done: 2026-08-24, and the guarantee is in the **signature**: `for_machine` takes no locale and
+  has no parameter that could carry one. A function that could be told to use a comma is one that will
+  be, at the single call site nobody checked, and the file is then wrong by a factor of a thousand while
+  looking correct. A test asserts the absence of such a parameter, because that is the property rather
+  than any particular output.
 ### TASK-034 - Stated convention in dual-purpose files
 - satisfies: AC-035
 - depends_on: TASK-033
 - done_when: a CSV carries the numeric convention it used
-
+- done: 2026-08-24. `convention_note` writes what the file did, so a reader does not have to infer
+  it from the values - which is exactly the inference that fails silently. A stated convention is
+  checkable; a guessed one is a factor of a thousand.
 ### TASK-035 - Promotion to the shared library
 - satisfies: AC-036
 - depends_on: TASK-029
