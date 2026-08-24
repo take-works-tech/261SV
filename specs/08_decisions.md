@@ -4108,3 +4108,35 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a decimator that both preserves the map and beats `vtkDecimatePro` on the silhouette,
   which would be measured against the same sphere rather than adopted on its description
 
+### XC-236 - An identifier is not a field, and an absent identifier is not an index
+- decided: 2026-08-24
+- status: active
+- decision: the identifiers a source wrote are held on the @Dataset **apart from its fields**, as
+  `SourceIdentifiers` per association: a global identifier as **int64**, a pedigree identifier as text,
+  and the name the file gave each. Which arrays those are is read from the attribute role the file
+  declared - `<PointData GlobalIds="...">` - and never from an array's name (E-135).
+  An extreme value is reported **at** its identifier. Where the file wrote none, the product says that
+  the file wrote none; **the array position is never offered**, in any wording, as a location.
+  In an assembly the location names the part and then the place in it, because every part may number
+  its own nodes from one
+- decided_by: the product owner, 2026-08-24
+- rationale: three separate things each rule out holding an identifier as a @Field, which is what the
+  reader did until this decision. It is not a physical quantity, so offering `GlobalNodeId` in the list
+  a user picks a @Variable from invites a plot of node numbers against node numbers. Its exactness is
+  the whole of its value and the field store is float64, which stops being exact above 2^53 - node
+  9007199254740993 becomes node 9007199254740992 with nothing said. And a pedigree identifier **may be
+  a string** (E-135), which no numeric array can hold at all.
+  The second half is INV-023 restated as a rule the code can obey: "the maximum is at node 12345" is
+  checkable in the solver and "the maximum is at index 8412" is checkable nowhere and changes when the
+  file is written again. The absence is phrased as a fact about the file rather than a failure of the
+  reader, because only one of those two can be fixed - by asking the solver to write identifiers
+- alternatives: keeping identifiers among the fields and filtering them at each display site is the
+  arrangement that produced the defect: every new site is a new chance to forget, and the one that
+  forgets is the one nobody tested. Falling back to the array index when a file has none is the
+  friendlier-looking option and is the one INV-023 exists to forbid
+- basis: E-135 (T1), E-075 (T1)
+- affects: MOD-001, MOD-002, INV-023, GL-034, features/ingest/tasks.md
+- decidedness: Fixed
+- reversal_trigger: a format that carries a stable identifier this product can construct rather than
+  read - at which point what constructs it is recorded with the value, and it is still not an index
+

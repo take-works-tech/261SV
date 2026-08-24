@@ -153,3 +153,47 @@ class TestPartsAndPartitionsAreCountedApart:
 
         assert contents.absences == ("パート gasket", "パーティション run_1.vtu")
         assert contents.is_partial is True
+
+
+class TestTheCaseWideExtremumSaysWhereItIs:
+    def test_it_names_the_part_and_the_place_in_it(self) -> None:
+        """A location naming only the node is unusable in an assembly where every part numbers its own
+        nodes from one."""
+        from domain_core.identifiers import SourceIdentifiers
+
+        def identified(first: float, ids: list[int]) -> Dataset:
+            return Dataset(
+                points_m=np.array([[0.0, 0, 0], [1, 0, 0], [0, 1, 0]]),
+                cells=TRIANGLE,
+                fields={
+                    "stress": Field(
+                        "stress", Association.POINT, np.array([first, first + 1, first + 2]), unit="MPa"
+                    )
+                },
+                identifiers={
+                    Association.POINT: SourceIdentifiers(
+                        global_ids=np.array(ids, np.int64), global_name="node"
+                    )
+                },
+            )
+
+        case = LoadedCase(
+            parts=(
+                Part("flange", ("asm", "flange"), identified(10.0, [1, 2, 3])),
+                Part("gasket", ("asm", "gasket"), identified(90.0, [1, 2, 3])),
+            ),
+            contents=CaseContents(steps=1, parts=2, axis=ResultAxis(AxisKind.NONE)),
+        )
+
+        value = case.maximum("stress")
+
+        assert value.value == 92.0
+        assert value.location == "asm / gasket：node 3"
+
+    def test_a_part_that_cannot_report_is_named_in_the_reason(self) -> None:
+        holed = LoadedCase(
+            parts=(Part("a", ("a",), mesh(1.0, np.nan, 3.0)),),
+            contents=CaseContents(steps=1, parts=1, axis=ResultAxis(AxisKind.NONE)),
+        )
+
+        assert "a：" in (holed.maximum("stress").missing_because or "")

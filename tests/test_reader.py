@@ -439,3 +439,79 @@ class TestReadCaseOnASingleFile:
         with pytest.raises(reader.UnsupportedFormatError) as refusal:
             reader.read_case(tmp_path / "nothing.xyz")
         assert ".xyz" in str(refusal.value)
+
+
+def write_identified(path: Path, *, with_ids: bool) -> None:
+    """A two-triangle grid, optionally carrying the identifiers the solver wrote."""
+    from vtkmodules.vtkCommonCore import vtkIdTypeArray
+
+    points = vtkPoints()
+    for x, y in ((0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)):
+        points.InsertNextPoint(x, y, 0.0)
+    grid = vtkUnstructuredGrid()
+    grid.SetPoints(points)
+    for triangle in ([0, 1, 2], [1, 3, 2]):
+        grid.InsertNextCell(VTK_TRIANGLE, 3, triangle)
+
+    stress = numpy_to_vtk(np.array([10.0, 20.0, 90.0, 40.0]), deep=True)
+    stress.SetName("stress")
+    grid.GetPointData().AddArray(stress)
+
+    if with_ids:
+        nodes = vtkIdTypeArray()
+        nodes.SetName("GlobalNodeId")
+        for value in (1001, 1002, 1003, 1004):
+            nodes.InsertNextValue(value)
+        grid.GetPointData().SetGlobalIds(nodes)
+        elements = vtkIdTypeArray()
+        elements.SetName("GlobalElementId")
+        for value in (5001, 5002):
+            elements.InsertNextValue(value)
+        grid.GetCellData().SetGlobalIds(elements)
+
+    writer = vtkXMLUnstructuredGridWriter()
+    writer.SetFileName(str(path))
+    writer.SetInputData(grid)
+    writer.Write()
+
+
+class TestIdentifiersSurviveReading:
+    """INV-023. `<PointData GlobalIds="GlobalNodeId">` is in the file, so the attribute role is read
+    rather than guessed from the array's name (E-135)."""
+
+    def test_the_identifiers_the_solver_wrote_come_back(self, tmp_path: Path) -> None:
+        write_identified(tmp_path / "ids.vtu", with_ids=True)
+
+        dataset = reader.read(tmp_path / "ids.vtu")
+
+        point_ids = dataset.identifiers[Association.POINT]
+        assert point_ids.global_name == "GlobalNodeId"
+        assert point_ids.global_ids.tolist() == [1001, 1002, 1003, 1004]
+        assert dataset.identifiers[Association.CELL].global_ids.tolist() == [5001, 5002]
+
+    def test_they_are_not_offered_as_variables(self, tmp_path: Path) -> None:
+        """Before this, `GlobalNodeId` arrived as a @Field with no declared unit - a physical quantity
+        as far as anything downstream could tell, castable to float and plottable against itself."""
+        write_identified(tmp_path / "ids.vtu", with_ids=True)
+
+        assert sorted(reader.read(tmp_path / "ids.vtu").fields) == ["stress"]
+
+    def test_they_stay_integers(self, tmp_path: Path) -> None:
+        write_identified(tmp_path / "ids.vtu", with_ids=True)
+
+        ids = reader.read(tmp_path / "ids.vtu").identifiers[Association.POINT].global_ids
+        assert np.issubdtype(ids.dtype, np.integer)
+
+    def test_the_maximum_is_reported_against_the_identifier(self, tmp_path: Path) -> None:
+        write_identified(tmp_path / "ids.vtu", with_ids=True)
+
+        assert reader.read(tmp_path / "ids.vtu").maximum("stress").location == "GlobalNodeId 1003"
+
+    def test_a_file_with_none_says_so_rather_than_giving_an_index(self, tmp_path: Path) -> None:
+        write_identified(tmp_path / "plain.vtu", with_ids=False)
+
+        value = reader.read(tmp_path / "plain.vtu").maximum("stress")
+
+        assert value.value == 90.0
+        assert "識別子" in (value.location or "")
+        assert reader.read(tmp_path / "plain.vtu").identifiers == {}
