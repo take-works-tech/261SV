@@ -33,6 +33,7 @@ from vtkmodules.vtkCommonDataModel import (
     vtkPolyData,
     vtkUnstructuredGrid,
 )
+from vtkmodules.vtkIOCGNSReader import vtkCGNSReader
 from vtkmodules.vtkIOExodus import vtkExodusIIReader
 from vtkmodules.vtkIOGeometry import vtkSTLReader
 from vtkmodules.vtkIOXML import (
@@ -56,7 +57,8 @@ from domain_core.object_compatibility import Disposition, handling
 from domain_core.partitions import Partitioning
 from domain_core.parts import LoadedCase, Part
 from engine.conversion import to_unstructured
-from engine.exodus import BLOCK_ID_ARRAY, check_nothing_was_dropped, enable_everything
+from engine import cgns, exodus
+from engine.exodus import BLOCK_ID_ARRAY
 
 class UnsupportedFormatError(Exception):
     """Raised for a file this build has no reader for. Names the format rather than failing vaguely."""
@@ -120,8 +122,19 @@ _EXODUS = ReaderChoice(
         "the toolkit's reader returns no results unless each array is enabled by name; this product "
         "enables every category and refuses the read if a result the file offered did not arrive"
     ),
-    prepare=enable_everything,
-    verify=check_nothing_was_dropped,
+    prepare=exodus.enable_everything,
+    verify=exodus.verify,
+)
+
+# CGNS is the one format this build reads that **declares** its units, and the one whose reader
+# exposes no way to read them (E-130, E-137). Saying so is required rather than optional: constructing
+# this without `unread_unit_information` is refused by `ReaderChoice` itself (ingest/AC-034).
+_CGNS = ReaderChoice(
+    ".cgns", vtkCGNSReader, "Verified",
+    known_gaps=cgns.KNOWN_GAPS,
+    unread_unit_information=cgns.UNREAD_UNIT_INFORMATION,
+    prepare=cgns.enable_everything,
+    verify=cgns.verify,
 )
 
 _READERS: dict[str, ReaderChoice] = {
@@ -130,6 +143,7 @@ _READERS: dict[str, ReaderChoice] = {
                           "pieces are concatenated; points on partition boundaries appear more than once"),
     ".vtp": ReaderChoice(".vtp", vtkXMLPolyDataReader, "Verified"),
     ".stl": ReaderChoice(".stl", vtkSTLReader, "Verified", "carries geometry only; no fields"),
+    ".cgns": _CGNS,
     ".e": _EXODUS,
     ".ex2": _EXODUS,
     ".exo": _EXODUS,

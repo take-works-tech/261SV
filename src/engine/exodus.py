@@ -9,18 +9,20 @@ There are **27 array categories** and all of them start off. Twenty-six have a p
 count/name/status triple; the twenty-seventh, `Object`, takes an object-type argument and is a view
 over the others. A reader that switches on the two obvious ones silently drops the other twenty-four.
 
-So this module does two things, and the second is the one that matters. It switches every category on;
-and then it **checks that every result the file offered actually arrived**, by name, and refuses the
-read if one did not. The switching is an attempt and the check is the guarantee: a category added to a
-future toolkit release, or one misspelled here, fails loudly instead of costing a user their results.
+This module holds what is Exodus's own: the list of categories, the identifiers the format can
+generate, and the block number it writes onto every cell. The part that is not Exodus's own - switch
+everything on, then **check that everything the file offered arrived** - is in `engine.completeness`,
+because `vtkCGNSReader` has the same defect through a different API (E-137) and a second copy here
+would be the beginning of a third.
 
 Specification: ingest/REQ-015, AC-032, XC-237. Evidence: E-136 (T1).
 """
 
 from __future__ import annotations
 
-from vtkmodules.vtkCommonDataModel import vtkCompositeDataSet, vtkDataSet
 from vtkmodules.vtkIOExodus import vtkExodusIIReader
+
+from engine.completeness import ResultsLost, check_nothing_was_dropped
 
 #: Every array category `vtkExodusIIReader` exposes, as the stem of its count/name/status triple.
 #: Written out rather than discovered by reflection so that a reviewer can see the whole surface, and
@@ -50,10 +52,6 @@ RESULT_CATEGORIES: tuple[str, ...] = (
 #: and it is not marked with an identifier role - so nothing else would keep it out of the list a user
 #: picks a @Variable from (GL-034, XC-236).
 BLOCK_ID_ARRAY = "ObjectId"
-
-
-class ExodusResultsLost(Exception):
-    """Raised when the file offered a result that did not arrive. Never silently dropped."""
 
 
 def _triple(reader: vtkExodusIIReader, category: str) -> tuple[int, object, object] | None:
@@ -86,7 +84,7 @@ def enable_everything(reader: vtkExodusIIReader) -> None:
     for category in CATEGORIES:
         triple = _triple(reader, category)
         if triple is None:
-            raise ExodusResultsLost(
+            raise ResultsLost(
                 f"this build's Exodus reader has no '{category}' category, so the list in "
                 "engine/exodus.py has fallen behind the toolkit and something may be going unread"
             )
@@ -99,35 +97,6 @@ def enable_everything(reader: vtkExodusIIReader) -> None:
     reader.SetGenerateGlobalElementIdArray(1)
 
 
-def _arrays_present(node: object, found: set[str]) -> None:
-    if isinstance(node, vtkCompositeDataSet):
-        iterator = node.NewIterator()
-        iterator.InitTraversal()
-        while not iterator.IsDoneWithTraversal():
-            _arrays_present(iterator.GetCurrentDataObject(), found)
-            iterator.GoToNextItem()
-        return
-    if isinstance(node, vtkDataSet):
-        for container in (node.GetPointData(), node.GetCellData(), node.GetFieldData()):
-            for index in range(container.GetNumberOfArrays()):
-                name = container.GetArrayName(index)
-                if name:
-                    found.add(name)
-
-
-def check_nothing_was_dropped(reader: vtkExodusIIReader, output: object) -> None:
-    """Refuse the read if a result the file offered is not in what came back.
-
-    The check rather than the switching is the guarantee. Switching every category on is an attempt
-    that can fall behind the toolkit; comparing what arrived against what was offered cannot.
-    """
-    arrived: set[str] = set()
-    _arrays_present(output, arrived)
-    missing = sorted(offered_results(reader) - arrived)
-    if missing:
-        raise ExodusResultsLost(
-            "この Exodus ファイルが持つ結果のうち、読み込まれなかったものがあります："
-            f"{', '.join(missing)}。"
-            "既定ではリーダーは結果を1つも読まないため、これは黙って失われる種類の欠落です"
-            "（E-136）。値のない結果を返すより、読み込みを中止します"
-        )
+def verify(reader: vtkExodusIIReader, output: object) -> None:
+    """Refuse the read if a result the file offered did not arrive."""
+    check_nothing_was_dropped(offered_results(reader), output, evidence="E-136")

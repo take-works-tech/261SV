@@ -49,6 +49,26 @@ def requires_vtk() -> None:
         pytest.skip(message, allow_module_level=True)
 
 
+def requires_h5py() -> None:
+    """Skip the caller unless h5py is importable, under the same rule as VTK.
+
+    CGNS is the one Verified format the toolkit ships **no writer** for (E-137), so its fixture is
+    written by this project's own test code straight into the CGNS/HDF5 node layout (XC-085's rule, by
+    a route XC-085 did not anticipate). h5py is what writes it, and it is a development dependency for
+    that reason alone - nothing in the engine imports it.
+    """
+    try:
+        import h5py  # noqa: F401
+    except ImportError as exc:
+        message = (
+            f"h5py is not importable in this interpreter ({sys.executable}): {exc}. "
+            "It writes the CGNS fixture; install with `python -m pip install -e \".[dev]\"`."
+        )
+        if REQUIRE_VTK:
+            pytest.fail(message + " SIM_VIEWER_REQUIRE_VTK=1 forbids skipping this.", pytrace=False)
+        pytest.skip(message, allow_module_level=True)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _report_the_interpreter(record_testsuite_property: object) -> None:
     """The Python that ran the suite, in the report.

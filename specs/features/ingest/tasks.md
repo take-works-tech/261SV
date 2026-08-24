@@ -326,3 +326,21 @@ is either missing a requirement or is not work this specification asked for.
   the guarantee.
   `ObjectId`, the element-block number Exodus writes onto every cell, carries no identifier role, so
   nothing in the toolkit would have kept it out of the list a user picks a @Variable from.
+
+### TASK-032 - CGNS, with its unread unit declaration stated
+- satisfies: AC-034
+- depends_on: TASK-031
+- done_when: a CGNS file loads as one @Case whose fields are undeclared, and the reader states which
+  declaration in the file it did not read
+- done: 2026-08-24, `engine/cgns.py`. CGNS is the one format this build reads that **declares** its
+  units, and `vtkCGNSReader` exposes no accessor whose name contains `unit`, `dimension` or `dataclass` -
+  zero matches (E-137). So the declaration is in the file, this product can say that it is there, and
+  every field stays undeclared. `ReaderChoice` refused to register the format without saying so, which
+  is TASK-003's rule firing on the format it was written for.
+  Its results are read only because every array is enabled - the same defect as Exodus through a
+  different API, which is why the check that catches it moved into `engine/completeness.py` (XC-239).
+  The fixture is **generated**, correcting XC-085: the toolkit has no CGNS writer, but CGNS/HDF5 is an
+  HDF5 node layout and h5py writes it. One trap found doing it - `C1` character data must be native
+  chars, and with h5py's string dtype the reader opens the file and misreads it, taking a 4-point
+  unstructured zone for an 8-point structured one.
+

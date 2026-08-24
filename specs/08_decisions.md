@@ -254,11 +254,18 @@ made one level earlier: nothing generated is on the path that produces one.
 - status: active
 - decision: fixtures are written by this product's own test code using the toolkit's writers, so they
   carry no third-party licence and can live in the repository. That covers EnSight, Exodus and IOSS,
-  VTKHDF, the VTK XML family including partitioned files, and STL - five of the six Verified formats.
-  **CGNS has no writer**, so its fixture comes from an outside file whose source and terms are recorded
-  before it is committed. Formats in the Offered tier that cannot be generated - OpenFOAM, Fluent,
+  VTKHDF, the VTK XML family including partitioned files, and STL. **CGNS has no writer**, so its fixture
+  was to come from an outside file whose source and terms are recorded before it is committed. Formats in the Offered tier that cannot be generated - OpenFOAM, Fluent,
   LS-DYNA, Tecplot, Plot3D - are verified manually against files the developer holds locally and does
   not redistribute, and the verification plan says so rather than implying automated coverage
+- correction: this said "five of the six Verified formats" and named CGNS as the exception, on the
+  correct premise that the toolkit ships no CGNS writer - measured again 2026-08-24 and still true, three
+  reader classes and none that writes (E-137). The conclusion drawn from it was wrong. **A CGNS file can
+  be generated without a CGNS writer**: CGNS/HDF5 stores every node as an HDF5 group with four attributes
+  and an optional ` data` dataset, and h5py writes that directly. So the rule holds for **six of six**,
+  no outside file is needed, and h5py joins the development dependencies for that one purpose. What the
+  generated fixture does not cover - multi-zone, structured zones, boundary conditions, ADF-format CGNS -
+  is named in the format's stated gaps rather than left to be assumed from the word Verified
 - alternatives: collecting public sample files is faster and was the obvious first answer. It fails on
   terms: the CGNS examples are submitted as-is with no licence, the toolkit's own data repository
   declares none, and the public research resources state none either. Shipping data whose licence
@@ -4203,4 +4210,30 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a merge that weakens the merging machinery and is noticed only afterwards in the
   log - which is the event this decision makes possible and the one that would settle whether the
   throughput was worth it
+
+### XC-239 - The completeness check is shared, because the defect is not one reader's
+- decided: 2026-08-24
+- status: active
+- decision: switching on every array a file offers, and then **checking by name that every one arrived**,
+  is one concern held in `engine.completeness` rather than repeated per format. A reader supplies only
+  what is its own: how to list what the file offers, and how to switch it all on. The check is shared,
+  and a result that is missing stops the read
+- decided_by: the product owner, 2026-08-24
+- rationale: two of the toolkit's readers for formats this product's users actually work in read **no
+  results at all** by default, through unrelated APIs and with no error either time - Exodus across 27
+  count/name/status triples (E-136), CGNS across three `vtkDataArraySelection` objects (E-137). Two
+  formats, two mechanisms, one defect: that is a pattern, and writing the answer a second time in the
+  Exodus module would have been the beginning of writing it a third.
+  The division is deliberate. The **switching** is an attempt that can fall behind a toolkit release,
+  misspell a category, or miss an API that did not exist when it was written. The **check** cannot: it
+  compares what came back against what the file said it held. So the shared half is the half that
+  guarantees, and the per-format half is the half that can be wrong without costing anyone their results
+- alternatives: a reader-agnostic sweep by reflection over `Get*ArraySelection` and `GetNumberOf*Arrays`
+  would cover both without a per-format module, and replaces a reviewable surface with a clever one that
+  nobody can audit against a specification
+- basis: E-136 (T1), E-137 (T1)
+- affects: MOD-002, ingest/REQ-015, XC-237
+- decidedness: Fixed
+- reversal_trigger: a third format whose reader reads everything by default, which would make this a
+  two-format special case rather than a rule - measured, not assumed
 

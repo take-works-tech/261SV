@@ -1460,3 +1460,26 @@ Recorded so that nothing silently depends on them:
   attribute role, so nothing in the toolkit distinguishes it from a measurement.
 - justifies: XC-237, ingest/REQ-015
 
+### E-137 - What the CGNS reader gives, and what it does not
+- tier: T1
+- url: spike/write_cgns.py
+- verified: 2026-08-24
+- says: measured on 2026-08-24 against **VTK 9.5.2**, against a minimal single-zone unstructured
+  CGNS/HDF5 file written for the purpose.
+  (1) **The build ships no CGNS writer.** Sweeping every `vtkmodules` module for a class name containing
+  `CGNS` returns three, all readers: `vtkCGNSReader`, `vtkCGNSFileSeriesReader`,
+  `vtkCONVERGECFDCGNSReader`. XC-085's premise is correct.
+  (2) **A CGNS file can nonetheless be generated**, which XC-085 did not anticipate. CGNS/HDF5 stores
+  every node as an HDF5 group with `name`, `label`, `type` and `flags` attributes and an optional
+  ` data` dataset, and h5py writes it directly. One trap: `C1` character data must be written as native
+  chars (int8). Written with h5py's string dtype the reader **opens the file and misreads it** - the
+  `ZoneType` node went unread, the zone was taken for structured, and 4 points came back as 8.
+  (3) **`vtkCGNSReader` exposes no unit accessor.** Every method name was searched for `unit`,
+  `dimension` and `dataclass`: **zero matches**. The file's `DimensionalUnits` declaration is
+  unreachable through the reader, which is what ingest/AC-034 is for.
+  (4) **It reads no results by default**, like Exodus and through a different API: three
+  `vtkDataArraySelection` objects, and a file offering `stress` comes back with the array listed and its
+  status **0**, giving a leaf with zero point arrays. Enabling them yields `stress`.
+  (5) The output is a `vtkMultiBlockDataSet` nesting base then zone.
+- justifies: XC-239, ingest/REQ-015, XC-085
+
