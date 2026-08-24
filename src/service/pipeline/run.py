@@ -25,9 +25,11 @@ Specification: XC-094, XC-095, XC-046, pipeline/AC-008 to AC-017, AC-024.
 from __future__ import annotations
 
 from dataclasses import dataclass, field as dataclass_field
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Iterable, Mapping
 
+from domain_core.recorded_time import RecordedTime, record as record_time
 from engine.analysis.expression import ExpressionError, Value, evaluate, quantity
 from engine.limits import MAX_LOOP_ITERATIONS
 from service.pipeline.memory import Ledger
@@ -182,6 +184,12 @@ class RunRecord:
     produced: dict[str, str] = dataclass_field(default_factory=dict)
     stopped_at: str | None = None
     written: list[str] = dataclass_field(default_factory=list)
+    #: When the run began and ended, each with the offset where it was recorded (XC-142). These are the
+    #: **only** parts of a record that may differ between two runs of the same pipeline on the same
+    #: inputs, which is what AC-016's "save for recorded timestamps" means and why
+    #: `reproduce.canonical` takes them out before comparing.
+    started: RecordedTime | None = None
+    finished: RecordedTime | None = None
 
     @property
     def failed_cases(self) -> tuple[str, ...]:
@@ -416,6 +424,9 @@ class _State:
     granted: list[Authorisation]
     act: Callable[[dict[str, Any], str], None] | None
     quantities_of: Callable[[str], Mapping[str, Value]] | None
+    #: Called as each result is recorded, so a headless run can report progress **while** it runs
+    #: rather than only at the end (AC-022). A run killed halfway has still said what it did.
+    on_result: Callable[[UnitResult], None] | None
     on_failure: OnFailure
     cancel_after: str | None
     #: What the run is holding against LIM-001, or None where no budget was stated. None means the
@@ -436,8 +447,10 @@ def run(
     act: Callable[[dict[str, Any], str], None] | None = None,
     variables: Mapping[str, Value] | None = None,
     quantities_of: Callable[[str], Mapping[str, Value]] | None = None,
+    on_result: Callable[[UnitResult], None] | None = None,
     budget_bytes: int | None = None,
     size_of: Callable[[str], int] | None = None,
+    clock: Callable[[], datetime] | None = None,
     authorisations: Iterable[Authorisation] = (),
     on_failure: OnFailure = OnFailure.CONTINUE,
     cancel_after: str | None = None,
@@ -462,7 +475,9 @@ def run(
             "メモリ台帳には budget_bytes と size_of の両方が要ります。"
             "片方だけでは、測れない上限か、断る先のない見積もりになります"
         )
+    now = clock or (lambda: datetime.now(timezone.utc).astimezone())
     record = RunRecord(str(pipeline.get("id", "")), revision, tuple(cases))
+    record.started = record_time(now())
     bindings: dict[str, Value] = dict(variables or {})
 
     # AC-028: every loop count is resolved before anything runs, and one above LIM-008 refuses the run
@@ -476,12 +491,14 @@ def run(
         granted=list(authorisations),
         act=act,
         quantities_of=quantities_of,
+        on_result=on_result,
         on_failure=on_failure,
         cancel_after=cancel_after,
         ledger=Ledger(budget_bytes) if budget_bytes is not None else None,
         size_of=size_of,
     )
     _execute(pipeline.get("units", []), state, bindings, {})
+    record.finished = record_time(now())
     return record
 
 
@@ -505,19 +522,19 @@ def _execute(
 
         if kind is Kind.ADD_CASES:
             state.targets.add(unit_id, unit.get("caseIds") or record.resolved_cases)
-            record.results.append(UnitResult(unit_id, None, Outcome.DONE, len(state.targets.cases)))
+            _note(state, UnitResult(unit_id, None, Outcome.DONE, len(state.targets.cases)))
         elif kind is Kind.CLEAR:
             _clear(unit_id, state)
         elif kind is Kind.VARIABLE:
             _declare(unit, bindings, state.sequences)
             detail = "ワークスペースの変数も更新します" if unit.get("toWorkspace") else None
-            record.results.append(
+            _note(state, 
                 UnitResult(unit_id, None, Outcome.DONE, len(state.targets.cases), detail)
             )
         elif kind is Kind.FORMULA:
             result = _bind(unit, {**bindings, **scope})
             bindings[str(unit.get("name", ""))] = result
-            record.results.append(
+            _note(state, 
                 UnitResult(unit_id, None, Outcome.DONE, len(state.targets.cases), result.describe())
             )
         elif kind is Kind.CONDITION:
@@ -534,17 +551,29 @@ def _execute(
             state.stopped = True
 
 
+def _note(state: _State, result: UnitResult) -> None:
+    """The one place a result reaches the record.
+
+    One place because there are two readers of it: the record itself and whoever is watching the run go
+    by. A second appender added later would be invisible to the second reader, and the failure would be
+    a headless run silently missing a step it did perform.
+    """
+    state.record.results.append(result)
+    if state.on_result is not None:
+        state.on_result(result)
+
+
 def _clear(unit_id: str, state: _State) -> None:
     size = len(state.targets.cases)
     if not _authorised(state.granted, unit_id, size):
-        state.record.results.append(
+        _note(state, 
             UnitResult(unit_id, None, Outcome.SKIPPED_UNAUTHORISED, size,
                        "破壊的ユニットの承認がありません")
         )
         return
     state.targets.clear(unit_id)
     freed = state.ledger.release_all(unit_id) if state.ledger is not None else 0
-    state.record.results.append(
+    _note(state, 
         UnitResult(
             unit_id, None, Outcome.DONE, 0,
             state.ledger.log[-1] if state.ledger is not None and freed else None,
@@ -568,7 +597,7 @@ def _condition(
     result = _bind(unit, {**bindings, **scope})
     if not isinstance(result.magnitude, bool):
         raise RunError(f"条件ユニット '{unit_id}' の式が真偽値になりません（{result.describe()}）")
-    state.record.results.append(
+    _note(state, 
         UnitResult(unit_id, None, Outcome.DONE, len(state.targets.cases),
                    f"条件は {'真' if result.magnitude else '偽'}")
     )
@@ -576,7 +605,7 @@ def _condition(
         _execute(unit.get("units") or [], state, bindings, scope)
         return
     for skipped, _ in walk(unit.get("units") or []):
-        state.record.results.append(
+        _note(state, 
             UnitResult(
                 str(skipped.get("id", "")), None, Outcome.SKIPPED_CONDITION,
                 len(state.targets.cases),
@@ -594,7 +623,7 @@ def _loop(
     """Repeat the contents the resolved number of times, binding the index under the declared name."""
     resolved = _resolve_count(unit, sequences=state.sequences, target_size=len(state.targets.cases))
     index_name = str(unit.get("indexName") or DEFAULT_INDEX_NAME)
-    state.record.results.append(
+    _note(state, 
         UnitResult(
             str(unit.get("id", "")), None, Outcome.DONE, len(state.targets.cases),
             resolved.describe(),
@@ -630,12 +659,12 @@ def _act_on_targets(unit: dict[str, Any], kind: Kind, state: _State) -> None:
     unit_id = str(unit.get("id", ""))
     acting = state.targets.acted_on(unit_id)
     if not acting:
-        record.results.append(UnitResult(unit_id, None, Outcome.SKIPPED_EMPTY, 0))
+        _note(state, UnitResult(unit_id, None, Outcome.SKIPPED_EMPTY, 0))
         return
     if kind in DESTRUCTIVE and not _authorised(state.granted, unit_id, len(acting)):
         # AC-010: the run continues and the destructive unit is reported as not authorised, rather than
         # the whole run being refused for one step somebody declined.
-        record.results.append(
+        _note(state, 
             UnitResult(unit_id, None, Outcome.SKIPPED_UNAUTHORISED, len(acting),
                        f"{len(acting)} 件を対象とする承認がありません")
         )
@@ -645,7 +674,7 @@ def _act_on_targets(unit: dict[str, Any], kind: Kind, state: _State) -> None:
         if case in state.failed:
             # XC-095: the rest of *this* case is skipped. Continuing within a failed case would build on
             # a state nobody checked.
-            record.results.append(
+            _note(state, 
                 UnitResult(unit_id, case, Outcome.SKIPPED_AFTER_FAILURE, len(acting),
                            "このケースは先の工程で失敗しています")
             )
@@ -656,7 +685,7 @@ def _act_on_targets(unit: dict[str, Any], kind: Kind, state: _State) -> None:
                 state.act(unit, case)
         except Exception as error:  # noqa: BLE001 - a unit may fail in any way it likes
             state.failed.add(case)
-            record.results.append(
+            _note(state, 
                 UnitResult(unit_id, case, Outcome.FAILED, len(acting), str(error)[:200])
             )
             if state.on_failure is OnFailure.STOP:
@@ -664,7 +693,7 @@ def _act_on_targets(unit: dict[str, Any], kind: Kind, state: _State) -> None:
                 state.stopped = True
                 return
             continue
-        record.results.append(UnitResult(unit_id, case, Outcome.DONE, len(acting)))
+        _note(state, UnitResult(unit_id, case, Outcome.DONE, len(acting)))
         if kind in ACT_ON_TARGETS:
             record.written.append(f"{unit_id}/{case}")
 

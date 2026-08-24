@@ -4393,3 +4393,33 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a unit these four exponents cannot express - a plane angle treated as dimensioned,
   an amount of substance, or a per-object unit such as "per cell" - which would need the dimension to
   carry more than the four
+
+### XC-243 - A headless run reports one JSON object per line, and its exit code answers one question
+- decided: 2026-08-25
+- status: active
+- decision: a headless run writes **JSON Lines** to standard output - one object per line, flushed as
+  each line is written - with an `event` field naming the kind: `plan` before anything runs, `start`,
+  one `unit` per unit per case as it finishes, and `finished` last. A run refused before it started
+  emits `refused` and nothing else.
+  The exit code answers **did any case fail**: `0` none, `1` one or more, `2` the run was refused before
+  it started
+- decided_by: the product owner, 2026-08-25
+- rationale: pipeline/AC-022 asks for progress and outcome, and a single JSON document written at the end
+  reports neither for the run that most needs reporting - the one killed at case thirty of forty. Line
+  delimited output survives truncation, can be followed while it runs, and can be read by a program
+  interested only in the last line. Flushing per line rather than per buffer is the same argument
+  carried to the end: a buffered line is a line that is lost.
+  `2` is separate from `1` because "a case failed" and "the run never happened" are different facts to
+  whatever is calling. A caller that retries on failure should not retry a pipeline that will be refused
+  again for the same reason.
+  The tie-breaker where this could have gone either way is XC-012, reproducibility before convenience:
+  the plan is emitted **before** the first unit so the log is usable as the record of what was
+  authorised, rather than something reconstructed afterwards from what happened
+- alternatives: a single JSON document at the end is smaller, easier to parse in one call, and silent
+  about an interrupted run. A human-readable progress format needs a second machine-readable one beside
+  it, and two formats of the same facts drift. A binary or length-prefixed stream is more robust to
+  interleaving and unreadable without a tool
+- affects: MOD-011, pipeline/AC-021, pipeline/AC-022
+- decidedness: Bounded
+- reversal_trigger: a consumer that needs interleaved output from several runs on one stream, which
+  line delimiting alone does not disambiguate and which would need a run identifier on every line
