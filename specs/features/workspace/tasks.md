@@ -129,13 +129,30 @@ updated: 2026-08-22
 - depends_on: TASK-001
 - done_when: a @Case whose source file is missing or modified opens as unresolved, and nothing is
   deleted or rewritten
-
+- done: 2026-08-24, `src/service/workspace/sources.py`. **Missing and changed are different states**,
+  not one problem state: a user can restore a missing file, and a changed one they have to decide about,
+  because the numbers in the workspace were computed from what it used to be.
+  A changed file is detected and **not re-read**. Re-reading it silently would replace every figure in
+  the workspace with figures from a different input, under a report someone already wrote. The
+  description gives both sides - recorded size and time against current - because "changed" alone
+  leaves the user nothing to decide with.
+- note: what this cannot detect is written into a test rather than left to be discovered. CT-001 records
+  a size and a modification time, not a checksum, so a file whose bytes changed while both stayed the
+  same reads as unchanged. Saying so is cheaper than a promise the contract cannot keep.
 ### TASK-014 - Tags and filtering
 - satisfies: AC-014
 - depends_on: TASK-005
 - done_when: filtering by tag shows matching cases and states how many are hidden, and the selected
   case stays visible marked as outside the filter (AC-015)
-
+- done: 2026-08-24, `src/service/workspace/tags.py`. A filter states how many it hid, because a tree
+  that quietly shrinks looks like a tree that lost cases and the user's next question is whether
+  something was deleted.
+  **The selected case stays visible and says it does not match** (AC-015) - hiding what somebody has open
+  is how a filter loses their place: they came back to a case, filtered to find its siblings, and the
+  thing they were reading vanished. An ancestor of a match is kept for the same reason and marked the
+  same way: a tree with its middle removed is not a tree, and it is not what was asked for either.
+  Whether every wanted tag is required or any one of them is a parameter with no default: the two give
+  different answers on the same tree, and only the caller knows which the user asked for.
 ### TASK-015 - Import grouping proposal
 - satisfies: AC-016
 - depends_on: TASK-005, ingest/TASK-007

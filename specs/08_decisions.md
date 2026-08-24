@@ -4273,3 +4273,24 @@ model or the prompt, never in a description that quietly went stale.
   `SimulationType_t` is the nearest - at which point the kind is read from it and this product stops
   reporting undeclared for that format
 
+### OPEN-026 - Where a variable bound to an input is recorded
+- question: workspace/AC-009 requires that dropping a @Variable onto a numeric input binds that input, so
+  later changes to the variable reach it. Nothing in the contracts has a place to record that binding.
+  CT-001 has no field for it, and CT-004's `inputBindings` belongs to a MaterialX material's inputs
+  rather than to a numeric field of a @View, @Graph or @Report definition
+- why_open: the answer decides the shape of three contracts at once, and the two candidate shapes differ
+  in a way that is hard to reverse. Either **an input holds a value or a reference** - every numeric
+  field in CT-004, CT-005 and CT-006 becomes a union type, which is invasive and puts the binding where
+  the input is - or **the workspace holds a table of bindings** keyed by a path into a definition, which
+  leaves the definitions alone and makes a binding something that can be orphaned by an edit the table
+  never sees.
+  The second failure mode is the one to weigh: an orphaned binding is a variable a user believes drives
+  something and does not
+- blocks: workspace/TASK-011 and workspace/TASK-012, which cannot be written until there is somewhere to write to.
+  workspace/AC-010's refusal - a binding whose units differ is refused naming both - is decided (XC-003's shape)
+  and is only waiting on this
+- closes_when: one of the two shapes is chosen, with the orphaning question answered rather than
+  deferred, and the contracts it touches carry it
+- affects: CT-001, CT-004, CT-005, CT-006, workspace/REQ-003, MOD-007
+- decidedness: Open
+
