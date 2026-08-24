@@ -87,6 +87,59 @@ def unit(symbol: str) -> Unit:
         raise UndeclaredUnitError(f"'{symbol}' is not a unit this product knows; declare one of {sorted(_KNOWN)}") from None
 
 
+class Kind(str, Enum):
+    """Whether a quantity is a point on a scale or an interval along it (INV-028).
+
+    Declared on the quantity, not chosen at each conversion. A call-site flag is right at every site
+    somebody thought about and wrong at the one they did not - and the wrong one here is the direction
+    that **stays in a plausible range**: a temperature difference converted with the offset is inflated
+    by 273.15 and looks like a temperature.
+    """
+
+    ABSOLUTE = "absolute"      # a point on the scale: 10 °C is 283.15 K
+    DIFFERENCE = "difference"  # an interval along it: a rise of 10 °C is 10 K
+
+
+#: What a quantity that says nothing is taken to be. INV-028 fixes this rather than leaving it to a
+#: default argument: "a quantity declared as neither is treated as absolute".
+DEFAULT_KIND = Kind.ABSOLUTE
+
+
+def kind_of(declaration: object) -> Kind:
+    """The kind a declaration states, or absolute where it states none.
+
+    Accepts anything with a `kind` attribute or key, so a @Variable, a @Field and a raw mapping read
+    from a document all answer the same way. A value this build does not recognise is refused rather
+    than falling back: a typo in a stored document must not silently choose the conversion.
+    """
+    stated = None
+    if isinstance(declaration, dict):
+        stated = declaration.get("kind")
+    else:
+        stated = getattr(declaration, "kind", None)
+    if stated is None:
+        return DEFAULT_KIND
+    if isinstance(stated, Kind):
+        return stated
+    try:
+        return Kind(str(stated))
+    except ValueError:
+        raise UndeclaredUnitError(
+            f"quantity kind {stated!r} is neither {Kind.ABSOLUTE.value} nor {Kind.DIFFERENCE.value}; "
+            "refusing to choose a conversion rule from a value nobody wrote deliberately (INV-028)"
+        ) from None
+
+
+def convert_declared(value: float, source: str | None, target: str, declaration: object) -> float:
+    """Convert a value using the kind its **declaration** states.
+
+    The form INV-028 asks for: the quantity says which it is, and the conversion follows. `convert`
+    below still takes a flag because a caller holding no declaration has to say something - but a
+    caller that has one should not be restating it.
+    """
+    return convert(value, source, target, difference=kind_of(declaration) is Kind.DIFFERENCE)
+
+
 def convert(value: float, source: str | None, target: str, *, difference: bool = False) -> float:
     """Convert a value between declared units.
 
