@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-20
+updated: 2026-08-24
 ---
 
 # Specifications
@@ -27,7 +27,7 @@ Index. The always-loaded layer points here and nowhere else; every body below is
 | [15_derived_quantities.md](15_derived_quantities.md) | derived quantities, component frames, result axes, identifiers | - |
 | [16_application_model.md](16_application_model.md) | the complete product: shell grammar, areas, regions, transitions, element inventory, object model | - |
 | [17_user_scenarios.md](17_user_scenarios.md) | eleven end-to-end paths through the complete product | - |
-| [contracts/](contracts/) | data contracts, one file each | 3 |
+| [contracts/](contracts/) | data contracts, one file each - including CT-012, which is tables rather than a document shape: what this product accepts, what it becomes, and what every combination it does not accept does instead | 3 |
 | [verification/plan.md](verification/plan.md) | how each acceptance criterion is verified | 6 |
 | [features/](features/) | one directory per feature | 2, 6 |
 | [../evidence/sources.md](../evidence/sources.md) | sources and tiers behind every Fixed value | - |
@@ -35,7 +35,7 @@ Index. The always-loaded layer points here and nowhere else; every body below is
 
 ## Gates
 
-Seven run in the build, and each says what it could **not** check rather than letting silence read as
+Ten run in the build, and each says what it could **not** check rather than letting silence read as
 coverage:
 
 | Gate | Checks |
@@ -46,6 +46,7 @@ coverage:
 | `validate/check_constant_duplication.py` | the same constant defined in two files: contradictions, and copies that will become contradictions |
 | `validate/check_context_budget.py` | the instruction layer paid on every turn - CLAUDE.md and what it imports, AGENTS.md, rules, output styles - and the path-scoped layer, both charged |
 | `validate/check_dependency_pins.py` | declared dependency versions against the manifests that pin them, in both directions - check 7 compares `SYMBOL = literal` in source files, and a pin inside a TOML array matches nothing it looks at (XC-185) |
+| `validate/check_object_compatibility.py` | CT-012's tables are total: every VTK data object type the toolkit declares has a disposition, every class the reader accepts is one the contract says it accepts, and all 64 ordered pairs of View object types are allowed or refused with a reason |
 | `validate/check_gates_wired.py` | every validator here is invoked by something that runs it |
 | `validate/check_automerge_policy.py` | the automatic-merge workflow still checks every condition XC-218 names, still fails closed, and is present or absent in step with that decision's status |
 | `validate/check_mockup_states.py` | every catalogue state renders, not only typechecks - needs `MOCKUP_BASE_URL` and refuses to report success without it |

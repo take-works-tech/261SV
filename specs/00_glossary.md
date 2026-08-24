@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-22
+updated: 2026-08-24
 ---
 
 # Glossary, units and coordinates
@@ -25,8 +25,12 @@ Reference a term from any other spec by writing `@Term`.
 - definition: one analysis result inside a @Workspace, nestable to any depth, inheriting settings and
   @Variable values from its parent unless overridden
 - not: a single file; a @Case may carry many files and many time steps
+- counts two multiplicities and does not mix them: **parts**, which are distinct things in the model -
+  an element block, a side set, a material - and **partitions**, which are one part cut up for parallel
+  input and output. Partitions recombine and their interface points are duplicates of each other
+  (INV-010); parts do not and theirs are not (XC-234, CT-012)
 - decidedness: Fixed
-- basis: E-001 (T1)
+- basis: E-001 (T1), E-133 (T1)
 
 ### GL-003 - Variable
 - definition: a named quantity in a @Workspace that can be referenced anywhere inside it. A variable is
