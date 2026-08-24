@@ -19,6 +19,7 @@ from service.workspace.items import (
     ItemError,
     SourceTemplate,
     apply_template,
+    preview_application,
     cases_owning_items,
     create,
     edit,
@@ -33,6 +34,12 @@ def workspace() -> dict[str, Any]:
     }
     add(document["cases"], new_case("case:001", "baseline"))
     return document
+
+
+def apply(document: dict[str, Any], item_id: str, name: str) -> dict[str, Any]:
+    """Preview then accept, which is the only way an item may be created from a template."""
+    shown = preview_application(document, "views", "view-template:001")
+    return apply_template(document, "views", item_id, name, accepted=shown)
 
 
 def with_template(document: dict[str, Any]) -> dict[str, Any]:
@@ -83,7 +90,7 @@ class TestEditingChangesOneItem:
     def test_it_changes_the_item_and_not_its_source_template(self) -> None:
         """AC-031."""
         document = with_template(workspace())
-        apply_template(document, "views", "view-template:001", "view:001", "断面")
+        apply(document, "view:001", "断面")
 
         edit(document, "views", "view:001", {"camera": "top"})
 
@@ -92,8 +99,8 @@ class TestEditingChangesOneItem:
 
     def test_it_changes_no_sibling_item(self) -> None:
         document = with_template(workspace())
-        apply_template(document, "views", "view-template:001", "view:001", "断面 A")
-        apply_template(document, "views", "view-template:001", "view:002", "断面 B")
+        apply(document, "view:001", "断面 A")
+        apply(document, "view:002", "断面 B")
 
         edit(document, "views", "view:001", {"camera": "top"})
 
@@ -115,7 +122,7 @@ class TestApplyingATemplateCopiesRatherThanLinks:
         """A shared structure would make a later template edit reach into a report somebody already
         sent."""
         document = with_template(workspace())
-        apply_template(document, "views", "view-template:001", "view:001", "断面")
+        apply(document, "view:001", "断面")
 
         document["templates"]["views"][0]["definition"]["colourMap"] = "changed"
 
@@ -126,13 +133,24 @@ class TestApplyingATemplateCopiesRatherThanLinks:
         answerable, and nothing can mistake it for a link to v4."""
         document = with_template(workspace())
 
-        item = apply_template(document, "views", "view-template:001", "view:001", "断面")
+        item = apply(document, "view:001", "断面")
 
         assert item["sourceTemplate"] == {"id": "view-template:001", "revision": 3}
 
-    def test_applying_a_template_that_is_not_there_is_refused(self) -> None:
+    def test_previewing_a_template_that_is_not_there_is_refused(self) -> None:
         with pytest.raises(ItemError):
-            apply_template(workspace(), "views", "view-template:404", "view:001", "断面")
+            preview_application(workspace(), "views", "view-template:404")
+
+    def test_an_item_cannot_be_created_without_a_resolution_having_been_shown(self) -> None:
+        """AC-061: the result is shown and the item is created **only after acceptance**. Taking the
+        preview rather than a template id is what makes that structural - the same shape as `prune`,
+        which takes the plan it showed."""
+        import inspect
+
+        parameters = inspect.signature(apply_template).parameters
+
+        assert "accepted" in parameters
+        assert "template_id" not in parameters
 
 
 class TestSavingAsATemplateLeavesTheItemAlone:
@@ -180,3 +198,39 @@ class TestSavingAsATemplateLeavesTheItemAlone:
 
     def test_the_source_template_of_an_applied_item_is_a_record_not_a_link(self) -> None:
         assert SourceTemplate("view-template:001", 3).revision == 3
+
+
+class TestTheResolutionIsShownBeforeAnythingIsCreated:
+    def test_a_preview_creates_nothing(self) -> None:
+        document = with_template(workspace())
+
+        preview_application(document, "views", "view-template:001")
+
+        assert document["workspaceItems"].get("views", []) == []
+
+    def test_it_reports_what_would_not_resolve(self) -> None:
+        """XC-090: what resolves is copied, what does not is listed **before anything is drawn**."""
+        document = with_template(workspace())
+        document["templates"]["views"][0]["requirements"] = [
+            {"kind": "field", "name": "stress"}, {"kind": "field", "name": "temperature"}
+        ]
+
+        shown = preview_application(document, "views", "view-template:001", available=["stress"])
+
+        assert shown.resolved == ("stress",)
+        assert shown.unresolved == ("temperature",)
+        assert "temperature" in shown.describe()
+
+    def test_everything_available_resolves_completely(self) -> None:
+        document = with_template(workspace())
+
+        assert preview_application(document, "views", "view-template:001").resolves_completely
+
+    def test_the_accepted_preview_is_what_becomes_the_item(self) -> None:
+        document = with_template(workspace())
+
+        shown = preview_application(document, "views", "view-template:001")
+        item = apply_template(document, "views", "view:001", "断面", accepted=shown)
+
+        assert item["definition"] == shown.definition
+        assert item["sourceTemplate"]["revision"] == shown.revision
