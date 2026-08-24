@@ -130,9 +130,10 @@ class TestDisplayGeometryKnowsWhatItCameFrom:
             )
         assert "tessellates it itself" in str(refusal.value)
 
-    def test_a_dataset_may_have_none_yet(self) -> None:
-        """Nothing has been drawn. That is different from having been drawn as itself."""
-        assert Dataset(points_m=CORNERS, cells=HEX).display is None
+    def test_a_dataset_has_drawn_nothing_until_asked(self) -> None:
+        """The cache is empty rather than absent: display geometry is derived, and a @Dataset that has
+        not been drawn is not a @Dataset that cannot be."""
+        assert Dataset(points_m=CORNERS, cells=HEX).display_by_budget == {}
 
     def test_the_triangle_type_is_the_toolkit_s(self) -> None:
         assert TRIANGLE_CELL == 5

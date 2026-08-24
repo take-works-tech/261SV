@@ -23,6 +23,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from domain_core.reduction import ReductionPlan
+
 # VTK 9.5.2 knows 64 cell types, of which 3 are zero-dimensional, 8 are curves, 21 are surfaces and 32
 # are volumes (E-132). This product does not enumerate them: a cell type it has no opinion about is
 # carried through unchanged, and only the ones a rule mentions are named anywhere.
@@ -89,7 +91,10 @@ class DisplayGeometry:
     triangles: np.ndarray      # (m, 3) point indices into points_m
     source_points: np.ndarray  # (n,) index into the @Dataset's own points, from vtkOriginalPointIds
     source_cells: np.ndarray   # (m,) index into the @Dataset's own cells, from vtkOriginalCellIds
-    reduced: bool = False      # whether anything was dropped as well as tessellated
+    # How much of the surface is drawn. A plan rather than a flag, because "reduced" alone is not a
+    # useful thing to tell someone: a view showing a tenth of its triangles and one showing 99% of them
+    # are both reduced, and only one is worth looking at twice.
+    reduction: ReductionPlan | None = None
 
     def __post_init__(self) -> None:
         if self.points_m.ndim != 2 or self.points_m.shape[1] != 3:
@@ -105,3 +110,7 @@ class DisplayGeometry:
             )
         if self.source_cells.shape != (self.triangles.shape[0],):
             raise ValueError("every display triangle says which dataset cell it came from")
+
+    @property
+    def is_reduced(self) -> bool:
+        return self.reduction is not None and self.reduction.needed

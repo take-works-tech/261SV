@@ -145,26 +145,44 @@ is either missing a requirement or is not work this specification asked for.
 - satisfies: AC-030
 - depends_on: TASK-001
 - done_when: a @Dataset above LIM-002 displays reduced and the view says so
-- partly done: 2026-08-24, the **separation** exists - `domain_core/mesh.py` holds `Cells` (the
-  connectivity the file declared) and `DisplayGeometry` (the triangulated surface with its map back to
-  the dataset's own points and cells), and `reader.read` fills both. Found while measuring the toolkit
-  for a compatibility specification: the reader had been storing the extracted surface **as** the
-  dataset's geometry while reading the fields from the original grid, so on a volume mesh every index
-  correspondence was wrong (E-132, XC-233, INV-001's correction). What remains for this task is the
-  reduction itself - decimation above LIM-002 and the view saying so; `DisplayGeometry.reduced` is the
-  flag it will set, and nothing sets it yet.
+- done: 2026-08-24, `domain_core/reduction.py` (the plan) and `engine/visualization/display.py` (the
+  work, and MOD-003's first code). A surface above LIM-002 is reduced by `vtkDecimatePro` and the plan
+  it carries states **how much**: "48 三角形のうち 12（25.0%）を描画" rather than "reduced", because a
+  view showing a tenth of its triangles and one showing 99% are both reduced and only one is worth
+  looking at twice.
+  Two things this task turned up. The separation it needed did not exist: the reader had been storing
+  the extracted surface **as** the dataset's geometry while reading fields from the original grid, so on
+  a volume mesh every index correspondence was wrong (E-132, XC-233, and INV-001's correction). And the
+  decimator had to be chosen on correctness rather than quality - `vtkQuadricDecimation` looks better and
+  **drops `vtkOriginalPointIds` entirely**, leaving a reduced surface that cannot answer a pick at all,
+  while `vtkDecimatePro` carries it through and moves no surviving point (E-134, XC-235).
+  Display geometry also moved out of the reader: it is produced when a view asks for it, so reading a
+  file no longer pays for a picture nobody wanted.
 
 ### TASK-016 - Numbers computed on the full dataset
 - satisfies: AC-031
 - depends_on: TASK-015
 - done_when: a reported maximum on a reduced view equals the value from the full data, asserted by test
   (INV-001)
+- done: 2026-08-24, structurally rather than by care at each call site: aggregates read `Dataset.fields`
+  and `engine.visualization.display` never touches them, so there is no path along which a reduced view
+  could reach a reported number. The test is the one the invariant asks for - the largest value in the
+  fixture block is at its centre, and the centre is not on the surface at all, reduced or otherwise, so
+  a maximum of 260 is a maximum the picture never had access to.
 
 ### TASK-017 - Reduction computed once and cached
 - satisfies: AC-030
 - depends_on: TASK-015
 - done_when: repeated display of the same @Case does not recompute the reduction, which was measured at
   22 seconds for a million-point surface
+- done: 2026-08-24, cached on the @Dataset and keyed by triangle budget, so two views of one @Case with
+  different budgets keep both and neither evicts the other. On the @Dataset rather than in a module
+  because the geometry is derived entirely from it and should die with it; a cache keyed by object
+  identity elsewhere outlives what it describes.
+- note: the 22 seconds is right but is not this scale. Re-measured on 2026-08-24: the same filter and
+  the same 90% reduction cost **2.63 s at 977,200 triangles** and the export spike's 22.34 s was a
+  2,251,442-cell mesh (E-134). Both are hundreds of frames, so the conclusion stands unchanged - the
+  figure is recorded at the size it was taken at rather than left attached to the wrong one.
 
 ### TASK-018 - Preserve source identifiers
 - satisfies: AC-035

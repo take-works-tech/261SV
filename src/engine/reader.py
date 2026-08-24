@@ -22,8 +22,6 @@ from pathlib import Path
 import numpy as np
 from vtkmodules.util.numpy_support import vtk_to_numpy
 from vtkmodules.vtkCommonDataModel import vtkDataSet, vtkPolyData, vtkUnstructuredGrid
-from vtkmodules.vtkFiltersCore import vtkTriangleFilter
-from vtkmodules.vtkFiltersGeometry import vtkDataSetSurfaceFilter
 from vtkmodules.vtkIOGeometry import vtkSTLReader
 from vtkmodules.vtkIOXML import (
     vtkXMLPolyDataReader,
@@ -32,7 +30,7 @@ from vtkmodules.vtkIOXML import (
 )
 
 from domain_core.dataset import Association, Dataset, Field, SourceFrame
-from domain_core.mesh import Cells, DisplayGeometry
+from domain_core.mesh import Cells
 from domain_core.frame import (
     CANONICAL_SCALE,
     FORMATS_CARRYING_UNIT_INFORMATION,
@@ -93,23 +91,6 @@ _READERS: dict[str, ReaderChoice] = {
 
 def supported_suffixes() -> list[str]:
     return sorted(_READERS)
-
-
-def _as_surface(data: vtkDataSet) -> vtkPolyData:
-    """Triangulated surface of a dataset, for display only - never for reported numbers (INV-001).
-
-    Both pass-throughs are on because the surface is a **different point set**, not a subset in the same
-    order: a 27-point block of hexahedra extracts to 26 surface points whose origins begin 0, 1, 10, 9, 3
-    (E-132). Without the map back, a picked vertex answers with a real value from the wrong place.
-    """
-    surface = vtkDataSetSurfaceFilter()
-    surface.SetInputData(data)
-    surface.PassThroughPointIdsOn()
-    surface.PassThroughCellIdsOn()
-    triangles = vtkTriangleFilter()
-    triangles.SetInputConnection(surface.GetOutputPort())
-    triangles.Update()
-    return triangles.GetOutput()
 
 
 def _canonical_cells(data: vtkDataSet) -> Cells:
@@ -173,32 +154,6 @@ def _fields(data: vtkDataSet) -> dict[str, Field]:
     return found
 
 
-def _display_geometry(surface: vtkPolyData, scale: float) -> DisplayGeometry:
-    """The drawn surface, with the map back to the points and cells it was made from."""
-    connectivity = vtk_to_numpy(surface.GetPolys().GetConnectivityArray())
-    offsets = vtk_to_numpy(surface.GetPolys().GetOffsetsArray())
-    sizes = np.diff(offsets)
-    if sizes.size and not np.all(sizes == 3):
-        raise UnreadableFileError("surface extraction produced cells that are not triangles")
-    triangles = connectivity.reshape(-1, 3).astype(np.int64, copy=False)
-
-    source_points = surface.GetPointData().GetArray("vtkOriginalPointIds")
-    source_cells = surface.GetCellData().GetArray("vtkOriginalCellIds")
-    if source_points is None or source_cells is None:
-        raise UnreadableFileError(
-            "surface extraction returned no map back to the original points; without it a picked "
-            "vertex answers with a value belonging to a different place (INV-001)"
-        )
-
-    points = vtk_to_numpy(surface.GetPoints().GetData()).astype(np.float64, copy=True)
-    return DisplayGeometry(
-        points_m=points if scale == CANONICAL_SCALE else points * scale,
-        triangles=triangles,
-        source_points=vtk_to_numpy(source_points).astype(np.int64, copy=True),
-        source_cells=vtk_to_numpy(source_cells).astype(np.int64, copy=True),
-    )
-
-
 def read(path: str | Path) -> Dataset:
     """Read a result file into a @Dataset in the canonical frame.
 
@@ -234,7 +189,6 @@ def read(path: str | Path) -> Dataset:
     return Dataset(
         points_m=points if scale == CANONICAL_SCALE else points * scale,
         cells=_canonical_cells(data),
-        display=_display_geometry(_as_surface(data), scale),
         fields=fields,
         source=SourceFrame(
             up_axis=up_axis,

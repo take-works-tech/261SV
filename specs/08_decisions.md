@@ -4039,3 +4039,41 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a reader for a format whose connectivity is implicit, at which point what `cells`
   means for it is decided rather than assumed - not by extracting its surface
 
+### XC-235 - Display geometry is produced by the renderer, reduced by vtkDecimatePro, and kept
+- decided: 2026-08-24
+- status: active
+- decision: three things, decided together because each is the reason the next one works.
+  **Display geometry is MOD-003's, not the reader's.** `reader.read` returns the file in the canonical
+  frame and draws nothing; `engine.visualization.display.display_geometry` takes a @Dataset and produces
+  the surface. It takes a @Dataset rather than a toolkit object, so the boundary is real rather than
+  maintained by the reader handing the renderer something extra.
+  **The decimator is `vtkDecimatePro`, chosen on correctness.** It carries `vtkOriginalPointIds` through
+  and moves no surviving point; `vtkQuadricDecimation` drops the array entirely (E-134). A reduced
+  surface built with the second cannot answer a pick, because nothing says which dataset point a vertex
+  was. `PreserveTopology` on and boundary-vertex deletion off, so a reduced picture does not close a
+  hole and show a different part.
+  **It is cached on the @Dataset, keyed by triangle budget.** Two views of one @Case may have different
+  budgets and neither evicts the other. Where a decimated triangle spans more than one cell, its source
+  cell is **-1** rather than one of the cells it partly covers
+- decided_by: the product owner, 2026-08-24
+- rationale: the decimator choice is the load-bearing one and it is not the choice a quality comparison
+  would make. Quadric decimation is the better-looking algorithm and it is unusable here, because this
+  product's reduced view still has to answer "what is the value at that point" and the only thing that
+  can answer is the map back. Measured rather than assumed: same input, same reduction, one filter keeps
+  the array and the other does not (E-134).
+  The cache is on the @Dataset because it is derived entirely from the @Dataset and should die with it -
+  a cache keyed by object identity in a module outlives what it describes. And it has to exist: 2.63 s
+  for a million triangles here, 22.34 s for 2.25 million in the export spike, against a frame budget of
+  about 23 ms (LIM-002).
+  -1 for a spanning triangle rather than a nearest cell is the same rule as everywhere else here: a
+  value attached to a place it is not true of is worse than no value (XC-001)
+- alternatives: reducing in the reader keeps one code path and makes every load pay for a picture nobody
+  asked to see; re-deriving the map by nearest-point search after decimation needs a tolerance and is
+  slower than the array the filter already produced; quadric decimation with a separate locator to
+  rebuild the map is two passes to recover what one filter gives free
+- basis: E-134 (T1), E-063 (T1)
+- affects: MOD-002, MOD-003, INV-001, LIM-002, features/ingest/tasks.md
+- decidedness: Fixed
+- reversal_trigger: a decimator that both preserves the map and beats `vtkDecimatePro` on the silhouette,
+  which would be measured against the same sphere rather than adopted on its description
+
