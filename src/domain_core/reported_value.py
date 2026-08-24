@@ -29,6 +29,7 @@ class Provenance(str, Enum):
     DECLARED = "declared"      # a person said so
     DATASET = "dataset"        # read from a @Dataset
     COMPUTED = "computed"      # computed by a formula, which is carried alongside
+    MEASURED = "measured"      # from a test, a rig or a sensor, as @Measurement data (XC-125)
     REFERENCE = "reference"    # taken from @Reference material, never a source of numbers
 
 

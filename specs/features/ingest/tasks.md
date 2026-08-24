@@ -212,17 +212,38 @@ is either missing a requirement or is not work this specification asked for.
 - satisfies: AC-037
 - depends_on: TASK-001
 - done_when: measured values attach to a case and are usable as a source of numbers
-
+- done: 2026-08-24, `domain_core/measurement.py` and `engine/measurements.py`. A measured value
+  reports with `Provenance.MEASURED` - not DECLARED and not REFERENCE, because @Reference material may
+  never supply a number and @Measurement data may, and the two have to be distinguishable in the value
+  itself (XC-125).
+  Two things are required rather than optional. A measured value **records what produced it**: one with
+  no stated origin is a number somebody must take on trust with nobody left to ask. And a measurement
+  file's columns are **declared, not recognised** - a column nobody reads is refused rather than
+  ignored, because ignoring it loses data the user believes was imported. Every refusal names the row.
 ### TASK-021 - Uncertainty travels with a measured value
 - satisfies: AC-038
 - depends_on: TASK-020
 - done_when: a comparison can state both the computed and the measured uncertainty
-
+- done: 2026-08-24. `Uncertainty` says which kind it is, and **an expanded one carries its coverage
+  factor or is refused**: the metrology guidance requires either U with its k or the combined standard
+  u_c, and "±0.4" at k=1 and k=2 describe intervals that differ by a factor of two (E-070). A standard
+  uncertainty carrying a k is refused too - it would be read as an expanded one by anyone who trusts
+  the label.
+  `comparison.compare` states both sides and **delivers no verdict** unless the user gave a threshold,
+  which is then named (XC-107). A computed value carries no uncertainty in this build, so the
+  comparison says the discretisation error is unquantified rather than omitting the subject - a bare
+  computed figure beside a measured one with error bars reads as the exact one.
+  `combined_uncertainty` combines in quadrature after converting each to standard form, and returns
+  None where there is nothing to combine rather than treating an absent contribution as zero.
 ### TASK-022 - Undeclared measured units
 - satisfies: AC-039
 - depends_on: TASK-020
 - done_when: no unit is inferred from the field being compared against
-
+- done: 2026-08-24. A measured value with no declared unit stays undeclared beside a computed field
+  in megapascals, and the **difference is refused** rather than computed: 231 from 235 is 4 whether
+  both are megapascals or one is a pascal, and the answer looks the same either way. Differing declared
+  units are refused too, rather than converted - a conversion happens when it is asked for.
+  An empty cell in an imported table means **absent**, never zero and never a default.
 ### TASK-023 - Integration-point values read as written
 - satisfies: AC-040
 - depends_on: TASK-001
