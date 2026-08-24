@@ -68,6 +68,9 @@ class ReportedValue:
     provenance: Provenance
     caveats: frozenset[Caveat] = frozenset()
     formula: str | None = None
+    # Why the value is not there, when it is not. A refusal that gives no reason reads as an oversight,
+    # and the reader then supplies their own explanation - usually a wrong one.
+    missing_because: str | None = None
 
     def __post_init__(self) -> None:
         if self.provenance is Provenance.COMPUTED and not self.formula:
@@ -77,11 +80,27 @@ class ReportedValue:
             )
         if self.digits < 1:
             raise ValueError("a value carries at least one significant digit")
+        if self.missing_because and self.value is not None:
+            raise ValueError("a value that is there does not also carry a reason for being absent")
         if self.unit is None and Caveat.UNDECLARED_UNIT not in self.caveats:
             raise ValueError(
                 "a value with no unit carries UNDECLARED_UNIT; a unit that is merely absent reads as a "
                 "unit nobody needed (XC-003)"
             )
+
+    @classmethod
+    def unavailable(
+        cls, reason: str, *, unit: str | None, digits: int, provenance: Provenance,
+        caveats: frozenset[Caveat] = frozenset(), formula: str | None = None,
+    ) -> "ReportedValue":
+        """A number this product declines to report, saying why.
+
+        Refusing is a result (XC-001). It is not the same as a value that happened to be NaN in the
+        file, and both are `None` here - `missing_because` is what separates them.
+        """
+        if unit is None:
+            caveats = caveats | {Caveat.UNDECLARED_UNIT}
+        return cls(None, unit, digits, provenance, caveats, formula, reason)
 
     @property
     def is_missing(self) -> bool:

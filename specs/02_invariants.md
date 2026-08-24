@@ -86,14 +86,25 @@ it. An invariant that cannot be judged is not an invariant - it is a wish.
 - basis: E-037 (T1), E-038 (T1)
 
 ### INV-010 - Duplicated points at partition boundaries are never counted twice
-- statement: a partitioned dataset repeats the points on each partition boundary; every count, mean,
-  integral and extremum excludes the duplicates
+- statement: a partitioned dataset repeats the points on each partition interface, and repeats cells as
+  well where the piece manifest declares ghost layers. Where the duplicates are marked, every count,
+  mean and sum excludes them; where nothing marks them, those numbers are refused with the reason rather
+  than reported. An extremum is reported either way
 - rationale: the reader performs no merging, so a naive sum over a 64-piece run over-counts every
   interface. The error is small enough to look plausible and large enough to be wrong
 - checked_by: a test comparing a reported integral over a partitioned dataset against the same dataset
-  in one piece
+  in one piece, and a test that the same numbers are refused when nothing marks the duplicates
+- correction: the first statement said that every count, mean, integral **and extremum** excludes the
+  duplicates, and implied that this is always possible. Measuring the toolkit showed both halves to be
+  wrong (E-131). An extremum has nothing to exclude - the largest of a set is unchanged by writing part
+  of it twice - so promising that it excludes duplicates described work that is not done and cannot be
+  checked. And a `.pvtu` written at the default `GhostLevel="0"` carries no ghost array at all, so in the
+  common case the duplicates are unidentifiable and no aggregate can exclude them; the reachable
+  guarantee there is that the number is not reported (XC-232). Left as written, the invariant would have
+  been satisfied by a merge-by-coordinate with a tolerance - which welds a crack face shut and would have
+  been adopted on the authority of this line
 - decidedness: Fixed
-- basis: E-039 (T1)
+- basis: E-039 (T1), E-131 (T1)
 
 ### INV-011 - A point that could not be sampled is missing, not zero
 - statement: wherever a value is transferred between meshes, points that fall outside the source carry

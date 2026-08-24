@@ -15,25 +15,18 @@ Specification: GL-005, GL-006, GL-007, GL-021, GL-023, INV-001, INV-003, INV-011
 from __future__ import annotations
 
 from dataclasses import dataclass, field as dataclass_field
-from enum import Enum
-
 import numpy as np
 
+from domain_core.association import Association, AssociationError
 from domain_core.case_contents import CaseContents
-from domain_core.reported_value import Caveat, Provenance, ReportedValue
+from domain_core.partitions import Aggregate, Partitioning, counted
+from domain_core.reported_value import DIMENSIONLESS, Caveat, Provenance, ReportedValue
 
 from domain_core.precision import format_value, significant_digits
 
-
-class Association(str, Enum):
-    """Where a field lives. Converting between these changes values, so it is never implicit."""
-
-    POINT = "point"
-    CELL = "cell"
-
-
-class AssociationError(Exception):
-    """Raised when a field is read as the association it does not have (INV-003)."""
+__all__ = [
+    "Association", "AssociationError", "Dataset", "Field", "SourceFrame",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,6 +93,11 @@ class Dataset:
     points_m: np.ndarray
     cells: np.ndarray
     fields: dict[str, Field] = dataclass_field(default_factory=dict)
+    # The ghost arrays, held apart from `fields` for two reasons: `vtkGhostType` is not a physical
+    # quantity and does not belong in the list a user picks a @Variable from, and the point one and the
+    # cell one share a name, so a dictionary keyed by name could only ever hold one of them.
+    ghosts: dict[Association, np.ndarray] = dataclass_field(default_factory=dict)
+    partitioning: Partitioning = dataclass_field(default_factory=Partitioning)
     source: SourceFrame | None = None
     # What the survey found: how many steps and parts, and whether a part the manifest named was
     # absent. Held on the dataset so that a value read from it can carry the mark without the call
@@ -157,6 +155,86 @@ class Dataset:
     def __post_init__(self) -> None:
         if self.points_m.ndim != 2 or self.points_m.shape[1] != 3:
             raise ValueError("points must be an (n, 3) array of metres in the canonical frame")
+        if self.contents is not None:
+            # The survey counted the parts; a caller restating them could restate them wrongly, and a
+            # partitioning that disagrees with the manifest decides which numbers get refused.
+            self.partitioning = Partitioning(self.contents.parts, self.contents.ghost_level)
+        for association, ghosts in self.ghosts.items():
+            expected = self.point_count if association is Association.POINT else self.cell_count
+            if ghosts.shape != (expected,):
+                raise ValueError(
+                    f"the {association.value} ghost array has {ghosts.shape} entries for {expected} "
+                    f"{association.value}s; a mask that does not line up excludes the wrong ones"
+                )
+
+    def counted(self, association: Association) -> np.ndarray | None:
+        """The mask of entries a number is computed over, or None when nothing was marked."""
+        ghosts = self.ghosts.get(association)
+        return None if ghosts is None else counted(ghosts, association)
+
+    def _aggregate(self, name: str, aggregate: Aggregate) -> ReportedValue:
+        """One number over a field, over the entries that count, or a refusal saying why not."""
+        field = self.field(name)
+        # A count is dimensionless whatever the field is in; every other aggregate here is in the
+        # field's own unit, so it inherits the field's undeclared-unit caveat.
+        unit = DIMENSIONLESS if aggregate is Aggregate.COUNT else field.unit
+        caveats = self.caveats()
+        if unit is None:
+            caveats = caveats | {Caveat.UNDECLARED_UNIT}
+        formula = f"{aggregate.value}({name})"
+
+        def refuse(reason: str) -> ReportedValue:
+            return ReportedValue.unavailable(
+                reason, unit=unit, digits=field.significant_digits,
+                provenance=Provenance.COMPUTED, caveats=caveats, formula=formula,
+            )
+
+        mask = self.counted(field.association)
+        reason = self.partitioning.refusal(aggregate, field.association, marked=mask is not None)
+        if reason is not None:
+            return refuse(reason)
+
+        values = field.values if mask is None else field.values[mask]
+        if values.size == 0:
+            return refuse("計算対象の要素が 1 件もありません")
+        missing = int(np.count_nonzero(np.isnan(values)))
+        if missing and aggregate is not Aggregate.COUNT:
+            return refuse(
+                f"{values.size} 件のうち {missing} 件が欠損しています。"
+                "残りだけで計算した値は、全体の値として読まれます（INV-011, XC-001）。"
+            )
+
+        result = {
+            Aggregate.EXTREMUM: lambda: float(np.max(values)),
+            Aggregate.TOTAL: lambda: float(np.sum(values)),
+            Aggregate.MEAN: lambda: float(np.mean(values)),
+            Aggregate.COUNT: lambda: float(values.size),
+        }[aggregate]()
+        return ReportedValue(
+            value=result, unit=unit, digits=field.significant_digits,
+            provenance=Provenance.COMPUTED, caveats=caveats, formula=formula,
+        )
+
+    def counted_entries(self, name: str) -> ReportedValue:
+        """How many entries of a field a reported number is computed over."""
+        return self._aggregate(name, Aggregate.COUNT)
+
+    def maximum(self, name: str) -> ReportedValue:
+        """The largest value of a field. Unharmed by partitioning: a repeat is the same number."""
+        return self._aggregate(name, Aggregate.EXTREMUM)
+
+    def total(self, name: str) -> ReportedValue:
+        """The sum of a field over the entries that count.
+
+        This is the sum the ghost mask governs, not yet a volume-weighted integral - weighting needs
+        cell measures, which arrive with the geometry tasks. The double-counting INV-010 is about is
+        the same in both.
+        """
+        return self._aggregate(name, Aggregate.TOTAL)
+
+    def mean(self, name: str) -> ReportedValue:
+        """The mean of a field over the entries that count."""
+        return self._aggregate(name, Aggregate.MEAN)
 
     @property
     def point_count(self) -> int:

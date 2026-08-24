@@ -57,6 +57,27 @@ class TestPartitionedSet:
         assert contents.missing_parts == ("run_1.vtu",)
         assert "run_1.vtu" in contents.describe()
 
+    def test_the_declared_ghost_level_is_read(self, tmp_path: Path) -> None:
+        """It decides whether cells are repeated as well as points, and the two invalidate different
+        numbers (INV-010). Nothing downstream can recover it once the manifest is closed."""
+        manifest = tmp_path / "run.pvtu"
+        manifest.write_text(
+            '<VTKFile type="PUnstructuredGrid">'
+            '<PUnstructuredGrid GhostLevel="2"><Piece Source="run_0.vtu"/></PUnstructuredGrid>'
+            "</VTKFile>",
+            encoding="utf-8",
+        )
+        (tmp_path / "run_0.vtu").write_text("piece", encoding="utf-8")
+
+        assert survey(manifest).ghost_level == 2
+
+    def test_the_common_manifest_declares_no_ghost_layers(self, tmp_path: Path) -> None:
+        """`GhostLevel="0"` is the writer's default (E-131), so this is the case most partitioned runs
+        arrive in - and the one where nothing marks the duplicated points."""
+        manifest = write_manifest(tmp_path / "run.pvtu", ["run_0.vtu", "run_1.vtu"])
+
+        assert survey(manifest).ghost_level == 0
+
     def test_a_piece_with_no_source_is_a_missing_part(self, tmp_path: Path) -> None:
         """The manifest said there was a piece there; silence about it would be this product deciding
         the file meant something other than what it says."""
