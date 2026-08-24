@@ -262,7 +262,20 @@ updated: 2026-08-25
 - satisfies: AC-016
 - depends_on: TASK-029
 - done_when: a second run on the same inputs produces identical artefacts, asserted by comparison
-
+- done: 2026-08-25, `src/service/pipeline/reproduce.py`. Two runs of the same pipeline on the same
+  inputs are compared by a canonical form of the run record with the timestamps removed - which is what
+  AC-016's "save for recorded timestamps" needs in order to be checkable at all. The record now carries
+  `started` and `finished`, so there is something real to exclude and the test can assert the two runs'
+  times genuinely differed rather than passing on two records that recorded no time.
+  **Nothing is sorted.** Two runs that acted on the same cases in a different order are not the same
+  run, and a canonical form that tidied that away would report agreement where there is none.
+  `differences` names where two runs part company rather than answering yes or no: a boolean is the
+  least useful form of a correct answer, and what somebody needs is the unit. `digest` answers whether,
+  in one comparison. Artefacts are compared by content and keyed by **file name**, because two runs
+  write into two directories and a comparison keyed by absolute path reports every file as missing from
+  the other side.
+  The property is asserted for the failing runs too, not only the clean one - otherwise it holds only
+  for the runs nobody needs to compare.
 ### TASK-031 - Produced cases know their unit
 - satisfies: AC-017
 - depends_on: TASK-029
@@ -309,7 +322,21 @@ updated: 2026-08-25
 - depends_on: TASK-020, TASK-029
 - done_when: a headless run reports machine-readable progress and outcome and exits non-zero when any
   case failed
-
+- done: 2026-08-25, `src/service/pipeline/headless.py`. JSON Lines to standard output, one object
+  per line, flushed per line (XC-243), and an exit code that answers one question: 0 when no case
+  failed, 1 when one or more did, 2 when the run was refused before it started. Two rather than one for
+  the refusal because "a case failed" and "the run never happened" are different facts to whatever is
+  calling.
+  Progress is emitted **while the run happens**. That needed one structural change: every result now
+  reaches the record through a single function, so a watcher and the record cannot disagree. Thirteen
+  call sites appended directly before; a fourteenth added later would have been invisible to the
+  watcher, and the failure would be a headless run silently missing a step it did perform.
+  The plan is emitted before the first unit, so the log is usable as the record of what was authorised
+  rather than something reconstructed afterwards.
+  **What this does not yet satisfy is the first half of AC-021.** The units are identical because this
+  module calls the same `run` and holds no execution of its own - asserted against its own source - but
+  "through the identical command surface" waits on TASK-020, which does not exist. The identity today is
+  structural, not yet CT-002's.
 ### TASK-035 - The scripting object model
 - satisfies: AC-035
 - depends_on: TASK-001, TASK-020
