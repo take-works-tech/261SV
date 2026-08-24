@@ -1,0 +1,662 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CT-012 object compatibility",
+  "version": "1.0.0",
+  "description": "The tables CT-012 states, as data. Not a document shape like the other contracts: what this contract constrains is which objects exist and what becomes what, so the machine-readable form is the tables themselves and validate/check_object_compatibility.py reads them.",
+  "measuredAgainst": {
+    "vtkVersion": "9.5.2",
+    "evidence": [
+      "E-132",
+      "E-133"
+    ],
+    "record": "spike/object_types.json, spike/reader_output_types.json"
+  },
+  "dispositions": {
+    "read": "accepted as it stands; its connectivity is explicit and its points are its own",
+    "convert": "accepted after one named conversion, whose cost is stated and recorded on the @Dataset",
+    "decompose": "not one dataset; it is taken apart into the parts of one @Case",
+    "refuse": "named and refused. Never approximated, never silently emptied"
+  },
+  "dataObjectTypes": {
+    "vtkPolyData": {
+      "disposition": "read",
+      "note": "explicit connectivity in four cell arrays - verts, lines, polys, strips - read in that order so a cell index means here what it means in the file"
+    },
+    "vtkUnstructuredGrid": {
+      "disposition": "read",
+      "note": "explicit connectivity of any cell type; the shape every conversion below targets"
+    },
+    "vtkPointSet": {
+      "disposition": "refuse",
+      "reason": "points with no cells, and no reader in this build produces one: a point cloud arrives as a vtkPolyData of vertex cells, which is read. Marking it read as well would be a second path with nothing behind it, and the check that found this said so"
+    },
+    "vtkStructuredGrid": {
+      "disposition": "convert",
+      "via": "vtkAppendFilter",
+      "to": "vtkUnstructuredGrid",
+      "costs": "connectivity becomes explicit, so memory grows by the connectivity array the file did not store; no value changes and no cell is added"
+    },
+    "vtkRectilinearGrid": {
+      "disposition": "convert",
+      "via": "vtkRectilinearGridToPointSet then vtkAppendFilter",
+      "to": "vtkUnstructuredGrid",
+      "costs": "the three coordinate vectors become one explicit point array; memory grows from O(nx+ny+nz) to O(nx*ny*nz) and no value changes"
+    },
+    "vtkImageData": {
+      "disposition": "convert",
+      "via": "vtkImageDataToPointSet then vtkAppendFilter",
+      "to": "vtkUnstructuredGrid",
+      "costs": "origin and spacing are implicit in the file and explicit afterwards; both are recorded on the @Dataset because after the conversion nothing can recover them, and a spacing is the one number in a voxel result that carries a length unit"
+    },
+    "vtkStructuredPoints": {
+      "disposition": "convert",
+      "via": "as vtkImageData, of which it is the older name",
+      "to": "vtkUnstructuredGrid",
+      "costs": "as vtkImageData"
+    },
+    "vtkUniformGrid": {
+      "disposition": "convert",
+      "via": "as vtkImageData",
+      "to": "vtkUnstructuredGrid",
+      "costs": "as vtkImageData, and its blanking becomes HIDDENCELL in the ghost array rather than being dropped - a blanked cell is a cell the file said to ignore, not a cell that is absent"
+    },
+    "vtkExplicitStructuredGrid": {
+      "disposition": "convert",
+      "via": "vtkExplicitStructuredGridToUnstructuredGrid",
+      "to": "vtkUnstructuredGrid",
+      "costs": "the i,j,k address of each cell is lost unless it is kept as a cell field; a reservoir result is usually reported by that address"
+    },
+    "vtkHyperTreeGrid": {
+      "disposition": "convert",
+      "via": "vtkHyperTreeGridToUnstructuredGrid",
+      "to": "vtkUnstructuredGrid",
+      "costs": "the tree is the compression; expanding it produces one cell per leaf and the memory is what the format existed to avoid. The cost is stated against LIM-002 before the conversion runs, never after"
+    },
+    "vtkUniformHyperTreeGrid": {
+      "disposition": "convert",
+      "via": "as vtkHyperTreeGrid",
+      "to": "vtkUnstructuredGrid",
+      "costs": "as vtkHyperTreeGrid"
+    },
+    "vtkCellGrid": {
+      "disposition": "convert",
+      "via": "vtkCellGridToUnstructuredGrid",
+      "to": "vtkUnstructuredGrid",
+      "costs": "the discontinuous-Galerkin basis does not survive: the conversion writes linear sub-cells. INV-009 therefore forbids reporting a number from the converted form, and the conversion is offered for display while the numbers wait for a path that reads the basis"
+    },
+    "vtkTable": {
+      "disposition": "read",
+      "as": "rows",
+      "note": "a @Case with no geometry. It is a source for a @Graph and never a View object; asking it for a mesh is refused rather than answered with an empty one"
+    },
+    "vtkPartitionedDataSet": {
+      "disposition": "decompose",
+      "into": "the partitions of one part",
+      "note": "partitions of a single dataset. They recombine, so they are one part with a partition count - the case INV-010 governs"
+    },
+    "vtkMultiPieceDataSet": {
+      "disposition": "decompose",
+      "into": "the partitions of one part",
+      "note": "as vtkPartitionedDataSet, under its older name"
+    },
+    "vtkPartitionedDataSetCollection": {
+      "disposition": "decompose",
+      "into": "one part per dataset, each with its own partitions",
+      "note": "the type that states both levels at once, and the reason a part and a partition are two words here"
+    },
+    "vtkMultiBlockDataSet": {
+      "disposition": "decompose",
+      "into": "one part per leaf block, keeping the block names as the part hierarchy",
+      "note": "the most common CAE reader output (E-133). Its blocks are distinct parts - an element block, a side set, a material - and not partitions of one mesh, so nothing sums across them without being asked"
+    },
+    "vtkOverlappingAMR": {
+      "disposition": "refuse",
+      "reason": "the levels overlap by construction: a refined region is present at every level above it, so a sum over the leaves counts it once per level. Until the level masking is read and applied, every aggregate over one is wrong by an amount that looks plausible - INV-010 one level up"
+    },
+    "vtkNonOverlappingAMR": {
+      "disposition": "refuse",
+      "reason": "no reader in this build produces one, and accepting a type nothing can deliver would be an untested path pretending to be support"
+    },
+    "vtkUniformGridAMR": {
+      "disposition": "refuse",
+      "reason": "as vtkOverlappingAMR, of which it is the base"
+    },
+    "vtkHierarchicalBoxDataSet": {
+      "disposition": "refuse",
+      "reason": "deprecated in the toolkit and superseded by vtkOverlappingAMR"
+    },
+    "vtkPath": {
+      "disposition": "refuse",
+      "reason": "a two-dimensional drawing path used by the text renderer, not result geometry, although it is a vtkDataSet"
+    },
+    "vtkMolecule": {
+      "disposition": "refuse",
+      "reason": "atoms and bonds are a different domain with their own units and their own conventions; reading one as a mesh of vertices would show it and mean nothing"
+    },
+    "vtkGraph": {
+      "disposition": "refuse",
+      "reason": "a topology with no geometry this product can report on"
+    },
+    "vtkDirectedGraph": {
+      "disposition": "refuse",
+      "reason": "as vtkGraph"
+    },
+    "vtkUndirectedGraph": {
+      "disposition": "refuse",
+      "reason": "as vtkGraph"
+    },
+    "vtkDirectedAcyclicGraph": {
+      "disposition": "refuse",
+      "reason": "as vtkGraph"
+    },
+    "vtkReebGraph": {
+      "disposition": "refuse",
+      "reason": "as vtkGraph"
+    },
+    "vtkTree": {
+      "disposition": "refuse",
+      "reason": "as vtkGraph"
+    },
+    "vtkSelection": {
+      "disposition": "refuse",
+      "reason": "a description of a subset, not data; it is an argument to an operation and never a @Case"
+    },
+    "vtkAnnotation": {
+      "disposition": "refuse",
+      "reason": "a selection with a label; annotations here are CT-004 state, not read data"
+    },
+    "vtkAnnotationLayers": {
+      "disposition": "refuse",
+      "reason": "as vtkAnnotation"
+    },
+    "vtkArrayData": {
+      "disposition": "refuse",
+      "reason": "n-dimensional arrays with no association to points or cells, so INV-003 has nothing to hold"
+    },
+    "vtkBSPCuts": {
+      "disposition": "refuse",
+      "reason": "a spatial partitioning tree used by parallel filters, not a result"
+    },
+    "vtkPiecewiseFunction": {
+      "disposition": "refuse",
+      "reason": "a transfer function - appearance, and already CT-004 state"
+    },
+    "vtkDataObject": {
+      "disposition": "refuse",
+      "reason": "the base class. A reader returning one has told us nothing about what it read, which is a reason to stop rather than to guess"
+    },
+    "vtkGenericDataSet": {
+      "disposition": "refuse",
+      "reason": "an adaptor interface with no storage of its own"
+    },
+    "vtkImageStencilData": {
+      "disposition": "refuse",
+      "reason": "a mask for image operations"
+    },
+    "vtkAbstractElectronicData": {
+      "disposition": "refuse",
+      "reason": "as vtkMolecule"
+    },
+    "vtkOpenQubeElectronicData": {
+      "disposition": "refuse",
+      "reason": "as vtkMolecule"
+    },
+    "vtkGeoJSONFeature": {
+      "disposition": "refuse",
+      "reason": "geographic features carry their own coordinate reference systems, which this product does not model"
+    },
+    "vtkAMRDataObject": {
+      "disposition": "refuse",
+      "reason": "as vtkOverlappingAMR"
+    },
+    "vtkCartesianGrid": {
+      "disposition": "refuse",
+      "reason": "present in the toolkit's type table and produced by no reader in this build"
+    },
+    "vtkStatisticalModel": {
+      "disposition": "refuse",
+      "reason": "a fitted model, not measured data"
+    },
+    "vtkCompositeDataSet": {
+      "disposition": "refuse",
+      "reason": "the composite base class; as vtkDataObject"
+    },
+    "vtkDataObjectTree": {
+      "disposition": "refuse",
+      "reason": "the composite tree base class; as vtkDataObject"
+    },
+    "vtkDataSet": {
+      "disposition": "refuse",
+      "reason": "the dataset base class; as vtkDataObject"
+    },
+    "vtkUnstructuredGridBase": {
+      "disposition": "refuse",
+      "reason": "an abstract base with no storage"
+    },
+    "vtkMultiGroupDataSet": {
+      "disposition": "refuse",
+      "reason": "obsolete in the toolkit"
+    },
+    "vtkHierarchicalDataSet": {
+      "disposition": "refuse",
+      "reason": "obsolete in the toolkit"
+    },
+    "vtkHyperOctree": {
+      "disposition": "refuse",
+      "reason": "obsolete in the toolkit"
+    },
+    "vtkTemporalDataSet": {
+      "disposition": "refuse",
+      "reason": "obsolete in the toolkit; time is a @Case axis here, not a data object"
+    },
+    "vtkPistonDataObject": {
+      "disposition": "refuse",
+      "reason": "obsolete in the toolkit"
+    }
+  },
+  "viewObjectTypes": {
+    "analysisMesh": {
+      "requires": "a @Dataset with cells",
+      "cellDimensions": [
+        1,
+        2,
+        3
+      ],
+      "maySourceReportedNumbers": true,
+      "note": "the only object a reported number may come from, and the reason the type exists separately from referenceMesh"
+    },
+    "referenceMesh": {
+      "requires": "geometry, from a @Dataset or an imported prop",
+      "cellDimensions": [
+        1,
+        2,
+        3
+      ],
+      "maySourceReportedNumbers": false,
+      "note": "scenery with a shape. A dimension drawn against it is a drawing, not a measurement"
+    },
+    "scalarField": {
+      "requires": "an analysisMesh and one single-component @Field on it",
+      "cellDimensions": [
+        1,
+        2,
+        3
+      ],
+      "maySourceReportedNumbers": true
+    },
+    "vectorField": {
+      "requires": "an analysisMesh and one @Field of two or more components on it",
+      "cellDimensions": [
+        1,
+        2,
+        3
+      ],
+      "maySourceReportedNumbers": true
+    },
+    "trajectory": {
+      "requires": "an analysisMesh, a seed set and an integrator; it is produced, not read",
+      "cellDimensions": [
+        1
+      ],
+      "maySourceReportedNumbers": true,
+      "note": "a streamline, particle trace or path line. Its own geometry is a result of a computation whose parameters CT-004 records (view/REQ-018)"
+    },
+    "pointCloud": {
+      "requires": "points, with no cells or with vertex cells only",
+      "cellDimensions": [
+        0
+      ],
+      "maySourceReportedNumbers": true
+    },
+    "annotation": {
+      "requires": "nothing geometric; a text, point label, scale bar or dimension",
+      "cellDimensions": [],
+      "maySourceReportedNumbers": false,
+      "note": "it may show a number, which is computed from the @Dataset and never measured off the picture (INV-001)"
+    },
+    "effect": {
+      "requires": "nothing",
+      "cellDimensions": [],
+      "maySourceReportedNumbers": false
+    }
+  },
+  "conversions": {
+    "note": "Every ordered pair of view object types appears. A pair that is not allowed says why, because a table with holes is read as a table whose holes are permitted.",
+    "allowed": [
+      {
+        "from": "analysisMesh",
+        "to": "referenceMesh",
+        "drops": "every @Field",
+        "note": "one direction only. The result may never source a reported number, which is the whole difference between the two types"
+      },
+      {
+        "from": "analysisMesh",
+        "to": "pointCloud",
+        "drops": "every cell, and with them every cell field",
+        "note": "point fields survive because they are indexed by points, which is what remains"
+      },
+      {
+        "from": "referenceMesh",
+        "to": "pointCloud",
+        "drops": "every cell"
+      },
+      {
+        "from": "scalarField",
+        "to": "vectorField",
+        "drops": "nothing",
+        "requires": "the @Field the scalarField draws has two or more components; a one-component field is refused rather than promoted to a vector of length one"
+      },
+      {
+        "from": "vectorField",
+        "to": "scalarField",
+        "drops": "nothing",
+        "requires": "a named component or magnitude from the derived-quantity catalogue, which is a computation with an identifier and not a change of appearance (15_derived_quantities.md)"
+      }
+    ],
+    "refusedReasons": {
+      "identity": "an object is already what it is; a conversion to its own type is not offered, so that a no-op cannot be mistaken for an accepted request",
+      "inventsConnectivity": "the target needs cells the source does not have, and meshing them is an invention with a tolerance - a different result wearing the same name",
+      "inventsData": "the target needs a @Field the source does not carry, and no default may stand in for one (XC-001)",
+      "wouldLaunder": "the source may not be a source of reported numbers and the target may, so the conversion would make a drawing into a measurement",
+      "differentKind": "one is geometry and the other is not; there is nothing to convert, only something to create",
+      "derivedNotConverted": "the target is produced from the source and does not replace it - a scalar field, a vector field and a trajectory each need an analysisMesh that goes on existing"
+    },
+    "refused": [
+      {
+        "from": "analysisMesh",
+        "to": "analysisMesh",
+        "reason": "identity"
+      },
+      {
+        "from": "analysisMesh",
+        "to": "scalarField",
+        "reason": "derivedNotConverted"
+      },
+      {
+        "from": "analysisMesh",
+        "to": "vectorField",
+        "reason": "derivedNotConverted"
+      },
+      {
+        "from": "analysisMesh",
+        "to": "trajectory",
+        "reason": "derivedNotConverted"
+      },
+      {
+        "from": "analysisMesh",
+        "to": "annotation",
+        "reason": "differentKind"
+      },
+      {
+        "from": "analysisMesh",
+        "to": "effect",
+        "reason": "differentKind"
+      },
+      {
+        "from": "referenceMesh",
+        "to": "analysisMesh",
+        "reason": "wouldLaunder"
+      },
+      {
+        "from": "referenceMesh",
+        "to": "referenceMesh",
+        "reason": "identity"
+      },
+      {
+        "from": "referenceMesh",
+        "to": "scalarField",
+        "reason": "derivedNotConverted"
+      },
+      {
+        "from": "referenceMesh",
+        "to": "vectorField",
+        "reason": "derivedNotConverted"
+      },
+      {
+        "from": "referenceMesh",
+        "to": "trajectory",
+        "reason": "derivedNotConverted"
+      },
+      {
+        "from": "referenceMesh",
+        "to": "annotation",
+        "reason": "differentKind"
+      },
+      {
+        "from": "referenceMesh",
+        "to": "effect",
+        "reason": "differentKind"
+      },
+      {
+        "from": "scalarField",
+        "to": "analysisMesh",
+        "reason": "wouldLaunder"
+      },
+      {
+        "from": "scalarField",
+        "to": "referenceMesh",
+        "reason": "wouldLaunder"
+      },
+      {
+        "from": "scalarField",
+        "to": "scalarField",
+        "reason": "identity"
+      },
+      {
+        "from": "scalarField",
+        "to": "trajectory",
+        "reason": "derivedNotConverted"
+      },
+      {
+        "from": "scalarField",
+        "to": "pointCloud",
+        "reason": "wouldLaunder"
+      },
+      {
+        "from": "scalarField",
+        "to": "annotation",
+        "reason": "differentKind"
+      },
+      {
+        "from": "scalarField",
+        "to": "effect",
+        "reason": "differentKind"
+      },
+      {
+        "from": "vectorField",
+        "to": "analysisMesh",
+        "reason": "wouldLaunder"
+      },
+      {
+        "from": "vectorField",
+        "to": "referenceMesh",
+        "reason": "wouldLaunder"
+      },
+      {
+        "from": "vectorField",
+        "to": "vectorField",
+        "reason": "identity"
+      },
+      {
+        "from": "vectorField",
+        "to": "trajectory",
+        "reason": "derivedNotConverted"
+      },
+      {
+        "from": "vectorField",
+        "to": "pointCloud",
+        "reason": "wouldLaunder"
+      },
+      {
+        "from": "vectorField",
+        "to": "annotation",
+        "reason": "differentKind"
+      },
+      {
+        "from": "vectorField",
+        "to": "effect",
+        "reason": "differentKind"
+      },
+      {
+        "from": "trajectory",
+        "to": "analysisMesh",
+        "reason": "wouldLaunder"
+      },
+      {
+        "from": "trajectory",
+        "to": "referenceMesh",
+        "reason": "wouldLaunder"
+      },
+      {
+        "from": "trajectory",
+        "to": "scalarField",
+        "reason": "derivedNotConverted"
+      },
+      {
+        "from": "trajectory",
+        "to": "vectorField",
+        "reason": "derivedNotConverted"
+      },
+      {
+        "from": "trajectory",
+        "to": "trajectory",
+        "reason": "identity"
+      },
+      {
+        "from": "trajectory",
+        "to": "pointCloud",
+        "reason": "wouldLaunder"
+      },
+      {
+        "from": "trajectory",
+        "to": "annotation",
+        "reason": "differentKind"
+      },
+      {
+        "from": "trajectory",
+        "to": "effect",
+        "reason": "differentKind"
+      },
+      {
+        "from": "pointCloud",
+        "to": "analysisMesh",
+        "reason": "inventsConnectivity"
+      },
+      {
+        "from": "pointCloud",
+        "to": "referenceMesh",
+        "reason": "inventsConnectivity"
+      },
+      {
+        "from": "pointCloud",
+        "to": "scalarField",
+        "reason": "derivedNotConverted"
+      },
+      {
+        "from": "pointCloud",
+        "to": "vectorField",
+        "reason": "derivedNotConverted"
+      },
+      {
+        "from": "pointCloud",
+        "to": "trajectory",
+        "reason": "derivedNotConverted"
+      },
+      {
+        "from": "pointCloud",
+        "to": "pointCloud",
+        "reason": "identity"
+      },
+      {
+        "from": "pointCloud",
+        "to": "annotation",
+        "reason": "differentKind"
+      },
+      {
+        "from": "pointCloud",
+        "to": "effect",
+        "reason": "differentKind"
+      },
+      {
+        "from": "annotation",
+        "to": "analysisMesh",
+        "reason": "differentKind"
+      },
+      {
+        "from": "annotation",
+        "to": "referenceMesh",
+        "reason": "differentKind"
+      },
+      {
+        "from": "annotation",
+        "to": "scalarField",
+        "reason": "differentKind"
+      },
+      {
+        "from": "annotation",
+        "to": "vectorField",
+        "reason": "differentKind"
+      },
+      {
+        "from": "annotation",
+        "to": "trajectory",
+        "reason": "differentKind"
+      },
+      {
+        "from": "annotation",
+        "to": "pointCloud",
+        "reason": "differentKind"
+      },
+      {
+        "from": "annotation",
+        "to": "annotation",
+        "reason": "identity"
+      },
+      {
+        "from": "annotation",
+        "to": "effect",
+        "reason": "differentKind"
+      },
+      {
+        "from": "effect",
+        "to": "analysisMesh",
+        "reason": "differentKind"
+      },
+      {
+        "from": "effect",
+        "to": "referenceMesh",
+        "reason": "differentKind"
+      },
+      {
+        "from": "effect",
+        "to": "scalarField",
+        "reason": "differentKind"
+      },
+      {
+        "from": "effect",
+        "to": "vectorField",
+        "reason": "differentKind"
+      },
+      {
+        "from": "effect",
+        "to": "trajectory",
+        "reason": "differentKind"
+      },
+      {
+        "from": "effect",
+        "to": "pointCloud",
+        "reason": "differentKind"
+      },
+      {
+        "from": "effect",
+        "to": "annotation",
+        "reason": "differentKind"
+      },
+      {
+        "from": "effect",
+        "to": "effect",
+        "reason": "identity"
+      }
+    ]
+  }
+}

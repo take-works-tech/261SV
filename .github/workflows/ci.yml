@@ -45,6 +45,8 @@ jobs:
         if: '!cancelled()'
       - run: python validate/check_dependency_pins.py
         if: '!cancelled()'
+      - run: python validate/check_object_compatibility.py
+        if: '!cancelled()'
       - run: python validate/check_gates_wired.py
         if: '!cancelled()'
       - run: python validate/check_automerge_policy.py

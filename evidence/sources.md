@@ -1380,6 +1380,24 @@ Recorded so that nothing silently depends on them:
   point a display vertex was.
 - justifies: INV-001, XC-233
 
+### E-133 - What each reader in the pinned build hands back
+- tier: T1
+- url: spike/reader_output_types.json
+- verified: 2026-08-24
+- says: measured on 2026-08-24 by instantiating every class whose name ends in `Reader` across the
+  `vtkIO*` modules of **VTK 9.5.2** and reading `GetOutputDataObject(0)`'s class name. 181 readers were
+  probed; the record is `spike/reader_output_types.json`.
+  (1) The most common output is **`vtkMultiBlockDataSet` (33 readers)**, ahead of `vtkImageData` (25),
+  `vtkPolyData` (21), `vtkPartitionedDataSetCollection` (13) and `vtkUnstructuredGrid` (13). 15 could
+  not be instantiated without a file and 14 create their output only during execution.
+  (2) Of the 40 CAE readers listed in `spike/readers.json`, **19 return `vtkMultiBlockDataSet` and 6
+  return `vtkPartitionedDataSetCollection`** - CGNS, Exodus (serial and parallel), every EnSight
+  variant, OpenFOAM (serial and parallel), LS-DYNA (serial and parallel), both Fluent readers, Tecplot,
+  IOSS, Plot3D and SLAC. Only **4** return a `vtkUnstructuredGrid` directly - GAMBIT, MFIX, NetCDF-CAM
+  and NetCDF-UGRID - and 1 returns a `vtkTable`.
+  So more than half of the readers for the formats this product's users work in return a composite, and
+  a read path whose signature is `vtkDataSet` accepts none of them.
+- justifies: CT-012, XC-234
 ### E-134 - Which decimator keeps the map back to the dataset
 - tier: T1
 - url: spike/measure_object_types.py

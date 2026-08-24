@@ -233,3 +233,34 @@ is either missing a requirement or is not work this specification asked for.
 - satisfies: AC-044
 - depends_on: TASK-025
 - done_when: combining results of different axes carries a statement
+
+### TASK-028 - A composite is read as the parts of one Case
+- satisfies: AC-026
+- depends_on: TASK-012
+- done_when: a `vtkMultiBlockDataSet` and a `vtkPartitionedDataSetCollection` each load as **one** @Case
+  whose parts are counted and named from the block hierarchy, and whose partition count is separate from
+  its part count (XC-234, CT-012)
+- why: this is the common case rather than an extension. 19 of the 40 CAE readers in the pinned build
+  return a `vtkMultiBlockDataSet` and 6 return a `vtkPartitionedDataSetCollection`, against 4 that return
+  an unstructured grid directly (E-133), so `reader.read`'s `vtkDataSet` signature meets none of the
+  formats this product exists for
+
+### TASK-029 - Each conversion CT-012 names states its cost before it runs
+- satisfies: AC-032
+- depends_on: TASK-028
+- done_when: reading a structured, rectilinear, image, explicit-structured, hyper-tree or cell grid
+  performs exactly the conversion CT-012 names for it, records what that conversion cost on the
+  @Dataset, and states a cost that exceeds LIM-002 **before** converting rather than after
+- why: three of the costs are not recoverable afterwards. An image grid's spacing is the one number in a
+  voxel result that carries a length; a hyper-tree grid's expansion is the memory the format exists to
+  avoid; a cell grid's high-order basis does not survive at all, so INV-009 forbids reporting a number
+  from the converted form
+
+### TASK-030 - A refused type names itself
+- satisfies: AC-021
+- depends_on: TASK-028
+- done_when: every data object type CT-012 marks `refuse` produces a failure naming that type and the
+  contract's stated reason, asserted by a test that walks the contract rather than a list written beside
+  it
+- why: a generic read failure tells a user their file is broken. Naming the type tells them what they
+  opened, and the difference decides whether they go looking for a corrupt file that does not exist

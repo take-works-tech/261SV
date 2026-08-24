@@ -4039,6 +4039,37 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a reader for a format whose connectivity is implicit, at which point what `cells`
   means for it is decided rather than assumed - not by extracting its surface
 
+### XC-234 - A part and a partition are two things, and the composite says which
+- decided: 2026-08-24
+- status: active
+- decision: a **partition** is one dataset cut up for parallel input and output - its pieces recombine,
+  their interface points are duplicates of each other, and INV-010 governs them. A **part** is a distinct
+  thing in the model - an element block, a side set, a material - whose points are not duplicates of
+  another part's and across which nothing is summed unless it was asked for.
+  Which one a composite carries is read from its type and never inferred from its shape:
+  `vtkPartitionedDataSet` and `vtkMultiPieceDataSet` are partitions, `vtkMultiBlockDataSet` is parts,
+  and `vtkPartitionedDataSetCollection` is parts each of which may be partitioned. A @Case therefore
+  counts both, and `CaseContents.parts` counts parts alone
+- decided_by: the product owner, 2026-08-24
+- rationale: conflating them produces exactly two errors and this product can afford neither. Treating
+  parts as partitions deduplicates points that were never duplicates and quietly drops geometry;
+  treating partitions as parts counts every interface twice.
+  It is the common case rather than an edge one, which is what makes it worth a decision of its own. Of
+  the 40 CAE readers in the pinned build, **19 return `vtkMultiBlockDataSet` and 6 return
+  `vtkPartitionedDataSetCollection`** - CGNS, Exodus, every EnSight variant, OpenFOAM, LS-DYNA, Fluent,
+  Tecplot, IOSS - while only 4 return a `vtkUnstructuredGrid` directly (E-133). Every format this
+  product's users work in arrives as a composite, so a read path whose signature is `vtkDataSet` meets
+  none of them, and the survey written against `.pvtu` pieces had counted the one kind of multiplicity
+  that is not the common one
+- alternatives: flattening every composite to one mesh on load is what a viewer does, and it is why a
+  viewer cannot tell you the maximum in the flange rather than in the assembly; carrying only the block
+  names as tags keeps the words and loses the boundary that makes an aggregate meaningful
+- basis: E-133 (T1)
+- affects: CT-012, GL-002, MOD-002, INV-010, features/ingest/spec.md
+- decidedness: Fixed
+- reversal_trigger: a composite type whose blocks are neither clearly parts nor clearly partitions, which
+  would be read from the file rather than decided by type - and would be an addition to CT-012's table,
+  not an exception to it
 ### XC-235 - Display geometry is produced by the renderer, reduced by vtkDecimatePro, and kept
 - decided: 2026-08-24
 - status: active
