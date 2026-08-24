@@ -36,8 +36,7 @@
           "id",
           "name",
           "children",
-          "sources",
-          "variableOverrides"
+          "sources"
         ],
         "properties": {
           "id": {
@@ -258,24 +257,37 @@
       "type": "object",
       "additionalProperties": false,
       "description": "concrete editable artefacts belonging to the workspace, distinct from reusable templates and never owned by a case (XC-109)",
-      "required": ["views", "graphs", "reports", "simulations"],
+      "required": [
+        "views",
+        "graphs",
+        "reports",
+        "simulations"
+      ],
       "properties": {
         "views": {
           "type": "array",
-          "items": { "$ref": "#/$defs/workspaceItem" }
+          "items": {
+            "$ref": "#/$defs/workspaceItem"
+          }
         },
         "graphs": {
           "type": "array",
-          "items": { "$ref": "#/$defs/workspaceItem" }
+          "items": {
+            "$ref": "#/$defs/workspaceItem"
+          }
         },
         "reports": {
           "type": "array",
-          "items": { "$ref": "#/$defs/workspaceItem" }
+          "items": {
+            "$ref": "#/$defs/workspaceItem"
+          }
         },
         "simulations": {
           "type": "array",
           "description": "saved Simulation flows owned by this workspace; each groups one or more explicitly ordered external-solver execution conditions (GL-043, XC-154)",
-          "items": { "$ref": "#/$defs/workspaceItem" }
+          "items": {
+            "$ref": "#/$defs/workspaceItem"
+          }
         }
       }
     },
@@ -311,6 +323,21 @@
           "inheritable": {
             "type": "boolean",
             "default": true
+          },
+          "declaredOn": {
+            "type": "string",
+            "description": "the id of the @Case this variable was declared on. Absent means the whole workspace. A variable declared on a child is not visible on its parent (workspace/AC-006), and this is the only field that says so - one declaration, one place it applies from (INV-004)"
+          },
+          "provenance": {
+            "type": "string",
+            "enum": [
+              "declared",
+              "dataset",
+              "computed",
+              "measured",
+              "reference"
+            ],
+            "description": "where the value came from (GL-003, GL-016). Absent is read as `declared`, which is what a variable a person typed is"
           }
         }
       }
@@ -385,21 +412,49 @@
     "workspaceItem": {
       "type": "object",
       "additionalProperties": true,
-      "required": ["id", "name", "revision", "definition"],
+      "required": [
+        "id",
+        "name",
+        "revision",
+        "definition"
+      ],
       "properties": {
-        "id": { "type": "string", "description": "stable workspace-local identity, never reused" },
-        "name": { "type": "string" },
-        "revision": { "type": "integer", "minimum": 1, "description": "increments when the item definition changes" },
-        "order": { "type": "integer", "description": "explicit display order within its kind" },
-        "definition": { "type": "object", "additionalProperties": true },
+        "id": {
+          "type": "string",
+          "description": "stable workspace-local identity, never reused"
+        },
+        "name": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "increments when the item definition changes"
+        },
+        "order": {
+          "type": "integer",
+          "description": "explicit display order within its kind"
+        },
+        "definition": {
+          "type": "object",
+          "additionalProperties": true
+        },
         "sourceTemplate": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["id", "revision"],
+          "required": [
+            "id",
+            "revision"
+          ],
           "description": "provenance only; not a live link and never causes silent propagation (XC-109)",
           "properties": {
-            "id": { "type": "string" },
-            "revision": { "type": "integer", "minimum": 1 }
+            "id": {
+              "type": "string"
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 1
+            }
           }
         }
       }

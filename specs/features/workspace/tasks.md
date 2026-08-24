@@ -59,37 +59,61 @@ updated: 2026-08-22
 - satisfies: AC-001
 - depends_on: TASK-001
 - done_when: a @Case can be created beneath another at any depth and reopens at that depth
-
+- done: 2026-08-24, `src/service/workspace/hierarchy.py`. A case nests to any depth and a new one
+  carries the fields CT-001 requires and nothing invented beyond them - a field this build makes up is
+  one a later version has to keep forever.
 ### TASK-006 - Cycle and deletion guards
 - satisfies: AC-003
 - depends_on: TASK-005
 - done_when: an operation making a @Case its own ancestor is refused with the hierarchy unchanged, and
   deleting a parent requires confirmation naming the descendant count (AC-002)
-
+- done: 2026-08-24. The cycle check runs **before anything is detached**, so AC-003's "leaves the
+  hierarchy unchanged" is a state that cannot occur rather than one that gets cleaned up afterwards.
+  Deletion takes the descendant count the caller put in front of the user and **refuses if it disagrees**
+  with what is actually there. A confirmation is only a confirmation if what was confirmed is what
+  happens: a dialogue saying "2 descendants" over a tree that now has 3 is worse than no dialogue, and
+  only the layer holding the tree can tell.
 ### TASK-007 - Variable declaration and resolution
 - satisfies: AC-004
 - depends_on: TASK-005
 - done_when: a @Variable is declared once and resolved through the hierarchy on load, never copied
   into children (INV-004)
-
+- done: 2026-08-24, `src/service/workspace/variables.py`. INV-004 is met by **resolving on read and
+  copying nothing**: a parent's change reaches every inheriting descendant in the same operation because
+  there is no second copy to update, not because an update walks the tree. The version that walks the
+  tree is the one that misses a branch.
 ### TASK-008 - Override and inheritance state
 - satisfies: AC-005
 - depends_on: TASK-007
 - done_when: changing a parent value changes every inheriting descendant in one operation and leaves
   overriding descendants untouched, with the state visible per variable
-
+- done: 2026-08-24. An inherited variable is **read-only in the child** and `detach` is the only way
+  out - XC-117's correction in code. The earlier model let a child type a new value and detach silently:
+  the user changes one number to try something, and three months later the parent no longer drives that
+  child and nothing on screen said so.
+  Detaching takes the current value as its starting point and records when it stopped following
+  (AC-044). A descendant of a detached case follows **that** case, not the workspace, which falls out of
+  resolving outwards rather than needing a rule.
 ### TASK-009 - Child-only variables
 - satisfies: AC-006
 - depends_on: TASK-007
 - done_when: a variable added to a child does not appear on the parent, and deleting an inherited
   variable from a child is refused naming the ancestor that defines it (AC-007)
-
+- done: 2026-08-24, and it needed a schema correction to be possible at all: a variable had nowhere
+  to record which case it was declared on, so any resolution written against the old shape would have
+  shown a child's variable on its parent. `declaredOn` is that field (CT-001's correction of the same
+  date).
+  Deleting an inherited variable from a child is refused **naming where it is defined** - the ancestor
+  case, or the workspace - because "cannot delete" without the location is something a user cannot act
+  on.
 ### TASK-010 - Unresolved variables are reported
 - satisfies: AC-008
 - depends_on: TASK-007
 - done_when: a referenced variable with no value in scope reports as unresolved and no value is
   substituted
-
+- done: 2026-08-24. An unresolved variable comes back as a `Resolution` that says why and carries
+  no value. Three ways to be unresolved, each with its own sentence: never declared, declared on a case
+  this one cannot see, and declared with no value.
 ### TASK-011 - Variable binding into inputs
 - satisfies: AC-009
 - depends_on: TASK-007

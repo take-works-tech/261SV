@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-22
+updated: 2026-08-24
 ---
 
 # Contract: workspace document
@@ -29,6 +29,26 @@ programs that ship together. **Dropping** them silently is never right: a user w
 an older build and saves it loses work with no error. **Preserving** them costs a little care in the
 writer and is the only option that survives a user with two machines on two versions, which is the
 normal case for a desktop product.
+
+## Two corrections found by implementing it, 2026-08-24
+
+**A case was required to carry a field the schema never defined.** `cases.items.required` listed
+`variableOverrides`, and `properties` had no entry for it at all - so a conforming document had to carry
+something of undefined shape. Worse, it is the concept XC-117 **corrected away**: the earlier model was
+"inherited unless overridden", and the field that expresses the model this product actually has is
+`variableStates`. Removed from `required`; documents that carry it keep it, as they keep any field
+(`additionalProperties` is true). The version is unchanged, because no document could have conformed
+meaningfully to a requirement with no definition.
+
+**A variable had nowhere to say which case it belongs to.** workspace/AC-006 requires that a variable
+added to a child @Case is not added to the parent, and every variable was declared in one workspace-wide
+list with no field recording where it was declared - so a resolution written against that shape would
+have shown a child's variable on its parent. `declaredOn` is that field: absent means the whole
+workspace, and one case id means that case and its descendants. One field rather than a copy on each
+case, for the same reason as INV-004.
+
+`provenance` was added beside it, because GL-003 requires every variable to carry it and the schema had
+no place for it either.
 
 ## What the document does not contain
 
