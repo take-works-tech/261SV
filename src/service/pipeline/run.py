@@ -30,6 +30,7 @@ from typing import Any, Callable, Iterable, Mapping
 
 from engine.analysis.expression import ExpressionError, Value, evaluate, quantity
 from engine.limits import MAX_LOOP_ITERATIONS
+from service.pipeline.memory import Ledger
 from service.pipeline.document import (
     ACT_ON_TARGETS,
     CONTAINERS,
@@ -417,6 +418,11 @@ class _State:
     quantities_of: Callable[[str], Mapping[str, Value]] | None
     on_failure: OnFailure
     cancel_after: str | None
+    #: What the run is holding against LIM-001, or None where no budget was stated. None means the
+    #: caller has not said which machine class this is - not that the budget is unlimited - so nothing
+    #: here invents one (XC-086).
+    ledger: Ledger | None = None
+    size_of: Callable[[str], int] | None = None
     failed: set[str] = dataclass_field(default_factory=set)
     sequences: dict[str, tuple[Value, ...]] = dataclass_field(default_factory=dict)
     stopped: bool = False
@@ -430,6 +436,8 @@ def run(
     act: Callable[[dict[str, Any], str], None] | None = None,
     variables: Mapping[str, Value] | None = None,
     quantities_of: Callable[[str], Mapping[str, Value]] | None = None,
+    budget_bytes: int | None = None,
+    size_of: Callable[[str], int] | None = None,
     authorisations: Iterable[Authorisation] = (),
     on_failure: OnFailure = OnFailure.CONTINUE,
     cancel_after: str | None = None,
@@ -443,7 +451,17 @@ def run(
 
     `cancel_after` names the unit to stop after, which is how a cancellation arrives at this layer: at a
     **unit boundary**, keeping what completed (AC-014).
+
+    `budget_bytes` and `size_of` turn on the memory ledger (REQ-006). Both or neither: a budget with no
+    way to size a case measures nothing, and a size with no budget has nothing to refuse against.
+    `engine.limits.dataset_budget_bytes` answers the first once the machine class is known - there is no
+    default, because LIM-001 differs by class and the wrong one is the one that gets a process killed.
     """
+    if (budget_bytes is None) != (size_of is None):
+        raise RunError(
+            "メモリ台帳には budget_bytes と size_of の両方が要ります。"
+            "片方だけでは、測れない上限か、断る先のない見積もりになります"
+        )
     record = RunRecord(str(pipeline.get("id", "")), revision, tuple(cases))
     bindings: dict[str, Value] = dict(variables or {})
 
@@ -460,6 +478,8 @@ def run(
         quantities_of=quantities_of,
         on_failure=on_failure,
         cancel_after=cancel_after,
+        ledger=Ledger(budget_bytes) if budget_bytes is not None else None,
+        size_of=size_of,
     )
     _execute(pipeline.get("units", []), state, bindings, {})
     return record
@@ -523,7 +543,13 @@ def _clear(unit_id: str, state: _State) -> None:
         )
         return
     state.targets.clear(unit_id)
-    state.record.results.append(UnitResult(unit_id, None, Outcome.DONE, 0))
+    freed = state.ledger.release_all(unit_id) if state.ledger is not None else 0
+    state.record.results.append(
+        UnitResult(
+            unit_id, None, Outcome.DONE, 0,
+            state.ledger.log[-1] if state.ledger is not None and freed else None,
+        )
+    )
 
 
 def _condition(
@@ -586,6 +612,18 @@ def _loop(
         _execute(unit.get("units") or [], state, bindings, inner)
 
 
+def _hold(case: str, state: _State) -> None:
+    """Count a case against the budget before anything acts on it (AC-019).
+
+    Raising here rather than returning a flag is deliberate: the refusal travels the same path as any
+    other per-case failure, so it stops that case, skips the rest of *its* units, and leaves the study
+    running - which is what XC-095 already decided and what AC-019 asks for in different words.
+    """
+    if state.ledger is None or state.size_of is None:
+        return
+    state.ledger.hold(case, state.size_of(case))
+
+
 def _act_on_targets(unit: dict[str, Any], kind: Kind, state: _State) -> None:
     """The per-case half: one attempt per case, with a failure confined to its own case (XC-095)."""
     record = state.record
@@ -613,6 +651,7 @@ def _act_on_targets(unit: dict[str, Any], kind: Kind, state: _State) -> None:
             )
             continue
         try:
+            _hold(case, state)
             if state.act is not None:
                 state.act(unit, case)
         except Exception as error:  # noqa: BLE001 - a unit may fail in any way it likes
