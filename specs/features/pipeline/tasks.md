@@ -10,44 +10,61 @@ updated: 2026-08-21
 - depends_on: workspace/TASK-001
 - done_when: units and their order are stored on the workspace, round-trip through CT-009, and an
   unknown unit kind is rejected on open
-
+- done: 2026-08-24, `src/service/pipeline/document.py` - MOD-011's first code. Units and their
+  order live on the workspace and round-trip through CT-009's shape.
 ### TASK-002 - Editing with validation
 - satisfies: AC-001
 - depends_on: TASK-001
 - done_when: dropping a workspace artefact or template adds a pinned, source-labelled definition
   reference or is refused with the reason, never leaving the pipeline invalid
-
+- done: 2026-08-24. A drop is validated **before it lands**, so a pipeline is never briefly
+  invalid - a state the editor would have to render and the user would have to interpret.
+  A reference states whether it is a workspace item or a template and is never inferred from the
+  identifier: the two have separate identity and lifecycle (XC-109), and guessing would silently follow
+  whichever one still existed. A reference missing its revision is refused rather than filled in -
+  **a revision this build supplied is a pin nobody chose**, and it would follow whatever the newest one
+  happened to be on the day it ran.
 ### TASK-003 - A multiple selection becomes one case unit
 - satisfies: AC-023
 - depends_on: TASK-002
 - done_when: dropping six selected cases produces exactly one case unit holding six
-
+- done: 2026-08-24. Six units of one case each look the same on screen and behave differently the
+  moment somebody reorders or removes one.
 ### TASK-004 - Unresolved definition-reference units
 - satisfies: AC-003
 - depends_on: TASK-002
 - done_when: a unit whose workspace item, template or pinned revision is gone is kept and marked with
   the exact missing reference, and the run is refused until resolved
-
+- done: 2026-08-24. The unit **stays** and the run is refused. Removing it would lose the user's
+  work over somebody else's deletion; running without it would produce a study missing a step nobody
+  noticed.
+  The revision is part of the comparison: a reference that resolved to a different revision is a unit
+  that would run something else.
 ### TASK-005 - Nesting limit
 - satisfies: AC-020
 - depends_on: TASK-002
 - done_when: an edit exceeding the LIM-007 depth is refused and names the limit
-
+- done: 2026-08-24. Refused at edit time naming LIM-007's three levels, and a refused edit leaves
+  the pipeline exactly as it was rather than half-applied.
 ### TASK-006 - Depth counts loops, conditions and simulations alike
 - satisfies: AC-025
 - depends_on: TASK-005
 - done_when: each containing kind consumes one level, asserted for all three
-
+- done: 2026-08-24, asserted for all three. A depth rule that counted only loops would let a
+  condition inside a simulation inside a loop through. The containing kinds are written out rather than
+  derived from "has a units field", so adding one is a decision somebody makes rather than a side effect
+  of a schema edit.
 ### TASK-007 - The target set
 - satisfies: AC-004
 - depends_on: TASK-001
 - done_when: a case unit adds to the set and the size after each unit is reported
-
+- done: 2026-08-24. Every unit that changes or reads the set writes a line, so "how many cases did
+  this act on" is answerable afterwards rather than reconstructed from the pipeline and the case list.
 ### TASK-008 - Units act on the whole accumulated set
 - satisfies: AC-005
 - depends_on: TASK-007
 - done_when: a view unit below two case units acts on the cases of both
-
+- done: 2026-08-24, including cases added by earlier case units (AC-005).
 ### TASK-009 - Case units holding a selection
 - satisfies: AC-006
 - depends_on: TASK-007
@@ -57,7 +74,8 @@ updated: 2026-08-21
 - satisfies: AC-007
 - depends_on: TASK-008
 - done_when: a unit with nothing in the set is skipped, stated as empty, and the run continues
-
+- done: 2026-08-24, stated and the run continues. A unit with nothing to do is not a failure, and
+  stopping there would end a study because one branch happened to be empty.
 ### TASK-011 - The expression evaluator
 - satisfies: AC-030
 - depends_on: analysis module
