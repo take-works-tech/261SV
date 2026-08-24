@@ -19,6 +19,9 @@ from enum import Enum
 
 import numpy as np
 
+from domain_core.case_contents import CaseContents
+from domain_core.reported_value import Caveat, Provenance, ReportedValue
+
 from domain_core.precision import format_value, significant_digits
 
 
@@ -98,8 +101,58 @@ class Dataset:
     cells: np.ndarray
     fields: dict[str, Field] = dataclass_field(default_factory=dict)
     source: SourceFrame | None = None
+    # What the survey found: how many steps and parts, and whether a part the manifest named was
+    # absent. Held on the dataset so that a value read from it can carry the mark without the call
+    # site having to remember to ask (ingest/AC-027).
+    contents: "CaseContents | None" = None
+    # An incompleteness of a kind the survey does not describe - recorded by whoever found it.
     partial: bool = False
     partial_reason: str | None = None
+
+    @property
+    def is_partial(self) -> bool:
+        """Whether this dataset is incomplete, from either source.
+
+        Two things can say so and they are not the same: the survey found a part the manifest named and
+        could not open (`contents.missing_parts`), or a caller recorded an incompleteness of another
+        kind (`mark_partial`). One property answers the question so that no reader has to check both and
+        no path can be incomplete in a way the other source does not see.
+        """
+        return self.partial or (self.contents is not None and self.contents.is_partial)
+
+    @property
+    def incompleteness(self) -> str | None:
+        """Why it is incomplete, in a line, or None."""
+        if self.partial_reason:
+            return self.partial_reason
+        if self.contents is not None and self.contents.missing_parts:
+            missing = ", ".join(self.contents.missing_parts)
+            return f"マニフェストが名指したパートが見つかりません：{missing}"
+        return None
+
+    def caveats(self) -> frozenset[Caveat]:
+        """The caveats every value read from this dataset carries.
+
+        Read from the dataset rather than attached by a caller: a caveat that has to be remembered is a
+        caveat that gets forgotten on the one path nobody tested.
+        """
+        return frozenset({Caveat.PARTIAL_DATASET}) if self.is_partial else frozenset()
+
+    def value(self, name: str, index: int) -> ReportedValue:
+        """One value of one field, carrying this dataset's caveats and the field's declared unit."""
+        field = self.fields[name]
+        raw = field.values[index]
+        missing = bool(np.isnan(raw)) if np.issubdtype(field.values.dtype, np.floating) else False
+        caveats = self.caveats()
+        if field.unit is None:
+            caveats = caveats | {Caveat.UNDECLARED_UNIT}
+        return ReportedValue(
+            value=None if missing else float(raw),
+            unit=field.unit,
+            digits=field.significant_digits,
+            provenance=Provenance.DATASET,
+            caveats=caveats,
+        )
 
     def __post_init__(self) -> None:
         if self.points_m.ndim != 2 or self.points_m.shape[1] != 3:
@@ -120,6 +173,11 @@ class Dataset:
             raise KeyError(f"no field named '{name}'; this dataset has {sorted(self.fields)}") from None
 
     def mark_partial(self, reason: str) -> None:
-        """Record that this dataset is incomplete, so every derived number can say so (XC-002)."""
+        """Record an incompleteness the survey did not describe, so every derived number says so.
+
+        The "every derived number" half is `value()` and `ReportedValue.derive`, which carry
+        `Caveat.PARTIAL_DATASET` through every computation (ingest/AC-027). Until those existed this
+        method set a flag nobody read.
+        """
         self.partial = True
         self.partial_reason = reason
