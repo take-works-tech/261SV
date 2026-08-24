@@ -16,6 +16,11 @@ class Association(str, Enum):
 
     POINT = "point"
     CELL = "cell"
+    #: Inside a cell, at the quadrature points the solver evaluated. Neither of the other two, and a
+    #: product with only the other two has nowhere truthful to put such a field - so it puts it
+    #: somewhere untruthful. Extrapolating these to nodes depends on the element formulation, which the
+    #: file does not carry, so this product reads them as written and converts nothing (XC-123).
+    INTEGRATION_POINT = "integration-point"
 
 
 class AssociationError(Exception):
