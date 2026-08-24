@@ -4140,3 +4140,34 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a format that carries a stable identifier this product can construct rather than
   read - at which point what constructs it is recorded with the value, and it is still not an index
 
+### XC-237 - A reader states what it had to switch on, and proves nothing was dropped
+- decided: 2026-08-24
+- status: active
+- decision: where a toolkit reader does not read a file's contents by default, this product **switches
+  everything on and then checks that everything arrived**. The two halves are not the same promise: the
+  switching is an attempt that can fall behind the toolkit, and the check is the guarantee.
+  Concretely for Exodus: every one of the 26 plain array categories is enabled by name, global and
+  pedigree identifier generation is turned on, and after the read every result the file offered is
+  looked for by name in what came back. A result that is missing **stops the read** rather than being
+  reported as an absent value - the file has it, so a @Dataset without it is not a partial reading of
+  that file but a wrong one.
+  The need for it is a named gap on the format (ingest/AC-033), not a detail of the implementation
+- decided_by: the product owner, 2026-08-24
+- rationale: `vtkExodusIIReader` reads **no results at all** unless each array is switched on by name,
+  across 27 categories that all start off, and it says nothing about it (E-136). A file written with
+  three results comes back as geometry with none. That is the exact failure this product exists to
+  prevent, arriving from the library rather than from this code, and a reader that enabled the two
+  obvious categories would have dropped the other twenty-four just as silently.
+  Checking by name rather than trusting the switching is what makes the guarantee survive a toolkit
+  upgrade: a category added in a later release is not in the list here, and the check notices that the
+  file offered something that did not arrive
+- alternatives: enabling categories by reflecting over the reader's methods removes the list to
+  maintain and replaces a reviewable surface with a clever one; trusting the defaults is what produced
+  the measurement; reporting the missing results as absent values (XC-001) is wrong here because the
+  value is not absent - it is in the file, unread
+- basis: E-136 (T1)
+- affects: MOD-002, ingest/REQ-015, features/ingest/tasks.md
+- decidedness: Fixed
+- reversal_trigger: a toolkit release whose Exodus reader reads its results by default, which would be
+  measured rather than assumed from a changelog
+

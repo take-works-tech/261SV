@@ -17,6 +17,7 @@ Specification: ingest/REQ-010, REQ-011, REQ-013, ingest/TASK-001, TASK-002.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable
 from pathlib import Path
 
 import numpy as np
@@ -32,6 +33,7 @@ from vtkmodules.vtkCommonDataModel import (
     vtkPolyData,
     vtkUnstructuredGrid,
 )
+from vtkmodules.vtkIOExodus import vtkExodusIIReader
 from vtkmodules.vtkIOGeometry import vtkSTLReader
 from vtkmodules.vtkIOXML import (
     vtkXMLPolyDataReader,
@@ -54,6 +56,7 @@ from domain_core.object_compatibility import Disposition, handling
 from domain_core.partitions import Partitioning
 from domain_core.parts import LoadedCase, Part
 from engine.conversion import to_unstructured
+from engine.exodus import BLOCK_ID_ARRAY, check_nothing_was_dropped, enable_everything
 
 class UnsupportedFormatError(Exception):
     """Raised for a file this build has no reader for. Names the format rather than failing vaguely."""
@@ -87,6 +90,17 @@ class ReaderChoice:
     # carries none - which is the measured case for every format in this build (E-130) - not that the
     # question was skipped.
     unread_unit_information: str = ""
+    # New fields go at the end. The four above are passed positionally at every call site, and a field
+    # inserted among them silently reassigns them - which is how a reader's stated gap became its
+    # preparation step for one commit, caught by a test rather than by review.
+    #
+    # What must be switched on between `SetFileName` and `Update`. None for a reader whose defaults
+    # read the file; a function for one whose defaults do not, which is not a thing to leave implicit
+    # (E-136).
+    prepare: "Callable[[object], None] | None" = None
+    # Run after `Update` to refuse a read that lost something. Separate from `prepare` because the
+    # switching is an attempt and the checking is the guarantee.
+    verify: "Callable[[object, object], None] | None" = None
 
     def __post_init__(self) -> None:
         carried = FORMATS_CARRYING_UNIT_INFORMATION.get(self.suffix)
@@ -97,12 +111,28 @@ class ReaderChoice:
             )
 
 
+# Exodus reads **no results at all** unless every array is switched on by name, across 27 categories
+# that all start off (E-136). The gap is named here because a user is entitled to know that this
+# format needed handling the others did not.
+_EXODUS = ReaderChoice(
+    ".ex2", vtkExodusIIReader, "Verified",
+    known_gaps=(
+        "the toolkit's reader returns no results unless each array is enabled by name; this product "
+        "enables every category and refuses the read if a result the file offered did not arrive"
+    ),
+    prepare=enable_everything,
+    verify=check_nothing_was_dropped,
+)
+
 _READERS: dict[str, ReaderChoice] = {
     ".vtu": ReaderChoice(".vtu", vtkXMLUnstructuredGridReader, "Verified"),
     ".pvtu": ReaderChoice(".pvtu", vtkXMLPUnstructuredGridReader, "Verified",
                           "pieces are concatenated; points on partition boundaries appear more than once"),
     ".vtp": ReaderChoice(".vtp", vtkXMLPolyDataReader, "Verified"),
     ".stl": ReaderChoice(".stl", vtkSTLReader, "Verified", "carries geometry only; no fields"),
+    ".e": _EXODUS,
+    ".ex2": _EXODUS,
+    ".exo": _EXODUS,
 }
 
 
@@ -215,6 +245,10 @@ def _fields(data: vtkDataSet) -> dict[str, Field]:
             array = container.GetArray(index)
             if array is None or array.GetName() in identifiers:
                 continue
+            if array.GetName() == BLOCK_ID_ARRAY:
+                # The element-block number Exodus writes onto every cell. An identity, carried on the
+                # part rather than offered as a quantity to plot (XC-236, E-136).
+                continue
             values = vtk_to_numpy(array).astype(np.float64, copy=True)
             name = array.GetName() or f"{association.value}_array_{index}"
             found[name] = Field(name=name, association=association, values=values, unit=None)
@@ -311,9 +345,20 @@ def read(path: str | Path) -> Dataset:
 
     reader = choice.factory()
     reader.SetFileName(str(location))
+    if choice.prepare is not None:
+        choice.prepare(reader)
     reader.Update()
     data = reader.GetOutput()
+    if choice.verify is not None:
+        choice.verify(reader, data)
 
+    if data is not None and handling(data.GetClassName()).disposition is Disposition.DECOMPOSE:
+        # Asked from the contract rather than by testing the class, so that what this refuses and what
+        # CT-012 says are one answer - and so the compatibility gate can tell a guard from a read.
+        raise UnsupportedFormatError(
+            f"{location.name} holds more than one part; use read_case, which returns them all rather "
+            "than one of them (XC-234)"
+        )
     if data is None or data.GetNumberOfPoints() == 0:
         raise UnreadableFileError(f"{location.name} was read by {choice.factory.__name__} but contains no points")
 
@@ -411,8 +456,12 @@ def read_case(path: str | Path) -> LoadedCase:
 
     reader = choice.factory()
     reader.SetFileName(str(location))
+    if choice.prepare is not None:
+        choice.prepare(reader)
     reader.Update()
     data = reader.GetOutputDataObject(0)
+    if choice.verify is not None:
+        choice.verify(reader, data)
     if data is None:
         raise UnreadableFileError(f"{location.name} was read by {choice.factory.__name__} and is empty")
 
