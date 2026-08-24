@@ -10,25 +10,51 @@ updated: 2026-08-22
 - depends_on: none
 - done_when: a @Workspace saves and reopens with every definition intact, and the schema file matches
   the prose version (CT-001)
-
+- done: 2026-08-24, `src/service/workspace/document.py` - MOD-007's first code. A document saves and
+  reopens with every definition intact, and a test compares the version this build writes against the
+  version in `schema/CT-001.json`: the contract states it in prose, in the schema and now in code, and
+  three places that must agree need a test rather than an intention.
 ### TASK-002 - Unknown fields preserved
 - satisfies: AC-011
 - depends_on: TASK-001
 - done_when: a document containing fields this build does not understand keeps them through a load and
   save cycle, asserted by test
-
+- done: 2026-08-24, and **structurally** rather than by care. The document is held as the parsed
+  mapping itself and read through, not unpacked into typed attributes and repacked on save. Unpacking is
+  how a field nobody wrote an attribute for disappears - silently, in a file the user believes they
+  saved - and it is why a nested unknown survives here as reliably as a top-level one, which the tests
+  check separately.
+  A document declaring a newer major version opens, keeps every field, and **refuses to be written
+  back**: writing it would claim to understand a shape that changed (CT-001 compatibility). Top-level
+  unknowns can be named to the user; nested ones are kept and not listed, because naming them would mean
+  walking a schema this build does not have for a version it does not know.
 ### TASK-003 - Damaged files never overwritten
 - satisfies: AC-013
 - depends_on: TASK-001
 - done_when: opening a truncated document reports what could not be read and leaves the file
   byte-identical on disk
-
+- done: 2026-08-24. `load` opens read-only and reads the whole file before parsing anything, so
+  AC-013's "leaves the original untouched" holds by construction rather than by the absence of a bug -
+  and the test asserts the bytes are identical afterwards rather than trusting the reasoning.
+  A refusal says where the parse stopped, by line and column, and points at the previous version's
+  filename. "Damaged" with no location is something a user cannot act on.
+  A document missing a required field is refused as **not a workspace** rather than as an old one: a
+  file without `cases` is not a workspace missing a feature.
 ### TASK-004 - Previous good version kept on save
 - satisfies: AC-013
 - depends_on: TASK-003
 - done_when: a save keeps the previous version beside the new one until the new one is written
   completely (XC-055)
-
+- done: 2026-08-24, as a sequence of renames rather than as an intention. The new document is
+  written to a temporary file beside the target and **flushed to the platform** first - a rename
+  following an unflushed write moves a file whose contents the operating system has not committed - then
+  the existing file is moved aside and the new one moved into place.
+  Between those two renames the data exists **twice**, as the previous version and as the temporary, and
+  at no point zero times. A copy instead of the first rename would spend the same moment with two names
+  for bytes that may not both be on disk.
+  The previous version keeps a visible `.previous` suffix beside the file it replaced, because XC-055's
+  restore procedure is "a file operation the user can perform without the product" and that requires a
+  file they can find.
 ### TASK-005 - Nested case hierarchy
 - satisfies: AC-001
 - depends_on: TASK-001
