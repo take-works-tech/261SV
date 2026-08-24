@@ -292,19 +292,35 @@ updated: 2026-08-22
 - depends_on: TASK-001
 - done_when: concrete definitions are written to `workspaceItems`, reusable workspace templates to the
   library envelope, and neither is written onto a case
-
+- done: 2026-08-24, `src/service/workspace/items.py`. Concrete definitions go to `workspaceItems`,
+  reusable ones to the template envelope, and **neither goes onto a case**. `cases_owning_items` is a
+  check rather than a comment: the model XC-109 replaced put artefacts on cases, and a document written
+  by that model - or by hand - would put them back.
+  A shared-scope template is refused from the workspace document rather than written there. Writing it
+  would mean that handing somebody a workspace file also hands them entries in their shared library.
+  The Japanese labels live beside the collections because XC-109 decided them: `テンプレート` is
+  reserved for the reusable library, and a list of working artefacts calling itself that is the collapse
+  the decision undid.
 ### TASK-030 - Editing changes only the workspace item
 - satisfies: AC-031
 - depends_on: TASK-029
 - done_when: an edit made while one case is selected changes the open item and no source template or
   sibling item; switching case reuses that item unless it has an explicit binding
-
+- done: 2026-08-24. An edit reaches the item and nothing else - not its source template, not a
+  sibling, and not a per-case copy, because there is no per-case copy. That is what makes switching case
+  re-render the same item: the alternative is how a user ends up editing the wrong one of nine views
+  called 断面 and finding out in a report.
 ### TASK-031 - Save as template
 - satisfies: AC-032
 - depends_on: TASK-029
 - done_when: View, Graph and Report can snapshot the current item as a new template revision in a
   chosen scope without establishing a live link
-
+- done: 2026-08-24. Saving copies the current definition into the next revision and leaves the item
+  independently editable - the whole difference between copying a definition and adopting one.
+  Applying one copies in the other direction and records the template identifier **with its revision**:
+  provenance, not a subscription. "This came from 断面テンプレート v3" stays answerable, and nothing can
+  mistake it for a link to v4. A shared structure would let a later template edit reach into a report
+  somebody already sent.
 ### TASK-032 - Locale-aware display
 - satisfies: AC-033
 - depends_on: TASK-001
