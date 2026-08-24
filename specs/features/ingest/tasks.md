@@ -109,6 +109,20 @@ is either missing a requirement or is not work this specification asked for.
 - satisfies: AC-027
 - depends_on: TASK-012
 - done_when: a missing part marks the @Dataset partial and every derived number carries the mark
+- done: 2026-08-24, `domain_core/reported_value.py`. The second half needed a type that did not exist:
+  until now a number was a bare `float`, and GL-016 requires @Provenance to travel with a value from
+  the moment it exists. `ReportedValue` carries the value, its unit, the digits it honestly holds, where
+  it came from and its caveats - and **`derive` unions the caveats of its inputs**, which is what makes
+  "every derived number carries the mark" a property of the type rather than a rule each call site
+  remembers.
+  **`Dataset` already had `partial` and `partial_reason`**, from the initial import, whose docstring
+  promised that every derived number could say so and which nothing read. They are kept for an
+  incompleteness the survey cannot describe, and `is_partial` answers from either source so no path can
+  be incomplete in a way the other does not see.
+  Two distinctions the type forces, both found by writing the first ratio: a value with no unit carries
+  `UNDECLARED_UNIT` rather than a blank, and **dimensionless is not undeclared** - a safety factor has no
+  unit because it has none. And a derived value is no more precise than its inputs (XC-230).
+  No VTK, so all 15 tests run without the engine environment
 
 ### TASK-014 - Boundary points counted once
 - satisfies: AC-027
