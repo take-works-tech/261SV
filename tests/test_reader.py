@@ -287,3 +287,155 @@ class TestTheGeometryAFieldBelongsTo:
         write_block(tmp_path / "block.vtu")
 
         assert reader.read(tmp_path / "block.vtu").maximum("stress").value == 260.0
+
+
+def triangle(offset: float, first: float):
+    """One triangle carrying a point field, for building composites out of."""
+    from vtkmodules.vtkCommonDataModel import VTK_TRIANGLE as TRI
+
+    points = vtkPoints()
+    for x, y in ((0.0, 0.0), (1.0, 0.0), (0.0, 1.0)):
+        points.InsertNextPoint(x + offset, y, 0.0)
+    grid = vtkUnstructuredGrid()
+    grid.SetPoints(points)
+    grid.InsertNextCell(TRI, 3, [0, 1, 2])
+    array = numpy_to_vtk(np.array([first, first + 1.0, first + 2.0]), deep=True)
+    array.SetName("stress")
+    grid.GetPointData().AddArray(array)
+    return grid
+
+
+class TestACompositeIsOneCaseOfManyParts:
+    """19 of the 40 CAE readers in the pinned build return a `vtkMultiBlockDataSet` and 6 a
+    `vtkPartitionedDataSetCollection`, against 4 that return an unstructured grid (E-133). An assembly
+    arrives as an assembly, and this is the path that meets it."""
+
+    def nested_assembly(self):
+        from vtkmodules.vtkCommonDataModel import vtkMultiBlockDataSet
+
+        inner = vtkMultiBlockDataSet()
+        inner.SetNumberOfBlocks(2)
+        inner.SetBlock(0, triangle(0.0, 10.0))
+        inner.GetMetaData(0).Set(vtkMultiBlockDataSet.NAME(), "flange")
+        inner.SetBlock(1, triangle(2.0, 90.0))
+        inner.GetMetaData(1).Set(vtkMultiBlockDataSet.NAME(), "gasket")
+
+        root = vtkMultiBlockDataSet()
+        root.SetNumberOfBlocks(3)
+        root.SetBlock(0, inner)
+        root.GetMetaData(0).Set(vtkMultiBlockDataSet.NAME(), "assembly")
+        root.SetBlock(1, triangle(5.0, 40.0))
+        root.GetMetaData(1).Set(vtkMultiBlockDataSet.NAME(), "bolt")
+        root.SetBlock(2, None)
+        root.GetMetaData(2).Set(vtkMultiBlockDataSet.NAME(), "washer")
+        return root
+
+    def walk(self, node):
+        from domain_core.case_contents import AxisKind, CaseContents, ResultAxis
+        from domain_core.parts import LoadedCase
+
+        found, absent, partitions = [], [], []
+        reader._walk(node, ("asm",), found, absent, partitions)
+        return LoadedCase(
+            parts=tuple(found),
+            contents=CaseContents(
+                steps=1,
+                parts=len(found),
+                axis=ResultAxis(AxisKind.NONE),
+                missing_parts=tuple(absent),
+                partitions=max(partitions or [1]),
+            ),
+        )
+
+    def test_nested_blocks_become_parts_with_their_hierarchy(self) -> None:
+        case = self.walk(self.nested_assembly())
+
+        assert [part.label for part in case.present] == [
+            "asm / assembly / flange", "asm / assembly / gasket", "asm / bolt"
+        ]
+
+    def test_an_empty_block_is_a_named_part_that_is_missing(self) -> None:
+        """AC-027: the file said there was a part there. A block with a name and no data is exactly
+        that, and skipping it would leave an assembly nobody knows is incomplete."""
+        case = self.walk(self.nested_assembly())
+
+        assert case.is_partial is True
+        assert case.contents.missing_parts == ("asm / washer",)
+
+    def test_the_case_wide_maximum_carries_the_missing_part(self) -> None:
+        value = self.walk(self.nested_assembly()).maximum("stress")
+
+        assert value.value == 92.0
+        assert "partial-dataset" in [caveat.value for caveat in value.caveats]
+
+    def test_partitions_of_one_dataset_are_one_part(self) -> None:
+        """XC-234: they recombine into the mesh they were cut from, so the case has one part and a
+        partition count - not three parts."""
+        from vtkmodules.vtkCommonDataModel import vtkPartitionedDataSet, vtkPartitionedDataSetCollection
+
+        pieces = vtkPartitionedDataSet()
+        pieces.SetNumberOfPartitions(3)
+        for index in range(3):
+            pieces.SetPartition(index, triangle(index * 3.0, 100.0 + index))
+        collection = vtkPartitionedDataSetCollection()
+        collection.SetNumberOfPartitionedDataSets(1)
+        collection.SetPartitionedDataSet(0, pieces)
+        collection.GetMetaData(0).Set(vtkPartitionedDataSetCollection.NAME(), "rotor")
+
+        case = self.walk(collection)
+
+        assert len(case.present) == 1
+        assert case.contents.parts == 1
+        assert case.contents.partitions == 3
+        assert case.part("rotor").dataset.point_count == 9
+
+    def test_the_recombined_part_refuses_the_numbers_partitioning_invalidates(self) -> None:
+        """The partition count reaches the @Dataset, so INV-010 applies without anyone re-stating it."""
+        from vtkmodules.vtkCommonDataModel import vtkPartitionedDataSet, vtkPartitionedDataSetCollection
+
+        pieces = vtkPartitionedDataSet()
+        pieces.SetNumberOfPartitions(2)
+        for index in range(2):
+            pieces.SetPartition(index, triangle(index * 3.0, 100.0 + index))
+        collection = vtkPartitionedDataSetCollection()
+        collection.SetNumberOfPartitionedDataSets(1)
+        collection.SetPartitionedDataSet(0, pieces)
+        collection.GetMetaData(0).Set(vtkPartitionedDataSetCollection.NAME(), "rotor")
+
+        dataset = self.walk(collection).part("rotor").dataset
+
+        assert dataset.partitioning.partitions == 2
+        assert dataset.maximum("stress").value == 103.0
+        assert dataset.total("stress").is_missing
+        assert "パーティション境界" in (dataset.total("stress").missing_because or "")
+
+    def test_a_type_the_contract_refuses_names_itself(self) -> None:
+        """TASK-030's rule, met here for the composite path: a generic read failure sends a user
+        looking for a corrupt file that does not exist."""
+        from vtkmodules.vtkCommonDataModel import vtkMultiBlockDataSet, vtkTable
+
+        root = vtkMultiBlockDataSet()
+        root.SetNumberOfBlocks(1)
+        root.SetBlock(0, vtkTable())
+        root.GetMetaData(0).Set(vtkMultiBlockDataSet.NAME(), "history")
+
+        with pytest.raises(reader.UnsupportedFormatError) as refusal:
+            self.walk(root)
+        assert "vtkTable" in str(refusal.value)
+        assert "asm / history" in str(refusal.value)
+
+
+class TestReadCaseOnASingleFile:
+    def test_one_file_is_one_case_of_one_part(self, tmp_path: Path) -> None:
+        write_grid(tmp_path / "one.vtu")
+
+        case = reader.read_case(tmp_path / "one.vtu")
+
+        assert case.contents.parts == 1
+        assert case.contents.partitions == 1
+        assert case.part("one").dataset.point_count == 4
+
+    def test_an_unreadable_format_is_named(self, tmp_path: Path) -> None:
+        with pytest.raises(reader.UnsupportedFormatError) as refusal:
+            reader.read_case(tmp_path / "nothing.xyz")
+        assert ".xyz" in str(refusal.value)

@@ -101,27 +101,35 @@ _SURVIVES_DUPLICATION = frozenset({Aggregate.EXTREMUM})
 
 @dataclass(frozen=True, slots=True)
 class Partitioning:
-    """How a @Dataset was decomposed, as the files declared it."""
+    """Into how many pieces one @Dataset was cut, as the files declared it.
 
-    parts: int = 1
+    **Partitions, not parts** (XC-234). This counts the pieces one mesh was divided into for parallel
+    input and output - they recombine, and their interface points are duplicates of each other. A part
+    is a different thing entirely and its points are nobody's duplicates, so nothing here applies to it.
+    The field was called `parts` until 2026-08-24, which is the confusion XC-234 exists to end.
+    """
+
+    partitions: int = 1
     # The `GhostLevel` attribute of the `.pvtu`: how many layers of cells each piece carries beyond its
     # own. The writer's default is 0 (E-131), and at 0 no cell belongs to two pieces - only the points
     # on the interfaces are repeated.
     ghost_level: int = 0
 
     def __post_init__(self) -> None:
-        if self.parts < 1 or self.ghost_level < 0:
-            raise ValueError("a dataset has at least one part and cannot have negative ghost layers")
+        if self.partitions < 1 or self.ghost_level < 0:
+            raise ValueError(
+                "a dataset is in at least one piece and cannot have negative ghost layers"
+            )
 
     @property
     def cells_are_repeated(self) -> bool:
         """Whether a cell can belong to more than one piece. Only ghost layers put it there."""
-        return self.parts > 1 and self.ghost_level > 0
+        return self.partitions > 1 and self.ghost_level > 0
 
     @property
     def points_are_repeated(self) -> bool:
         """Whether a point can arrive more than once. Any interface does that, at any ghost level."""
-        return self.parts > 1
+        return self.partitions > 1
 
     def refusal(
         self, aggregate: Aggregate, association: Association, *, marked: bool
@@ -138,11 +146,11 @@ class Partitioning:
         )
         if not repeated:
             return None
-        where = "パートの境界で点が重複しています" if association is Association.POINT else (
+        where = "パーティション境界で点が重複しています" if association is Association.POINT else (
             f"ゴースト層が {self.ghost_level} 層あるためセルが重複しています"
         )
         return (
-            f"{self.parts} パートに分割されたデータで、{where}。"
+            f"{self.partitions} パーティションに分割されたデータで、{where}。"
             f"重複を示す {GHOST_ARRAY_NAME} 配列がファイルにないため、どの要素が重複かを判定できません。"
             "推定した値は妥当に見えて誤っているため、この量は報告しません（INV-010）。"
         )

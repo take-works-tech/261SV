@@ -60,7 +60,7 @@ def bar(
         cells=line_cells(count),
         fields={"stress": Field("stress", Association.POINT, values, unit=unit)},
         ghosts={} if ghosts is None else {Association.POINT: ghosts},
-        partitioning=Partitioning(parts=parts, ghost_level=ghost_level),
+        partitioning=Partitioning(partitions=parts, ghost_level=ghost_level),
     )
 
 
@@ -112,8 +112,8 @@ class TestWhatIsRefusedWhenNothingIsMarked:
     def test_cells_are_refused_only_once_ghost_layers_exist(self) -> None:
         """At ghost level 0 each cell belongs to exactly one piece, so a cell quantity is already
         exact; an interface repeats points, not cells."""
-        flat = Partitioning(parts=8, ghost_level=0)
-        layered = Partitioning(parts=8, ghost_level=1)
+        flat = Partitioning(partitions=8, ghost_level=0)
+        layered = Partitioning(partitions=8, ghost_level=1)
 
         assert flat.refusal(Aggregate.TOTAL, Association.CELL, marked=False) is None
         assert layered.refusal(Aggregate.TOTAL, Association.CELL, marked=False) is not None
@@ -161,17 +161,19 @@ class TestTheTwoVocabulariesDoNotMix:
 
 
 class TestTheSurveyIsTheAuthorityOnTheParts:
-    def test_the_partitioning_comes_from_what_was_counted(self) -> None:
-        """A caller restating the part count could restate it wrongly, and the count decides which
-        numbers get refused."""
+    def test_the_partitioning_comes_from_the_partition_count_not_the_part_count(self) -> None:
+        """XC-234: a part's points are nobody's duplicates, so reading the part count here would refuse
+        aggregates over an assembly that has nothing wrong with it."""
         dataset = Dataset(
             points_m=np.zeros((2, 3)),
             cells=line_cells(2),
-            contents=CaseContents(steps=1, parts=4, axis=ResultAxis(AxisKind.NONE), ghost_level=2),
-            partitioning=Partitioning(parts=1),
+            contents=CaseContents(
+                steps=1, parts=1, axis=ResultAxis(AxisKind.NONE), partitions=4, ghost_level=2
+            ),
+            partitioning=Partitioning(partitions=1),
         )
 
-        assert dataset.partitioning == Partitioning(parts=4, ghost_level=2)
+        assert dataset.partitioning == Partitioning(partitions=4, ghost_level=2)
 
 
 class TestARefusalIsNotAnAbsentValue:

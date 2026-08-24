@@ -244,6 +244,22 @@ is either missing a requirement or is not work this specification asked for.
   return a `vtkMultiBlockDataSet` and 6 return a `vtkPartitionedDataSetCollection`, against 4 that return
   an unstructured grid directly (E-133), so `reader.read`'s `vtkDataSet` signature meets none of the
   formats this product exists for
+- done: 2026-08-24, `domain_core/parts.py` (`Part`, `LoadedCase`) and `reader.read_case`, which walks a
+  composite into named parts keeping the block hierarchy as the path - two assemblies may each hold a
+  `gasket`, and a name alone would name both.
+  **An empty block is a named part that is missing.** A block with a name and no data is exactly what
+  AC-027 describes, and it comes back as an absence rather than being skipped, so an assembly cannot be
+  incomplete without saying so.
+  Only the extremum is offered case-wide, and `total` and `mean` are **not offered at all** rather than
+  offered with a warning: adding a flange's values to a gasket's is arithmetically fine and means
+  nothing (XC-234). Partitions of one dataset recombine into one part carrying its partition count, so
+  INV-010 applies to it without anyone restating anything.
+- correction: TASK-012 counted a `.pvtu`'s pieces as **parts**, and they are partitions - the other
+  multiplicity entirely. Worse, `Partitioning.parts` was the same word for the same mistake one layer
+  down, and `Dataset.partitioning` was built from `contents.parts`, so once composites arrived an
+  assembly of three components would have had its aggregates refused as though its points were
+  duplicates of each other. Renamed to `partitions` and re-derived; `CaseContents` now counts both and
+  says which kind each absence is (XC-234)
 
 ### TASK-029 - Each conversion CT-012 names states its cost before it runs
 - satisfies: AC-032
