@@ -841,7 +841,6 @@ def test_view_uses_an_interactive_threejs_mock_without_invented_analysis_values(
 
 def test_view_object_properties_are_specific_to_all_first_release_object_types() -> None:
     page = CHAT_PAGE.read_text(encoding="utf-8")
-    styles = CHAT_STYLES.read_text(encoding="utf-8")
     view_schema = json.loads(VIEW_SCHEMA.read_text(encoding="utf-8"))
 
     for object_type in (
