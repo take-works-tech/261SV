@@ -1508,3 +1508,17 @@ Recorded so that nothing silently depends on them:
   at all. A product treating that 0.0 as a position would show a number the file never wrote.
 - justifies: XC-240, GL-036, ingest/AC-043
 
+### E-139 - What `os.kill(pid, 0)` reports on Windows, and why it is not a liveness probe
+- tier: T1
+- url: spike/measure_object_types.py
+- verified: 2026-08-24
+- says: measured on 2026-08-24 on Windows 11 with CPython 3.11. `os.kill(pid, 0)` returns without
+  raising for a live process; for a pid that does not exist it raises **`OSError` with
+  `winerror == 87`** (ERROR_INVALID_PARAMETER) and **not `ProcessLookupError`**, which is what the
+  POSIX form of the same check catches; and for a protected process - pid 4, the System process - it
+  raises **`SystemError`** wrapping an OSError.
+  So a liveness check written against `ProcessLookupError` finds every process alive on this platform,
+  and one that treats any exception as "gone" declares the System process dead. Neither error tells the
+  two cases apart on its own.
+- justifies: workspace/AC-029, XC-241
+

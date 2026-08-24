@@ -30,6 +30,11 @@ sys.path.insert(0, str(ROOT / "src"))
 
 REQUIRE_VTK = os.environ.get("SIM_VIEWER_REQUIRE_VTK") == "1"
 
+#: One instant, supplied by a test rather than read from a clock, so the same call twice produces the
+#: same document and a failure never depends on the minute it ran. Here rather than in each file
+#: because two copies of a constant are two answers waiting to differ.
+FIXED_INSTANT = "2026-08-24T12:00:00Z"
+
 
 def requires_vtk() -> None:
     """Skip the caller unless VTK is importable - or fail, where a skip is not an acceptable answer.
