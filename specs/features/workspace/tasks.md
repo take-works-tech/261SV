@@ -169,23 +169,43 @@ updated: 2026-08-22
 - depends_on: TASK-005
 - done_when: declared, read, computed and reference-material quantities appear in one list, each with
   its provenance and its unit or the undeclared marker
-
+- done: 2026-08-24, `src/service/workspace/quantities.py`. Declared, read, computed, measured and
+  reference-material quantities in one list, each with its origin and its unit or the undeclared marker.
+  The order is by provenance then name, because a list whose order depends on a dictionary's iteration
+  is a list two screenshots disagree about.
+  A @Field is listed as a field - its extent, association and unit - rather than as one of its values.
+  Showing one number would be a choice of which entry to show, and nothing at this layer has the
+  standing to make it.
 ### TASK-018 - Computed quantities show their expression
 - satisfies: AC-019
 - depends_on: TASK-017
 - done_when: a computed entry displays the expression that produced it
-
+- done: 2026-08-24. The expression is part of the entry rather than a tooltip: "1.17" and
+  "1.17 = allowable / maximum" are different claims, and only the second can be checked.
 ### TASK-019 - Unavailable rather than absent
 - satisfies: AC-020
 - depends_on: TASK-018
 - done_when: a quantity that cannot be evaluated for a case is shown as unavailable for that case
-
+- done: 2026-08-24. An entry that disappears reads as a quantity that does not apply; one marked
+  unavailable reads as a quantity that does apply and could not be worked out, which is what happened.
+  **Reference material is listed and supplies nothing** - XC-013 forbids it as a source of numbers, and
+  omitting it would hide that the value the user is looking for exists in a document the product
+  declines to read a number from.
+  One distinction the task did not name: a variable declared on a case this one cannot see is **absent**
+  rather than unavailable. It is not this case's quantity at all.
 ### TASK-020 - Significant digits from stored precision
 - satisfies: AC-021
 - depends_on: TASK-017
 - done_when: a value's displayed digits are derived from its stored precision, in one shared component,
   asserted for both single and double precision fields (INV-014)
-
+- done: 2026-08-24. The shared component is `domain_core/precision.py`, which already derived digits
+  from a stored dtype; what was missing was the digits of a value a **person typed**, and its absence
+  showed up immediately - a variable written as 1.17 displayed as 1.17000, which is exactly the padded
+  expansion INV-014 calls "a claim the data cannot support".
+  `digits_written` counts the digits of Python's shortest round-tripping form, capped at what the
+  storage carries. What it cannot recover is written into its docstring: somebody who typed 12.00
+  meaning four significant digits is indistinguishable from one who typed 12, because the distinction
+  was lost when the text became a float.
 ### TASK-021 - Stable identifiers, references by identifier
 - satisfies: AC-022
 - depends_on: TASK-001

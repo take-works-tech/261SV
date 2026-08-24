@@ -63,6 +63,34 @@ def weakest(dtypes: Iterable[np.dtype | type]) -> int:
     return min(floating) if floating else 0
 
 
+def digits_written(value: float, *, at_most: int = FLOAT64_DIGITS) -> int:
+    """How many significant digits a value actually distinguishes, capped by what storage supports.
+
+    For a number a person typed into a document this recovers what they wrote. Python's `repr` gives the
+    **shortest string that round-trips**, so 1.17 comes back as "1.17" and its three digits are three
+    digits - not the six a default would pad it to. INV-014 calls that padding "a claim the data cannot
+    support", and a variable someone typed as 1.17 shown as 1.17000 is exactly that claim.
+
+    Capped because the shortest round-trip form of a full-precision double runs to sixteen or seventeen
+    digits, and the storage carries fifteen.
+
+    **What this cannot recover**, stated rather than left to surprise: a person who typed 12.00 meaning
+    four significant digits is indistinguishable here from one who typed 12, because the distinction was
+    lost when the text became a float. An integral value counts the digits of its integer part - Python
+    writes 12.0 for 12, and reading that trailing zero as a digit would invent the precision this
+    function exists to avoid inventing.
+    """
+    if value != value or value in (float("inf"), float("-inf")):  # NaN and infinities
+        return 1
+    shortest = repr(float(value))
+    if "e" in shortest or "E" in shortest:
+        shortest = shortest.split("e")[0].split("E")[0]
+    if shortest.endswith(".0"):
+        shortest = shortest[:-2]
+    counted = len(shortest.lstrip("-").replace(".", "").lstrip("0")) or 1
+    return max(1, min(counted, at_most))
+
+
 def format_value(value: float, digits: int, *, missing: str = "-") -> str:
     """Write a value to the digits its storage supports.
 
