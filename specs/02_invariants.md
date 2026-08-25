@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-25
+updated: 2026-08-26
 ---
 
 # Invariants
@@ -73,8 +73,12 @@ it. An invariant that cannot be judged is not an invariant - it is a wish.
 
 ### INV-007 - Offline means offline
 - statement: with networking disabled, every operation not explicitly marked as network-dependent
-  completes normally, and no network call is attempted
-- checked_by: a test run with outbound network blocked, asserting both completion and zero attempts
+  completes normally, and no network call is attempted. A **produced deliverable** is held to the same
+  rule: an exported document that reaches a host renders one way online and another way offline, which
+  is the failure this exists to prevent, and the ordinary case is a customer opening it with no network
+- checked_by: a test run with outbound network blocked, asserting both completion and zero attempts;
+  and for an export, the produced text searched for an external reference and the file refused if one
+  is found - checked of the output rather than trusted of the writer (XC-254)
 - decidedness: Fixed
 - basis: E-001 (T1)
 
