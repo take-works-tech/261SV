@@ -42,12 +42,31 @@ updated: 2026-08-25
 - depends_on: TASK-001
 - done_when: a selection resolves to a case set, the set is shown, and an empty result names the
   condition that emptied it
-
+- done: 2026-08-25, `src/domain_core/selection.py`. CT-007's declarative tree resolves to a case set,
+  the set size and the number considered are reported, and **an empty result names the condition that
+  emptied it** - narrowed one condition at a time, so the answer is the step that did it rather than an
+  inference from a whole tree that came back with nothing. An empty graph with no explanation reads as
+  "no data" when it means "your filter excluded everything", and those are different problems.
+  Two refusals rather than silences. An **unrecognised condition** is refused, because ignoring one is
+  how a filter quietly becomes "everything", and the refusal happens before any case is examined so a
+  bad selection does not work until the data changes. A **comparison with no unit on both sides** is
+  refused (XC-003); when both sides have one they are converted before comparing, so 12 m/s satisfies
+  `greaterThan 10000` in mm/s.
+  It lives in MOD-001 rather than in MOD-005 or MOD-007: a selection reads case metadata only and
+  depends on no toolkit, and the graph module cannot import a service module without pointing a
+  dependency upward. That also makes it reachable by pipeline/TASK-009 and by templates.
+  This needed XC-244 first - CT-007's own worked example compares against `m/s`, and the unit registry
+  refused every composed symbol, so the contract's example could not be evaluated.
 ### TASK-005 - Default selection is the selected case
 - satisfies: AC-008
 - depends_on: TASK-004
 - done_when: with no selection given, the selected case is plotted and stated
-
+- done: 2026-08-25. With no selection written, the cases already selected are used **and the
+  result says so**: a graph that plotted the selected case silently looks identical to one that was told
+  to plot it.
+  A selection of nothing at all chooses **nothing**, not everything. "No selection" and "select all" are
+  different intentions, and the expensive direction is the one where a study silently covers every case
+  in the workspace.
 ### TASK-006 - Selection code, isolated
 - satisfies: AC-011
 - depends_on: TASK-004

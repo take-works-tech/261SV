@@ -95,3 +95,84 @@ def symbol_for(dimension: Dimension) -> str | None:
         if exponent
     ]
     return "·".join(parts)
+
+
+@dataclass(frozen=True, slots=True)
+class Composed:
+    """A declared unit that is a product or quotient of known ones - `m/s`, `kg/m^3`.
+
+    `to_internal` multiplies a value in this unit into the internal unit of its dimension, exactly as
+    `units.Unit.to_internal` does for a simple one. There is no offset field, and that is the decision
+    rather than an omission: see `parse_symbol`.
+    """
+
+    dimension: Dimension
+    to_internal: float
+    #: How this product writes the same unit back, which may differ from what the user typed.
+    canonical: str
+
+
+#: What separates one term from the next. `/` inverts the term that follows it and every term after it,
+#: which is how `kg/m·s` reads to a person - the alternative, inverting only the next term, makes
+#: `kg/m·s` mean kilogram-seconds per metre and nobody writes it meaning that.
+_MULTIPLY = ("·", "*", "\u00b7")
+_DIVIDE = "/"
+
+
+def parse_symbol(symbol: str) -> Composed:
+    """Read a declared unit that may be composed, or refuse it naming what is wrong.
+
+    Accepts a single known symbol, and products and quotients of them with integer powers: `m/s`,
+    `kg/m^3`, `MPa·s`, `m·s^-1`. The components must be units this product knows - composing is about
+    combining declared units, not about inventing new ones.
+
+    **A component carrying an offset is refused.** `degC/s` has no meaning that survives the arithmetic:
+    doubling a value in it gives one answer if you convert first and another if you scale first, and the
+    gap is the offset (E-141). A temperature *rate* is written in `K/s`, which is what it is.
+    """
+    text = symbol.strip()
+    if not text:
+        raise ValueError("単位が空です。宣言がないなら None であって、空文字ではありません")
+
+    dimension = DIMENSIONLESS
+    factor = 1.0
+    inverted = False
+    term = ""
+    parts: list[tuple[str, bool]] = []
+    for character in text:
+        if character in _MULTIPLY or character == _DIVIDE:
+            parts.append((term, inverted))
+            if character == _DIVIDE:
+                inverted = True
+            term = ""
+            continue
+        term += character
+    parts.append((term, inverted))
+
+    for raw, invert in parts:
+        name, caret, power_text = raw.strip().partition("^")
+        if not name:
+            raise ValueError(f"'{symbol}' の項が空です。区切りが余分にあります")
+        if caret and not power_text:
+            # `m^` read as `m` was the first version, and it accepts a typo as though it were a unit.
+            raise ValueError(f"'{symbol}' の '{name}^' に指数がありません")
+        try:
+            power = int(power_text) if power_text else 1
+        except ValueError:
+            raise ValueError(
+                f"'{symbol}' の指数 '{power_text}' が整数ではありません。"
+                "半端な指数の単位はこの製品に表記がありません"
+            ) from None
+        known = unit(name)
+        if known.offset:
+            raise ValueError(
+                f"'{name}' はゼロ点をずらした単位なので、組み合わせた単位の一部にはできません。"
+                "先に倍にするか先に換算するかで答えが変わり、その差はオフセットそのものです"
+                "（E-141）。温度の変化率は K/s と書いてください"
+            )
+        if invert:
+            power = -power
+        dimension = dimension.times(DIMENSION_OF[known.quantity].power(power))
+        factor *= known.to_internal ** power
+
+    return Composed(dimension, factor, symbol_for(dimension) or "")

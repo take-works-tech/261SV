@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-20
+updated: 2026-08-25
 ---
 
 # Contract: case selection
@@ -33,7 +33,9 @@ declarative is that it must not be one (XC-080).
 ```
 
 Every condition names its unit where it compares a quantity. A comparison against a variable whose unit
-is undeclared is refused, not silently compared as a bare number (XC-003).
+is undeclared is refused, not silently compared as a bare number (XC-003). The unit may be composed -
+`m/s` above is a product of two known symbols (XC-244) - and the two sides are converted before they are
+compared, so `12 m/s` satisfies `greaterThan 10000` in `mm/s`.
 
 ## The code form, when a user opts in
 

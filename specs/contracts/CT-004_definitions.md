@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-22
+updated: 2026-08-25
 ---
 
 # Contracts: view, graph and report definitions
@@ -116,7 +116,12 @@ the two objects the same thing (XC-109).
 A graph names its series, and each series names a source: a field on a dataset, a derived quantity
 with the expression that produced it, or an external reference file. **Each series carries the unit it
 is plotted in and whether that unit was declared**; a series whose unit is undeclared is drawn with the
-undeclared marker on its axis rather than an assumed label (XC-003).
+undeclared marker on its axis rather than an assumed label (XC-003). A series' unit may be composed -
+`m/s`, `kg/m^3` (XC-244) - and an axis carrying declared units is labelled with the internal unit of the
+quantity rather than with whichever symbol the first series used: MPa and kPa on one axis are plotted as
+Pa. Two series whose units do not combine are refused with both named, and so is a declared unit beside
+an undeclared one, because that arrangement reads as a comparison and nothing said the undeclared series
+was in the same unit.
 
 ### CT-006 - Report definition
 - purpose: the reproducible description of a deliverable - what goes in it, in what order, in what style

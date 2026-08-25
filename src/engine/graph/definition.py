@@ -27,7 +27,7 @@ from enum import Enum
 from typing import Any, Iterable, Sequence
 
 from domain_core.case_contents import ResultAxis, differing_axes
-from domain_core.dimension import Dimension, dimension_of, symbol_for
+from domain_core.dimension import Dimension, parse_symbol, symbol_for
 from domain_core.units import UndeclaredUnitError
 
 #: What an axis says where no unit was declared. One spelling, so a graph, a table and a report cannot
@@ -102,8 +102,8 @@ class Series:
             )
         if self.unit is not None:
             try:
-                dimension_of(self.unit)
-            except (KeyError, UndeclaredUnitError) as error:
+                parse_symbol(self.unit)
+            except (KeyError, ValueError, UndeclaredUnitError) as error:
                 raise GraphError(f"系列 '{self.label}'：{error}") from None
 
     @property
@@ -112,7 +112,7 @@ class Series:
 
     @property
     def dimension(self) -> Dimension | None:
-        return dimension_of(self.unit) if self.unit is not None else None
+        return parse_symbol(self.unit).dimension if self.unit is not None else None
 
     def describe(self) -> str:
         """The series as it is labelled: what it plots, in what unit, from where (INV-013)."""
