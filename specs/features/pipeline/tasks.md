@@ -341,17 +341,40 @@ updated: 2026-08-25
 - satisfies: AC-035
 - depends_on: TASK-001, TASK-020
 - done_when: a script builds a pipeline document equal to one built by hand, asserted by comparison
-
+- done: 2026-08-25, `src/service/scripting/model.py`. A script builds the same CT-009 document the
+  editor builds, asserted by **equality** with one built by hand rather than by resemblance: two
+  documents that look alike diverge on the first rule one of them enforces and the other does not.
+  Every edit goes through MOD-011's own functions, so a pipeline a script builds is refused by exactly
+  the rules that refuse one built by hand - a builder that assembled the dictionary itself would be a
+  second implementation of the edit-time rules, and the copy would be the one that stopped refusing.
+  XC-103's lookup rule is implemented here and it is where both reference products differ from this one:
+  one appends a numeric suffix so `Cube` silently becomes `Cube.002` (E-064), the other returns every
+  match so the documented idiom is to take the first and hope (E-067). This one refuses, naming what
+  holds the name - the only one of the three that never quietly points a reference at the wrong object.
 ### TASK-036 - Nothing stored executes itself
 - satisfies: AC-036
 - depends_on: TASK-035
 - done_when: opening a workspace and running a stored pipeline both start no interpreter, asserted
-
+- done: 2026-08-25. Asserted structurally rather than behaviourally: a workspace arrives by
+  email, and the claim is about what the code can do, not about the payloads somebody thought to try.
+  No module anywhere under `src/` reaches `eval`, `exec`, `__import__` or `importlib` - swept over the
+  whole tree rather than over a named list, so a module added later is covered without anybody
+  remembering to add it. A stored pipeline carrying a `python` unit with code in it is refused because
+  CT-009's set of unit kinds is closed, and the code is a string that never runs. An expression is
+  evaluated by this product's own evaluator, which has no interpreter behind it (XC-101).
 ### TASK-037 - Scripted changes are commands, and undo as one step
 - satisfies: AC-037
 - depends_on: TASK-035
 - done_when: every change a script makes is in the log and one undo returns the prior state
-
+- done: 2026-08-25. Every call a script makes goes through MOD-012 with `Origin.SCRIPT` and the
+  script's group id, so it is in the log and refused by the same rules as a click - there is no
+  privileged form. One undo returns the prior state for the whole script (XC-061, XC-102), which is
+  deliberately unlike the reference application, where operators called from Python skip the undo stack
+  by default so a script does not push a step per operator (E-064). That trade suits a tool whose
+  scripts run before anyone is watching; here the customer asks an agent to build forty reports and must
+  be able to take it back.
+  A script that only reads produces no log entry that can be undone and no undo step, which is why
+  `sv.data` and `sv.ops` are separate rather than one object.
 ### TASK-038 - Unattended execution is off by default
 - satisfies: AC-038
 - depends_on: TASK-035

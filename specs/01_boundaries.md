@@ -170,7 +170,10 @@ module; a surface owned by one of its callers is a dependency waiting to be inve
 - owns: the Python surface (13_scripting.md) - the object model scripts reach, name and identifier
   resolution, the sandbox scripts run in, and the recording of interface actions as script text. It
   **builds documents and issues commands**; it holds no behaviour of its own
-- depends_on: domain-core, command, workspace
+- depends_on: domain-core, command, workspace, pipeline
+  (`pipeline` because `sv.pipeline` in 13_scripting.md's object model builds a CT-009 document, and
+  MOD-011 owns what a valid one is. Building it here instead would be a second implementation of the
+  edit-time rules, and the copy would be the one that stopped refusing)
 - decidedness: Fixed
 - basis: E-064 (T1)
 
