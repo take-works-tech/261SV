@@ -1764,3 +1764,44 @@ Recorded so that nothing silently depends on them:
 - note: the CPU point is what makes this relevant here rather than merely available. XC-086 supports a
   business laptop with integrated graphics, and INV-007 makes offline a feature - a photorealistic path
   that needs neither a particular vendor's GPU nor a network is the only one that fits both.
+
+### E-155 - ANARI: one interface, three vendors' renderers behind it
+- tier: T1
+- url: https://www.khronos.org/anari
+- verified: 2026-08-25
+- says: ANARI is a Khronos C99 API with C++ wrappers that builds an in-memory scene tree for one frame,
+  sitting **above** the low-level graphics APIs. Khronos states it "significantly simplifies the
+  development of applications in domains such as scientific visualization" and it names scientific and
+  exploratory visualisation as its target domain explicitly.
+  **Three vendors provide back ends**: AMD RadeonProRender, Intel OSPRay (CPU and GPU through the oneAPI
+  Rendering Toolkit) and NVIDIA VisRTX (RTX-accelerated). Barney, Visionaray and Cycles are named as
+  further implementations.
+  ANARI 1.0 launched in August 2023 and 1.1 is in preview with a feature freeze of 2025-08-07. It is
+  **not yet fully ratified**: implementations are "expected to be officially conformant when the ANARI
+  1.0 Adopters Program is released".
+- justifies: OPEN-031, XC-251
+
+### E-156 - The ANARI implementations, licences read through the registry
+- tier: T1
+- url: https://api.github.com/repos/KhronosGroup/ANARI-SDK/license
+- verified: 2026-08-25
+- says: read on 2026-08-25 through GitHub's licence endpoint, which reports the SPDX identifier the
+  repository's own licence file declares.
+  **ANARI-SDK** (Khronos): Apache-2.0. It ships the API headers and front-end library, the `helium`
+  utilities for building a device, **`helide` - a CPU reference ray tracer using Embree** - a debug
+  validation device, a capability-analysis tool and a conformance suite.
+  **NVIDIA VisRTX**: **BSD-3-Clause**, copyright NVIDIA 2019-2026, read from the licence text itself
+  because the registry reports NOASSERTION - the file carries a trailing paragraph excepting the sample
+  applications' own external libraries, which is what defeats the classifier. It is an OptiX-based
+  ANARI device with an experimental OpenGL device beside it, and **nothing in it refers to Omniverse or
+  the Kit SDK**.
+  **AMD RadeonProRenderANARI**: Apache-2.0.
+  **Intel `anari-ospray`**: Apache-2.0.
+  **Intel OSPRay, Embree, Open Image Denoise, Open VKL**: Apache-2.0, all four.
+  **VTK's own source tree carries `Rendering/ANARI` and `Rendering/RayTracing`** - so the bridge from
+  this product's data model to ANARI is a module Kitware already maintains, absent only from the
+  published wheel (E-153).
+- justifies: XC-251, OPEN-031
+- note: VisRTX's **source** is BSD-3; running it needs OptiX, which is NVIDIA's own licence and NVIDIA
+  hardware. The permissive licence removes the redistribution problem, not the hardware one - which is
+  the same shape as CUDA and a different shape from the Kit SDK, where redistribution itself is barred.

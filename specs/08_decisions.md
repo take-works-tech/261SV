@@ -4785,3 +4785,38 @@ model or the prompt, never in a description that quietly went stale.
   settled either way (XC-250)
 - affects: MOD-003, XC-034, XC-037, XC-087, OPEN-023, LIM-002
 - decidedness: Open
+
+### XC-251 - The renderer is reached through ANARI, so changing it is a back end and not a rewrite
+- decided: 2026-08-25
+- status: active
+- decision: where this product renders by ray tracing, it targets **ANARI** - the Khronos scene API -
+  rather than any one renderer's own interface. The back end is then a **choice made at run time from
+  what the machine has**: Intel **OSPRay** on any CPU, NVIDIA **VisRTX** where there is an NVIDIA GPU,
+  AMD **RadeonProRender** where there is a Radeon, and the SDK's own **`helide`** CPU reference where
+  there is nothing else (E-155, E-156). All five of those - the SDK and the four devices - are
+  Apache-2.0 or BSD-3-Clause with no field-of-use restriction.
+  This does **not** decide that ray tracing ships (OPEN-031) or which back end is the default (XC-087
+  governs the paths that exist today). It decides the shape of the seam, before anything is written
+  against a shape that would have to be undone
+- decided_by: the product owner, 2026-08-25
+- rationale: the renderer is the single most likely part of this product to change, and the reasons are
+  already visible: the licence position moved twice in one day of reading, the shipped build has no ray
+  tracer at all (E-153), and the hardware a customer has is not something this product chooses. A seam
+  that makes that change a back end rather than a rewrite is worth taking before the first line, and
+  ANARI is that seam - it exists, it is Khronos, three vendors implement it, and Kitware already
+  maintains a `Rendering/ANARI` module in VTK's source.
+  It also settles the vendor question without settling it. Writing to OSPRay's interface would make
+  Intel a dependency; writing to OptiX would make NVIDIA one and re-open everything XC-250 just closed.
+  Writing to ANARI makes **none of them** a dependency, and a customer with an RTX card gets RTX while a
+  customer with a laptop gets the same picture more slowly
+- alternatives: writing to one renderer's interface is less code today and is the change this decision
+  exists to avoid. Writing an abstraction of our own is the same work as ANARI with none of the
+  conformance suite, none of the vendors and none of the specification. Rendering only through
+  OpenGL - what the shipped build does - is what happens if OPEN-031 chooses the third way, and this
+  decision costs nothing in that case because nothing is written
+- basis: E-155 (T1), E-156 (T1), E-153 (T1)
+- affects: MOD-003, XC-087, XC-250, OPEN-031, INV-002
+- decidedness: Fixed
+- reversal_trigger: ANARI failing to ratify - it is 1.0 since August 2023 with 1.1 in preview, and
+  conformance still waits on the Adopters Program (E-155). A standard that stalls is an abstraction
+  with one implementation, which is worse than the vendor interface it replaced
