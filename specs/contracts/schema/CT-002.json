@@ -4,14 +4,25 @@
   "version": "1.0.0",
   "type": "object",
   "additionalProperties": false,
-  "required": ["command", "parameters"],
+  "required": [
+    "command",
+    "parameters"
+  ],
   "properties": {
-    "command": { "type": "string", "description": "operation name; meaning never changes once shipped" },
-    "parameters": { "type": "object", "additionalProperties": true },
+    "command": {
+      "$ref": "CT-003.json#/properties/operation",
+      "description": "operation name; meaning never changes once shipped. The set is CT-003's catalogue, referenced rather than repeated: an unconstrained string here would accept an unknown command, which is the one thing CT-002 says it refuses, and a second copy of the enumeration would be the copy that stopped agreeing"
+    },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "targets": {
       "type": "array",
       "description": "identifiers this command acts on, from CT-001",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
     },
     "groupId": {
       "type": "string",
@@ -22,9 +33,18 @@
       "additionalProperties": false,
       "description": "explicit consent for classes of operation that would otherwise be refused headless",
       "properties": {
-        "allowDestructive": { "type": "boolean", "default": false },
-        "allowOverwrite": { "type": "boolean", "default": false },
-        "allowNetwork": { "type": "boolean", "default": false }
+        "allowDestructive": {
+          "type": "boolean",
+          "default": false
+        },
+        "allowOverwrite": {
+          "type": "boolean",
+          "default": false
+        },
+        "allowNetwork": {
+          "type": "boolean",
+          "default": false
+        }
       }
     },
     "dryRun": {
@@ -37,13 +57,34 @@
     "result": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status"],
+      "required": [
+        "status"
+      ],
       "properties": {
-        "status": { "type": "string", "enum": ["applied", "refused", "failed"] },
-        "changed": { "type": "array", "items": { "type": "string" } },
-        "effectSummary": { "type": "string" },
-        "reason": { "type": "string", "description": "required when status is refused or failed" },
-        "undoId": { "type": "string" }
+        "status": {
+          "type": "string",
+          "enum": [
+            "applied",
+            "refused",
+            "failed"
+          ]
+        },
+        "changed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "effectSummary": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string",
+          "description": "required when status is refused or failed"
+        },
+        "undoId": {
+          "type": "string"
+        }
       }
     }
   }
