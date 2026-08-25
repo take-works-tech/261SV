@@ -10,6 +10,7 @@ Specification: GL-023, GL-024, INV-014, INV-015, INV-016, XC-096.
 
 from __future__ import annotations
 
+import math
 from decimal import Decimal
 from typing import Iterable
 
@@ -132,3 +133,32 @@ def equal_within(
     if np.isnan(left) or np.isnan(right):
         return False
     return bool(np.isclose(left, right, rtol=relative, atol=absolute))
+
+
+def digits_after_subtraction(left: float, right: float, *, source_digits: int) -> int:
+    """Significant digits left in `left - right`, given what the operands carried (INV-034).
+
+    Subtracting two nearly equal numbers is exact and still destroys meaning: two stresses of 300 MPa
+    differing by 1e-7 each carry ten digits, and their difference carries one. Nine and a half digits
+    are gone, and the type the difference is stored in - genuinely float64, genuinely irrelevant - will
+    print fifteen unless something works this out.
+
+    `significant_digits` cannot answer this because it reads the **storage**, which is the right answer
+    to a different question. This reads the arithmetic.
+
+    Returns 0 where nothing survives, which callers report as unresolvable rather than as a number
+    (INV-011: a value nobody can resolve is not a small value).
+    """
+    gap = abs(float(left) - float(right))
+    if gap == 0.0:
+        return 0
+    larger = max(abs(float(left)), abs(float(right)))
+    if larger == 0.0:
+        return source_digits
+    lost = math.log10(larger / gap)
+    return max(0, int(source_digits - math.ceil(lost)))
+
+
+def resolvable(left: float, right: float, *, source_digits: int) -> bool:
+    """Whether a difference between these two has any significant digit at all (INV-034)."""
+    return digits_after_subtraction(left, right, source_digits=source_digits) > 0

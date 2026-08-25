@@ -1,0 +1,37 @@
+{
+  "count": 10000000,
+  "accumulation": {
+    "float64_pairwise": 1.5894571945649138e-16,
+    "float64_sequential": 1.3224283858780084e-13,
+    "float32_accumulated_in_float32": 3.488594692175688e-10,
+    "float32_accumulated_in_float64": 2.2001266487167536e-12,
+    "mean_exact": 299.99999989534217,
+    "mean_float32_in_float32": 300.0,
+    "mean_float32_in_float64": 299.9999998960022,
+    "mean_error_float32_in_float32": 1.0465782906976528e-07
+  },
+  "cancellation": {
+    "two_close_literals_round_to_the_same_float32": true,
+    "float32_subtraction_differs_from_float64_anywhere": false,
+    "pairs_checked": 100000,
+    "operand_magnitude": 300.0000001,
+    "difference": 1.0000002248489182e-07,
+    "significant_digits_left": 9.477121157213794
+  },
+  "averaging": {
+    "cell_values": [
+      10.0,
+      20.0,
+      200.0,
+      20.0,
+      10.0
+    ],
+    "unaveraged_maximum": 200.0,
+    "averaged_maximum": 110.0,
+    "averaged_as_fraction_of_unaveraged": 0.55,
+    "under_report": 90.0,
+    "nodal_difference_at_the_peak": 180.0,
+    "concentration_at_the_end_face_unaveraged": 200.0,
+    "concentration_at_the_end_face_averaged": 200.0
+  }
+}

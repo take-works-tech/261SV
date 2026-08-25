@@ -4529,3 +4529,65 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a dataset large enough that double-precision coordinates do not fit in LIM-001's
   budget while single precision would, which would make this a choice between a wrong number and no
   number rather than between two representations
+
+### XC-246 - Arithmetic happens in double precision; the source bounds what is shown, not what is computed
+- decided: 2026-08-25
+- status: active
+- decision: every reduction, difference and derived quantity is computed in **float64**, whatever the
+  field is stored in, with pairwise or better accumulation. Fields are stored at the precision the file
+  gave them - a float32 result stays float32 in memory - and INV-014 continues to bound the digits that
+  may be **displayed**. Converting the storage to double, and refusing to compute in double, are both
+  wrong and in opposite directions
+- decided_by: the product owner, 2026-08-25
+- rationale: the two rules get confused because they both mention precision, and the confusion is
+  expensive in both directions. Computing in the storage precision loses the answer: a float32 field of
+  300.0 ± 1e-3 has an exact mean of 299.999999895342 and a float32-accumulated mean of exactly
+  300.000000000000 - the variation is gone and the offset is printed to full width (E-143). Promoting
+  the storage to float64 doubles the memory a case occupies against LIM-001 and buys nothing, because
+  the digits beyond the source's precision are noise INV-014 already refuses to show.
+  So: **store what the file gave, compute in double, show what the source supports**. Three separate
+  decisions that a single word would have collapsed into one wrong one.
+  Geometry is the exception, and it is an exception about storage rather than about arithmetic: the
+  canonical frame holds float64 coordinates because volumes computed from them weight every average
+  (XC-245)
+- alternatives: accumulating in the storage precision is what a naive implementation does and is the
+  measured failure above. Promoting every field to float64 on load is simple and halves the case size
+  the memory budget allows. Compensated summation everywhere (Kahan, or `math.fsum`) is exact and is
+  measurably slower than pairwise for a gain of 1.6e-16 against 2.2e-12, which is below what any of
+  this product's inputs carry
+- basis: E-143 (T1)
+- affects: MOD-001, MOD-004, INV-014, INV-031, XC-245
+- decidedness: Fixed
+- reversal_trigger: an input format that stores more than float64 - a solver writing quad precision -
+  which would make double the lossy choice rather than the safe one
+
+### XC-247 - An averaged peak is never reported without the spread it was averaged from
+- decided: 2026-08-25
+- status: active
+- decision: element values at a shared node are kept as the several values they are. A reported
+  extremum states **averaged** or **unaveraged**; both are available; and an averaged figure is
+  accompanied by the **spread** at that node - the difference between the largest and smallest
+  contributing element value, and that difference as a fraction of the average.
+  Neither is the default that gets applied silently. Where a report states one and not the other, the
+  one it states is named in the sentence that states it
+- decided_by: the product owner, 2026-08-25
+- rationale: measured here, the averaged maximum of a stress concentration inside a body is **110 MPa
+  against an element maximum of 200 MPa** - 55 per cent of it (E-144). Neither number is wrong; they
+  answer different questions, and a report that gives one without saying which has answered neither.
+  The spread travels with the averaged value because it is the **only discretisation indicator a
+  post-processor can compute from a single solve**, and because the combination that misleads is
+  precisely the smoothed peak shown alone: it looks converged. The reference product publishes the same
+  quantity as Nodal Difference and states that a large one means the mesh needs refining there (E-145),
+  so this is the field's existing vocabulary rather than a convention invented here.
+  The measurement also fixes where the test has to be. The same concentration at an end face gives
+  200 MPa either way, because that node belongs to one element - so a check placed at a boundary reports
+  that averaging is harmless
+- alternatives: reporting the unaveraged extremum alone is defensible and overstates a peak that is one
+  element's integration artefact. Reporting the averaged one alone is what a smooth contour invites and
+  is the measured under-report. Treating averaging as a display option rather than as two numbers is how
+  a figure and a table on the same page come to disagree
+- basis: E-144 (T1), E-145 (T1)
+- affects: MOD-004, MOD-005, MOD-006, INV-017, INV-022, INV-032, INV-033
+- decidedness: Fixed
+- reversal_trigger: a solver that writes genuinely nodal results rather than element ones, where there
+  is no spread because there was never more than one value

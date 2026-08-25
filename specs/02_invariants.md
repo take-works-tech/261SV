@@ -364,3 +364,86 @@ it. An invariant that cannot be judged is not an invariant - it is a wish.
 
 An invariant with no `checked_by` is on its way to being false. Write the check when you write the
 invariant, and prove the check can fail before trusting it.
+
+### INV-031 - Every reduction and every difference is accumulated in double precision
+- statement: sums, means, integrals, standard deviations and differences are computed in float64
+  whatever precision the field is stored in, and the accumulation is pairwise or better - never a
+  sequential loop over a large array. The **storage** precision still bounds what may be *displayed*
+  (INV-014); this invariant is about the arithmetic in between, and the two are not the same rule
+- rationale: measured here on ten million values of 300.0 varying by 1e-3 - the ordinary shape of a
+  temperature field or a stress about a preload. A float32 field accumulated in float32 gives a mean of
+  **300.000000000000** where the exact mean is **299.999999895342**: the variation the field was written
+  to carry is gone, and what is printed is the offset. Accumulating the same float32 field in float64
+  costs nothing and is 160 times closer; a sequential float64 loop is a thousand times worse than a
+  pairwise one (E-143).
+- checked_by: a test summing a float32 field of a large offset and a small variation, asserting the
+  float32-accumulated mean returns the offset exactly while this product's returns the variation
+- correction: 2026-08-25, same day. This invariant was first written with a second argument attached:
+  that a difference of two values 1e-7 apart "subtracts to exactly 0.0 in float32", so a @Diff computed
+  in the storage precision would report a real difference as agreement. **That was wrong.** Both
+  literals round to the same float32 before any subtraction happens, and subtraction of two float
+  values within a factor of two is exact - measured over 100,000 pairs (E-143).
+  Computing differences in float64 is still what this product does, and it is still worth doing where
+  the two operands are of different precisions or come from earlier arithmetic. What it does **not** do
+  is rescue a distinction that storage already lost, and the invariant should not be read as claiming
+  it does. The loss that is real in a near-equal difference is significance, and it has its own rule
+  (INV-034)
+- decidedness: Fixed
+- basis: E-143 (T1)
+
+### INV-032 - A value at a shared node is several values, and a reported extremum says which it is
+- statement: where a @Field is held per element, the value at a node shared by several elements is
+  **several values**. Any extremum, contour or reported figure derived from them states whether it is
+  **averaged** or **unaveraged**, and the two are recorded as different numbers rather than one number
+  with a display option. Where a product reports an averaged extremum it also carries the **spread** at
+  that node - the difference between the largest and smallest contributing element value
+- rationale: measured here on a stress concentration inside a body carrying element values 10, 20, 200,
+  20, 10 MPa. Averaging onto the shared nodes gives a maximum of **110 MPa against 200 MPa - 55 per
+  cent of it, an under-report of 90 MPa** (E-144). A report that says "maximum von Mises stress
+  110 MPa" is not wrong about the averaging it did; it is wrong about the question it was asked.
+  The same concentration at an **end face** gives 200 MPa either way, because that node belongs to one
+  element - so this is invisible to any check placed at a boundary and visible only where a
+  concentration actually is.
+  The spread is not a defect to hide: the reference product publishes it as Nodal Difference and states
+  that a large one indicates the mesh needs refining there (E-145). It is the one discretisation
+  indicator a post-processor can compute from a single solve, and suppressing it while reporting the
+  smoothed peak is the combination that reads as precision
+- checked_by: a test on a mesh with an interior concentration, asserting the averaged and unaveraged
+  maxima differ, that each figure carries its label, and that the spread at the peak node is reported
+- decidedness: Fixed
+- basis: E-144 (T1), E-145 (T1)
+
+### INV-033 - This product states discretisation error where it can measure it, and never implies convergence
+- statement: no output of this product states or implies that a result is mesh-independent, converged,
+  or accurate to a tolerance, unless it was given the evidence for that claim - two or more meshes of
+  the same problem, compared here. What it may always state is what it can measure from one solve: the
+  spread at shared nodes (INV-032), the outside-point count and round-trip error of a cross-mesh
+  comparison (XC-038), and the precision the source supports (INV-014)
+- rationale: verification and validation are different questions and mixing them is a defect (E-069).
+  A post-processor sees one solve. It cannot know whether the mesh was fine enough, whether the solver
+  converged, or whether the model represents the article - and a report that presents a number without
+  that boundary invites the reader to assume all three, which is the assumption the number cannot carry.
+  Stating the indicator it *can* compute is the honest half, and it is why INV-032 requires the spread
+  to travel with the smoothed value rather than instead of it
+- checked_by: the report language check (XC-104) rejecting a statement of convergence, accuracy or mesh
+  independence that no comparison supports, tested with a sentence of each kind
+- decidedness: Fixed
+- basis: E-069 (T1), E-144 (T1)
+
+### INV-034 - A difference reports the digits the subtraction left, not the digits its storage holds
+- statement: where a value is the difference of two nearly equal quantities, the significant digits it
+  may be shown to are computed from **the operands and the gap between them** - roughly the operands'
+  digits less `log10(|a| / |a - b|)` - not from the type the result is stored in. A difference that has
+  no significant digits left is reported as unresolvable rather than as a number
+- rationale: two stresses of 300 MPa differing by 1e-7 MPa each carry about ten digits, and their
+  difference carries **one**: 9.5 digits are gone in the subtraction (E-143). Stored in float64, that
+  difference will happily print fifteen, and INV-014 does not catch it because INV-014 reads the
+  **storage** precision, which is genuinely float64 and genuinely irrelevant here.
+  This is the one place where the arithmetic is exact and the reported number is still a lie. The
+  subtraction loses nothing - measured over a hundred thousand float32 pairs, single and double
+  precision agree exactly - and what it loses is the meaning of the digits that survive
+- checked_by: a test taking the difference of two values agreeing in nine digits and asserting the
+  reported figure carries one digit rather than fifteen; and a test asserting a difference below the
+  resolution of its operands is reported as unresolvable
+- decidedness: Fixed
+- basis: E-143 (T1)

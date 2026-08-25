@@ -133,7 +133,11 @@ def difference(
                 f"'{name}' の要素数が違います（{a.values.shape[0]} と {b.values.shape[0]}）。"
                 "識別子がないため位置で対応させるほかなく、長さが違えば対応がつきません"
             )
-        values = a.values - b.values
+        # Subtracted in float64 whatever the fields are stored in (INV-031, XC-246). Two float32
+        # values 1e-7 apart subtract to **exactly 0.0**, and a difference of zero is what an engineer
+        # reads as "these agree" - so the storage precision of the inputs would decide whether a real
+        # difference is reported at all (E-143).
+        values = a.values.astype(np.float64) - b.values.astype(np.float64)
         unmatched = 0
         method = Method.SHARED_MESH
 
@@ -169,7 +173,9 @@ def _by_identifier(
             # engineer reads as "these agree" (INV-011).
             unmatched += 1
             continue
-        values[index] = left_values[index] - right_values[found]
+        # float64 on both sides before the subtraction, for the reason in INV-031: the cancellation
+        # here is between two nearly equal numbers, which is where single precision returns zero.
+        values[index] = float(left_values[index]) - float(right_values[found])
     return values, unmatched
 
 

@@ -87,3 +87,9 @@ def _report_the_interpreter(record_testsuite_property: object) -> None:
             "while pyproject.toml requires >=3.12. Results may differ from CI.",
             file=sys.stderr,
         )
+
+
+#: VTK's cell-type code for a hexahedron, held once for the tests that build a mesh by hand without the
+#: toolkit present. `test_summary_weights.py` asserts it against `vtkmodules`' own constant where VTK is
+#: available, so this copy cannot quietly disagree with the value it stands in for.
+VTK_HEXAHEDRON = 12

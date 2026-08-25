@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from conftest import requires_vtk
+from conftest import VTK_HEXAHEDRON, requires_vtk
 
 requires_vtk()
 
@@ -27,8 +27,6 @@ from domain_core.dataset import Dataset, Field  # noqa: E402
 from domain_core.mesh import Cells  # noqa: E402
 from engine.analysis.summary import Reduction, Weighting, summarise  # noqa: E402
 from engine.analysis.weights import cell_volumes, point_weights  # noqa: E402
-
-VTK_HEXAHEDRON = 12
 
 
 def two_cubes(big: float = 1.0, small: float = 0.1) -> Dataset:
@@ -161,3 +159,11 @@ class TestPointDataIsWeightedByTheVolumeAroundIt:
 
         assert weighted.weighting is Weighting.DUAL_VOLUME
         assert weighted.value == pytest.approx(10.03, abs=0.01)
+
+
+def test_the_hand_written_cell_type_is_the_toolkits_own() -> None:
+    """The tests that build a mesh without VTK hold the code as a literal. This is where it is checked
+    against the toolkit, so the copy cannot quietly stand for a different value."""
+    from vtkmodules.vtkCommonDataModel import VTK_HEXAHEDRON as FROM_TOOLKIT
+
+    assert VTK_HEXAHEDRON == FROM_TOOLKIT
