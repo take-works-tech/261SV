@@ -147,9 +147,17 @@ class TestAccumulationHappensInDoublePrecision:
         assert (in_single == in_double).all()
         assert np.float32(300.0000001) == np.float32(300.0)
 
-    def test_the_reduction_is_pairwise_rather_than_sequential(self) -> None:
-        """A sequential float64 loop is a thousand times worse than a pairwise sum (E-143). Asserted by
-        accuracy rather than by reading the implementation, so it holds however it is written."""
+    def test_the_reduction_is_accurate_to_the_measured_bound(self) -> None:
+        """E-143 measured 1.6e-16 relative error for a pairwise float64 sum. Asserted against that
+        figure rather than against the implementation, so it holds however the sum is written.
+
+        The first version of this compared the result against Python's built-in `sum()` and asserted
+        this product was closer. That test passed on 3.11 and **failed on CI**, because 3.12 changed
+        `sum()` to Neumaier summation "to improve accuracy and commutativity when summing floats" - so
+        the reference point moved and the assertion was measuring the interpreter, not this product.
+        The local interpreter was 3.11 and `conftest.py` prints a warning about exactly that; the
+        warning was there and I read past it.
+        """
         values = a_field(COUNT, np.float64)
         exact = math.fsum(values.tolist())
 
@@ -159,8 +167,7 @@ class TestAccumulationHappensInDoublePrecision:
         )
 
         assert found.value is not None
-        sequential = float(sum(values.tolist()))
-        assert abs(found.value - exact) < abs(sequential - exact)
+        assert abs(found.value - exact) / abs(exact) < 1.0e-15
 
 
 class TestASharedNodeHoldsSeveralValues:

@@ -1632,3 +1632,20 @@ Recorded so that nothing silently depends on them:
 - note: this is the vocabulary, not the default. The product documents both that it averages across
   element and geometric discontinuities and that averaging across dissimilar materials is inadvisable;
   INV-022 already refuses the second outright rather than advising against it.
+
+### E-146 - The built-in sum() stopped being a naive accumulator in Python 3.12
+- tier: T1
+- url: https://docs.python.org/3/whatsnew/3.12.html
+- verified: 2026-08-25
+- says: the language's own release notes, under "Other Language Changes": "`sum()` now uses Neumaier
+  summation to improve accuracy and commutativity when summing floats or mixed ints and floats."
+  Observed here on both sides of that change: on Python 3.11, `sum([0.1] * 10 + [1e16, -1e16])` returns
+  **0.0** where `math.fsum` returns **1.0**; on Python 3.12, running the same accumulation over ten
+  million values, `sum()` matched `math.fsum` exactly while NumPy's pairwise sum differed by 4.8e-07 in
+  the last bits.
+- justifies: INV-031
+- note: this is a fact about the interpreter, not about this product, and it is recorded because a test
+  here used `sum()` as the thing to be more accurate than. That test passed on 3.11 and failed on CI's
+  3.12: the reference point had moved and the assertion was measuring the interpreter. `pyproject.toml`
+  requires 3.12 and `conftest.py` prints a warning when the suite runs on anything older, which is the
+  warning that would have caught it.

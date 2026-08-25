@@ -377,7 +377,11 @@ invariant, and prove the check can fail before trusting it.
   costs nothing and is 160 times closer; a sequential float64 loop is a thousand times worse than a
   pairwise one (E-143).
 - checked_by: a test summing a float32 field of a large offset and a small variation, asserting the
-  float32-accumulated mean returns the offset exactly while this product's returns the variation
+  float32-accumulated mean returns the offset exactly while this product's returns the variation; and a
+  test asserting the float64 sum against the **measured bound** of 1.6e-16 rather than against another
+  implementation. The first version compared it against Python's built-in `sum()` and asserted this
+  product was closer, which passed on 3.11 and failed on 3.12 - the interpreter changed `sum()` to
+  Neumaier summation (E-146) and the assertion was measuring the interpreter
 - correction: 2026-08-25, same day. This invariant was first written with a second argument attached:
   that a difference of two values 1e-7 apart "subtracts to exactly 0.0 in float32", so a @Diff computed
   in the storage precision would report a real difference as agreement. **That was wrong.** Both
@@ -389,7 +393,7 @@ invariant, and prove the check can fail before trusting it.
   it does. The loss that is real in a near-equal difference is significance, and it has its own rule
   (INV-034)
 - decidedness: Fixed
-- basis: E-143 (T1)
+- basis: E-143 (T1), E-146 (T1)
 
 ### INV-032 - A value at a shared node is several values, and a reported extremum says which it is
 - statement: where a @Field is held per element, the value at a node shared by several elements is
