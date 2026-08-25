@@ -285,7 +285,9 @@ class TestTheLoopIndex:
         record = run(document, cases=CASES)
 
         assert [r.detail for r in record.results if r.unit_id == "unit:f"] == [
-            "0 単位なし", "10 単位なし", "20 単位なし"
+            "0 単位が宣言されていません",
+            "10 単位が宣言されていません",
+            "20 単位が宣言されていません",
         ]
 
     def test_a_loop_that_names_no_index_still_has_one(self) -> None:
@@ -293,7 +295,7 @@ class TestTheLoopIndex:
         add(document, loop_unit("unit:loop", count=1))
         add(document, formula_unit("unit:f", "here", "index"), inside="unit:loop")
 
-        assert detail_of(run(document, cases=CASES), "unit:f") == "0 単位なし"
+        assert detail_of(run(document, cases=CASES), "unit:f") == "0 単位が宣言されていません"
 
     def test_the_index_leaves_scope_with_the_loop(self) -> None:
         document = with_cases()

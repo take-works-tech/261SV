@@ -20,7 +20,8 @@ from typing import Mapping
 import pytest
 
 from engine.analysis.expression import Value, quantity
-from engine.graph.definition import GraphError, Provenance, Series, SourceKind
+from domain_core.reported_value import Provenance
+from engine.graph.definition import GraphError, Series, SourceKind
 from engine.graph.series import (
     REPEAT_WORD,
     Figure,
@@ -47,7 +48,7 @@ def quantities_of(case: str) -> Mapping[str, Value]:
 
 
 def peak() -> Series:
-    return Series("最大応力", SourceKind.FIELD, Provenance.READ, unit="MPa", field_name="peak")
+    return Series("最大応力", SourceKind.FIELD, Provenance.DATASET, unit="MPa", field_name="peak")
 
 
 def margin() -> Series:
@@ -120,7 +121,7 @@ class TestAMissingQuantityStaysVisible:
         assert "1 点はデータなし" in plot(peak(), CASES, quantities_of).describe()
 
     def test_a_series_with_nothing_plotted_still_appears_in_the_legend(self) -> None:
-        nowhere = Series("見当たらない量", SourceKind.FIELD, Provenance.READ, field_name="absent")
+        nowhere = Series("見当たらない量", SourceKind.FIELD, Provenance.DATASET, field_name="absent")
 
         drawn = plot(nowhere, CASES, quantities_of)
 

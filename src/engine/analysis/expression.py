@@ -37,7 +37,8 @@ import statistics
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
-from domain_core.dimension import DIMENSIONLESS, Dimension, dimension_of, symbol_for
+from domain_core.dimension import DIMENSIONLESS, Dimension, parse_symbol, symbol_for
+from domain_core.reported_value import UNDECLARED_MARKER
 from domain_core.units import Kind, kind_of, unit
 
 
@@ -65,7 +66,13 @@ class Value:
 
     @property
     def unit_name(self) -> str:
-        """The unit the magnitude is **in**, which is always the internal one.
+        """The unit the magnitude is **in**, which is always the internal one - or the marker.
+
+        A value with no `declared` symbol is one **nobody declared a unit for**, which is not the same
+        as a quantity that genuinely has none. A ratio of two declared lengths is dimensionless and
+        prints as `1`; `2 * 3` is a pair of bare numbers and prints as undeclared. Conflating them makes
+        every safety factor look like a stress whose unit went missing (XC-003, `reported_value`).
+
 
         Not the symbol the user wrote. An earlier version of this returned `declared or ...`, and the
         difference of two temperatures then printed as "5 degC" while holding 5 K, and the larger of
@@ -73,7 +80,9 @@ class Value:
         unit and labelled with another - the failure this product exists not to commit - and both came
         from one field answering two questions.
         """
-        return symbol_for(self.dimension) or "単位なし"
+        if self.declared is None:
+            return UNDECLARED_MARKER
+        return symbol_for(self.dimension) or UNDECLARED_MARKER
 
     @property
     def written_unit(self) -> str:
@@ -99,7 +108,7 @@ def quantity(magnitude: float, symbol: str | None = None, *, declaration: object
     difference = kind_of(declaration) is Kind.DIFFERENCE
     internal = float(magnitude) * known.to_internal + (0.0 if difference else known.offset)
     return Value(
-        internal, dimension_of(symbol), symbol, absolute=bool(known.offset) and not difference
+        internal, parse_symbol(symbol).dimension, symbol, absolute=bool(known.offset) and not difference
     )
 
 
@@ -325,7 +334,7 @@ class _Parser:
                     raise ExpressionError(str(error)) from None
                 return Value(
                     magnitude * known.to_internal + known.offset,
-                    dimension_of(following.text),
+                    parse_symbol(following.text).dimension,
                     following.text,
                     absolute=bool(known.offset),
                 )
@@ -557,12 +566,13 @@ def _binary(operator: str, left: Value, right: Value) -> Value:
         _not_affine(left, "乗除")
         _not_affine(right, "乗除")
         a, b = _number(left, "乗除"), _number(right, "乗除")
+        declared = left.declared is not None and right.declared is not None
         if operator == "*":
-            return _derived(a * b, left.dimension.times(right.dimension))
+            return _derived(a * b, left.dimension.times(right.dimension), from_declared=declared)
         if b == 0.0:
             raise ExpressionError("0 で割ることはできません")
         if operator == "/":
-            return _derived(a / b, left.dimension.over(right.dimension))
+            return _derived(a / b, left.dimension.over(right.dimension), from_declared=declared)
         _same_dimension(left, right, "剰余")
         return Value(math.fmod(a, b), left.dimension, left.declared)
 
@@ -579,15 +589,23 @@ def _binary(operator: str, left: Value, right: Value) -> Value:
                 )
             return Value(_number(left, "べき乗") ** exponent)
         return _derived(
-            _number(left, "べき乗") ** int(exponent), left.dimension.power(int(exponent))
+            _number(left, "べき乗") ** int(exponent), left.dimension.power(int(exponent)),
+            from_declared=left.declared is not None,
         )
 
     raise ExpressionError(f"演算子 '{operator}' はこの言語にありません")
 
 
-def _derived(magnitude: float, dimension: Dimension) -> Value:
-    """A value whose unit nobody wrote: the dimension names it, or it has none."""
-    return Value(magnitude, dimension, symbol_for(dimension))
+def _derived(magnitude: float, dimension: Dimension, *, from_declared: bool) -> Value:
+    """A value whose unit nobody wrote: the dimension names it, or nobody declared one.
+
+    `from_declared` is whether the operands carried units. A ratio of two declared lengths is a declared
+    dimensionless quantity and prints as `1`; a product of two bare numbers is still undeclared, and
+    giving it `1` would be this module declaring a unit on somebody's behalf.
+    """
+    if not dimension.is_dimensionless:
+        return Value(magnitude, dimension, symbol_for(dimension))
+    return Value(magnitude, dimension, "1" if from_declared else None)
 
 
 def _call(function: str, arguments: list[Value]) -> Value:
@@ -635,7 +653,7 @@ def _call(function: str, arguments: list[Value]) -> Value:
             raise ExpressionError(
                 f"{first.written_unit} の平方根は指数が半端になり、この製品に表記できる単位がありません"
             )
-        return _derived(math.sqrt(numbers[0]), halved)
+        return _derived(math.sqrt(numbers[0]), halved, from_declared=first.declared is not None)
     if function in DIMENSIONLESS_ONLY:
         if function in ("log", "log10") and numbers[0] <= 0.0:
             raise ExpressionError(f"{function} には正の値が要ります（{numbers[0]:g}）")

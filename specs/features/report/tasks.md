@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-21
+updated: 2026-08-25
 ---
 
 # Tasks: report generation
@@ -10,19 +10,50 @@ updated: 2026-08-21
 - depends_on: workspace/TASK-001
 - done_when: an exported document contains every displayed value as readable text and opens with the
   network disabled
-
+- done: 2026-08-25, `src/engine/report/document.py`. Every displayed value appears as readable text
+  with its unit, its provenance and where it is in the source's own words - `GlobalNodeId 1003`, never
+  an array index. REQ-001's own note is why: the free export path dropped a text annotation and a point
+  label **with no warning** while the scalar bar survived, and a document whose values live only inside
+  the 3D content stops being readable the moment the viewer fails.
+  A value that is absent says why rather than leaving a blank cell (XC-001) - a blank is a value the
+  reader supplies an explanation for, usually a wrong one.
+  The document opens with the network disabled, checked **on the produced document** rather than
+  trusted of the writers, and the check is proven able to fail against a document containing one
+  external reference.
+  Nothing here produces a number: the rows are handed in, because MOD-004 makes values and a report
+  layer that computed would be a second place a value comes from (INV-001). No HTML is written yet -
+  the document model is what the writers will agree on, so the same values reach the interactive
+  document and the office formats without either being the definition of what a report contains.
 ### TASK-002 - Provenance block
 - satisfies: AC-007
 - depends_on: TASK-001
 - done_when: the document records the @Workspace, the @Case, source files with modification times,
   declared units and the product version
-
+- done: 2026-08-25. Workspace, cases, source files **with their modification times**, declared
+  units and the product version. The time is the half that matters: without it the block says which
+  files, and a reader cannot tell a delivered document from one whose inputs have moved since (INV-027).
+  It is **mandatory and refuses to be partly filled**: a missing workspace, case list or product version
+  raises and blocks the export, rather than writing a document with a gap where its provenance should be
+  - which is a document somebody sends. Having no source files at all is **stated** rather than omitted,
+  because an empty list and an absent list read the same on a page and only one of them means "this
+  report read no file".
+  The product version is handed in. Nothing here can know which build produced the document, so nothing
+  here guesses.
 ### TASK-003 - Undeclared units in the document
 - satisfies: AC-008
 - depends_on: TASK-001
 - done_when: a field with no declared unit appears with the undeclared marker and never with a guessed
   unit
-
+- done: 2026-08-25. A value with no declared unit carries the marker where the unit would be, and
+  which values those are is answerable from the document without reading it. The marker is **one string
+  in one place** (`domain_core.reported_value.UNDECLARED_MARKER`): an axis label, a table cell and a
+  report line cannot disagree about the same absence.
+  Two defects found and fixed while writing this. The marker had been defined **three times** - the
+  duplication gate caught two of them and the third was a different spelling inside the evaluator. And
+  a genuinely **dimensionless** quantity was being reported as undeclared, which is the confusion
+  `reported_value` explicitly warns about: it makes every safety factor look like a stress whose unit
+  went missing. A ratio of two declared lengths now reads as `1` and a product of two bare numbers still
+  reads as undeclared.
 ### TASK-004 - Embedded geometry and its viewer
 - satisfies: AC-001
 - depends_on: TASK-001

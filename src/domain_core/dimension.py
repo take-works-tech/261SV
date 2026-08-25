@@ -21,6 +21,11 @@ from domain_core.units import INTERNAL, Quantity, unit
 #: The base symbols, in the order a composed symbol writes them. One entry per exponent.
 BASE_SYMBOLS = ("kg", "m", "s", "K")
 
+#: How SI writes a quantity that genuinely has no unit - a ratio, a safety factor. **Not** the same as
+#: a unit nobody declared: conflating the two makes every safety factor look like a stress whose unit
+#: went missing, which is the confusion `reported_value` names and this is the other half of.
+DIMENSIONLESS_SYMBOL = "1"
+
 
 @dataclass(frozen=True, slots=True)
 class Dimension:
@@ -85,7 +90,7 @@ def symbol_for(dimension: Dimension) -> str | None:
     same way.
     """
     if dimension.is_dimensionless:
-        return None
+        return DIMENSIONLESS_SYMBOL
     for quantity, known in DIMENSION_OF.items():
         if known == dimension:
             return INTERNAL[quantity]
@@ -131,6 +136,8 @@ def parse_symbol(symbol: str) -> Composed:
     gap is the offset (E-141). A temperature *rate* is written in `K/s`, which is what it is.
     """
     text = symbol.strip()
+    if text == DIMENSIONLESS_SYMBOL:
+        return Composed(DIMENSIONLESS, 1.0, DIMENSIONLESS_SYMBOL)
     if not text:
         raise ValueError("単位が空です。宣言がないなら None であって、空文字ではありません")
 
@@ -164,7 +171,10 @@ def parse_symbol(symbol: str) -> Composed:
                 "半端な指数の単位はこの製品に表記がありません"
             ) from None
         known = unit(name)
-        if known.offset:
+        # A single `degC` is a perfectly good declared unit; what has no meaning is degC **combined**
+        # with something, or raised to a power. The first version refused it outright and rejected every
+        # temperature anybody declared.
+        if known.offset and (len(parts) > 1 or power != 1):
             raise ValueError(
                 f"'{name}' はゼロ点をずらした単位なので、組み合わせた単位の一部にはできません。"
                 "先に倍にするか先に換算するかで答えが変わり、その差はオフセットそのものです"
