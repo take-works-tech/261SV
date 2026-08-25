@@ -1476,6 +1476,2215 @@
           }
         }
       }
+    },
+    "reportedValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "digits",
+        "provenance",
+        "unit",
+        "value"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "値。無ければ null であって 0 ではない（XC-001）"
+        },
+        "unit": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "宣言された単位。無ければ null で、未宣言として表示される（XC-003）"
+        },
+        "digits": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "この値が正直に持つ有効桁（INV-014）"
+        },
+        "provenance": {
+          "type": "string",
+          "enum": [
+            "declared",
+            "dataset",
+            "computed",
+            "measured",
+            "reference"
+          ],
+          "description": "GL-016 の五つ"
+        },
+        "formula": {
+          "type": "string",
+          "description": "計算値ならその式（INV-013、GL-032）"
+        },
+        "caveats": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "読み手が知る必要のあること（部分データ、平均済み、縮退形状由来、単位未宣言）"
+        },
+        "missingBecause": {
+          "type": "string",
+          "description": "値が無い理由。理由のない欠測は見落としに読める"
+        },
+        "location": {
+          "type": "string",
+          "description": "ソース自身の言葉での位置。配列添字ではない（INV-023）"
+        }
+      },
+      "description": "この製品が報告する一つの数値。単位・来歴・有効桁は必須"
+    },
+    "operationResults": {
+      "description": "操作ごとの結果の形。表の Result 列は文脈での意味を述べ、こちらが名前と型を述べる。数値を返す操作は `reportedValue` を使い、単位・来歴・有効桁を **必須** として運ぶ — 散文では求めることしかできなかったものを、契約が要求する（XC-003、INV-013、INV-014）",
+      "properties": {
+        "workspace.open": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "formatVersion",
+            "unresolvedCases",
+            "workspaceId"
+          ],
+          "properties": {
+            "workspaceId": {
+              "type": "string",
+              "description": "開いたワークスペース"
+            },
+            "formatVersion": {
+              "type": "string",
+              "description": "文書の形式版（CT-001）"
+            },
+            "unresolvedCases": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "ファイルが見つからない、または変わったケース"
+            }
+          }
+        },
+        "workspace.save": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "書いた先"
+            },
+            "previousKept": {
+              "type": "boolean",
+              "description": "直前の版を残したか"
+            }
+          }
+        },
+        "workspace.close": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {},
+          "description": "返す値はない。実行の結果は封筒の changed と undoId が伝える"
+        },
+        "case.create": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "作られたもの、または対象の識別子"
+            }
+          }
+        },
+        "case.delete": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "affectedDescendantIds"
+          ],
+          "properties": {
+            "affectedDescendantIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "巻き添えになる子孫。件数ではなく識別子で"
+            }
+          }
+        },
+        "case.move": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {},
+          "description": "返す値はない。実行の結果は封筒の changed と undoId が伝える"
+        },
+        "case.tag": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {},
+          "description": "返す値はない。実行の結果は封筒の changed と undoId が伝える"
+        },
+        "dataset.load": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "datasetId",
+            "fields",
+            "gaps",
+            "supportLevel"
+          ],
+          "properties": {
+            "datasetId": {
+              "type": "string",
+              "description": "読み込んだデータセット"
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "association",
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "フィールド名"
+                  },
+                  "association": {
+                    "type": "string",
+                    "enum": [
+                      "point",
+                      "cell",
+                      "integrationPoint",
+                      "field"
+                    ],
+                    "description": "運ぶ。推測しない（INV-003）"
+                  },
+                  "unit": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "ファイルは単位を運ばない。宣言されるまで null（XC-003）"
+                  }
+                }
+              },
+              "description": "読めたフィールド"
+            },
+            "supportLevel": {
+              "type": "string",
+              "enum": [
+                "verified",
+                "offered"
+              ],
+              "description": "XC-049 の段"
+            },
+            "gaps": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "description": "読めなかったもの。名指しする（XC-002）"
+              },
+              "description": "欠落"
+            }
+          }
+        },
+        "dataset.describe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "boundsM",
+            "cellCount",
+            "partial",
+            "pointCount"
+          ],
+          "properties": {
+            "pointCount": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "点数（整数。件数は整数のまま、INV-015）"
+            },
+            "cellCount": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "セル数（整数。件数は整数のまま、INV-015）"
+            },
+            "boundsM": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "maxM",
+                "minM"
+              ],
+              "properties": {
+                "minM": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "description": "正準フレームのメートル座標"
+                },
+                "maxM": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "description": "同上"
+                }
+              },
+              "description": "境界。名前が単位を持つ（GL-020）"
+            },
+            "partial": {
+              "type": "boolean",
+              "description": "一部しか読めていないか（XC-002）"
+            },
+            "resultAxis": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "time",
+                    "mode",
+                    "frequency",
+                    "undeclared",
+                    "none"
+                  ],
+                  "description": "ファイルが宣言したもの。推測しない（XC-240）"
+                },
+                "positions": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "description": "軸上の位置"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "段数（整数。件数は整数のまま、INV-015）"
+                },
+                "unit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "positions の単位。ファイルは単位を運ばないので、宣言されるまで null（XC-003）。モード番号のように無次元なら \"1\""
+                }
+              }
+            }
+          }
+        },
+        "field.declareUnit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {},
+          "description": "返す値はない。実行の結果は封筒の changed と undoId が伝える"
+        },
+        "field.statistics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "association",
+            "maximum",
+            "mean",
+            "minimum",
+            "missingCount",
+            "reduction",
+            "scope",
+            "weighting"
+          ],
+          "properties": {
+            "minimum": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "digits",
+                "provenance",
+                "unit",
+                "value"
+              ],
+              "properties": {
+                "value": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "値。無ければ null であって 0 ではない（XC-001）"
+                },
+                "unit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "宣言された単位。無ければ null で、未宣言として表示される（XC-003）"
+                },
+                "digits": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "この値が正直に持つ有効桁（INV-014）"
+                },
+                "provenance": {
+                  "type": "string",
+                  "enum": [
+                    "declared",
+                    "dataset",
+                    "computed",
+                    "measured",
+                    "reference"
+                  ],
+                  "description": "GL-016 の五つ"
+                },
+                "formula": {
+                  "type": "string",
+                  "description": "計算値ならその式（INV-013、GL-032）"
+                },
+                "caveats": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "読み手が知る必要のあること（部分データ、平均済み、縮退形状由来、単位未宣言）"
+                },
+                "missingBecause": {
+                  "type": "string",
+                  "description": "値が無い理由。理由のない欠測は見落としに読める"
+                },
+                "location": {
+                  "type": "string",
+                  "description": "ソース自身の言葉での位置。配列添字ではない（INV-023）"
+                }
+              },
+              "description": "この製品が報告する一つの数値。単位・来歴・有効桁は必須"
+            },
+            "maximum": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "digits",
+                "provenance",
+                "unit",
+                "value"
+              ],
+              "properties": {
+                "value": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "値。無ければ null であって 0 ではない（XC-001）"
+                },
+                "unit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "宣言された単位。無ければ null で、未宣言として表示される（XC-003）"
+                },
+                "digits": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "この値が正直に持つ有効桁（INV-014）"
+                },
+                "provenance": {
+                  "type": "string",
+                  "enum": [
+                    "declared",
+                    "dataset",
+                    "computed",
+                    "measured",
+                    "reference"
+                  ],
+                  "description": "GL-016 の五つ"
+                },
+                "formula": {
+                  "type": "string",
+                  "description": "計算値ならその式（INV-013、GL-032）"
+                },
+                "caveats": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "読み手が知る必要のあること（部分データ、平均済み、縮退形状由来、単位未宣言）"
+                },
+                "missingBecause": {
+                  "type": "string",
+                  "description": "値が無い理由。理由のない欠測は見落としに読める"
+                },
+                "location": {
+                  "type": "string",
+                  "description": "ソース自身の言葉での位置。配列添字ではない（INV-023）"
+                }
+              },
+              "description": "この製品が報告する一つの数値。単位・来歴・有効桁は必須"
+            },
+            "mean": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "digits",
+                "provenance",
+                "unit",
+                "value"
+              ],
+              "properties": {
+                "value": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "値。無ければ null であって 0 ではない（XC-001）"
+                },
+                "unit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "宣言された単位。無ければ null で、未宣言として表示される（XC-003）"
+                },
+                "digits": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "この値が正直に持つ有効桁（INV-014）"
+                },
+                "provenance": {
+                  "type": "string",
+                  "enum": [
+                    "declared",
+                    "dataset",
+                    "computed",
+                    "measured",
+                    "reference"
+                  ],
+                  "description": "GL-016 の五つ"
+                },
+                "formula": {
+                  "type": "string",
+                  "description": "計算値ならその式（INV-013、GL-032）"
+                },
+                "caveats": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "読み手が知る必要のあること（部分データ、平均済み、縮退形状由来、単位未宣言）"
+                },
+                "missingBecause": {
+                  "type": "string",
+                  "description": "値が無い理由。理由のない欠測は見落としに読める"
+                },
+                "location": {
+                  "type": "string",
+                  "description": "ソース自身の言葉での位置。配列添字ではない（INV-023）"
+                }
+              },
+              "description": "この製品が報告する一つの数値。単位・来歴・有効桁は必須"
+            },
+            "missingCount": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "値の無かった要素数（整数。件数は整数のまま、INV-015）"
+            },
+            "association": {
+              "type": "string",
+              "enum": [
+                "point",
+                "cell"
+              ],
+              "description": "どちらの上で計算したか"
+            },
+            "reduction": {
+              "type": "string",
+              "description": "どの縮約か（INV-017）"
+            },
+            "weighting": {
+              "type": "string",
+              "enum": [
+                "volume",
+                "dualVolume",
+                "area",
+                "none"
+              ],
+              "description": "重み付け。none はそう表示される（INV-017、AC-023）"
+            },
+            "scope": {
+              "type": "string",
+              "description": "計算した範囲（INV-017）"
+            }
+          }
+        },
+        "variable.declare": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "作られたもの、または対象の識別子"
+            }
+          }
+        },
+        "variable.set": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "changedIds"
+          ],
+          "properties": {
+            "changedIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "値が変わったすべての場所（INV-004）"
+            }
+          }
+        },
+        "variable.detach": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "keptValue"
+          ],
+          "properties": {
+            "keptValue": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "digits",
+                "provenance",
+                "unit",
+                "value"
+              ],
+              "properties": {
+                "value": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "値。無ければ null であって 0 ではない（XC-001）"
+                },
+                "unit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "宣言された単位。無ければ null で、未宣言として表示される（XC-003）"
+                },
+                "digits": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "この値が正直に持つ有効桁（INV-014）"
+                },
+                "provenance": {
+                  "type": "string",
+                  "enum": [
+                    "declared",
+                    "dataset",
+                    "computed",
+                    "measured",
+                    "reference"
+                  ],
+                  "description": "GL-016 の五つ"
+                },
+                "formula": {
+                  "type": "string",
+                  "description": "計算値ならその式（INV-013、GL-032）"
+                },
+                "caveats": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "読み手が知る必要のあること（部分データ、平均済み、縮退形状由来、単位未宣言）"
+                },
+                "missingBecause": {
+                  "type": "string",
+                  "description": "値が無い理由。理由のない欠測は見落としに読める"
+                },
+                "location": {
+                  "type": "string",
+                  "description": "ソース自身の言葉での位置。配列添字ではない（INV-023）"
+                }
+              },
+              "description": "この製品が報告する一つの数値。単位・来歴・有効桁は必須"
+            }
+          },
+          "description": "切り離した時点の値。以後は親に追随しない（XC-117）"
+        },
+        "view.create": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "revision"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "対象"
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "新しい版"
+            }
+          }
+        },
+        "view.update": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "revision"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "対象"
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "新しい版"
+            }
+          }
+        },
+        "view.duplicate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "作られたもの、または対象の識別子"
+            }
+          }
+        },
+        "view.rename": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "revision"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "対象"
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "新しい版"
+            }
+          }
+        },
+        "view.delete": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "deletedId",
+            "unresolvedUnitIds"
+          ],
+          "properties": {
+            "deletedId": {
+              "type": "string",
+              "description": "消したもの"
+            },
+            "unresolvedUnitIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "未解決として残るパイプラインユニット"
+            }
+          }
+        },
+        "view.render": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "handle"
+          ],
+          "properties": {
+            "handle": {
+              "type": "string",
+              "description": "画像への参照。画素そのものは封筒に載せない"
+            },
+            "reduced": {
+              "type": "string",
+              "description": "簡略化したなら、どれだけか。数値は完全データから（AC-007）"
+            }
+          }
+        },
+        "graph.create": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "revision"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "対象"
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "新しい版"
+            }
+          }
+        },
+        "graph.update": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "revision"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "対象"
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "新しい版"
+            }
+          }
+        },
+        "graph.duplicate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "作られたもの、または対象の識別子"
+            }
+          }
+        },
+        "graph.rename": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "revision"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "対象"
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "新しい版"
+            }
+          }
+        },
+        "graph.delete": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "deletedId",
+            "unresolvedUnitIds"
+          ],
+          "properties": {
+            "deletedId": {
+              "type": "string",
+              "description": "消したもの"
+            },
+            "unresolvedUnitIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "未解決として残るユニット"
+            }
+          }
+        },
+        "graph.data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "series"
+          ],
+          "properties": {
+            "series": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "label",
+                  "points",
+                  "provenance",
+                  "unit"
+                ],
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "description": "系列名"
+                  },
+                  "points": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "caseId"
+                      ],
+                      "properties": {
+                        "caseId": {
+                          "type": "string",
+                          "description": "ケース"
+                        },
+                        "value": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "無ければ null（AC-013）"
+                        },
+                        "reason": {
+                          "type": "string",
+                          "description": "値が無い理由"
+                        }
+                      }
+                    },
+                    "description": "点"
+                  },
+                  "unit": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "未宣言なら null（AC-002）"
+                  },
+                  "provenance": {
+                    "type": "string",
+                    "enum": [
+                      "declared",
+                      "dataset",
+                      "computed",
+                      "measured",
+                      "reference"
+                    ]
+                  },
+                  "expression": {
+                    "type": "string",
+                    "description": "計算系列ならその式（AC-006）"
+                  }
+                }
+              },
+              "description": "系列"
+            },
+            "resultAxisNote": {
+              "type": "string",
+              "description": "結果軸が異なるときに言うべきこと（XC-131）"
+            }
+          }
+        },
+        "diff.create": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "diffId",
+            "disclosure",
+            "outsideCount",
+            "outsideFraction",
+            "roundTripError"
+          ],
+          "properties": {
+            "diffId": {
+              "type": "string",
+              "description": "できた差分"
+            },
+            "outsideCount": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "基準メッシュの外に落ちた点数（整数。件数は整数のまま、INV-015）"
+            },
+            "outsideFraction": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "その割合"
+            },
+            "roundTripError": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "digits",
+                "provenance",
+                "unit",
+                "value"
+              ],
+              "properties": {
+                "value": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "値。無ければ null であって 0 ではない（XC-001）"
+                },
+                "unit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "宣言された単位。無ければ null で、未宣言として表示される（XC-003）"
+                },
+                "digits": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "この値が正直に持つ有効桁（INV-014）"
+                },
+                "provenance": {
+                  "type": "string",
+                  "enum": [
+                    "declared",
+                    "dataset",
+                    "computed",
+                    "measured",
+                    "reference"
+                  ],
+                  "description": "GL-016 の五つ"
+                },
+                "formula": {
+                  "type": "string",
+                  "description": "計算値ならその式（INV-013、GL-032）"
+                },
+                "caveats": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "読み手が知る必要のあること（部分データ、平均済み、縮退形状由来、単位未宣言）"
+                },
+                "missingBecause": {
+                  "type": "string",
+                  "description": "値が無い理由。理由のない欠測は見落としに読める"
+                },
+                "location": {
+                  "type": "string",
+                  "description": "ソース自身の言葉での位置。配列添字ではない（INV-023）"
+                }
+              },
+              "description": "この製品が報告する一つの数値。単位・来歴・有効桁は必須"
+            },
+            "disclosure": {
+              "type": "string",
+              "description": "XC-038 が添付を求める文。方向・範囲外・往復誤差・三つの寄与"
+            }
+          }
+        },
+        "report.create": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "revision"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "対象"
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "新しい版"
+            }
+          }
+        },
+        "report.update": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "revision"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "対象"
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "新しい版"
+            }
+          }
+        },
+        "report.duplicate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "作られたもの、または対象の識別子"
+            }
+          }
+        },
+        "report.rename": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "revision"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "対象"
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "新しい版"
+            }
+          }
+        },
+        "report.delete": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "deletedId",
+            "unresolvedUnitIds"
+          ],
+          "properties": {
+            "deletedId": {
+              "type": "string",
+              "description": "消したもの"
+            },
+            "unresolvedUnitIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "未解決として残るユニット"
+            }
+          }
+        },
+        "report.export": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "bytes",
+            "omitted",
+            "path",
+            "reductions"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "書いた先"
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "大きさ（整数。件数は整数のまま、INV-015）"
+            },
+            "reductions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "適用した簡略化。適用したなら文書に書かれる（AC-003）"
+            },
+            "omitted": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "書けなかった要素。黙って落とさない（AC-014）"
+            }
+          }
+        },
+        "system.capabilities": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "formats",
+            "machineClass",
+            "renderers"
+          ],
+          "properties": {
+            "machineClass": {
+              "type": "string",
+              "enum": [
+                "integrated-graphics",
+                "workstation"
+              ],
+              "description": "XC-086 の二つ。限界値はこれで決まる"
+            },
+            "renderers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "available",
+                  "backend"
+                ],
+                "properties": {
+                  "backend": {
+                    "type": "string",
+                    "description": "経路"
+                  },
+                  "available": {
+                    "type": "boolean"
+                  },
+                  "requires": {
+                    "type": "string",
+                    "description": "使えないなら何が要るか。要件のない「使えません」は対処できない（AC-006）"
+                  }
+                }
+              },
+              "description": "描画経路"
+            },
+            "formats": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "format",
+                  "level"
+                ],
+                "properties": {
+                  "format": {
+                    "type": "string",
+                    "description": "形式"
+                  },
+                  "level": {
+                    "type": "string",
+                    "enum": [
+                      "verified",
+                      "offered",
+                      "absent"
+                    ]
+                  }
+                }
+              },
+              "description": "読める形式と、その保証の段（XC-049）"
+            }
+          }
+        },
+        "system.protocols": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "versions"
+          ],
+          "properties": {
+            "versions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "話せる版。下限より下は丁寧に断る"
+            }
+          }
+        },
+        "history.undo": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "restoredIds"
+          ],
+          "properties": {
+            "restoredIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "戻したもの"
+            }
+          }
+        },
+        "history.list": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "entries"
+          ],
+          "properties": {
+            "entries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "atUtc",
+                  "operation",
+                  "origin",
+                  "outcome"
+                ],
+                "properties": {
+                  "operation": {
+                    "type": "string",
+                    "description": "操作"
+                  },
+                  "origin": {
+                    "type": "string",
+                    "enum": [
+                      "interface",
+                      "assistant",
+                      "script",
+                      "pipeline"
+                    ]
+                  },
+                  "atUtc": {
+                    "type": "string",
+                    "description": "時刻。UTC"
+                  },
+                  "outcome": {
+                    "type": "string",
+                    "description": "結果"
+                  },
+                  "undoId": {
+                    "type": "string",
+                    "description": "取り消し"
+                  }
+                }
+              },
+              "description": "記録（XC-023）"
+            }
+          }
+        },
+        "dataset.probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value"
+          ],
+          "properties": {
+            "value": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "digits",
+                "provenance",
+                "unit",
+                "value"
+              ],
+              "properties": {
+                "value": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "値。無ければ null であって 0 ではない（XC-001）"
+                },
+                "unit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "宣言された単位。無ければ null で、未宣言として表示される（XC-003）"
+                },
+                "digits": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "この値が正直に持つ有効桁（INV-014）"
+                },
+                "provenance": {
+                  "type": "string",
+                  "enum": [
+                    "declared",
+                    "dataset",
+                    "computed",
+                    "measured",
+                    "reference"
+                  ],
+                  "description": "GL-016 の五つ"
+                },
+                "formula": {
+                  "type": "string",
+                  "description": "計算値ならその式（INV-013、GL-032）"
+                },
+                "caveats": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "読み手が知る必要のあること（部分データ、平均済み、縮退形状由来、単位未宣言）"
+                },
+                "missingBecause": {
+                  "type": "string",
+                  "description": "値が無い理由。理由のない欠測は見落としに読める"
+                },
+                "location": {
+                  "type": "string",
+                  "description": "ソース自身の言葉での位置。配列添字ではない（INV-023）"
+                }
+              },
+              "description": "この製品が報告する一つの数値。単位・来歴・有効桁は必須"
+            },
+            "association": {
+              "type": "string",
+              "description": "点とセルのどちらから来たか"
+            }
+          }
+        },
+        "dataset.parts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "parts"
+          ],
+          "properties": {
+            "parts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "cellCount",
+                  "name",
+                  "pointCount",
+                  "type"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "ソースが付けた名前。こちらでは付けない（GL-029）"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "パートの種類"
+                  },
+                  "pointCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "点数（整数。件数は整数のまま、INV-015）"
+                  },
+                  "cellCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "セル数（整数。件数は整数のまま、INV-015）"
+                  },
+                  "parentId": {
+                    "type": "string",
+                    "description": "親。ファイルに階層があれば"
+                  },
+                  "boundsM": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "maxM",
+                      "minM"
+                    ],
+                    "properties": {
+                      "minM": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "description": "正準フレームのメートル座標"
+                      },
+                      "maxM": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "description": "同上"
+                      }
+                    },
+                    "description": "境界。名前が単位を持つ（GL-020）"
+                  }
+                }
+              },
+              "description": "パート。ファイルに階層が無ければ無いまま"
+            }
+          }
+        },
+        "field.derive": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "conventions",
+            "fieldName",
+            "formula"
+          ],
+          "properties": {
+            "fieldName": {
+              "type": "string",
+              "description": "できた導出量"
+            },
+            "formula": {
+              "type": "string",
+              "description": "使った式（INV-020）"
+            },
+            "conventions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "従った規約。成分順や主値の順序（E-073）"
+            },
+            "frameId": {
+              "type": "string",
+              "description": "報告したフレーム（INV-021）"
+            }
+          }
+        },
+        "field.setDisplayUnit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {},
+          "description": "返す値はない。実行の結果は封筒の changed と undoId が伝える"
+        },
+        "frame.declare": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "作られたもの、または対象の識別子"
+            }
+          }
+        },
+        "measurement.import": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "importedIds"
+          ],
+          "properties": {
+            "importedIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "取り込んだ値"
+            },
+            "undeclared": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "単位や不確かさが宣言されていなかったもの。名指しする（XC-125）"
+            }
+          }
+        },
+        "case.proposeTags": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "proposals"
+          ],
+          "properties": {
+            "proposals": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "caseId",
+                  "signal",
+                  "tag"
+                ],
+                "properties": {
+                  "caseId": {
+                    "type": "string",
+                    "description": "対象"
+                  },
+                  "tag": {
+                    "type": "string",
+                    "description": "提案するタグ"
+                  },
+                  "signal": {
+                    "type": "string",
+                    "description": "その提案の根拠。根拠のない提案は判断できない"
+                  }
+                }
+              },
+              "description": "提案。何も適用しない（XC-120）"
+            }
+          }
+        },
+        "template.createFromItem": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "revision"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "対象"
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "新しい版"
+            }
+          }
+        },
+        "template.apply": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "resolved",
+            "unresolved"
+          ],
+          "properties": {
+            "resolved": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "解決した参照"
+            },
+            "unresolved": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "missing",
+                  "what"
+                ],
+                "properties": {
+                  "what": {
+                    "type": "string",
+                    "description": "解決しなかったもの"
+                  },
+                  "missing": {
+                    "type": "string",
+                    "description": "何が無かったか"
+                  }
+                }
+              },
+              "description": "解決しなかったもの。名前と欠けたものの両方（XC-090）"
+            },
+            "itemId": {
+              "type": "string",
+              "description": "承諾後に作られる独立した項目。承諾前は無い"
+            }
+          }
+        },
+        "template.promote": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "requirements",
+            "templateId"
+          ],
+          "properties": {
+            "templateId": {
+              "type": "string",
+              "description": "昇格したテンプレート"
+            },
+            "requirements": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "name"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "description": "種類"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "名前"
+                  },
+                  "originOnly": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "description": "適用先に必要なもの（AC-037）"
+            }
+          }
+        },
+        "template.export": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "assetsEmbedded",
+            "assetsListed",
+            "path"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "書いた先"
+            },
+            "assetsEmbedded": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "同梱した資産"
+            },
+            "assetsListed": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "同梱せず名前だけ書いた資産"
+            }
+          }
+        },
+        "template.import": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "origin",
+            "templateId"
+          ],
+          "properties": {
+            "templateId": {
+              "type": "string",
+              "description": "取り込んだテンプレート"
+            },
+            "origin": {
+              "type": "string",
+              "description": "出所として記録したもの"
+            },
+            "unresolvedReferences": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "解決しない参照"
+            }
+          }
+        },
+        "library.list": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "entries"
+          ],
+          "properties": {
+            "entries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "kind",
+                  "origin",
+                  "scope"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "項目"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "description": "種類"
+                  },
+                  "scope": {
+                    "type": "string",
+                    "enum": [
+                      "sample",
+                      "workspace",
+                      "shared"
+                    ],
+                    "description": "どこにあるか"
+                  },
+                  "origin": {
+                    "type": "string",
+                    "description": "由来"
+                  },
+                  "newerSampleExists": {
+                    "type": "boolean",
+                    "description": "サンプル由来の写しに新版があるか（XC-130）"
+                  }
+                }
+              },
+              "description": "項目"
+            }
+          }
+        },
+        "pipeline.create": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "revision"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "対象"
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "新しい版"
+            }
+          }
+        },
+        "pipeline.update": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "revision"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "対象"
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "新しい版"
+            }
+          }
+        },
+        "pipeline.dryRun": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "steps"
+          ],
+          "properties": {
+            "steps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "caseCount",
+                  "kind",
+                  "unitId"
+                ],
+                "properties": {
+                  "unitId": {
+                    "type": "string",
+                    "description": "ユニット"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "description": "種類"
+                  },
+                  "caseCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "対象件数（整数。件数は整数のまま、INV-015）"
+                  },
+                  "iterations": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "countSource": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "conditionValue": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "destructive": {
+                    "type": "boolean"
+                  },
+                  "unresolved": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "実行前には確定しない理由"
+                  }
+                }
+              },
+              "description": "工程。書き出しは行わない（AC-008）"
+            }
+          }
+        },
+        "pipeline.run": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "failedCases",
+            "resolvedCases",
+            "results",
+            "runId",
+            "written"
+          ],
+          "properties": {
+            "runId": {
+              "type": "string",
+              "description": "この実行"
+            },
+            "resolvedCases": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "解決したケース"
+            },
+            "results": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "caseId",
+                  "outcome",
+                  "targetSize",
+                  "unitId"
+                ],
+                "properties": {
+                  "unitId": {
+                    "type": "string",
+                    "description": "ユニット"
+                  },
+                  "caseId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "ケースを持たないユニットは null"
+                  },
+                  "outcome": {
+                    "type": "string",
+                    "enum": [
+                      "done",
+                      "skipped-empty",
+                      "skipped-after",
+                      "skipped-unauthorised",
+                      "skipped-condition",
+                      "failed",
+                      "cancelled"
+                    ]
+                  },
+                  "targetSize": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "そのとき対象だった件数（整数。件数は整数のまま、INV-015）"
+                  },
+                  "detail": {
+                    "type": "string",
+                    "description": "その結果について言うべきこと"
+                  }
+                }
+              },
+              "description": "ユニットごと・ケースごとの結果（AC-015）"
+            },
+            "written": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "書き出したもの。削除の申し出はこれに基づく（AC-041）"
+            },
+            "failedCases": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "失敗したケース"
+            },
+            "stoppedAt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "startedUtc": {
+              "type": "string",
+              "description": "開始。UTC"
+            },
+            "finishedUtc": {
+              "type": "string",
+              "description": "終了。UTC"
+            }
+          }
+        },
+        "pipeline.cancel": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "stoppedAt",
+            "written"
+          ],
+          "properties": {
+            "stoppedAt": {
+              "type": "string",
+              "description": "停止したユニット"
+            },
+            "written": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "そこまでに書き出したもの（AC-014）"
+            }
+          }
+        },
+        "script.run": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "commandCount",
+            "undoId"
+          ],
+          "properties": {
+            "undoId": {
+              "type": "string",
+              "description": "この実行全体の取り消し。一つのスクリプトは一つの取り消し（XC-061）"
+            },
+            "commandCount": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "発行したコマンド数（整数。件数は整数のまま、INV-015）"
+            }
+          }
+        },
+        "report.provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "caseIds",
+            "declaredUnits",
+            "productVersion",
+            "sources",
+            "workspaceId"
+          ],
+          "properties": {
+            "workspaceId": {
+              "type": "string",
+              "description": "ワークスペース"
+            },
+            "caseIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "ケース"
+            },
+            "sources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "modifiedUtc",
+                  "path"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "元ファイル"
+                  },
+                  "modifiedUtc": {
+                    "type": "string",
+                    "description": "更新時刻。UTC"
+                  }
+                }
+              },
+              "description": "元ファイルと更新時刻（INV-027）"
+            },
+            "declaredUnits": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "量ごとの宣言単位"
+            },
+            "productVersion": {
+              "type": "string",
+              "description": "作った版"
+            }
+          }
+        },
+        "system.audit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "entries"
+          ],
+          "properties": {
+            "entries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "atUtc",
+                  "host",
+                  "outcome",
+                  "purpose"
+                ],
+                "properties": {
+                  "atUtc": {
+                    "type": "string",
+                    "description": "時刻"
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "description": "何のために"
+                  },
+                  "host": {
+                    "type": "string",
+                    "description": "どこへ"
+                  },
+                  "outcome": {
+                    "type": "string",
+                    "enum": [
+                      "sent",
+                      "refused",
+                      "awaitingConfirmation"
+                    ]
+                  },
+                  "sent": {
+                    "type": "string",
+                    "description": "送った内容そのもの。要約ではない"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "拒否や保留の理由"
+                  },
+                  "withheld": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "伏せた語（AC-020）"
+                  }
+                }
+              },
+              "description": "外に出た要求（AC-021）"
+            }
+          }
+        },
+        "system.supportBundle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contents",
+            "path"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "作った先"
+            },
+            "contents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "同封したもの。承諾された一覧そのもの（AC-008）"
+            }
+          }
+        },
+        "workspace.pack": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "bytes",
+            "path"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "作った先"
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "大きさ（整数。件数は整数のまま、INV-015）"
+            },
+            "omitted": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "持って行けなかったもの"
+            }
+          }
+        },
+        "output.prune": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "deletedFiles",
+            "freedBytes",
+            "removedRunIds"
+          ],
+          "properties": {
+            "removedRunIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "取り除いた実行"
+            },
+            "freedBytes": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "空いた容量（整数。件数は整数のまま、INV-015）"
+            },
+            "deletedFiles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "消したファイル。名前で（AC-053）"
+            }
+          }
+        }
+      }
     }
   }
 }

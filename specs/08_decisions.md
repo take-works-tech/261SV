@@ -4728,3 +4728,42 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a contract whose shape cannot be expressed in JSON Schema well enough to generate
   from - which would mean the schema had stopped being the contract, and that is a larger problem than
   this decision
+
+### XC-253 - What a command answers is stated by the contract, and a number in it arrives with its unit
+- decided: 2026-08-25
+- status: active
+- decision: every operation of CT-003 carries a **JSON Schema for its result** - the field names, their
+  types and which of them are required - in `$defs.operationResults`, the mirror of the parameter
+  schemas XC-249 settled. Where a result carries a measured number it uses `$defs.reportedValue`, whose
+  `value`, `unit`, `digits` and `provenance` are **required rather than optional**. The exceptions are
+  three and each is checkable: a field whose own name carries the unit in the manner of GL-020
+  (`minM`), a number the schema bounds to a ratio, and a number under an object that declares the unit
+  once for a series of them (`graph.data`). `validate/check_commands.py` generates the field names into
+  `src/service/command/catalogue.py` as `RESULT_FIELDS`, checks that no answer holds a bare number, and
+  the command surface fails a handler whose effect carries a field the contract does not declare or
+  omits one it requires - `failed` and not `refused`, because the caller did nothing wrong
+- decided_by: the product owner, 2026-08-25
+- rationale: the parameters became machine-readable and the results did not, which left the contract
+  stating half of an interface. `result` was `additionalProperties: true` for all 61 operations, so no
+  answer could disagree with the contract and every type generated above the service would have been
+  `any` - the interface would have learned the shape of an answer by reading the engine, which is the
+  coupling MOD-012 exists to prevent.
+  The part worth the work is not the shapes. Several invariants are statements about **what a result
+  carries** - a number with its unit (XC-003), its provenance (INV-013), the digits it honestly has
+  (INV-014), the weighting a reduction used (INV-017) - and prose can only ask for those while a schema
+  can require them. Making `unit` required of `reportedValue` turns "a value shown without its unit is a
+  value in whatever unit the reader assumed" from a rule somebody remembers into one a build cannot
+  break.
+  The check found one on its first run: `dataset.describe` answered with the positions of the result
+  axis and no unit, so a time axis in seconds and one in milliseconds were the same answer
+- alternatives: leaving `result` open and validating in the interface puts the check downstream of the
+  place that could still be wrong, and each client would carry its own copy. Describing results in the
+  catalogue's prose column only repeats XC-249's problem one column to the right. Requiring the unit on
+  every number without exception would force it onto ratios and onto coordinates whose name already
+  carries it, and a rule with unstatable exceptions is one people disable
+- basis: E-001 (T1)
+- affects: CT-002, CT-003, MOD-012, MOD-013, validate/check_commands.py, src/service/command/surface.py
+- decidedness: Fixed
+- reversal_trigger: an operation whose answer is genuinely open-ended - a passthrough of a format's own
+  metadata, say - which a closed field list cannot hold and which would need the contract to name the
+  one place `additionalProperties` is allowed, rather than allowing it everywhere by default

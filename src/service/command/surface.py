@@ -38,7 +38,7 @@ from enum import Enum
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from domain_core.recorded_time import RecordedTime, record as record_time
-from service.command.catalogue import OPERATIONS, PARAMETERS, writes
+from service.command.catalogue import OPERATIONS, PARAMETERS, RESULT_FIELDS, writes
 
 
 class Origin(str, Enum):
@@ -141,6 +141,16 @@ class Handler:
     @property
     def required(self) -> frozenset[str]:
         return PARAMETERS[self.operation][1]
+
+    @property
+    def answers(self) -> frozenset[str]:
+        """The fields this operation's result may carry, from CT-003."""
+        return RESULT_FIELDS[self.operation][0]
+
+    @property
+    def answers_required(self) -> frozenset[str]:
+        """The fields it must carry. Where a number is among them, so is its unit (XC-003)."""
+        return RESULT_FIELDS[self.operation][1]
 
 
 @dataclass(frozen=True, slots=True)
@@ -339,7 +349,56 @@ class Surface:
                     "取り消せない変更を履歴に載せるより、適用しないほうが安全です（XC-061）"
                 ),
             )
+        mismatch = self._answer_mismatch(handler, effect, dry_run=command.dry_run)
+        if mismatch is not None:
+            return Result(Status.FAILED, reason=mismatch)
         return effect
+
+    @staticmethod
+    def _answer_mismatch(handler: Handler, effect: Effect, *, dry_run: bool) -> str | None:
+        """Why this effect is not the answer CT-003 states, or None.
+
+        The mirror of the parameter check, pointed the other way: a caller is refused for sending a
+        field the contract does not declare, and a **build** fails for returning one. It is `FAILED`
+        rather than `REFUSED` because the caller did nothing wrong - the defect is here.
+
+        A dry run is held to the field names and not to the required ones: it applies nothing, so it
+        cannot produce the identifier or the revision that applying would have created, and requiring
+        those of it would make every dry run of a write fail (CT-002).
+        """
+        declared, required = handler.answers, handler.answers_required
+        value = effect.value
+        if value is None:
+            absent = sorted(required)
+            if absent and not dry_run:
+                return (
+                    f"'{handler.operation}' は {absent} を返すと契約に書かれていますが、"
+                    "何も返していません（CT-003）"
+                )
+            return None
+        if not isinstance(value, Mapping):
+            if not declared:
+                return (
+                    f"'{handler.operation}' は値を返さない操作ですが、"
+                    f"{type(value).__name__} を返しています（CT-003）"
+                )
+            return (
+                f"'{handler.operation}' の結果はオブジェクトです。"
+                f"{type(value).__name__} では呼び出し側に型がありません（CT-003）"
+            )
+        unknown = sorted(set(value) - declared)
+        if unknown:
+            return (
+                f"'{handler.operation}' が契約にない項目 {unknown} を返しています（CT-003）。"
+                f"返せるのは {sorted(declared)} です — 契約にない項目は、呼び出し側の型に無い項目です"
+            )
+        absent = sorted(required - set(value))
+        if absent and not dry_run:
+            return (
+                f"'{handler.operation}' の結果に {absent} がありません（CT-003）。"
+                "単位や来歴が必須なのは、それが無い数値は読み手が仮定した単位の数値だからです（XC-003）"
+            )
+        return None
 
     def _keep(self, command: Command, effect: Effect) -> str:
         undo_id = command.group_id or self._identifier()

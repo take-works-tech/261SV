@@ -20,7 +20,7 @@ from typing import Any, Mapping
 
 import pytest
 
-from service.command.catalogue import OPERATIONS, READS, WRITES, writes
+from service.command.catalogue import OPERATIONS, READS, RESULT_FIELDS, WRITES, writes
 from service.command.surface import (
     Command,
     Effect,
@@ -43,6 +43,7 @@ class Store:
 
     def __init__(self) -> None:
         self.names: dict[str, str] = {}
+        self.revisions: dict[str, int] = {}
 
     def rename(self, parameters: Mapping[str, Any], targets: tuple[str, ...]) -> Effect:
         identifier = str(parameters["viewId"])
@@ -55,10 +56,40 @@ class Store:
             else:
                 self.names[identifier] = before
 
-        return Effect(f"{identifier} の名前を変更しました", changed=(identifier,), undo=undo)
+        self.revisions[identifier] = self.revisions.get(identifier, 0) + 1
+        # The result CT-003 states for `view.rename`, not a shape this stub found convenient. A stub
+        # free to answer as it liked would be a stub that passed while the product could not.
+        return Effect(
+            f"{identifier} の名前を変更しました",
+            changed=(identifier,),
+            value={"id": identifier, "revision": self.revisions[identifier]},
+            undo=undo,
+        )
 
     def read(self, parameters: Mapping[str, Any], targets: tuple[str, ...]) -> Effect:
-        return Effect("名前を読みました", value=dict(self.names))
+        return Effect(
+            "名前を読みました",
+            value={
+                "entries": [
+                    {"operation": "view.rename", "origin": "interface",
+                     "atUtc": "2026-08-25T00:00:00Z", "outcome": name}
+                    for name in self.names.values()
+                ]
+            },
+        )
+
+
+def an_export(parameters: Mapping[str, Any], targets: tuple[str, ...]) -> Effect:
+    """A `report.export` handler that answers what CT-003 says an export answers.
+
+    `reductions` and `omitted` are required of it, empty lists included: an export that stayed silent
+    about what it left out would be one the reader had no way to ask about (AC-014).
+    """
+    return Effect(
+        "書き出しました",
+        value={"path": "out", "bytes": 12, "reductions": [], "omitted": []},
+        undo=lambda: None,
+    )
 
 
 def a_surface(store: Store | None = None) -> tuple[Surface, Store]:
@@ -215,7 +246,7 @@ class TestAuthorisationIsNeverAssumed:
         surface.register(
             Handler(
                 "report.export",
-                lambda p, t: Effect("書き出しました", undo=lambda: None),
+                an_export,
                 needs=frozenset({Permission.OVERWRITE}),
             )
         )
@@ -230,7 +261,7 @@ class TestAuthorisationIsNeverAssumed:
         surface.register(
             Handler(
                 "report.export",
-                lambda p, t: Effect("書き出しました", undo=lambda: None),
+                an_export,
                 needs=frozenset({Permission.OVERWRITE}),
             )
         )
@@ -416,3 +447,138 @@ class TestTheLogIsWhatHistoryReadsBack:
         assert {origin.value for origin in Origin} == {
             "interface", "assistant", "script", "pipeline"
         }
+
+
+class TestTheAnswerIsTheOneTheContractStates:
+    """CT-003 states what each operation answers, and a build is held to it.
+
+    The mirror of the parameter rule, pointed the other way. A caller is refused for sending a field the
+    contract does not declare; a build **fails** for returning one - `FAILED` rather than `REFUSED`
+    because the caller did nothing wrong and the defect is on this side. Until 2026-08-25 the contract's
+    `result` was an open object, so no answer could disagree with it and none of this could be checked.
+    """
+
+    @staticmethod
+    def _surface(operation: str, value: object, *, undo: bool = True) -> Surface:
+        surface = Surface(clock=at(9))
+        surface.register(
+            Handler(operation, lambda p, t: Effect("しました", value=value, undo=(lambda: None) if undo else None))
+        )
+        return surface
+
+    def test_an_undeclared_field_fails_the_build_rather_than_the_caller(self) -> None:
+        surface = self._surface("view.rename", {"id": "v", "revision": 1, "colour": "red"})
+
+        result = surface.submit(Command("view.rename", {"viewId": "v", "newName": "n"}))
+
+        assert result.status is Status.FAILED
+        assert "colour" in (result.reason or "")
+        assert result.changed == ()
+
+    def test_the_refusal_says_what_may_be_returned(self) -> None:
+        surface = self._surface("view.rename", {"id": "v", "revision": 1, "colour": "red"})
+
+        result = surface.submit(Command("view.rename", {"viewId": "v", "newName": "n"}))
+
+        assert "revision" in (result.reason or "")
+
+    def test_a_missing_required_field_fails(self) -> None:
+        """`report.export` must say what it reduced and what it omitted, empty lists included: an export
+        silent about what it left out is one the reader cannot ask about (AC-014)."""
+        surface = self._surface("report.export", {"path": "out", "bytes": 12})
+
+        result = surface.submit(
+            Command("report.export", {"reportId": "r", "path": "out"},
+                    allowed=frozenset({Permission.OVERWRITE})),
+        )
+
+        assert result.status is Status.FAILED
+        assert "omitted" in (result.reason or "") and "reductions" in (result.reason or "")
+
+    def test_returning_nothing_where_something_is_required_fails(self) -> None:
+        surface = self._surface("report.export", None)
+
+        result = surface.submit(
+            Command("report.export", {"reportId": "r", "path": "out"},
+                    allowed=frozenset({Permission.OVERWRITE})),
+        )
+
+        assert result.status is Status.FAILED
+
+    def test_a_value_where_the_contract_declares_none_fails(self) -> None:
+        """`field.declareUnit` answers nothing. A build returning something anyway is returning a value
+        no caller has a type for."""
+        surface = self._surface("field.declareUnit", {"unit": "MPa"})
+
+        result = surface.submit(
+            Command(
+                "field.declareUnit",
+                {"datasetId": "d", "fieldName": "f", "unitSymbol": "MPa"},
+            )
+        )
+
+        assert result.status is Status.FAILED
+
+    def test_something_that_is_not_an_object_fails(self) -> None:
+        surface = self._surface("view.rename", "v")
+
+        result = surface.submit(Command("view.rename", {"viewId": "v", "newName": "n"}))
+
+        assert result.status is Status.FAILED
+        assert "str" in (result.reason or "")
+
+    def test_a_dry_run_is_not_asked_for_what_applying_would_have_created(self) -> None:
+        """A dry run applies nothing, so it has no identifier and no new revision to report. Holding it
+        to the required fields would make every dry run of a write fail."""
+        surface = self._surface("view.rename", None)
+
+        result = surface.submit(
+            Command("view.rename", {"viewId": "v", "newName": "n"}, dry_run=True)
+        )
+
+        assert result.status is Status.ANSWERED
+
+    def test_a_dry_run_is_still_held_to_the_field_names(self) -> None:
+        """What it would return is still the contract's shape - only its completeness is excused."""
+        surface = self._surface("view.rename", {"colour": "red"})
+
+        result = surface.submit(
+            Command("view.rename", {"viewId": "v", "newName": "n"}, dry_run=True)
+        )
+
+        assert result.status is Status.FAILED
+
+    def test_the_contracted_answer_applies(self) -> None:
+        surface = self._surface("view.rename", {"id": "v", "revision": 2})
+
+        result = surface.submit(Command("view.rename", {"viewId": "v", "newName": "n"}))
+
+        assert result.status is Status.APPLIED
+        assert result.value == {"id": "v", "revision": 2}
+
+
+class TestEveryOperationSaysWhatItAnswers:
+    def test_the_catalogue_and_the_result_fields_hold_the_same_set(self) -> None:
+        assert set(RESULT_FIELDS) == set(OPERATIONS)
+
+    def test_a_number_in_an_answer_comes_with_its_unit(self) -> None:
+        """XC-003, as a property of the contract rather than of a habit. `field.statistics` answers with
+        a minimum, and that minimum is an object carrying the unit, the provenance and the digits - not
+        a bare float the caller reads in whatever unit it assumed."""
+        import json
+        from pathlib import Path as _Path
+
+        schema = json.loads(
+            _Path("specs/contracts/schema/CT-003.json").read_text(encoding="utf-8")
+        )
+        minimum = schema["$defs"]["operationResults"]["properties"]["field.statistics"][
+            "properties"
+        ]["minimum"]
+
+        assert set(minimum["required"]) >= {"value", "unit", "digits", "provenance"}
+
+    def test_a_reduction_says_how_it_weighted(self) -> None:
+        """INV-017: an average over elements of different sizes is not the average of its values, and a
+        figure that does not say which it is cannot be checked."""
+        assert "weighting" in RESULT_FIELDS["field.statistics"][1]
+        assert "scope" in RESULT_FIELDS["field.statistics"][1]

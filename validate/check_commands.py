@@ -116,9 +116,14 @@ def render() -> str:
     writes = [name for name, is_write in rows if is_write]
     reads = [name for name, is_write in rows if not is_write]
     stated = operation_parameters()
+    answers = operation_results()
 
     def declared(name: str) -> tuple[list[str], list[str]]:
         one = stated.get(name, {})
+        return sorted(one.get("properties", {})), sorted(one.get("required", []))
+
+    def answered(name: str) -> tuple[list[str], list[str]]:
+        one = answers.get(name, {})
         return sorted(one.get("properties", {})), sorted(one.get("required", []))
     lines = [
         '"""The operation catalogue of CT-003, as code.',
@@ -156,6 +161,17 @@ def render() -> str:
         "PARAMETERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {",
         *[
             f'    "{name}": (frozenset({declared(name)[0]!r}), frozenset({declared(name)[1]!r})),'
+            for name, _ in rows
+        ],
+        "}",
+        "",
+        "#: What each operation **answers**, and which of those fields it must carry. From CT-003's",
+        "#: per-operation result schemas. A handler is checked against these the way a caller is checked",
+        "#: against PARAMETERS: the contract states the answer, so a build cannot return a value the",
+        "#: caller has no type for, nor omit a unit the contract requires beside a number (XC-003).",
+        "RESULT_FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {",
+        *[
+            f'    "{name}": (frozenset({answered(name)[0]!r}), frozenset({answered(name)[1]!r})),'
             for name, _ in rows
         ],
         "}",
@@ -369,6 +385,109 @@ def check_components_are_unique(findings: list[Finding]) -> bool:
     return True
 
 
+def operation_results() -> dict[str, dict]:
+    """The per-operation result schemas of CT-003.
+
+    Absent means the contract does not say what an operation **answers** - the state this repository was
+    in until 2026-08-25, when `result` was `additionalProperties: true` for all of them and every type
+    generated above the service would have been `any`.
+    """
+    schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+    return schema.get("$defs", {}).get("operationResults", {}).get("properties", {})
+
+
+def check_results_are_stated(findings: list[Finding]) -> None:
+    """Every catalogue operation says what it answers, in a form something can check."""
+    stated = operation_results()
+    if not stated:
+        findings.append(
+            Finding(
+                SCHEMA.name,
+                "no per-operation result schemas: the contract says what each operation takes and not "
+                "what it returns, so nothing can check that an answer carries a unit or a provenance",
+            )
+        )
+        return
+    catalogue = catalogue_operations()
+    for name in catalogue:
+        if name not in stated:
+            findings.append(Finding(SCHEMA.name, f"{name} has no result schema"))
+    for name in stated:
+        if name not in catalogue:
+            findings.append(
+                Finding(SCHEMA.name, f"{name} has a result schema and is not in the catalogue")
+            )
+
+
+#: Number-typed result fields whose **name** carries the unit, in the manner GL-020 asks for. Listed
+#: rather than inferred from a suffix: a rule that read a trailing capital would accept `deltaT` as
+#: metres, and being able to say which fields these are is the point of the list.
+NAMED_UNIT_FIELDS = frozenset({"minM", "maxM"})
+
+
+def _number_fields(node: object, path: str = "") -> list[tuple[str, dict]]:
+    """Every number-typed leaf in a schema, with the path that reaches it."""
+    found: list[tuple[str, dict]] = []
+    if isinstance(node, dict):
+        kind = node.get("type")
+        kinds = kind if isinstance(kind, list) else [kind]
+        if "number" in kinds:
+            found.append((path, node))
+        for name, child in (node.get("properties") or {}).items():
+            found += _number_fields(child, f"{path}.{name}" if path else name)
+        if "items" in node:
+            found += _number_fields(node["items"], f"{path}[]")
+    return found
+
+
+def _declares_unit(schema: dict, holder: str) -> bool:
+    """Whether the object at `holder`, or any object enclosing it, declares a `unit`.
+
+    Enclosing counts: a graph series states the unit once and its points carry the numbers (AC-002), and
+    requiring it on every point would be a second answer to the same question.
+    """
+    node: object = schema
+    seen: list[object] = [node]
+    for part in [p for p in holder.split(".") if p]:
+        if not isinstance(node, dict):
+            return False
+        node = (node.get("properties") or {}).get(part.removesuffix("[]"), {})
+        if part.endswith("[]") and isinstance(node, dict):
+            node = node.get("items", {})
+        seen.append(node)
+    return any(isinstance(one, dict) and "unit" in (one.get("properties") or {}) for one in seen)
+
+
+def check_results_declare_units(findings: list[Finding]) -> None:
+    """A number in an answer arrives with its unit, or this gate names the one that does not (XC-003).
+
+    Prose could ask for this; a schema can require it. A number-typed field is accepted where the object
+    holding it - or one enclosing it - also declares a `unit`, where the field's own name carries the
+    unit, or where the schema bounds it to a ratio. Every other one is named here rather than found
+    later in a report that printed a bare figure.
+
+    Integers are exempt by type: counts are dimensionless and stay integers (INV-015).
+    """
+    for operation, schema in operation_results().items():
+        for path, node in _number_fields(schema):
+            leaf = path.rsplit(".", 1)[-1].removesuffix("[]")
+            if leaf in NAMED_UNIT_FIELDS:
+                continue
+            if node.get("minimum") == 0 and node.get("maximum") == 1:
+                continue  # a ratio, bounded in the schema itself
+            holder = path.rsplit(".", 1)[0] if "." in path else ""
+            if _declares_unit(schema, holder):
+                continue
+            findings.append(
+                Finding(
+                    SCHEMA.name,
+                    f"{operation} answers with a bare number at '{path}': no unit beside it, none in "
+                    "its name, and no bound making it a ratio. A value shown without its unit is a "
+                    "value in whatever unit the reader assumed (XC-003)",
+                )
+            )
+
+
 def unchecked(generated_checked: bool = True) -> list[str]:
     """What this gate could not examine. Printed every run, never silently omitted."""
     gaps: list[str] = []
@@ -406,6 +525,8 @@ def main() -> int:
     findings: list[Finding] = []
     check_catalogue_matches_schema(findings)
     check_parameters_are_stated(findings)
+    check_results_are_stated(findings)
+    check_results_declare_units(findings)
     check_surface_and_wire_agree(findings)
     generated_checked = check_generated_matches(findings)
     check_mentions_resolve(findings)
