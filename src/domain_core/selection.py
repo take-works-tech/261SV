@@ -162,6 +162,15 @@ def resolve(selection: Mapping[str, Any] | None, cases: Iterable[CaseFacts]) -> 
     return Resolution(tuple(case.identifier for case in chosen), None, len(listed))
 
 
+def check_selection(node: Mapping[str, Any]) -> None:
+    """Refuse a selection this build cannot honour, before it is stored (CT-007).
+
+    Public because a selection is written long before it is resolved - a pipeline unit carries one that
+    runs at midnight - and the refusal is worth having at the moment somebody writes it.
+    """
+    _check(node)
+
+
 def _check(node: Mapping[str, Any]) -> None:
     """Refuse anything this build does not understand, before any case is examined."""
     if not isinstance(node, Mapping):

@@ -27,9 +27,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field as dataclass_field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from domain_core.recorded_time import RecordedTime, record as record_time
+from domain_core.selection import CaseFacts, SelectionError, resolve
 from engine.analysis.expression import ExpressionError, Value, evaluate, quantity
 from engine.limits import MAX_LOOP_ITERATIONS
 from service.pipeline.memory import Ledger
@@ -237,6 +238,34 @@ class LoopCount:
         return f"{self.unit_id}：{self.count} 回（{named}）"
 
 
+def cases_for(
+    unit: dict[str, Any], fallback: Sequence[str], facts: Sequence[CaseFacts]
+) -> tuple[tuple[str, ...], str | None]:
+    """What a case unit adds, and what to say about it (AC-006).
+
+    An explicit list is itself. A **selection is resolved when the run starts**, which is how a pipeline
+    picks up cases that did not exist when it was written - and both forms list what they resolved to
+    before anything runs.
+
+    A selection with nothing to resolve against is refused rather than resolved to nothing: an empty
+    target set is a legitimate outcome that later units skip on (AC-007), and producing one because the
+    caller supplied no cases would make a missing argument look like a study with no matching runs.
+    """
+    if "selection" not in unit:
+        return tuple(unit.get("caseIds") or fallback), None
+    if not facts:
+        raise RunError(
+            f"ケースユニット '{unit.get('id')}' は選択で解決しますが、"
+            "照合するケースの情報が渡されていません。空の対象集合として扱うことはしません — "
+            "引数の欠落が「該当なし」に見えてしまいます"
+        )
+    try:
+        found = resolve(unit["selection"], facts)
+    except SelectionError as error:
+        raise RunError(f"ケースユニット '{unit.get('id')}' の選択：{error}") from None
+    return found.selected, found.describe()
+
+
 def _sequence_of(unit: dict[str, Any]) -> tuple[Value, ...]:
     symbol = unit.get("unit")
     declaration = {"kind": unit["quantityKind"]} if "quantityKind" in unit else None
@@ -333,6 +362,7 @@ def dry_run(
     *,
     cases: Iterable[str],
     variables: Mapping[str, Value] | None = None,
+    case_facts: Iterable[CaseFacts] = (),
 ) -> DryRun:
     """What the run would do, changing nothing (AC-008, AC-024).
 
@@ -345,6 +375,7 @@ def dry_run(
     the same three steps is a dry run nobody reads, which is the same as not having one.
     """
     targets = TargetSet()
+    facts = list(case_facts)
     bindings: dict[str, Value] = dict(variables or {})
     sequences: dict[str, tuple[Value, ...]] = {}
     steps: list[Step] = []
@@ -359,7 +390,8 @@ def dry_run(
             unresolved: str | None = None
 
             if kind is Kind.ADD_CASES:
-                targets.add(unit_id, unit.get("caseIds") or list(cases))
+                chosen, _ = cases_for(unit, list(cases), list(facts))
+                targets.add(unit_id, chosen)
             elif kind is Kind.CLEAR:
                 acting = tuple(targets.cases)
                 targets.clear(unit_id)
@@ -424,6 +456,10 @@ class _State:
     granted: list[Authorisation]
     act: Callable[[dict[str, Any], str], None] | None
     quantities_of: Callable[[str], Mapping[str, Value]] | None
+    #: The case metadata a case unit's selection resolves against (AC-006, CT-007). Empty where the
+    #: pipeline holds no selection, and a selection with nothing to resolve against is refused rather
+    #: than resolved to nothing.
+    facts: list[CaseFacts]
     #: Called as each result is recorded, so a headless run can report progress **while** it runs
     #: rather than only at the end (AC-022). A run killed halfway has still said what it did.
     on_result: Callable[[UnitResult], None] | None
@@ -447,6 +483,7 @@ def run(
     act: Callable[[dict[str, Any], str], None] | None = None,
     variables: Mapping[str, Value] | None = None,
     quantities_of: Callable[[str], Mapping[str, Value]] | None = None,
+    case_facts: Iterable[CaseFacts] = (),
     on_result: Callable[[UnitResult], None] | None = None,
     budget_bytes: int | None = None,
     size_of: Callable[[str], int] | None = None,
@@ -483,7 +520,7 @@ def run(
     # AC-028: every loop count is resolved before anything runs, and one above LIM-008 refuses the run
     # rather than being discovered a night later. The dry run is what resolves them, so the check and
     # the plan cannot disagree - a second resolver here would be a second answer to the same question.
-    dry_run(pipeline, cases=record.resolved_cases, variables=bindings)
+    dry_run(pipeline, cases=record.resolved_cases, variables=bindings, case_facts=case_facts)
 
     state = _State(
         record=record,
@@ -491,6 +528,7 @@ def run(
         granted=list(authorisations),
         act=act,
         quantities_of=quantities_of,
+        facts=list(case_facts),
         on_result=on_result,
         on_failure=on_failure,
         cancel_after=cancel_after,
@@ -521,8 +559,12 @@ def _execute(
         kind = kind_of(unit)
 
         if kind is Kind.ADD_CASES:
-            state.targets.add(unit_id, unit.get("caseIds") or record.resolved_cases)
-            _note(state, UnitResult(unit_id, None, Outcome.DONE, len(state.targets.cases)))
+            chosen, stated = cases_for(unit, record.resolved_cases, state.facts)
+            state.targets.add(unit_id, chosen)
+            _note(
+                state,
+                UnitResult(unit_id, None, Outcome.DONE, len(state.targets.cases), stated),
+            )
         elif kind is Kind.CLEAR:
             _clear(unit_id, state)
         elif kind is Kind.VARIABLE:
