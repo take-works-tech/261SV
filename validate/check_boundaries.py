@@ -111,6 +111,25 @@ def imported_modules(source: Path, modules: list[Module], root: Path) -> set[str
     return imported
 
 
+def unchecked(modules: list[Module], root: Path) -> list[str]:
+    """What this gate could not examine. Printed every run, never left as silence.
+
+    It reads `*.py`, so the four layers above `service` - which are TypeScript (XC-252) - are invisible
+    to it. A gate that checked the Python half and reported "boundaries hold" would be describing a
+    product that is half here.
+    """
+    gaps: list[str] = []
+    above = [m for m in modules if m.layer in ("ui", "ui-logic", "state", "client")]
+    if above:
+        present = [m for m in above if any((root / path).exists() for path in m.paths)]
+        named = ", ".join(m.name for m in above)
+        gaps.append(
+            f"the {len(above)} module(s) above `service` ({named}): this gate reads *.py and those "
+            f"layers are TypeScript (XC-252). {len(present)} of them exist on disk today"
+        )
+    return gaps
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Check the code against the module boundaries the specification declares.")
     parser.add_argument("--root", default=".")
@@ -162,6 +181,11 @@ def main(argv: list[str] | None = None) -> int:
                 findings.append(
                     f"{relative}: {owner.name} imports {imported}, which it does not declare in depends_on"
                 )
+
+    for gap in unchecked(modules, root):
+        print(f"NOT checked: {gap}")
+    if unchecked(modules, root):
+        print()
 
     for finding in findings:
         print(finding)
