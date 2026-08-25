@@ -4472,3 +4472,32 @@ model or the prompt, never in a description that quietly went stale.
   for a case that produced nothing
 - affects: CT-002, CT-003, CT-009, MOD-011, MOD-012, pipeline/AC-021, INV-006
 - decidedness: Open
+
+### XC-244 - A declared unit may be a product or quotient of units this product knows
+- decided: 2026-08-25
+- status: active
+- decision: a declared unit symbol may be a single known symbol or a **product or quotient of them with
+  integer powers** - `m/s`, `kg/m^3`, `MPa·s`, `m·s^-1`. `/` inverts the term that follows it and every
+  term after it. The components must be symbols the unit registry holds; composing combines declared
+  units and does not invent new ones, so `N` is not a unit until somebody adds it.
+  **A component carrying an offset is refused**: `degC/s` has no answer that survives the arithmetic,
+  and a temperature rate is written `K/s`. A unit is printed back in the canonical composed form
+  (`m·s^-1`), which may differ from what the user typed, for the same reason a value in MPa is labelled
+  Pa - the printed unit is the one the number is in
+- decided_by: the product owner, 2026-08-25
+- rationale: this was a gap rather than a choice. CT-007's own worked example compares against
+  `"unit": "m/s"`, and the registry held fourteen simple symbols and refused everything else - so the
+  contract's example could not be evaluated, and **no user could declare a velocity, a density or a
+  rate anywhere in the product**. XC-242 already made expressions produce composed dimensions; the
+  asymmetry was that the product could write `m·s^-1` and could not read it.
+  The offset rule is XC-242's, restated where it bites again: doubling before converting and converting
+  before doubling differ by the offset, measured at 273.15 K for degC and 255.37 K for degF (E-141)
+- alternatives: keeping only simple symbols and adding `velocity`, `density` and the rest to the
+  registry as named quantities is the enumeration XC-242 already rejected - a closed list cannot hold an
+  open set of products. Accepting any string and comparing symbols textually would make `m/s` and
+  `mm/ms` different units, which they are not
+- basis: E-141 (T1)
+- affects: MOD-001, CT-007, CT-005, GL-020, XC-003, XC-242
+- decidedness: Fixed
+- reversal_trigger: a unit whose components are not integer powers of the four base quantities - a
+  logarithmic unit such as a decibel, where a product of two values is a sum of two units

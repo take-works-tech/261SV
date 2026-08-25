@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-24
+updated: 2026-08-25
 ---
 
 # Glossary, units and coordinates
@@ -458,6 +458,10 @@ guessed is worse than one that shows no unit at all.
 - definition: the unit a user states for a @Field, per @Case, and which every displayed number,
   axis label and report value then carries
 - not: a detected unit. Nothing in this product infers units from data
+- note: a declared unit may be a **product or quotient** of units this product knows, with integer
+  powers - `m/s`, `kg/m^3`, `MPa·s` (XC-244). It is printed back in the canonical composed form, which
+  may differ from what was typed, for the same reason a value in MPa is labelled Pa: the printed unit is
+  the one the number is in
 - decidedness: Fixed
 - basis: E-001 (T1)
 
