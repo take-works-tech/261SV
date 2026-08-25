@@ -128,13 +128,32 @@ updated: 2026-08-25
 - satisfies: AC-017
 - depends_on: TASK-001
 - done_when: styles apply from any scope, partially where they resolve, with the scope shown
-
+- done: 2026-08-25, `src/engine/graph/apply.py`. A style applies from any of CT-008's three scopes,
+  the keys that resolve are applied and **the ones that do not are named** - a style key nobody honours
+  is a difference between two figures that neither of them shows. The scope is in the line the user
+  reads and is recorded on the graph that was made, because somebody opening it next month reads the
+  graph rather than the dialogue that made it.
+  A style may set the axes, the kind and the per-series style, and **not the series**: a style that
+  could change which numbers are plotted is not a style. `service/workspace/items.py`'s generic preview
+  carries the scope too, so any kind of template shows the same thing.
 ### TASK-013 - Templates across workspaces
 - satisfies: AC-018
 - depends_on: TASK-012
 - done_when: a graph template creates an independent Graph in another workspace, listing unresolved
   series and drawing them as no data
-
+- done: 2026-08-25. A template resolves against what the target has, and an **unresolved series
+  stays in the definition** - removing it would make the applied graph look complete and quietly smaller
+  than the one it came from, which is the failure XC-090 exists to prevent. Drawing it as no data then
+  needs nothing extra: the series module already draws a quantity it cannot find as no data with a
+  reason (AC-013), and the test asserts that path rather than a second one.
+  The requirements are read from the definition rather than from a list maintained beside it: a promise
+  written by hand next to the thing it describes stops matching after the third edit. An expression
+  series contributes no field requirement, because an expression's names are the evaluator's business
+  and a second parser here would be a second answer.
+  `accept` takes the resolution rather than the template, so a graph cannot be created without a
+  resolution result having existed - the gaps were on screen before the thing was made. What did not
+  resolve is recorded on the artefact, and the definition is a copy: a shared structure would let a
+  later template edit reach into a graph somebody already sent (XC-109).
 ### TASK-014 - Export matching the screen
 - satisfies: AC-020
 - depends_on: TASK-001

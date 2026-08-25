@@ -132,13 +132,17 @@ class Application:
     definition: dict[str, Any]
     resolved: tuple[str, ...]
     unresolved: tuple[str, ...]
+    #: Which library scope the entry came from (CT-008), shown wherever one is applied (AC-017). A
+    #: template that resolved from the shared library and one that resolved from this workspace behave
+    #: identically and travel differently, and only the scope says which.
+    scope: str = "workspace"
 
     @property
     def resolves_completely(self) -> bool:
         return not self.unresolved
 
     def describe(self) -> str:
-        line = f"'{self.template_id}' 第 {self.revision} 版を適用します"
+        line = f"'{self.template_id}' 第 {self.revision} 版（{self.scope} スコープ）を適用します"
         if self.resolves_completely:
             return line + "。参照はすべて解決します"
         return (
@@ -166,6 +170,7 @@ def preview_application(
                 definition=dict(template.get("definition", {})),
                 resolved=tuple(name for name in stated if name in have),
                 unresolved=tuple(name for name in stated if name not in have),
+                scope=str(template.get("scope", "workspace")),
             )
     raise ItemError(f"テンプレート '{template_id}' が {COLLECTIONS[kind]} にありません")
 
