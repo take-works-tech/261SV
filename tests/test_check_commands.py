@@ -86,6 +86,61 @@ def test_an_unconstrained_schema_fails(project: Path) -> None:
     assert "unconstrained" in result.stdout
 
 
+def surface_schema_path(project: Path) -> Path:
+    return project / "specs" / "contracts" / "schema" / "CT-002.json"
+
+
+def test_the_surface_pointing_at_nothing_fails(project: Path) -> None:
+    """AC-010, and the state this repository was actually in until 2026-08-25: CT-002's `command` was an
+    unconstrained string, so nothing compared the abstract surface's set against the wire form's, and
+    CT-002 could not refuse the unknown command its own prose says it refuses."""
+    schema = json.loads(surface_schema_path(project).read_text(encoding="utf-8"))
+    schema["properties"]["command"] = {"type": "string"}
+    surface_schema_path(project).write_text(json.dumps(schema), encoding="utf-8")
+
+    result = run(project)
+
+    assert result.returncode == 1
+    assert "unconstrained" in result.stdout
+
+
+def test_an_operation_in_the_wire_form_and_not_the_surface_fails(project: Path) -> None:
+    """One direction of AC-010, proven against a surface that lists its own set rather than referring."""
+    catalogue = catalogue_operations_of(project)
+    schema = json.loads(surface_schema_path(project).read_text(encoding="utf-8"))
+    schema["properties"]["command"] = {"enum": catalogue[:-1]}
+    surface_schema_path(project).write_text(json.dumps(schema), encoding="utf-8")
+
+    result = run(project)
+
+    assert result.returncode == 1
+    assert catalogue[-1] in result.stdout
+
+
+def test_an_operation_in_the_surface_and_not_the_wire_form_fails(project: Path) -> None:
+    """The other direction."""
+    schema = json.loads(surface_schema_path(project).read_text(encoding="utf-8"))
+    schema["properties"]["command"] = {"enum": [*catalogue_operations_of(project), "workspace.teleport"]}
+    surface_schema_path(project).write_text(json.dumps(schema), encoding="utf-8")
+
+    result = run(project)
+
+    assert result.returncode == 1
+    assert "workspace.teleport" in result.stdout
+
+
+def test_referring_to_the_one_enumeration_passes(project: Path) -> None:
+    """The arrangement this repository uses: one set, referenced. There is no second list to disagree."""
+    schema = json.loads(surface_schema_path(project).read_text(encoding="utf-8"))
+
+    assert schema["properties"]["command"]["$ref"] == "CT-003.json#/properties/operation"
+    assert run(project).returncode == 0
+
+
+def catalogue_operations_of(project: Path) -> list[str]:
+    return json.loads(schema_path(project).read_text(encoding="utf-8"))["properties"]["operation"]["enum"]
+
+
 def test_a_prose_reference_to_a_nonexistent_command_fails(project: Path) -> None:
     path = project / "specs" / "contracts" / "CT-002_command_surface.md"
     path.write_text(path.read_text(encoding="utf-8") + "\n\nSee `workspace.vanish` for details.\n", encoding="utf-8")

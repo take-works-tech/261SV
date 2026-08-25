@@ -30,6 +30,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CATALOGUE = ROOT / "specs" / "contracts" / "CT-003_engine_api.md"
 UI_SPEC = ROOT / "specs" / "11_ui.md"
 SCHEMA = ROOT / "specs" / "contracts" / "schema" / "CT-003.json"
+SURFACE_SCHEMA = ROOT / "specs" / "contracts" / "schema" / "CT-002.json"
 SOURCE = ROOT / "src"
 GENERATED = ROOT / "src" / "service" / "command" / "catalogue.py"
 NEWLINE = chr(10)
@@ -129,6 +130,41 @@ def render() -> str:
         "",
     ]
     return NEWLINE.join(lines)
+
+
+def check_surface_and_wire_agree(findings: list[Finding]) -> None:
+    """AC-010: the same set in CT-002 and in CT-003, with neither holding an operation the other does not.
+
+    Checked by reference rather than by comparison. CT-002's `command` points at CT-003's enumeration,
+    so the two cannot hold different sets - there is only one set. An unconstrained string here would
+    accept an unknown command, which is the one thing CT-002's own prose says it refuses, and a second
+    copy of the enumeration would be the copy that stopped agreeing.
+    """
+    schema = json.loads(SURFACE_SCHEMA.read_text(encoding="utf-8"))
+    command = schema.get("properties", {}).get("command", {})
+    reference = command.get("$ref")
+    if reference == "CT-003.json#/properties/operation":
+        return
+    if "enum" in command:
+        catalogue = catalogue_operations()
+        listed = list(command["enum"])
+        for name in [n for n in catalogue if n not in listed]:
+            findings.append(
+                Finding(SURFACE_SCHEMA.name, f"{name} is in CT-003 and not in the CT-002 surface")
+            )
+        for name in [n for n in listed if n not in catalogue]:
+            findings.append(
+                Finding(SURFACE_SCHEMA.name, f"{name} is in the CT-002 surface and not in CT-003")
+            )
+        return
+    findings.append(
+        Finding(
+            SURFACE_SCHEMA.name,
+            "`command` is an unconstrained string: CT-002 cannot refuse an unknown command, which is "
+            "what its own prose says it does. Point it at CT-003's enumeration "
+            "($ref CT-003.json#/properties/operation) rather than repeating the list",
+        )
+    )
 
 
 def check_generated_matches(findings: list[Finding]) -> bool:
@@ -326,6 +362,7 @@ def main() -> int:
 
     findings: list[Finding] = []
     check_catalogue_matches_schema(findings)
+    check_surface_and_wire_agree(findings)
     generated_checked = check_generated_matches(findings)
     check_mentions_resolve(findings)
     check_components_are_unique(findings)

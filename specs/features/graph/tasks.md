@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-21
+updated: 2026-08-25
 ---
 
 # Tasks: graph
@@ -10,17 +10,33 @@ updated: 2026-08-21
 - depends_on: workspace/TASK-001
 - done_when: each series records its quantity, unit and provenance, and the definition rather than the
   values is what is saved
-
+- done: 2026-08-25, `src/engine/graph/definition.py`. Each series records its quantity, its unit and
+  its provenance, and **the definition is what is saved** - asserted by sweeping the stored document for
+  anything that looks like cached values, because a figure that kept its numbers would still draw after
+  the study changed, showing last week's answer under this week's title.
+  There are four provenances and no fifth for "unknown" (INV-013). A value whose origin nobody recorded
+  is not a fifth kind of origin - it is a value this product should not be plotting, so there is nowhere
+  to put it. A computed series without its expression is refused at construction for the same reason.
 ### TASK-002 - Undeclared units on axes
 - satisfies: AC-002
 - depends_on: TASK-001
 - done_when: a series with no declared unit labels its axis with the undeclared marker
-
+- done: 2026-08-25. An axis with nothing declared on it says so, in one spelling held in one
+  place so a graph, a table and a report cannot disagree about how the same absence is written.
+  An axis that **does** carry declared units is labelled with the internal unit of the quantity rather
+  than with whichever symbol the first series happened to use - MPa and kPa on one axis are plotted as
+  Pa, and labelling it "MPa" would be a number shown in one unit and labelled with another.
 ### TASK-003 - Incompatible units refused
 - satisfies: AC-003
 - depends_on: TASK-002
 - done_when: combining incompatible units on one axis is refused with both units named
-
+- done: 2026-08-25, naming both. Two refusals, and the second is the one that looks harmless.
+  Different dimensions is the obvious one - a length beside a time. **A declared unit beside an
+  undeclared one** is the quiet one: the figure reads as a comparison, and nothing ever said the
+  undeclared series was in the same unit (XC-003). All-undeclared together is allowed, because AC-002
+  requires that case to be drawable with the marker on its axis.
+  A refused addition leaves the definition exactly as it was, so a graph is never briefly holding a
+  combination the product would refuse to draw.
 ### TASK-004 - Declarative selection
 - satisfies: AC-009
 - depends_on: TASK-001
