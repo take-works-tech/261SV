@@ -71,7 +71,14 @@ updated: 2026-08-25
 - depends_on: TASK-002
 - done_when: a report built on a partial @Dataset states the coverage every derived number was computed
   over
-
+- done: 2026-08-25. The coverage is attached to the **value**, not to the block, because AC-004 is
+  about a number computed over part of the data rather than about a figure drawn from it. A value
+  carrying `PARTIAL_DATASET` **refuses to be put in a document without its coverage**: a caveat saying
+  "part of the dataset was missing" with no figures behind it is a warning nobody can act on, because
+  the reader cannot tell whether one part of fifteen was absent or twelve were.
+  Which values are partial, and what each covered, is answerable from the document, and the mechanical
+  summary carries it as something to know before reading rather than as one more line among the
+  figures.
 ### TASK-007 - Annotations survive, or the export stops
 - satisfies: AC-014
 - depends_on: TASK-004
@@ -117,7 +124,18 @@ updated: 2026-08-25
 - depends_on: TASK-002
 - done_when: a report is produced offline with no language model configured, carrying the mechanical
   summary only
-
+- done: 2026-08-25, `src/engine/report/summary.py`. A report is produced with no language model and
+  no network, carrying counts, the extremes **named with their labels** - "the maximum is 240 MPa" is a
+  number without a subject - and what a reader must know to act on the numbers.
+  The mechanical summary is **not the degraded version** of a generated one: AC-013 makes it the part
+  that is always there, and generated commentary is what may be added to it. It is marked as mechanical,
+  because a reader who cannot tell which sentences a model wrote has to treat all of them as if one did.
+  It composes no prose, and the test that matters is the negative one: none of the language E-071
+  enumerates - superlatives, subjective assessments, ambiguous adverbs - can appear, because nothing
+  here assembles a sentence. It states quantities and stops. A clean report gets **no** concerns rather
+  than a manufactured caution to look thorough.
+  AC-012 holds by construction rather than by restraint: the summary is derived from the document's own
+  rows and has nothing else it could say.
 ### TASK-015 - Generated commentary marked and grounded
 - satisfies: AC-011
 - depends_on: TASK-014, assistant/TASK-008

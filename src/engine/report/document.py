@@ -122,10 +122,25 @@ class Provenance:
 
 @dataclass(frozen=True, slots=True)
 class ValueRow:
-    """One number as it appears in the document's text (AC-002, INV-013)."""
+    """One number as it appears in the document's text (AC-002, INV-013).
+
+    `coverage` is what this value was computed over, and it is **required** where the value carries
+    `PARTIAL_DATASET` (AC-004). A caveat saying "part of the dataset was missing" without saying which
+    part is a warning nobody can act on: the reader cannot tell whether one part of fifteen was absent
+    or twelve were.
+    """
 
     label: str
     value: ReportedValue
+    coverage: str | None = None
+
+    def __post_init__(self) -> None:
+        if Caveat.PARTIAL_DATASET in self.value.caveats and not self.coverage:
+            raise ReportError(
+                f"'{self.label}' は部分的なデータセットから計算された値ですが、"
+                "その対象範囲が書かれていません。範囲のない「一部が欠けています」は、"
+                "読み手が対処できない警告です（AC-004）"
+            )
 
     def unit_text(self) -> str:
         if self.value.unit is not None:
@@ -145,6 +160,8 @@ class ValueRow:
             if caveat is Caveat.UNDECLARED_UNIT:
                 continue  # already said by the unit column; saying it twice reads as two problems
             line += f"・{CAVEAT_TEXT[caveat]}"
+        if self.coverage:
+            line += f"（対象範囲：{self.coverage}）"
         return line
 
 
@@ -265,6 +282,15 @@ def undeclared(document: Document) -> tuple[str, ...]:
     """
     return tuple(
         row.label for row in document.values() if row.value.unit is None
+    )
+
+
+def partial(document: Document) -> tuple[str, ...]:
+    """Which values were computed over part of the data, with what they covered (AC-004)."""
+    return tuple(
+        f"{row.label}：{row.coverage}"
+        for row in document.values()
+        if Caveat.PARTIAL_DATASET in row.value.caveats
     )
 
 
