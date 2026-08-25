@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-20
+updated: 2026-08-25
 ---
 
 # Technology
@@ -197,6 +197,13 @@ and each becomes ours to maintain. Second, a few ParaView capabilities are appli
 than library-level - plot-over-line is a ParaView filter, not a VTK class - so they are rebuilt rather
 than inherited. Neither is a reason to narrow the promise; both are reasons to write the promise about
 VTK's readers rather than about ParaView's menu.
+
+**That is a maintenance decision and it was being read as a legal one.** ParaView is BSD-3-Clause
+(E-147), so its readers and filters may be embedded here on the same terms as VTK. XC-248 settles what
+to do with that: a **reader** ParaView has and VTK does not is worth copying in with its notice when a
+customer's format needs it, because a format is a fixed target and the cost ends; an application-level
+**filter** is rebuilt rather than copied, because it is behaviour this product will change, and a copied
+implementation diverges on the first change and then carries somebody else's structure forever.
 
 ## Analysis capability, in stages
 

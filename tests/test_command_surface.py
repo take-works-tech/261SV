@@ -68,11 +68,9 @@ def a_surface(store: Store | None = None) -> tuple[Surface, Store]:
         Handler(
             "view.rename",
             held.rename,
-            parameters=frozenset({"viewId", "newName"}),
-            required=frozenset({"viewId", "newName"}),
         )
     )
-    surface.register(Handler("history.list", held.read, parameters=frozenset({"workspaceId"})))
+    surface.register(Handler("history.list", held.read))
     return surface, held
 
 
@@ -111,17 +109,36 @@ class TestRegistrationIsAgainstTheCatalogue:
         with pytest.raises(KeyError):
             surface.register(Handler("view.rename", store.rename))
 
-    def test_a_required_parameter_outside_the_accepted_set_is_refused(self) -> None:
-        """The handler would refuse every call it received, and would do it at run time."""
-        with pytest.raises(ValueError):
-            Surface().register(
-                Handler(
-                    "view.rename",
-                    lambda p, t: Effect(""),
-                    parameters=frozenset({"viewId"}),
-                    required=frozenset({"viewId", "newName"}),
-                )
-            )
+    def test_a_handler_cannot_say_what_its_operation_accepts(self) -> None:
+        """OPEN-028's answer, and the reason it mattered. A handler that declared its own parameters
+        would be a second answer to what an operation takes, and the enforcement would then hold against
+        the copy rather than against CT-003.
+
+        The first version of this module let a handler declare them, so `view.rename` accepted whatever
+        that handler happened to list - which is not what CT-002 promises when it says an unknown
+        parameter is rejected.
+        """
+        import dataclasses
+
+        names = {one.name for one in dataclasses.fields(Handler)}
+
+        assert names == {"operation", "perform", "needs"}
+
+    def test_they_come_from_the_contract(self) -> None:
+        from service.command.catalogue import PARAMETERS
+
+        surface, store = a_surface()
+        handler = Handler("view.rename", store.rename)
+
+        assert handler.parameters == PARAMETERS["view.rename"][0]
+        assert "newName" in handler.required
+
+    def test_every_operation_in_the_catalogue_has_its_parameters_stated(self) -> None:
+        """134 parameters over 61 operations, so a handler for any of them is checkable."""
+        from service.command.catalogue import OPERATIONS, PARAMETERS
+
+        assert set(PARAMETERS) == set(OPERATIONS)
+        assert sum(len(accepted) for accepted, _ in PARAMETERS.values()) == 134
 
     def test_what_is_not_implemented_is_reportable(self) -> None:
         """A build that answers "unimplemented" for most of the catalogue should be able to say which,
@@ -185,7 +202,7 @@ class TestRefusalBeatsAssumption:
         def explode(parameters: Mapping[str, Any], targets: tuple[str, ...]) -> Effect:
             raise RuntimeError("ディスクがいっぱいです")
 
-        surface.register(Handler("view.delete", explode, parameters=frozenset({"viewId"})))
+        surface.register(Handler("view.delete", explode))
         result = surface.submit(Command("view.delete", {"viewId": "v"}))
 
         assert result.status is Status.FAILED
@@ -199,7 +216,6 @@ class TestAuthorisationIsNeverAssumed:
             Handler(
                 "report.export",
                 lambda p, t: Effect("書き出しました", undo=lambda: None),
-                parameters=frozenset({"reportId", "path"}),
                 needs=frozenset({Permission.OVERWRITE}),
             )
         )
@@ -215,7 +231,6 @@ class TestAuthorisationIsNeverAssumed:
             Handler(
                 "report.export",
                 lambda p, t: Effect("書き出しました", undo=lambda: None),
-                parameters=frozenset({"reportId", "path"}),
                 needs=frozenset({Permission.OVERWRITE}),
             )
         )
@@ -250,7 +265,7 @@ class TestAReadIsNotAWrite:
         """Putting an irreversible change into the history is worse than not making it: the history
         would say it can be taken back."""
         surface = Surface(clock=at(9))
-        surface.register(Handler("case.delete", lambda p, t: Effect("消しました"), parameters=frozenset({"caseId"})))
+        surface.register(Handler("case.delete", lambda p, t: Effect("消しました")))
 
         result = surface.submit(Command("case.delete", {"caseId": "c"}))
 

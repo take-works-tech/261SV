@@ -74,6 +74,37 @@ def catalogue_rows() -> list[tuple[str, bool]]:
     return rows
 
 
+def operation_parameters() -> dict[str, dict]:
+    """The per-operation parameter schemas of CT-003 (OPEN-028's answer).
+
+    Absent means the contract does not say what an operation takes, which is the state this repository
+    was in until 2026-08-25 and is reported rather than treated as "no parameters".
+    """
+    schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+    return schema.get("$defs", {}).get("operationParameters", {}).get("properties", {})
+
+
+def check_parameters_are_stated(findings: list[Finding]) -> None:
+    """Every catalogue operation says what it takes, in a form something can check."""
+    stated = operation_parameters()
+    if not stated:
+        findings.append(
+            Finding(
+                SCHEMA.name,
+                "no per-operation parameter schemas: nothing can compare a handler's declaration "
+                "against the contract, so CT-002's promise about unknown parameters is kept against "
+                "whatever the handler happened to declare (OPEN-028)",
+            )
+        )
+        return
+    for name in catalogue_operations():
+        if name not in stated:
+            findings.append(Finding(SCHEMA.name, f"{name} has no parameter schema"))
+    for name in stated:
+        if name not in catalogue_operations():
+            findings.append(Finding(SCHEMA.name, f"{name} has a parameter schema and is not in the catalogue"))
+
+
 def render() -> str:
     """The catalogue as a Python module the product can import.
 
@@ -84,6 +115,11 @@ def render() -> str:
     rows = catalogue_rows()
     writes = [name for name, is_write in rows if is_write]
     reads = [name for name, is_write in rows if not is_write]
+    stated = operation_parameters()
+
+    def declared(name: str) -> tuple[list[str], list[str]]:
+        one = stated.get(name, {})
+        return sorted(one.get("properties", {})), sorted(one.get("required", []))
     lines = [
         '"""The operation catalogue of CT-003, as code.',
         "",
@@ -113,6 +149,16 @@ def render() -> str:
         "OPERATIONS = (",
         *[f'    "{name}",' for name, _ in rows],
         ")",
+        "",
+        "#: What each operation accepts, and which of those it requires. From CT-003's per-operation",
+        "#: schemas, so a handler is checked against the **contract** rather than against its own",
+        "#: declaration - which is what CT-002 promises when it says an unknown parameter is rejected.",
+        "PARAMETERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {",
+        *[
+            f'    "{name}": (frozenset({declared(name)[0]!r}), frozenset({declared(name)[1]!r})),'
+            for name, _ in rows
+        ],
+        "}",
         "",
         "",
         "def writes(operation: str) -> bool:",
@@ -331,10 +377,7 @@ def unchecked(generated_checked: bool = True) -> list[str]:
             "the generated catalogue against CT-003: there is no src/ tree here, so "
             f"{GENERATED.relative_to(ROOT).as_posix()} was not compared"
         )
-    gaps.append(
-        "a handler's parameter names against the contract (OPEN-028): CT-003 states parameters in "
-        "prose, so nothing compares them to what a handler declares it accepts"
-    )
+
     if not interface_directories():
         gaps.append(
             "interface actions dispatching commands (operations/AC-011): no interface code exists yet, "
@@ -362,6 +405,7 @@ def main() -> int:
 
     findings: list[Finding] = []
     check_catalogue_matches_schema(findings)
+    check_parameters_are_stated(findings)
     check_surface_and_wire_agree(findings)
     generated_checked = check_generated_matches(findings)
     check_mentions_resolve(findings)

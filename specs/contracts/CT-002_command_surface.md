@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-20
+updated: 2026-08-25
 ---
 
 # Contract: command surface
@@ -58,4 +58,7 @@ the dry run each need to be built only once.
   (assistant/AC-002)
 - **Refusal beats assumption.** An unknown command, a malformed parameter, or an operation needing
   confirmation without authorisation is refused with a named reason, changing nothing
-  (assistant/AC-012)
+  (assistant/AC-012). Since 2026-08-25 that refusal is measured against **CT-003's per-operation
+  parameter schema** rather than against whatever an implementation declared (XC-249) - the promise was
+  otherwise being kept against a copy, and a handler listing one parameter too many widened this surface
+  with nothing noticing

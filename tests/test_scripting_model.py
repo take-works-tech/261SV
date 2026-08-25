@@ -67,13 +67,10 @@ def a_session() -> Session:
         Handler(
             "view.rename",
             rename,
-            parameters=frozenset({"viewId", "newName"}),
-            required=frozenset({"viewId", "newName"}),
         )
     )
     surface.register(
-        Handler("history.list", lambda p, t: Effect("読みました", value=dict(store)),
-                parameters=frozenset({"workspaceId"}))
+        Handler("history.list", lambda p, t: Effect("読みました", value=dict(store)))
     )
     session = Session(surface, group_id="script:001")
     session.views.add(Named("view:001", "Pressure top"))

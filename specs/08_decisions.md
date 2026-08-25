@@ -4444,7 +4444,23 @@ model or the prompt, never in a description that quietly went stale.
   handler declarations against it, or a decision is recorded that the handler is the authority and the
   contract's column is documentation
 - affects: CT-002, CT-003, MOD-012, validate/check_commands.py
-- decidedness: Open
+- decidedness: Fixed
+- status: superseded
+- superseded_by: XC-249
+- decided: 2026-08-25
+- resolution: the first of the two candidates. `specs/contracts/schema/CT-003.json` gained
+  `$defs.operationParameters` - one JSON Schema per operation, naming each parameter, its type and
+  whether it is required - and the prose column stayed, doing the job it is good at: saying what a
+  parameter **means** in context. The two are not two lists of the same thing, which is what made a
+  second machine-readable list beside the prose the wrong answer.
+  `validate/check_commands.py` now fails an operation with no parameter schema and a schema for an
+  operation not in the catalogue, generates `PARAMETERS` into `src/service/command/catalogue.py`, and
+  `service/command/surface.py` reads a handler's accepted and required parameters **from there**. A
+  handler can no longer declare its own, so the enforcement holds against the contract.
+  Authoring it found three operations the prose said were "A or B" - `variable.declare`, `script.run`,
+  `report.provenance` - whose first schema required neither, and so would have accepted a call with
+  neither
+- basis: E-001 (T1)
 
 ### OPEN-029 - Which commands a pipeline unit issues, given that the catalogue has no shape for one
 - question: pipeline/TASK-020 requires every unit to execute as commands from CT-002, with no execution
@@ -4591,3 +4607,91 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a solver that writes genuinely nodal results rather than element ones, where there
   is no spread because there was never more than one value
+
+### XC-248 - ParaView's own code may be taken, and each piece taken becomes ours to maintain
+- decided: 2026-08-25
+- status: active
+- decision: ParaView is BSD-3-Clause, so its readers and its application-level filters may be embedded
+  in this product on the same terms as VTK (E-147, E-002). **The licence is not the constraint; the
+  maintenance is.** Anything taken from ParaView is taken **by copying the source into this repository
+  with its notice**, not by depending on the ParaView application, and it is recorded in the notices
+  file beside VTK's.
+  The rule for deciding is one question: **is this a reader, or is it behaviour?** A reader ParaView has
+  and VTK does not - the Nastran BDF reader is the named example - is worth taking when a customer's
+  format needs it, because a format is a fixed target and the cost ends. An application-level filter -
+  plot-over-line - is **rebuilt rather than copied**, because it is behaviour this product will change,
+  and a copied implementation diverges from its origin on the first change and then carries somebody
+  else's structure forever
+- decided_by: the product owner, 2026-08-25
+- rationale: the specification already says the promise is written about VTK's readers rather than
+  ParaView's menu, and that was read as though ParaView were unavailable. It is not: the licence
+  expressly permits it, and reading a maintenance decision as a legal one leaves capability on the table
+  for a reason that does not exist.
+  The reader-versus-behaviour split is where the cost actually differs. A format does not change its
+  mind; a filter does. Copying a reader buys a fixed amount of maintenance for a fixed amount of
+  capability. Copying a filter buys an unbounded amount of both, and the first time this product wants
+  it to behave differently the copy stops being an import and becomes a fork nobody named
+- alternatives: depending on the ParaView application rather than copying from it would inherit
+  upstream fixes and requires shipping and launching ParaView, which is a second application inside the
+  product. Taking nothing keeps one dependency and refuses formats this product's own specification
+  lists as Absent when the reader exists three metres away
+- basis: E-147 (T1), E-002 (T1)
+- affects: MOD-002, XC-049, XC-025, specs/09_technology.md
+- decidedness: Fixed
+- reversal_trigger: ParaView relicensing, or a reader whose upstream changes often enough that the copy
+  is a liability rather than an import - which would make the dependency the cheaper of the two
+
+### OPEN-030 - Whether this product is a "competing product" under the Omniverse terms
+- question: XC-037 makes the Omniverse path optional and carries its attribution, usage-reporting and
+  flow-down obligations. Two clauses of the same terms are recorded in E-009 and are **not** addressed
+  anywhere: **8.12 forbids use in developing competing products**, and **8.9 forbids publishing
+  benchmark or performance data**. This product is a CAE post-processor whose photorealistic path would
+  be Omniverse; whether that makes it a competing product under 8.12 is a question about NVIDIA's terms
+  and not about this architecture
+- why_open: it cannot be settled by reading harder. 8.12's reach depends on what NVIDIA treats as
+  competing, and the answer changes what may be built rather than how: if the photorealistic path is
+  barred, XC-037's optional capability is not optional but absent, and the differentiator it was chosen
+  for goes with it. Guessing in either direction is expensive - assuming permission builds a feature
+  that may have to be removed after release, and assuming prohibition abandons a capability the terms
+  may well allow.
+  8.9 is narrower and also real: this project measures and publishes render performance as evidence
+  (E-063 among others), and a measurement of the Omniverse path could not be recorded the way every
+  other measurement here is
+- blocks: nothing today - MOD-003 has no renderer at all and the Omniverse path is not built. It blocks
+  the first line of code that links against it
+- closes_when: NVIDIA states in writing whether a CAE post-processing product embedding Omniverse for
+  rendering falls under 8.12, or counsel reads the current terms and records the reading here with its
+  date - the terms are versioned and the answer is only good for the version it was read against
+- affects: XC-037, MOD-003, OPEN-023, specs/09_technology.md
+- decidedness: Open
+
+### XC-249 - What a command takes is stated by the contract, and a handler may not restate it
+- decided: 2026-08-25
+- status: active
+- decision: every operation of CT-003 carries a **JSON Schema for its parameters** - the name, the type
+  and whether it is required - in `$defs.operationParameters`. The prose column of the catalogue table
+  stays and says what each parameter **means** in context; it is not a second copy of the same list.
+  `validate/check_commands.py` generates the names into `src/service/command/catalogue.py`, and a
+  handler registered with the command surface takes its accepted and required parameters **from there**.
+  A handler has no field in which to declare its own
+- decided_by: the product owner, 2026-08-25
+- rationale: CT-002 promises that an unknown parameter is rejected, and until this the promise was kept
+  against whatever the handler happened to declare - so the strictness held against a copy rather than
+  against the contract, and a handler that listed one parameter too many widened the surface with
+  nothing noticing.
+  The prose was doing two jobs and only one of them can be mechanised: naming the parameters, which a
+  machine can use, and saying what they mean in context - "source template id and revision?",
+  "region?" - which is what makes the table readable by somebody deciding whether an operation is the
+  one they want. Splitting the two jobs rather than replacing one with the other is why this is not the
+  "second list beside the prose" that OPEN-028 rejected.
+  Authoring the 134 parameters found three operations the prose stated as "A or B" whose schema at first
+  required neither, and so would have accepted a call with neither
+- alternatives: generating the schema from the prose column is a guess at where a name ends. Keeping a
+  second machine-readable list beside the prose is two places to edit, and the day they disagree the
+  checkable one wins silently. Leaving the handler as the authority makes CT-002's strictness a
+  statement about implementations rather than about the contract
+- basis: E-001 (T1)
+- affects: CT-002, CT-003, MOD-012, MOD-013, validate/check_commands.py
+- decidedness: Fixed
+- reversal_trigger: an operation whose parameters genuinely depend on another parameter's value, which
+  a flat per-operation schema cannot express and which would need the contract to carry a conditional

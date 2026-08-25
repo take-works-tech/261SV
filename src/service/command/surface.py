@@ -38,7 +38,7 @@ from enum import Enum
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from domain_core.recorded_time import RecordedTime, record as record_time
-from service.command.catalogue import OPERATIONS, writes
+from service.command.catalogue import OPERATIONS, PARAMETERS, writes
 
 
 class Origin(str, Enum):
@@ -122,13 +122,25 @@ class Effect:
 
 @dataclass(frozen=True, slots=True)
 class Handler:
-    """One operation's implementation, with the parameters it accepts."""
+    """One operation's implementation.
+
+    `parameters` and `required` are **not** declared here any more: they come from CT-003 (`catalogue.
+    PARAMETERS`). A handler that declared its own would be a second answer to what an operation takes,
+    and the enforcement would hold against the copy rather than against the contract - which is what
+    OPEN-028 recorded until the contract became machine-readable on 2026-08-25.
+    """
 
     operation: str
     perform: Callable[[Mapping[str, Any], tuple[str, ...]], Effect]
-    parameters: frozenset[str] = frozenset()
-    required: frozenset[str] = frozenset()
     needs: frozenset[Permission] = frozenset()
+
+    @property
+    def parameters(self) -> frozenset[str]:
+        return PARAMETERS[self.operation][0]
+
+    @property
+    def required(self) -> frozenset[str]:
+        return PARAMETERS[self.operation][1]
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,12 +193,6 @@ class Surface:
             )
         if handler.operation in self._handlers:
             raise KeyError(f"'{handler.operation}' の実装はすでに登録されています")
-        if not handler.required <= handler.parameters:
-            missing = sorted(handler.required - handler.parameters)
-            raise ValueError(
-                f"'{handler.operation}' が必須としている {missing} が、受け付ける引数の一覧に"
-                "ありません"
-            )
         self._handlers[handler.operation] = handler
 
     def registered(self) -> tuple[str, ...]:
