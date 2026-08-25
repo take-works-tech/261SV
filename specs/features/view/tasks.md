@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-22
+updated: 2026-08-25
 ---
 
 # Tasks: view
@@ -26,12 +26,32 @@ updated: 2026-08-22
 - depends_on: TASK-001
 - done_when: available renderers are probed at start, an unavailable one names its requirement, and an
   alternative is offered
-
+- done: 2026-08-25, `src/engine/visualization/backends.py`. XC-087's four paths, each stating **what
+  it requires** in the words a user is told when it cannot run - "unavailable" without a requirement is
+  a message nobody can act on. Which path does which job is a table, so "which renderer draws a report
+  image" is answered in one place rather than decided at each call site.
+  Nothing probes on its own authority: whether a WebGL2 context exists is a question about a browser and
+  whether the toolkit is importable is a question about an installation, so the answers are handed in. A
+  path nobody answered for is **unavailable with the reason that it was not probed** rather than absent
+  from the list, because a path missing from a list reads as a path that does not exist.
+  The refusal is the substance (XC-004). `selected` stays None when the wanted path cannot run and the
+  alternative arrives as `offered` - a field holding the alternative as though it were the answer is how
+  a silent substitution gets written by accident. The message says why it is not automatic: a
+  substituted backend changes shading, tessellation and colour interpolation, so the user would be
+  measuring something they did not choose.
 ### TASK-005 - Numbers identical across renderers
 - satisfies: AC-005
 - depends_on: TASK-004
 - done_when: a golden test runs one view through each backend and compares reported values, not images
-
+- done: 2026-08-25, the **structural half**. INV-002 is a property of the interface rather than a
+  rule somebody remembers: a backend is handed a scene and returns pixels and its capabilities, and
+  there is no method on it that could return a field value. Asserted against the protocol itself, and
+  the module is asserted to import neither the analysis layer nor the dataset - a backend module that
+  did would be a second place where a number could be produced.
+- blocked: 2026-08-25, on the golden comparison. `done_when` asks for one view run through **each**
+  backend with the reported values compared, and this build has no backend at all - the interface exists
+  and nothing implements it. The comparison becomes runnable when the second path does; with one it
+  would compare a thing against itself and report agreement.
 ### TASK-006 - Reduced display with numbers from full data
 - satisfies: AC-007
 - depends_on: TASK-004
