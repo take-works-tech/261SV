@@ -1568,3 +1568,84 @@ Recorded so that nothing silently depends on them:
   numbers. It matters here because a volume-weighted mean multiplies field values by these volumes
   (INV-017), so it does not stay in the geometry - it arrives in the reported number.
 - justifies: INV-001, XC-245, graph/AC-022
+
+### E-143 - What a reduction over a large field loses, by the precision it is accumulated in
+- tier: T1
+- url: spike/measure_numerical_integrity.py
+- verified: 2026-08-25
+- says: measured on 2026-08-25 with NumPy 2.x on ten million values of 300.0 varying by 1e-3 - the
+  ordinary shape of a temperature field in kelvin or a stress field about a preload. Relative error of
+  the sum against an exact one: **1.6e-16** accumulated pairwise in float64, **1.3e-13** accumulated
+  sequentially in float64, **3.5e-10** for a float32 field accumulated in float32, and **2.2e-12** for
+  the same float32 field accumulated in float64 - a factor of 160 for no cost but the accumulator's
+  type.
+  The mean is where it shows. The exact mean is **299.999999895342**; accumulated in float32 it is
+  **300.000000000000** - the variation the field was written to carry is gone, and the number that
+  remains is the offset, printed to full width.
+- justifies: INV-031, XC-246
+- correction: 2026-08-25, same day. This entry first carried a second claim: that two values 1e-7 apart
+  "differ by exactly 0.0 in float32 and by 1.0000002e-07 in float64", offered as a loss in the
+  **subtraction** and as an argument for subtracting in double. **It is wrong**, and it was wrong in a
+  way that would have produced a rule doing nothing.
+  What the 0.0 shows is that both literals round to the **same float32 before anything is subtracted** -
+  the distinction was gone in storage, and no arithmetic can recover it. Subtraction itself loses
+  nothing: measured over **100,000 random float32 pairs within a factor of two**, the float32 difference
+  equals the float64 difference in every case, which is Sterbenz's lemma holding as it should.
+  What a near-equal difference does lose is **significance**, not bits: operands of magnitude 300
+  differing by 1e-7 carry ten digits each and produce a difference carrying **one** - 9.5 digits gone -
+  and the result's storage type says nothing about that. That is INV-034's subject, and it is a
+  reporting rule rather than an arithmetic one.
+
+### E-144 - Averaging element values onto shared nodes halves a reported peak
+- tier: T1
+- url: spike/measure_numerical_integrity.py
+- verified: 2026-08-25
+- says: measured on 2026-08-25 against **VTK 9.5.2**. A row of five hexahedra carrying element values
+  10, 20, **200**, 20, 10 MPa - a stress concentration inside the body. `vtkCellDataToPointData`
+  averages them onto the shared nodes, and the maximum of the result is **110 MPa against the element
+  maximum of 200 MPa: 55 per cent of it, an under-report of 90 MPa**.
+  The same concentration placed at the **end face** gives 200 MPa either way, because that node belongs
+  to one element. So a check written on a peak at a boundary reports that averaging is harmless, and a
+  peak in the interior - which is where a concentration is - is where it is not.
+  The spread at the peak node is 180 MPa, which is the quantity the reference product publishes as
+  Nodal Difference (E-145).
+- justifies: INV-032, XC-247
+
+### E-145 - How the reference product names averaged results, and what it refuses to average
+- tier: T1
+- url: https://ansyshelp.ansys.com/public/Views/Secured/corp/v242/en/wb_sim/ds_Unaveraged_Results.html
+- verified: 2026-08-25
+- says: the vendor's own documentation for its mechanical post-processor defines: **averaged contours**
+  "distribute the average elemental nodal results across element and geometric discontinuities",
+  averaging component values at shared nodes and computing principal values from the averages;
+  **unaveraged contours** "vary discontinuously even across element boundaries" and are "determined by
+  linear interpolation within each element and are unaffected by surrounding elements".
+  It publishes the spread as first-class results: **Nodal Difference** is "the maximum difference
+  between the unaveraged computed result ... for all elements that share a particular node",
+  **Nodal Fraction** "the ratio of the nodal difference and the nodal average", with Elemental
+  Difference and Elemental Fraction the same quantities per element. The documentation states these aid
+  in determining mesh quality: large differences between elements attached to a shared node indicate
+  that a refined mesh may be necessary in that region.
+  On material boundaries it warns that where bodies have different material properties, "averaging
+  across bodies at the interface is not recommended".
+- justifies: INV-032, XC-247
+- note: this is the vocabulary, not the default. The product documents both that it averages across
+  element and geometric discontinuities and that averaging across dissimilar materials is inadvisable;
+  INV-022 already refuses the second outright rather than advising against it.
+
+### E-146 - The built-in sum() stopped being a naive accumulator in Python 3.12
+- tier: T1
+- url: https://docs.python.org/3/whatsnew/3.12.html
+- verified: 2026-08-25
+- says: the language's own release notes, under "Other Language Changes": "`sum()` now uses Neumaier
+  summation to improve accuracy and commutativity when summing floats or mixed ints and floats."
+  Observed here on both sides of that change: on Python 3.11, `sum([0.1] * 10 + [1e16, -1e16])` returns
+  **0.0** where `math.fsum` returns **1.0**; on Python 3.12, running the same accumulation over ten
+  million values, `sum()` matched `math.fsum` exactly while NumPy's pairwise sum differed by 4.8e-07 in
+  the last bits.
+- justifies: INV-031
+- note: this is a fact about the interpreter, not about this product, and it is recorded because a test
+  here used `sum()` as the thing to be more accurate than. That test passed on 3.11 and failed on CI's
+  3.12: the reference point had moved and the assertion was measuring the interpreter. `pyproject.toml`
+  requires 3.12 and `conftest.py` prints a warning when the suite runs on anything older, which is the
+  warning that would have caught it.

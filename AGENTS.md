@@ -49,6 +49,20 @@ ran. Every gate in `validate/` runs in `.github/workflows/ci.yml`, and
 - **A number and a picture come from different code paths.** Reported values are computed on the full
   dataset in the canonical frame; display geometry is decimated, tessellated and scaled, and measuring
   it produces a number that is wrong in a way that looks right (INV-001, INV-009).
+- **Arithmetic on results has four separate precision questions, and one word for all of them is how
+  they get confused.** *Store* what the file gave - a float32 result stays float32, because promoting it
+  doubles what a case costs against LIM-001 for digits nothing may display. *Compute* in float64 always,
+  with pairwise accumulation: a float32 field of 300 ± 0.001 summed in float32 has a mean of exactly
+  300.000000 and the variation is gone (E-143, INV-031). *Show* only the digits the source supports
+  (INV-014) - **except** for a difference of two nearly equal values, which carries the digits the
+  subtraction left and not the digits its storage holds (INV-034). And hold **geometry** in float64
+  whatever the file said, because cell volumes weight every average (XC-245, E-142).
+- **A value at a shared node is several values.** Where a solver writes per element, averaging onto the
+  nodes is what makes a smooth contour and it changes the number: a concentration inside a body reports
+  110 MPa averaged against 200 MPa unaveraged (E-144, INV-032). Both are produced, each says which it
+  is, and an averaged peak carries the spread it was averaged from - that spread is the only
+  discretisation indicator a post-processor can compute from one solve, and the smoothed peak shown
+  alone is the combination that looks converged (INV-033).
 - **Units never come from the file.** CAE formats do not carry them reliably, so a unit is declared by
   the user or the value is shown as undeclared. Nothing in this product infers one (XC-003).
 - **Failing loudly beats a plausible default.** Missing values stay missing and say so; no substituted
