@@ -235,12 +235,20 @@ updated: 2026-08-25
 - satisfies: AC-025
 - depends_on: TASK-001
 - done_when: surface, scatter and contour over two independent variables are available
-
+- done: 2026-08-25. Surface, scatter and contour over two independent variables, named as a **set**
+  rather than matched by a suffix: a rule reading "ends in 3d" is a rule a kind called `volume` would
+  escape.
 ### TASK-022 - Projection stated on 3D export
 - satisfies: AC-026
 - depends_on: TASK-021
 - done_when: an exported 3D graph names its projection and view direction
-
+- done: 2026-08-25. A three-dimensional graph carries its projection and its **view direction**, and
+  there is **no default** for either: a default view direction is an angle nobody chose. A graph of one
+  of those kinds without them is refused rather than drawn, and a projection with no direction is
+  refused too - it has not said which angle it was read from, which is the whole of AC-026's reason
+  that a surface read from one angle is a different claim from another.
+  A flat graph has **no** projection rather than an empty one, which would read as a projection nobody
+  recorded.
 ### TASK-023 - Remove the Graph display Apply button
 - satisfies: AC-027
 - depends_on: TASK-001

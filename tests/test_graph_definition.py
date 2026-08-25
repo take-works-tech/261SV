@@ -22,6 +22,8 @@ import pytest
 
 from domain_core.case_contents import AxisKind, ResultAxis
 from engine.graph.definition import (
+    PROJECTIONS,
+    THREE_DIMENSIONAL,
     KINDS,
     UNDECLARED_MARKER,
     GraphError,
@@ -34,6 +36,8 @@ from engine.graph.definition import (
     note_result_axes,
     read_series,
     refusal_for,
+    describe_projection,
+    projection_of,
     stored_values,
 )
 
@@ -237,3 +241,52 @@ class TestSeriesFromDifferentResultAxes:
         axes = [ResultAxis(AxisKind.TIME), ResultAxis(AxisKind.FREQUENCY)]
 
         assert note_result_axes(graph, axes) == differing_axes(*axes)
+
+
+class TestAThreeDimensionalGraphSaysHowItIsRead:
+    """AC-025 and AC-026. A surface read from one angle is a different claim from another."""
+
+    def test_the_three_kinds_over_two_variables_are_offered(self) -> None:
+        assert THREE_DIMENSIONAL == {"surface3d", "scatter3d", "contour3d"}
+        assert THREE_DIMENSIONAL <= KINDS
+
+    def test_they_are_named_rather_than_matched_by_their_suffix(self) -> None:
+        """A rule reading "ends in 3d" is a rule a kind called `volume` would escape."""
+        assert "surface3d" in THREE_DIMENSIONAL
+        assert all(not kind.endswith("3d") or kind in THREE_DIMENSIONAL for kind in KINDS)
+
+    def test_one_without_a_projection_is_refused(self) -> None:
+        """No default. A default view direction is an angle nobody chose."""
+        with pytest.raises(GraphError) as refusal:
+            projection_of(new_graph("graph:001", "面", "surface3d"))
+
+        assert "AC-026" in str(refusal.value)
+
+    def test_a_projection_this_product_does_not_know_is_refused(self) -> None:
+        graph = new_graph("graph:001", "面", "surface3d")
+        graph["projection"] = {"kind": "isometric", "viewDirection": [0, 0, 1]}
+
+        with pytest.raises(GraphError):
+            projection_of(graph)
+
+    def test_a_projection_with_no_direction_is_refused(self) -> None:
+        """A projection without a direction has not said which angle it was read from."""
+        graph = new_graph("graph:001", "面", "surface3d")
+        graph["projection"] = {"kind": "orthographic"}
+
+        with pytest.raises(GraphError):
+            projection_of(graph)
+
+    def test_a_complete_one_is_stated_in_words(self) -> None:
+        graph = new_graph("graph:001", "面", "surface3d")
+        graph["projection"] = {"kind": "perspective", "viewDirection": [1, 0, 0]}
+
+        assert describe_projection(graph) == "透視投影・視線方向 (1, 0, 0)"
+
+    def test_a_flat_graph_has_no_projection_to_state(self) -> None:
+        """Rather than an empty one, which would read as a projection nobody recorded."""
+        assert describe_projection(new_graph("graph:001", "線", "line")) is None
+        assert projection_of(new_graph("graph:001", "線", "line")) is None
+
+    def test_the_two_projections_are_the_contracts(self) -> None:
+        assert PROJECTIONS == {"orthographic", "perspective"}

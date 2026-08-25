@@ -191,6 +191,51 @@ KINDS = frozenset(
      "surface3d", "scatter3d", "contour3d"}
 )
 
+#: The kinds drawn over **two** independent variables (AC-025). Named as a set rather than by a suffix
+#: on the string: a rule that read "ends in 3d" is a rule a kind called `volume` would escape.
+THREE_DIMENSIONAL = frozenset({"surface3d", "scatter3d", "contour3d"})
+
+#: How a three-dimensional graph is looked at. CT-005's two.
+PROJECTIONS = frozenset({"orthographic", "perspective"})
+
+
+def projection_of(graph: dict[str, Any]) -> dict[str, Any] | None:
+    """The projection and view direction a 3D graph is read from, or None where it has none.
+
+    Required for a three-dimensional kind and meaningless for a flat one, which is why this returns
+    rather than defaults: a default view direction is an angle nobody chose, and AC-026 exists because
+    **a surface read from one angle is a different claim from another**.
+    """
+    stated = graph.get("projection")
+    if graph.get("kind") not in THREE_DIMENSIONAL:
+        return None
+    if not stated:
+        raise GraphError(
+            f"'{graph.get('kind')}' は 2 つの独立変数の上に描く種類なので、"
+            "投影と視線方向が要ります。既定は置きません — "
+            "ある角度から読んだ曲面は、別の角度から読んだものとは違う主張です（AC-026）"
+        )
+    kind = str(stated.get("kind", ""))
+    if kind not in PROJECTIONS:
+        raise GraphError(f"投影 '{kind}' は CT-005 の一覧にありません（{sorted(PROJECTIONS)}）")
+    direction = stated.get("viewDirection")
+    if not direction or len(direction) != 3:
+        raise GraphError(
+            f"投影に視線方向（3 成分）がありません（{direction!r}）。"
+            "方向のない投影は、どの角度から読んだか言っていないのと同じです"
+        )
+    return dict(stated)
+
+
+def describe_projection(graph: dict[str, Any]) -> str | None:
+    """The line an exported 3D graph carries (AC-026), or None where the kind is flat."""
+    stated = projection_of(graph)
+    if stated is None:
+        return None
+    x, y, z = stated["viewDirection"]
+    named = "正射影" if stated["kind"] == "orthographic" else "透視投影"
+    return f"{named}・視線方向 ({x:g}, {y:g}, {z:g})"
+
 
 def add_series(graph: dict[str, Any], series: Series) -> dict[str, Any]:
     """Add a series, or refuse the combination with both units named (AC-003).
