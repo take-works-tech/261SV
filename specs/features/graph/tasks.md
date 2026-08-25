@@ -78,28 +78,52 @@ updated: 2026-08-25
 - depends_on: TASK-001
 - done_when: every quantity of the selected cases is offered, including computed ones and
   reference-file values
-
+- done: 2026-08-25, `src/engine/graph/series.py`. Every quantity the selected cases hold is offered,
+  together with computed ones and values from an uploaded reference file - a builder that offered only
+  what came out of the solver would make the other two second-class, and they are the ones a comparison
+  usually needs.
+  A quantity that only some cases have is offered **once**. Offering it per case would put the same
+  name on the list three times, and the cases that lack it become no-data points when it is plotted
+  rather than a reason not to offer it.
 ### TASK-008 - Expressions computed in the analysis module
 - satisfies: AC-006
 - depends_on: TASK-007
 - done_when: an expression series shows its expression and is computed by the analysis module, never in
   the graph layer
-
+- done: 2026-08-25. The expression is evaluated by MOD-004 and this module records what came
+  back (AC-006, XC-080, XC-088). A graph layer that computed would be a second place where numbers are
+  produced, and the two would disagree the day one of them was fixed. The expression travels with the
+  series, which is INV-013's last clause.
 ### TASK-009 - Expression failure drawn as no data
 - satisfies: AC-007
 - depends_on: TASK-008
 - done_when: a case where the expression fails is drawn as no data with the reason, and the series stays
-
+- done: 2026-08-25. A case where the expression fails is **that case's** no-data with the
+  evaluator's own reason, and the series stays: one that vanished would take the other cases' answers
+  with it. The reason is the evaluator's rather than a summary of it, because that is what tells
+  somebody whether the expression is wrong or the case is.
+  No-data is `None`, never zero. A missing value arriving as zero is the failure XC-001 exists to
+  prevent, so there is no numeric stand-in here to be mistaken for a measurement.
 ### TASK-010 - Repeated studies
 - satisfies: AC-012
 - depends_on: TASK-004
 - done_when: per-repeat and combined plotting are both available and the choice is stated
-
+- done: 2026-08-25. Both are available and **which was used is stated** (AC-012). Neither is a
+  default applied silently: one drifting repeat is visible when repeats are separated and hidden when
+  they are combined, and a product that picked would be choosing which of those somebody saw.
+  Combining does **not** average. An average is a number nobody asked for, and it would appear on the
+  axis as though it had been measured. Separating without a rule for which case is which repeat is
+  refused - grouping by similar names would be a grouping the user never stated.
 ### TASK-011 - Missing quantity kept visible
 - satisfies: AC-013
 - depends_on: TASK-010
 - done_when: a case lacking the quantity is drawn as no data and remains in the legend
-
+- done: 2026-08-25. The case is drawn as no data and stays in the points and in the legend,
+  and a series with nothing plotted at all still appears there marked as such. Dropping it would make
+  the figure look complete - two cases plotted where three were asked for, and nothing on the page
+  saying which is gone.
+  What is missing is answerable from the figure rather than collected while drawing, so a renderer that
+  never ran gives the same answer.
 ### TASK-012 - Styles and templates from the library
 - satisfies: AC-017
 - depends_on: TASK-001
