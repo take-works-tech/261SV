@@ -38,6 +38,7 @@ from service.pipeline.document import (
     names_bound_before,
     variable_unit,
 )
+from domain_core.selection import CaseFacts
 from service.pipeline.run import Outcome, RunError, dry_run, run
 
 VIEW_REF = DefinitionRef(Source.WORKSPACE_ITEM, "view:001", 1)
@@ -359,3 +360,74 @@ class TestWhatAnExpressionCanSeeOfACase:
         assert [r.detail for r in record.results if r.unit_id == "unit:f"] == [
             "1e+08 Pa", "1e+07 Pa", "1.5e+08 Pa"
         ]
+
+
+class TestACaseUnitMayCarryASelection:
+    def test_it_resolves_when_the_run_starts(self) -> None:
+        """AC-006, and the reason the form exists: a pipeline written last month picks up a case created
+        this morning, which an explicit list cannot do."""
+
+        document = pipeline()
+        add(document, add_cases_unit("unit:cases", selection={"tag": "converged"}))
+        add(document, artefact_unit("unit:view", Kind.VIEW, VIEW_REF))
+        facts = [
+            CaseFacts("case:001", "run_a", frozenset({"converged"})),
+            CaseFacts("case:002", "run_b", frozenset()),
+            CaseFacts("case:003", "run_c", frozenset({"converged"})),
+        ]
+
+        record = run(document, cases=[], case_facts=facts)
+
+        acted = {r.case_id for r in record.results if r.unit_id == "unit:view"}
+        assert acted == {"case:001", "case:003"}
+
+    def test_it_lists_what_it_resolved_to_before_anything_runs(self) -> None:
+        """CT-009: both forms list what they resolved to."""
+
+        document = pipeline()
+        add(document, add_cases_unit("unit:cases", selection={"tag": "converged"}))
+        facts = [CaseFacts("case:001", "run_a", frozenset({"converged"}))]
+
+        assert "1 件" in detail_of(run(document, cases=[], case_facts=facts), "unit:cases")
+
+    def test_a_selection_with_nothing_to_resolve_against_is_refused(self) -> None:
+        """Not resolved to nothing. An empty target set is a legitimate outcome that later units skip
+        on, and producing one from a missing argument would make it look like a study with no matching
+        runs."""
+        document = pipeline()
+        add(document, add_cases_unit("unit:cases", selection={"tag": "converged"}))
+
+        with pytest.raises(RunError):
+            run(document, cases=[])
+
+    def test_holding_both_forms_is_refused(self) -> None:
+        """The two disagree precisely when a case was added after the pipeline was written, which is the
+        case the selection form exists for."""
+        with pytest.raises(PipelineError):
+            add_cases_unit("unit:cases", CASES, selection={"tag": "converged"})
+
+    def test_holding_neither_is_refused(self) -> None:
+        with pytest.raises(PipelineError):
+            add_cases_unit("unit:cases")
+
+    def test_an_unreadable_selection_is_refused_when_the_unit_is_written(self) -> None:
+        """Not at midnight when the pipeline runs."""
+        with pytest.raises(PipelineError) as refusal:
+            add_cases_unit("unit:cases", selection={"colour": "red"})
+        assert "colour" in str(refusal.value)
+
+    def test_the_dry_run_resolves_it_too(self) -> None:
+        """A plan that could not say which cases a selection picks would be describing a different
+        execution from the one that follows."""
+
+        document = pipeline()
+        add(document, add_cases_unit("unit:cases", selection={"tag": "converged"}))
+        add(document, artefact_unit("unit:view", Kind.VIEW, VIEW_REF))
+        facts = [
+            CaseFacts("case:001", "run_a", frozenset({"converged"})),
+            CaseFacts("case:002", "run_b", frozenset()),
+        ]
+
+        plan = dry_run(document, cases=[], case_facts=facts)
+
+        assert next(step for step in plan.steps if step.unit_id == "unit:view").cases == ("case:001",)

@@ -29,6 +29,7 @@ from dataclasses import dataclass, field as dataclass_field
 from enum import Enum
 from typing import Any, Iterable, Iterator
 
+from domain_core.selection import SelectionError, check_selection
 from engine.analysis.expression import ExpressionError, check
 from engine.limits import MAX_PIPELINE_DEPTH
 
@@ -158,16 +159,40 @@ def depth_of(units: Iterable[dict[str, Any]]) -> int:
     return max((level for _, level in walk(units)), default=0)
 
 
-def add_cases_unit(unit_id: str, case_ids: Iterable[str], *, label: str | None = None) -> dict[str, Any]:
-    """One unit holding a whole multiple selection (AC-023).
+def add_cases_unit(
+    unit_id: str,
+    case_ids: Iterable[str] | None = None,
+    *,
+    selection: dict[str, Any] | None = None,
+    label: str | None = None,
+) -> dict[str, Any]:
+    """One unit holding a whole multiple selection (AC-023), or a selection resolved at run start.
 
     Six units of one case each look the same on screen and behave differently the moment somebody
-    reorders or removes one.
+    reorders or removes one, which is why a drag produces one unit.
+
+    The two forms are exclusive (CT-009). A unit holding both would run one of them, and which one is
+    not something this product should be deciding on somebody's behalf - an explicit list and a
+    selection disagree precisely when a case was added after the pipeline was written, which is the case
+    the selection form exists for.
     """
-    cases = [str(case) for case in case_ids]
-    if not cases:
-        raise PipelineError("ケースユニットには少なくとも 1 件のケースが必要です")
-    unit: dict[str, Any] = {"id": unit_id, "kind": Kind.ADD_CASES.value, "caseIds": cases}
+    if (case_ids is None) == (selection is None):
+        raise PipelineError(
+            f"ケースユニット '{unit_id}' には、明示的なケース一覧か CT-007 の選択の"
+            "どちらか一方が要ります（CT-009）"
+        )
+    unit: dict[str, Any] = {"id": unit_id, "kind": Kind.ADD_CASES.value}
+    if selection is not None:
+        try:
+            check_selection(selection)
+        except SelectionError as error:
+            raise PipelineError(f"ケースユニット '{unit_id}' の選択：{error}") from None
+        unit["selection"] = selection
+    else:
+        cases = [str(case) for case in case_ids or ()]
+        if not cases:
+            raise PipelineError("ケースユニットには少なくとも 1 件のケースが必要です")
+        unit["caseIds"] = cases
     if label:
         unit["label"] = label
     return unit

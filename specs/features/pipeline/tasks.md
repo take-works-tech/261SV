@@ -69,7 +69,17 @@ updated: 2026-08-25
 - satisfies: AC-006
 - depends_on: TASK-007
 - done_when: a selection resolves through CT-007 at run start and the resolved cases are listed
-
+- done: 2026-08-25. A case unit carries **either** an explicit list or a CT-007 selection, and
+  holding both is refused: the two disagree precisely when a case was added after the pipeline was
+  written, which is the case the selection form exists for, so which one wins is not something this
+  product should decide on somebody's behalf.
+  The selection is checked when the unit is written and resolved when the run starts, and both forms
+  list what they resolved to before anything runs. A selection with **nothing to resolve against** is
+  refused rather than resolved to nothing - an empty target set is a legitimate outcome that later units
+  skip on (AC-007), and producing one from a missing argument would make it look like a study with no
+  matching runs.
+  The dry run resolves it as well, because a plan that could not say which cases a selection picks would
+  be describing a different execution from the one that follows.
 ### TASK-010 - An empty target set skips rather than fails
 - satisfies: AC-007
 - depends_on: TASK-008
