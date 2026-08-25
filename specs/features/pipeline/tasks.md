@@ -390,7 +390,15 @@ updated: 2026-08-25
 - depends_on: TASK-035
 - done_when: a fresh workspace refuses to run a script unattended, and enabling it is a per-workspace
   setting
-
+- done: 2026-08-25, `src/service/scripting/authorisation.py`. A fresh workspace refuses, and the
+  **default value of the field is the refusal** rather than a convention applied elsewhere: a setting
+  whose permissive value is what you get by forgetting is a permissive setting. E-065 is the argument -
+  the application this rule is modelled on shipped the permissive default first and had to retrofit the
+  preference, and a permissive default cannot be made stricter without breaking somebody's automation,
+  so it is never actually changed.
+  Enabling it **requires saying who granted it**: a permission with no record of being granted is one
+  nobody can be asked about. And a person pressing run needs no setting at all - the setting is about
+  running *without* a person, not about running.
 ### TASK-039 - Actions shown as script text
 - satisfies: AC-039
 - depends_on: TASK-020
@@ -405,7 +413,14 @@ updated: 2026-08-25
 - satisfies: AC-041
 - depends_on: TASK-029
 - done_when: the run record lists what it wrote and can delete it
-
+- done: 2026-08-25. The run record lists what it wrote **by name** - a count is something somebody
+  accepts without reading - and the offer says why it exists: undo restores the workspace and not the
+  disk (XC-061). A run that wrote forty reports and was then undone leaves forty reports, and the user's
+  undo was for the workspace.
+  It deletes **only what that run wrote**. A path that this run did not write is refused rather than
+  removed: a file that was there before is not this run's to delete, and a deletion routine that took a
+  path on trust is one that eventually takes the wrong one. The list comes from the run record rather
+  than being assembled afterwards, so what can be deleted is what the run said it wrote.
 ### TASK-042 - Definition-reference source stays explicit
 - satisfies: AC-042
 - depends_on: TASK-002, TASK-004

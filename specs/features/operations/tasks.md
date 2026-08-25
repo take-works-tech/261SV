@@ -103,7 +103,12 @@ updated: 2026-08-25
 - satisfies: AC-009
 - depends_on: TASK-012, assistant/TASK-018
 - done_when: sending requires consent and appears in the outbound audit
-
+- done: 2026-08-25. Satisfied by the two halves that landed together: `service/egress/diagnostics.py`
+  requires the manifest to be accepted before a bundle exists, and `service/egress/gate.py` requires
+  explicit consent before it leaves and records the transfer in the outbound audit (XC-106).
+  The two acceptances are deliberately separate and both are tested: accepting what goes **into** the
+  bundle is not agreeing to **send** it, and the gate refuses without its own consent. What the audit
+  records is the manifest's own lines, so what was audited is what the user accepted.
 ### TASK-014 - Samples update alongside
 - satisfies: AC-018
 - depends_on: workspace/TASK-029
