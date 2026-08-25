@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-25
+updated: 2026-08-26
 ---
 
 # Modules and dependency direction
@@ -93,7 +93,9 @@ touches a file, a device or a clock.
 - layer: engine
 - paths: src/engine/report
 - owns: assembling @Report output - the interactive HTML document, office formats, images and video -
-  from @View, @Graph and text
+  from @View, @Graph and text. It owns what an output **cannot** carry as well as what it can: the
+  writer answers that before it writes, refuses until the list is accepted, and puts the same list in
+  the document (XC-254)
 - depends_on: domain-core, visualization, graph
 - decidedness: Fixed
 - basis: E-001 (T1)

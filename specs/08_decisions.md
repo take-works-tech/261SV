@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-25
+updated: 2026-08-26
 ---
 
 # Decisions and open questions
@@ -4891,3 +4891,61 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: an operation whose answer is genuinely open-ended - a passthrough of a format's own
   metadata, say - which a closed field list cannot hold and which would need the contract to name the
   one place `additionalProperties` is allowed, rather than allowing it everywhere by default
+
+### OPEN-032 - Which licensed font is embedded, now that every report needs one
+- question: report/AC-015 requires a subset of a licensed font covering the characters a report holds, so the
+  document renders identically on a machine with no such font installed. No decision names the font, and
+  none names how the subset is produced
+- why_open: the answer is a licence question and this project may not settle one from a summary. A font
+  whose terms permit **embedding in a document that is redistributed** is a narrower set than a font
+  that is free to use, and the difference is exactly the case here: a deliverable is sent to a customer
+  who did not install this product. It also decides a build step - producing a subset needs a tool, and
+  a tool is a dependency with its own licence and pin
+- found: **the font is required of every report this product writes, not only of reports containing
+  Japanese.** Expected the opposite and the check said otherwise on 2026-08-26: a document whose content
+  is entirely Latin still carries characters outside the basic Latin set, because this product's own
+  labels are Japanese - the provenance block says `ワークスペース`, `元ファイル`, `宣言された単位`. So a
+  build with no embedded font produces empty boxes on any machine without a Japanese font installed, for
+  every document it writes. That moves the font from a provision for some reports to a condition of the
+  deliverable
+- blocks: report/AC-015 and report/AC-016 in full. Not the writer: `engine.report.html` states the uncovered
+  characters and the element each is in, and refuses to write until that list is accepted (report/AC-014), so a
+  build without a font is honest rather than broken
+- closes_when: a font is chosen whose **licence text**, read first-hand, permits embedding a subset in a
+  redistributed document, and the subsetting tool is named and pinned
+- affects: MOD-006, report/AC-015, report/AC-016, XC-024
+- decidedness: Open
+
+### XC-254 - An exported document states what it could not carry, and never substitutes something lesser
+- decided: 2026-08-26
+- status: active
+- decision: the HTML writer answers `unrepresentable(document, capability)` **before** anything is
+  written, `write()` refuses while that list is non-empty and unaccepted, and once accepted the same
+  list is written **into** the document so the recipient reads it too. A rotatable @View is declared
+  unsupported by a build without the vtk.js bundle rather than replaced with a still image. Characters
+  no embedded font covers are named as characters, with the element each appears in, rather than
+  counted. And the produced text is searched for an external reference and refused if one is found -
+  checked of the output rather than trusted of the writer
+- decided_by: the product owner, 2026-08-26
+- rationale: the free export path measured here produced 34.4 MB for a 1.13 million point surface and
+  **left the text annotation and the point label out of the file with no warning** while the scalar bar
+  survived (spike/results.json). That is what a writer that drops what it cannot represent looks like
+  from the outside: a document that appears complete, with no way for the reader to learn otherwise.
+  Refusing before the file exists is what report/AC-014 asks for in its own words - "say so before writing the
+  file". Writing the statement into the document as well is not in report/AC-014 and is the other half of the
+  same argument: a refusal the operator accepted and the recipient never sees moves the silence one step
+  along rather than ending it.
+  A still image in place of a rotatable view would satisfy report/AC-001's sentence and not its requirement,
+  and would be the harder failure to find later, because the document would look right
+- alternatives: substituting a still image and stating the substitution is what report/AC-006 asks of the
+  office formats, where the format genuinely cannot carry a scene; the interactive document can, and a
+  build that has not yet been given the means is a different fact from a format that cannot. Writing the
+  file and listing the omissions afterwards makes the list something somebody finds. Trusting the writer
+  not to emit an external reference holds until a block's text carries one, which is the case that
+  matters
+- basis: E-001 (T1)
+- affects: MOD-006, CT-006, report/AC-001, report/AC-014, report/AC-016, INV-007
+- decidedness: Fixed
+- reversal_trigger: a deliverable kind where partial output is worth more than none - a very large
+  report where one unrepresentable block should not stop the other forty - which would need the refusal
+  to become per-block rather than per-document

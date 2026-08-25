@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-25
+updated: 2026-08-26
 ---
 
 # Contracts: view, graph and report definitions
@@ -134,7 +134,10 @@ was in the same unit.
 - basis: E-001 (T1)
 
 A report is an ordered list of blocks - a view, a graph, a table of values, a text passage, a
-page break - plus the output targets and the art style. A text block records whether it was written by
+page break - plus the output targets and the art style. A definition may name a block **no build can
+write**: a rotatable view where the viewer bundle is absent, a character no embedded font covers. That
+is a fact about the build and not about the definition, so the definition keeps the block and the writer
+states what it could not carry before writing anything (XC-254, report/AC-014). A text block records whether it was written by
 a person or generated, and a generated block records the values it was derived from (report/AC-011).
 
 ## Why definitions and results are kept apart
