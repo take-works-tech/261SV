@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-20
+updated: 2026-08-25
 ---
 
 # Tasks: assistant and headless operation
@@ -102,27 +102,55 @@ updated: 2026-08-20
 - depends_on: TASK-001
 - done_when: every outbound request goes through MOD-014 and lands in an exportable audit, asserted by
   a test that fails if any other module opens a connection
-
+- done: 2026-08-25, `src/service/egress/gate.py`. Every outbound request goes through one gate and
+  lands in an audit the user can read and export - **including the refused ones**, because a refusal
+  that leaves no trace is a refusal nobody can investigate, and including a query that waited for
+  confirmation, so the audit shows what was about to go as well as what went.
+  The condition's own test is here: a sweep over `src/` that fails if any module outside MOD-014 imports
+  a network client. Written as a sweep rather than a list, so a module added later is covered without
+  anybody remembering to add it.
+  A gate with **no transport** refuses rather than pretending to send. That is what an offline build is,
+  and it is what a test wants: nothing in this build can reach a network, and the gate says so instead
+  of reporting success.
 ### TASK-019 - Search permission per workspace
 - satisfies: AC-018
 - depends_on: TASK-018
 - done_when: a fresh workspace permits nothing, and a denied search names the unanswered question
-
+- done: 2026-08-25. A fresh workspace permits nothing - the default values of the permission are
+  the refusal rather than a convention that something must configure. An empty host allow-list means
+  **none**, not "any": an empty setting read as permission is how a field nobody filled in becomes
+  access to everywhere.
+  A denied search names the question it left unanswered (AC-018) and the rest of the operation
+  continues.
 ### TASK-020 - The query is shown before it is sent
 - satisfies: AC-019
 - depends_on: TASK-019
 - done_when: the query is visible, and per-search confirmation blocks sending until confirmed
-
+- done: 2026-08-25. The query is in the record before it goes, and per-search confirmation holds it
+  without sending.
+  An ordering defect found by its own test and fixed at the cause: the confirmation was being asked
+  **before** the permission was checked, so an unpermitted search came back as "waiting for
+  confirmation". That asks somebody to authorise a request that will then be refused. Every reason a
+  request is stopped is now in one place and runs first - offline, permission, host list, transport -
+  and confirmation is the last gate rather than the first.
 ### TASK-021 - Workspace content withheld from queries
 - satisfies: AC-020
 - depends_on: TASK-020
 - done_when: values, case names and paths are stripped unless allowed for that search
-
+- done: 2026-08-25. Values, case names and paths are withheld unless allowed **for that search**,
+  and the per-search answer overrides the workspace default in both directions. What was withheld is
+  named in the audit, and a marker is left where it was: deleted outright, the query stops reading as a
+  question and the user cannot see where their content was removed from.
+  The stricter rule is kept separate rather than shared with this one. A **language model** request has
+  nowhere to put a dataset value at all (XC-229) - it carries names, associations, units, counts and the
+  instruction, and no permission can add a number to it. A rule that depends on a caller redacting
+  correctly is a rule that holds until somebody adds a field.
 ### TASK-022 - Host allow-list
 - satisfies: AC-022
 - depends_on: TASK-018
 - done_when: an unlisted host is refused by name, with no fallback source
-
+- done: 2026-08-25. An unlisted host is refused **by name**, and no other source is tried: trying
+  another host would be this product choosing where a customer's question goes.
 ### TASK-023 - Results become dated reference material
 - satisfies: AC-023
 - depends_on: TASK-018
