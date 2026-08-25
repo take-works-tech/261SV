@@ -1734,3 +1734,33 @@ Recorded so that nothing silently depends on them:
 - note: this is the closest published work to this product's own subject, and it is the clearest case of
   the distinction XC-250 draws: what it does is directly relevant, and what it runs on cannot be
   shipped inside somebody else's desktop application.
+
+### E-153 - The published VTK wheel contains no ray-tracing back end
+- tier: T1
+- url: spike/measure_vtk_rendering_modules.py
+- verified: 2026-08-25
+- says: measured on 2026-08-25 against the pinned **VTK 9.5.2** wheel. It carries 163 modules, 27 of
+  them rendering, and **none of OSPRay, RayTracing, ANARI, OptiX, OpenVKL or Embree is among them**.
+  The 27 are the OpenGL2, volume, VR/OpenXR, LIC, label, annotation and vtk.js-export families.
+  So the ray-traced path ParaView offers - which is OSPRay - is **absent from the build this product
+  ships**, and reaching it means building VTK from source with the module enabled. This is a fact about
+  the wheel, not about VTK: VTK's documentation describes what VTK can be built with.
+- justifies: XC-034, XC-087, OPEN-031
+
+### E-154 - The Intel rendering stack, licences read directly
+- tier: T1
+- url: https://raw.githubusercontent.com/RenderKit/ospray/master/LICENSE.txt
+- verified: 2026-08-25
+- says: **OSPRay**, **Embree** and **Open Image Denoise** each ship a LICENSE file containing the
+  **plain Apache License 2.0 text with no additional clause** - no hardware restriction, no
+  field-of-use restriction, no competing-products restriction, and no product-specific addendum of any
+  kind. Copyright Intel; the projects are maintained under the `RenderKit` organisation.
+  OSPRay is a ray tracing engine for high-fidelity visualisation that renders **surfaces** (meshes,
+  subdivision surfaces, spheres, curves, boxes, planes), **volumes** (structured regular and spherical,
+  AMR, **unstructured**, VDB and particle volumes) and **isosurfaces**. It runs on **CPUs** - Intel
+  architecture and Aarch64/ARM64 - with a beta implementation for Intel GPUs. Its dependencies are
+  Embree, Open VKL, Open Image Denoise, ISPC and TBB.
+- justifies: XC-250, OPEN-031
+- note: the CPU point is what makes this relevant here rather than merely available. XC-086 supports a
+  business laptop with integrated graphics, and INV-007 makes offline a feature - a photorealistic path
+  that needs neither a particular vendor's GPU nor a network is the only one that fits both.

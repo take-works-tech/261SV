@@ -64,6 +64,14 @@ option that already lost, because nothing records that it lost.
   platforms - recurring cost against a duty that is discharged by a paragraph and an archive. The
   reason to build from source later is size (LIM-004) or disabling readers with open advisories
   (XC-047), and even the second is better served by never invoking those readers
+- note: 2026-08-25, a **third reason** the alternatives above do not list, and a stronger one because it
+  buys a capability rather than removing an obligation. The published wheel contains **no ray-tracing
+  back end at all** - measured, 27 rendering modules and no OSPRay, ANARI, OptiX, OpenVKL or Embree
+  among them (E-153). Any photorealistic path through VTK therefore requires the source build this
+  decision declined. That does not reverse the decision - the obligation argument stands and the build
+  cost is unchanged - but it means the trade is no longer "a paragraph and an archive against a
+  toolchain", and OPEN-031 weighs it against two alternatives that did not exist when this was
+  decided
 - basis: E-045 (T1), E-051 (T1), E-052 (T1)
 - affects: XC-041, XC-025, LIM-004
 - decidedness: Fixed
@@ -4747,3 +4755,33 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: NVIDIA relicensing the Kit SDK permissively, which would move the whole RTX path
   across the line - or any of PhysX, MDL or Warp gaining a field-of-use restriction, which would move
   them back
+
+### OPEN-031 - How a photorealistic path is reached, now that both candidates are unavailable as shipped
+- question: XC-087 gives the product a photorealistic direction and XC-037 named Omniverse as the
+  optional path to it. Measured on 2026-08-25, **neither candidate is reachable from what this product
+  ships**, and for two unrelated reasons. Omniverse's Kit may not be distributed inside another
+  application at all (E-151, XC-250). And the pinned VTK 9.5.2 wheel contains **no ray-tracing back end
+  whatsoever** - no OSPRay, ANARI, OptiX, OpenVKL or Embree module among its 27 rendering modules
+  (E-153) - so the path ParaView offers is absent from the build here
+- why_open: the three ways forward cost different things and none is obviously right.
+  **Build VTK from source with OSPRay enabled.** XC-034 chose the published wheel and listed two reasons
+  to build later - size and disabling readers with advisories. This is a **third reason nobody had**,
+  and it is a stronger one: it buys a capability rather than removing an obligation. It costs a
+  toolchain, a multi-hour build and a per-release burden on three platforms.
+  **Use OSPRay directly, beside VTK rather than through it.** OSPRay, Embree and Open Image Denoise are
+  plain Apache-2.0 with no restrictions (E-154), run on CPU, and render **unstructured volumes** - which
+  is CAE data. It avoids the VTK build and means writing the bridge from a @Dataset to OSPRay's scene,
+  which VTK's own module already is.
+  **Ship no photorealistic path in the first release.** XC-087 already makes the interactive and
+  offscreen paths a division of labour, and both work today; the photorealistic one is the
+  differentiator XC-037 was chosen for, not a requirement of any acceptance criterion.
+  The measurement that would decide it does not exist yet: what OSPRay costs to render this product's
+  own worst case (LIM-002's ten million triangles, LIM-001's eight gigabytes) on the integrated-graphics
+  machine class, against what the OpenGL path already does there (E-063)
+- blocks: nothing today - MOD-003 has no renderer. It blocks the first decision about how MOD-003 is
+  built, which is the next substantial piece of work
+- closes_when: OSPRay is measured on this product's worst case on the measured machine class, and one
+  of the three is chosen against that figure rather than against the licence position, which is now
+  settled either way (XC-250)
+- affects: MOD-003, XC-034, XC-037, XC-087, OPEN-023, LIM-002
+- decidedness: Open
