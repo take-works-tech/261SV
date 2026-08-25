@@ -64,6 +64,14 @@ option that already lost, because nothing records that it lost.
   platforms - recurring cost against a duty that is discharged by a paragraph and an archive. The
   reason to build from source later is size (LIM-004) or disabling readers with open advisories
   (XC-047), and even the second is better served by never invoking those readers
+- note: 2026-08-25, a **third reason** the alternatives above do not list, and a stronger one because it
+  buys a capability rather than removing an obligation. The published wheel contains **no ray-tracing
+  back end at all** - measured, 27 rendering modules and no OSPRay, ANARI, OptiX, OpenVKL or Embree
+  among them (E-153). Any photorealistic path through VTK therefore requires the source build this
+  decision declined. That does not reverse the decision - the obligation argument stands and the build
+  cost is unchanged - but it means the trade is no longer "a paragraph and an archive against a
+  toolchain", and OPEN-031 weighs it against two alternatives that did not exist when this was
+  decided
 - basis: E-045 (T1), E-051 (T1), E-052 (T1)
 - affects: XC-041, XC-025, LIM-004
 - decidedness: Fixed
@@ -4663,6 +4671,17 @@ model or the prompt, never in a description that quietly went stale.
   rendering falls under 8.12, or counsel reads the current terms and records the reading here with its
   date - the terms are versioned and the answer is only good for the version it was read against
 - affects: XC-037, MOD-003, OPEN-023, specs/09_technology.md
+- confirmed: 2026-08-25, the same day, and by a second primary source rather than by re-reading the
+  first. The Omniverse License Agreement shipped with `kit-cae` states it in as many words: **"you may
+  not use the Omniverse Products for the purpose of developing competing products or technologies"**
+  (E-151). A summarised fetch of the Product Specific Terms page taken minutes earlier reported that no
+  such clause existed; the licence text is what settles it, and the recorded evidence (E-009) was right.
+  So the question is not whether the clause exists - it does - but whether a CAE post-processor is a
+  competing product under it. That remains an answer NVIDIA gives, not one this project reads out.
+  Two further restrictions surfaced with it and narrow the question further: **the Kit itself may not be
+  distributed at all**, and public distribution must go through NVIDIA's Exchange or a fork of NVIDIA's
+  repository. XC-250 therefore places the whole Kit path outside what this product may embed, whatever
+  8.12 turns out to mean - which lowers what this question is worth deciding, without closing it
 - decidedness: Open
 
 ### XC-249 - What a command takes is stated by the contract, and a handler may not restate it
@@ -4696,6 +4715,111 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: an operation whose parameters genuinely depend on another parameter's value, which
   a flat per-operation schema cannot express and which would need the contract to carry a conditional
 
+### XC-250 - What may be embedded is decided by the licence on the part, not by the name on the box
+- decided: 2026-08-25
+- status: active
+- decision: "Omniverse" and "ParaView" are not single things, and this product decides part by part.
+  **Embeddable, and used freely**: VTK (BSD-3, E-002), ParaView's own readers (BSD-3, E-147, under
+  XC-248's reader-or-behaviour rule), **NVIDIA PhysX** (BSD-3, E-148), **NVIDIA MDL SDK** (BSD-3,
+  E-149), **NVIDIA Warp** (Apache-2.0, E-150), OpenUSD (E-005), OpenVDB (E-006), OpenUSD Exchange SDK
+  (E-007). None of these carries a hardware restriction, a field-of-use restriction or a
+  competing-products restriction; each carries a notice obligation, which goes in the notices file
+  (XC-025).
+  **Not embeddable**: the **Omniverse Kit SDK and everything that requires it** - the RTX and IndeX
+  render paths, and `kit-cae`. The agreement forbids distributing the Kit at all, requires public
+  distribution to go through NVIDIA's Exchange or a fork of NVIDIA's repository, and forbids use "for
+  the purpose of developing competing products or technologies" (E-151, E-152).
+  Where a capability exists on both sides of that line, **the permissive part is taken and the
+  restricted part is rebuilt or left out**, never depended upon
+- decided_by: the product owner, 2026-08-25
+- rationale: the question "can we use Omniverse" has no answer, and asking it that way produced two
+  wrong ones in this project already - first that Omniverse was simply available (XC-037's optional
+  path), then that ParaView was simply unavailable (XC-248's correction). The licence sits on the
+  **part**.
+  `kit-cae` is the case that makes the line visible. NVIDIA publishes OpenUSD file-format plugins for
+  CGNS, EnSight, VTK and OpenFOAM that compose scientific datasets without conversion - which is this
+  product's subject exactly - and they run on a Kit that may not be shipped inside somebody else's
+  application. What is worth taking from it is the **idea**, which is not licensed: composing a result
+  file as USD layers rather than converting it.
+  MDL is the piece that changes what is possible. MaterialX is already this product's canonical
+  material graph, MDL is what NVIDIA's renderers consume, and the SDK that translates between them is
+  BSD-3 with no hardware restriction - so the photorealistic direction is reachable without the
+  component that cannot be redistributed
+- alternatives: treating the Omniverse licence as governing everything NVIDIA publishes leaves PhysX,
+  MDL and Warp on the table for a restriction that does not apply to them. Treating BSD-3 on some NVIDIA
+  repositories as evidence about others is the same error in the other direction, and it is the one that
+  ends in a distribution somebody has to recall
+- basis: E-148 (T1), E-149 (T1), E-150 (T1), E-151 (T1), E-152 (T1), E-147 (T1), E-002 (T1)
+- affects: MOD-003, XC-025, XC-037, XC-248, OPEN-030, specs/09_technology.md
+- decidedness: Fixed
+- reversal_trigger: NVIDIA relicensing the Kit SDK permissively, which would move the whole RTX path
+  across the line - or any of PhysX, MDL or Warp gaining a field-of-use restriction, which would move
+  them back
+
+### OPEN-031 - How a photorealistic path is reached, now that both candidates are unavailable as shipped
+- question: XC-087 gives the product a photorealistic direction and XC-037 named Omniverse as the
+  optional path to it. Measured on 2026-08-25, **neither candidate is reachable from what this product
+  ships**, and for two unrelated reasons. Omniverse's Kit may not be distributed inside another
+  application at all (E-151, XC-250). And the pinned VTK 9.5.2 wheel contains **no ray-tracing back end
+  whatsoever** - no OSPRay, ANARI, OptiX, OpenVKL or Embree module among its 27 rendering modules
+  (E-153) - so the path ParaView offers is absent from the build here
+- why_open: the three ways forward cost different things and none is obviously right.
+  **Build VTK from source with OSPRay enabled.** XC-034 chose the published wheel and listed two reasons
+  to build later - size and disabling readers with advisories. This is a **third reason nobody had**,
+  and it is a stronger one: it buys a capability rather than removing an obligation. It costs a
+  toolchain, a multi-hour build and a per-release burden on three platforms.
+  **Use OSPRay directly, beside VTK rather than through it.** OSPRay, Embree and Open Image Denoise are
+  plain Apache-2.0 with no restrictions (E-154), run on CPU, and render **unstructured volumes** - which
+  is CAE data. It avoids the VTK build and means writing the bridge from a @Dataset to OSPRay's scene,
+  which VTK's own module already is.
+  **Ship no photorealistic path in the first release.** XC-087 already makes the interactive and
+  offscreen paths a division of labour, and both work today; the photorealistic one is the
+  differentiator XC-037 was chosen for, not a requirement of any acceptance criterion.
+  The measurement that would decide it does not exist yet: what OSPRay costs to render this product's
+  own worst case (LIM-002's ten million triangles, LIM-001's eight gigabytes) on the integrated-graphics
+  machine class, against what the OpenGL path already does there (E-063)
+- blocks: nothing today - MOD-003 has no renderer. It blocks the first decision about how MOD-003 is
+  built, which is the next substantial piece of work
+- closes_when: OSPRay is measured on this product's worst case on the measured machine class, and one
+  of the three is chosen against that figure rather than against the licence position, which is now
+  settled either way (XC-250)
+- affects: MOD-003, XC-034, XC-037, XC-087, OPEN-023, LIM-002
+- decidedness: Open
+
+### XC-251 - The renderer is reached through ANARI, so changing it is a back end and not a rewrite
+- decided: 2026-08-25
+- status: active
+- decision: where this product renders by ray tracing, it targets **ANARI** - the Khronos scene API -
+  rather than any one renderer's own interface. The back end is then a **choice made at run time from
+  what the machine has**: Intel **OSPRay** on any CPU, NVIDIA **VisRTX** where there is an NVIDIA GPU,
+  AMD **RadeonProRender** where there is a Radeon, and the SDK's own **`helide`** CPU reference where
+  there is nothing else (E-155, E-156). All five of those - the SDK and the four devices - are
+  Apache-2.0 or BSD-3-Clause with no field-of-use restriction.
+  This does **not** decide that ray tracing ships (OPEN-031) or which back end is the default (XC-087
+  governs the paths that exist today). It decides the shape of the seam, before anything is written
+  against a shape that would have to be undone
+- decided_by: the product owner, 2026-08-25
+- rationale: the renderer is the single most likely part of this product to change, and the reasons are
+  already visible: the licence position moved twice in one day of reading, the shipped build has no ray
+  tracer at all (E-153), and the hardware a customer has is not something this product chooses. A seam
+  that makes that change a back end rather than a rewrite is worth taking before the first line, and
+  ANARI is that seam - it exists, it is Khronos, three vendors implement it, and Kitware already
+  maintains a `Rendering/ANARI` module in VTK's source.
+  It also settles the vendor question without settling it. Writing to OSPRay's interface would make
+  Intel a dependency; writing to OptiX would make NVIDIA one and re-open everything XC-250 just closed.
+  Writing to ANARI makes **none of them** a dependency, and a customer with an RTX card gets RTX while a
+  customer with a laptop gets the same picture more slowly
+- alternatives: writing to one renderer's interface is less code today and is the change this decision
+  exists to avoid. Writing an abstraction of our own is the same work as ANARI with none of the
+  conformance suite, none of the vendors and none of the specification. Rendering only through
+  OpenGL - what the shipped build does - is what happens if OPEN-031 chooses the third way, and this
+  decision costs nothing in that case because nothing is written
+- basis: E-155 (T1), E-156 (T1), E-153 (T1)
+- affects: MOD-003, XC-087, XC-250, OPEN-031, INV-002
+- decidedness: Fixed
+- reversal_trigger: ANARI failing to ratify - it is 1.0 since August 2023 with 1.1 in preview, and
+  conformance still waits on the Adopters Program (E-155). A standard that stalls is an abstraction
+  with one implementation, which is worse than the vendor interface it replaced
 ### XC-252 - The vocabulary crosses the language boundary by generation, not by a second definition
 - decided: 2026-08-25
 - status: active

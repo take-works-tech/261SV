@@ -109,6 +109,12 @@ ran. Every gate in `validate/` runs in `.github/workflows/ci.yml`, and
   OPEN-020), so a direct push to `main` skips every check. Judgement is still required and nothing
   compels it - and it is now the only thing standing between a green pull request and the machinery
   that decides what green means.
+  **It merges what was pushed when the checks went green, and nothing after that.** A commit pushed to
+  a branch whose pull request has already passed is left on the branch: the squash took the tree as it
+  stood, the branch commits are not ancestors of the result, and the branch looks merged. This has
+  happened here - three commits of specification research were pushed minutes after PR #79 merged and
+  reached nobody until `git log main..branch` was run. **Push, then watch it merge, then start the next
+  piece on a new branch from `main`** - do not keep committing to a branch that is already green.
   A pull request **in conflict receives no checks at all** and therefore never merges - GitHub does not
   run `pull_request` workflows while the merge commit cannot be computed. It looks like the mechanism
   failing; merge `main` into the branch (never rebase) and the checks appear.

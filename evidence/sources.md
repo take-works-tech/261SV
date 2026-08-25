@@ -1664,3 +1664,144 @@ Recorded so that nothing silently depends on them:
   plot-over-line - may be taken into a commercial product on the same terms as VTK itself (E-002),
   which is a **licence** answer and not a maintenance one.
 - justifies: XC-248
+
+### E-148 - NVIDIA PhysX, licence read directly
+- tier: T1
+- url: https://raw.githubusercontent.com/NVIDIA-Omniverse/PhysX/main/LICENSE.md
+- verified: 2026-08-25
+- says: **BSD 3-Clause**, copyright NVIDIA Corporation 2008-2025. Source and binary redistribution both
+  permitted on the usual notice-and-disclaimer conditions; the only prohibition is endorsement using
+  NVIDIA's name. **No hardware restriction, no field-of-use restriction, no competing-products
+  restriction**, and no component of the repository under different terms. The GPU simulation kernels
+  are included under the same licence.
+- justifies: XC-250
+
+### E-149 - NVIDIA MDL SDK, licence read directly
+- tier: T1
+- url: https://raw.githubusercontent.com/NVIDIA/MDL-SDK/master/LICENSE.md
+- verified: 2026-08-25
+- says: **BSD 3-Clause**, copyright NVIDIA Corporation 2018-2026, with the usual notice conditions and
+  the endorsement prohibition. **No hardware, field-of-use or competing-products restriction** is
+  stated, and no component carries separate terms.
+- justifies: XC-250
+- note: this matters to this product specifically. MaterialX is already the canonical material graph
+  (XC-115 and the technology table), and MDL is the language NVIDIA's own renderers consume - so the
+  SDK is the piece that would let a MaterialX graph reach a photorealistic path **without** the piece
+  that cannot be redistributed.
+
+### E-150 - NVIDIA Warp, licence read directly
+- tier: T1
+- url: https://raw.githubusercontent.com/NVIDIA/warp/main/LICENSE.md
+- verified: 2026-08-25
+- says: **Apache License 2.0**, copyright NVIDIA Corporation & Affiliates 2022. Commercial
+  redistribution permitted on the usual attribution and licence-delivery conditions. No hardware,
+  field-of-use or competing-products restriction is stated.
+- justifies: XC-250
+
+### E-151 - What the Omniverse License Agreement actually forbids
+- tier: T1
+- url: https://raw.githubusercontent.com/NVIDIA-Omniverse/kit-cae/main/LICENSE
+- verified: 2026-08-25
+- says: the agreement governing Omniverse Kit and everything built on it states three things this
+  product cannot work around.
+  **"you may not use the Omniverse Products for the purpose of developing competing products or
+  technologies."**
+  **The Kit itself may not be distributed** - only specific extensions, snippets of thirty lines or
+  fewer, and derivative works meeting stated criteria.
+  **Public distribution "must take place either through the Exchange or through a fork of the Omniverse
+  GitHub Repository"**, and the terms a distributor imposes "must be at least as protective as the terms
+  of this license".
+  Attribution is required in the form "This software contains source code provided by NVIDIA
+  Corporation".
+- justifies: XC-250, OPEN-030
+- note: this **confirms E-009 against a contradicting reading taken the same day**. A summarised fetch of
+  the Product Specific Terms page reported that no competing-products clause and no benchmark clause
+  were stated; the licence text above states the competing-products prohibition in as many words. The
+  recorded evidence was right and the summary was not, which is the argument for reading licence texts
+  rather than pages about them.
+
+### E-152 - What `kit-cae` provides, and what it requires
+- tier: T1
+- url: https://github.com/NVIDIA-Omniverse/kit-cae
+- verified: 2026-08-25
+- says: NVIDIA publishes a Kit sample **for CAE** - OpenUSD schemas and file-format plugins that compose
+  and lazily access scientific datasets **without conversion**, with reference implementations for
+  **CGNS, EnSight, VTK and OpenFOAM**; Warp-based GPU data-processing and visualisation algorithms; RTX
+  and IndeX rendering of surfaces, volumes and particles; and capture and WebRTC streaming skills.
+  Its extensions **require the Omniverse Kit SDK**, and the repository states that development using
+  the Kit SDK is subject to the Omniverse licensing terms (E-151).
+- justifies: XC-250
+- note: this is the closest published work to this product's own subject, and it is the clearest case of
+  the distinction XC-250 draws: what it does is directly relevant, and what it runs on cannot be
+  shipped inside somebody else's desktop application.
+
+### E-153 - The published VTK wheel contains no ray-tracing back end
+- tier: T1
+- url: spike/measure_vtk_rendering_modules.py
+- verified: 2026-08-25
+- says: measured on 2026-08-25 against the pinned **VTK 9.5.2** wheel. It carries 163 modules, 27 of
+  them rendering, and **none of OSPRay, RayTracing, ANARI, OptiX, OpenVKL or Embree is among them**.
+  The 27 are the OpenGL2, volume, VR/OpenXR, LIC, label, annotation and vtk.js-export families.
+  So the ray-traced path ParaView offers - which is OSPRay - is **absent from the build this product
+  ships**, and reaching it means building VTK from source with the module enabled. This is a fact about
+  the wheel, not about VTK: VTK's documentation describes what VTK can be built with.
+- justifies: XC-034, XC-087, OPEN-031
+
+### E-154 - The Intel rendering stack, licences read directly
+- tier: T1
+- url: https://raw.githubusercontent.com/RenderKit/ospray/master/LICENSE.txt
+- verified: 2026-08-25
+- says: **OSPRay**, **Embree** and **Open Image Denoise** each ship a LICENSE file containing the
+  **plain Apache License 2.0 text with no additional clause** - no hardware restriction, no
+  field-of-use restriction, no competing-products restriction, and no product-specific addendum of any
+  kind. Copyright Intel; the projects are maintained under the `RenderKit` organisation.
+  OSPRay is a ray tracing engine for high-fidelity visualisation that renders **surfaces** (meshes,
+  subdivision surfaces, spheres, curves, boxes, planes), **volumes** (structured regular and spherical,
+  AMR, **unstructured**, VDB and particle volumes) and **isosurfaces**. It runs on **CPUs** - Intel
+  architecture and Aarch64/ARM64 - with a beta implementation for Intel GPUs. Its dependencies are
+  Embree, Open VKL, Open Image Denoise, ISPC and TBB.
+- justifies: XC-250, OPEN-031
+- note: the CPU point is what makes this relevant here rather than merely available. XC-086 supports a
+  business laptop with integrated graphics, and INV-007 makes offline a feature - a photorealistic path
+  that needs neither a particular vendor's GPU nor a network is the only one that fits both.
+
+### E-155 - ANARI: one interface, three vendors' renderers behind it
+- tier: T1
+- url: https://www.khronos.org/anari
+- verified: 2026-08-25
+- says: ANARI is a Khronos C99 API with C++ wrappers that builds an in-memory scene tree for one frame,
+  sitting **above** the low-level graphics APIs. Khronos states it "significantly simplifies the
+  development of applications in domains such as scientific visualization" and it names scientific and
+  exploratory visualisation as its target domain explicitly.
+  **Three vendors provide back ends**: AMD RadeonProRender, Intel OSPRay (CPU and GPU through the oneAPI
+  Rendering Toolkit) and NVIDIA VisRTX (RTX-accelerated). Barney, Visionaray and Cycles are named as
+  further implementations.
+  ANARI 1.0 launched in August 2023 and 1.1 is in preview with a feature freeze of 2025-08-07. It is
+  **not yet fully ratified**: implementations are "expected to be officially conformant when the ANARI
+  1.0 Adopters Program is released".
+- justifies: OPEN-031, XC-251
+
+### E-156 - The ANARI implementations, licences read through the registry
+- tier: T1
+- url: https://api.github.com/repos/KhronosGroup/ANARI-SDK/license
+- verified: 2026-08-25
+- says: read on 2026-08-25 through GitHub's licence endpoint, which reports the SPDX identifier the
+  repository's own licence file declares.
+  **ANARI-SDK** (Khronos): Apache-2.0. It ships the API headers and front-end library, the `helium`
+  utilities for building a device, **`helide` - a CPU reference ray tracer using Embree** - a debug
+  validation device, a capability-analysis tool and a conformance suite.
+  **NVIDIA VisRTX**: **BSD-3-Clause**, copyright NVIDIA 2019-2026, read from the licence text itself
+  because the registry reports NOASSERTION - the file carries a trailing paragraph excepting the sample
+  applications' own external libraries, which is what defeats the classifier. It is an OptiX-based
+  ANARI device with an experimental OpenGL device beside it, and **nothing in it refers to Omniverse or
+  the Kit SDK**.
+  **AMD RadeonProRenderANARI**: Apache-2.0.
+  **Intel `anari-ospray`**: Apache-2.0.
+  **Intel OSPRay, Embree, Open Image Denoise, Open VKL**: Apache-2.0, all four.
+  **VTK's own source tree carries `Rendering/ANARI` and `Rendering/RayTracing`** - so the bridge from
+  this product's data model to ANARI is a module Kitware already maintains, absent only from the
+  published wheel (E-153).
+- justifies: XC-251, OPEN-031
+- note: VisRTX's **source** is BSD-3; running it needs OptiX, which is NVIDIA's own licence and NVIDIA
+  hardware. The permissive licence removes the redistribution problem, not the hardware one - which is
+  the same shape as CUDA and a different shape from the Kit SDK, where redistribution itself is barred.

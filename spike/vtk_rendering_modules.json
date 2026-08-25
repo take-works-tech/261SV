@@ -1,0 +1,42 @@
+{
+  "vtk_version": "9.5.2",
+  "module_count": 163,
+  "rendering_modules": [
+    "vtkRenderingAnnotation",
+    "vtkRenderingCellGrid",
+    "vtkRenderingContext2D",
+    "vtkRenderingContextOpenGL2",
+    "vtkRenderingCore",
+    "vtkRenderingExternal",
+    "vtkRenderingFreeType",
+    "vtkRenderingGL2PSOpenGL2",
+    "vtkRenderingGridAxes",
+    "vtkRenderingHyperTreeGrid",
+    "vtkRenderingImage",
+    "vtkRenderingLICOpenGL2",
+    "vtkRenderingLOD",
+    "vtkRenderingLabel",
+    "vtkRenderingMatplotlib",
+    "vtkRenderingOpenGL2",
+    "vtkRenderingOpenXR",
+    "vtkRenderingOpenXRRemoting",
+    "vtkRenderingParallel",
+    "vtkRenderingSceneGraph",
+    "vtkRenderingUI",
+    "vtkRenderingVR",
+    "vtkRenderingVRModels",
+    "vtkRenderingVolume",
+    "vtkRenderingVolumeAMR",
+    "vtkRenderingVolumeOpenGL2",
+    "vtkRenderingVtkJS"
+  ],
+  "looked_for": {
+    "OSPRay": [],
+    "RayTracing": [],
+    "Anari": [],
+    "OptiX": [],
+    "OpenVKL": [],
+    "Embree": []
+  },
+  "any_ray_tracing": false
+}
