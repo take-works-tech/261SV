@@ -1649,3 +1649,18 @@ Recorded so that nothing silently depends on them:
   3.12: the reference point had moved and the assertion was measuring the interpreter. `pyproject.toml`
   requires 3.12 and `conftest.py` prints a warning when the suite runs on anything older, which is the
   warning that would have caught it.
+
+### E-147 - ParaView's own licence, read directly
+- tier: T1
+- url: https://gitlab.kitware.com/paraview/paraview/-/raw/master/Copyright.txt
+- verified: 2026-08-25
+- says: ParaView is **BSD 3-Clause**, copyright Kitware Inc. Binary redistribution requires reproducing
+  the copyright notice, the list of conditions and the disclaimer in the documentation or other
+  materials supplied with the distribution; the only prohibition is using Kitware's name or a
+  contributor's name to endorse a derived product without written permission. There is no
+  source-disclosure or copyleft obligation, and the file states no different licence for any part of
+  the repository.
+  So ParaView's own code - the readers VTK does not have, the application-level filters such as
+  plot-over-line - may be taken into a commercial product on the same terms as VTK itself (E-002),
+  which is a **licence** answer and not a maintenance one.
+- justifies: XC-248

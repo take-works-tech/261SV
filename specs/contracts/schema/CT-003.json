@@ -212,6 +212,1270 @@
           "minimum": 1
         }
       }
+    },
+    "operationParameters": {
+      "description": "引数の名前・型・必須／任意を、操作ごとに。表の散文の列は残し、文脈での意味を述べる仕事に専念する — 名前がどこで終わるかを散文から推測させないため（OPEN-028）",
+      "properties": {
+        "workspace.open": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "開くワークスペースファイルのパス"
+            }
+          }
+        },
+        "workspace.save": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "workspaceId"
+          ],
+          "properties": {
+            "workspaceId": {
+              "type": "string",
+              "description": "ワークスペース の識別子（CT-001）"
+            },
+            "path": {
+              "type": "string",
+              "description": "別名で保存する先"
+            }
+          }
+        },
+        "workspace.close": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "workspaceId"
+          ],
+          "properties": {
+            "workspaceId": {
+              "type": "string",
+              "description": "ワークスペース の識別子（CT-001）"
+            }
+          }
+        },
+        "case.create": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "workspaceId"
+          ],
+          "properties": {
+            "workspaceId": {
+              "type": "string",
+              "description": "ワークスペース の識別子（CT-001）"
+            },
+            "name": {
+              "type": "string",
+              "description": "ケース名。同じ種類の中で一意"
+            },
+            "parentCaseId": {
+              "type": "string",
+              "description": "親ケース の識別子（CT-001）"
+            }
+          }
+        },
+        "case.delete": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "caseId"
+          ],
+          "properties": {
+            "caseId": {
+              "type": "string",
+              "description": "ケース の識別子（CT-001）"
+            }
+          }
+        },
+        "case.move": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "caseId",
+            "newParentId"
+          ],
+          "properties": {
+            "caseId": {
+              "type": "string",
+              "description": "ケース の識別子（CT-001）"
+            },
+            "newParentId": {
+              "type": "string",
+              "description": "移動先の親ケース の識別子（CT-001）"
+            }
+          }
+        },
+        "case.tag": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "caseId",
+            "tags"
+          ],
+          "properties": {
+            "caseId": {
+              "type": "string",
+              "description": "ケース の識別子（CT-001）"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "付けるタグ"
+            }
+          }
+        },
+        "dataset.load": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "caseId",
+            "filePaths"
+          ],
+          "properties": {
+            "caseId": {
+              "type": "string",
+              "description": "ケース の識別子（CT-001）"
+            },
+            "filePaths": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "読み込むファイル"
+            }
+          }
+        },
+        "dataset.describe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "datasetId"
+          ],
+          "properties": {
+            "datasetId": {
+              "type": "string",
+              "description": "データセット の識別子（CT-001）"
+            }
+          }
+        },
+        "field.declareUnit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "datasetId",
+            "fieldName",
+            "unitSymbol"
+          ],
+          "properties": {
+            "datasetId": {
+              "type": "string",
+              "description": "データセット の識別子（CT-001）"
+            },
+            "fieldName": {
+              "type": "string",
+              "description": "フィールド名"
+            },
+            "unitSymbol": {
+              "type": "string",
+              "description": "宣言する単位。積・商も可（XC-244）"
+            }
+          }
+        },
+        "field.statistics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "datasetId",
+            "fieldName"
+          ],
+          "properties": {
+            "datasetId": {
+              "type": "string",
+              "description": "データセット の識別子（CT-001）"
+            },
+            "fieldName": {
+              "type": "string",
+              "description": "フィールド名"
+            },
+            "region": {
+              "type": "string",
+              "description": "対象範囲。省略時は全体で、その範囲は結果に記録される（INV-017）"
+            }
+          }
+        },
+        "variable.declare": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "value"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "変数名"
+            },
+            "value": {
+              "description": "値。数値・文字列・真偽"
+            },
+            "workspaceId": {
+              "type": "string",
+              "description": "ワークスペース の識別子（CT-001）"
+            },
+            "caseId": {
+              "type": "string",
+              "description": "ケース の識別子（CT-001）"
+            },
+            "unit": {
+              "type": "string",
+              "description": "宣言する単位。無ければ未宣言として扱う（XC-003）"
+            }
+          },
+          "oneOf": [
+            {
+              "required": [
+                "workspaceId"
+              ]
+            },
+            {
+              "required": [
+                "caseId"
+              ]
+            }
+          ],
+          "description": "変数はワークスペースかケースのどちらかに属します。どちらでもない宣言は行き場がありません"
+        },
+        "variable.set": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value",
+            "variableId"
+          ],
+          "properties": {
+            "variableId": {
+              "type": "string",
+              "description": "変数 の識別子（CT-001）"
+            },
+            "value": {
+              "description": "新しい値"
+            }
+          }
+        },
+        "variable.detach": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "caseId",
+            "variableId"
+          ],
+          "properties": {
+            "caseId": {
+              "type": "string",
+              "description": "ケース の識別子（CT-001）"
+            },
+            "variableId": {
+              "type": "string",
+              "description": "変数 の識別子（CT-001）"
+            }
+          }
+        },
+        "view.create": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "definition",
+            "workspaceId"
+          ],
+          "properties": {
+            "workspaceId": {
+              "type": "string",
+              "description": "ワークスペース の識別子（CT-001）"
+            },
+            "definition": {
+              "type": "object",
+              "description": "CT-004 のビュー定義"
+            },
+            "sourceTemplateId": {
+              "type": "string",
+              "description": "元テンプレート の識別子（CT-001）"
+            },
+            "sourceTemplateRevision": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "版。省略も既定もしない — 誰も選んでいない固定は実行日の最新版に追随する"
+            }
+          }
+        },
+        "view.update": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "definition",
+            "viewId"
+          ],
+          "properties": {
+            "viewId": {
+              "type": "string",
+              "description": "ビュー の識別子（CT-001）"
+            },
+            "definition": {
+              "type": "object",
+              "description": "CT-004"
+            }
+          }
+        },
+        "view.duplicate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "newName",
+            "viewId"
+          ],
+          "properties": {
+            "viewId": {
+              "type": "string",
+              "description": "ビュー の識別子（CT-001）"
+            },
+            "newName": {
+              "type": "string",
+              "description": "複製の名前"
+            }
+          }
+        },
+        "view.rename": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "newName",
+            "viewId"
+          ],
+          "properties": {
+            "viewId": {
+              "type": "string",
+              "description": "ビュー の識別子（CT-001）"
+            },
+            "newName": {
+              "type": "string",
+              "description": "新しい名前"
+            }
+          }
+        },
+        "view.delete": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "viewId"
+          ],
+          "properties": {
+            "viewId": {
+              "type": "string",
+              "description": "ビュー の識別子（CT-001）"
+            }
+          }
+        },
+        "view.render": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "format",
+            "height",
+            "viewId",
+            "width"
+          ],
+          "properties": {
+            "viewId": {
+              "type": "string",
+              "description": "ビュー の識別子（CT-001）"
+            },
+            "width": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "format": {
+              "type": "string",
+              "enum": [
+                "png",
+                "jpeg",
+                "webp"
+              ]
+            }
+          }
+        },
+        "graph.create": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "definition",
+            "workspaceId"
+          ],
+          "properties": {
+            "workspaceId": {
+              "type": "string",
+              "description": "ワークスペース の識別子（CT-001）"
+            },
+            "definition": {
+              "type": "object",
+              "description": "CT-005 のグラフ定義"
+            },
+            "sourceTemplateId": {
+              "type": "string",
+              "description": "元テンプレート の識別子（CT-001）"
+            },
+            "sourceTemplateRevision": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "版。省略も既定もしない — 誰も選んでいない固定は実行日の最新版に追随する"
+            }
+          }
+        },
+        "graph.update": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "definition",
+            "graphId"
+          ],
+          "properties": {
+            "graphId": {
+              "type": "string",
+              "description": "グラフ の識別子（CT-001）"
+            },
+            "definition": {
+              "type": "object",
+              "description": "CT-005"
+            }
+          }
+        },
+        "graph.duplicate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "graphId",
+            "newName"
+          ],
+          "properties": {
+            "graphId": {
+              "type": "string",
+              "description": "グラフ の識別子（CT-001）"
+            },
+            "newName": {
+              "type": "string",
+              "description": "複製の名前"
+            }
+          }
+        },
+        "graph.rename": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "graphId",
+            "newName"
+          ],
+          "properties": {
+            "graphId": {
+              "type": "string",
+              "description": "グラフ の識別子（CT-001）"
+            },
+            "newName": {
+              "type": "string",
+              "description": "新しい名前"
+            }
+          }
+        },
+        "graph.delete": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "graphId"
+          ],
+          "properties": {
+            "graphId": {
+              "type": "string",
+              "description": "グラフ の識別子（CT-001）"
+            }
+          }
+        },
+        "graph.data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "graphId"
+          ],
+          "properties": {
+            "graphId": {
+              "type": "string",
+              "description": "グラフ の識別子（CT-001）"
+            }
+          }
+        },
+        "diff.create": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "basisCaseId",
+            "caseIdA",
+            "caseIdB"
+          ],
+          "properties": {
+            "caseIdA": {
+              "type": "string",
+              "description": "左のケース の識別子（CT-001）"
+            },
+            "caseIdB": {
+              "type": "string",
+              "description": "右のケース の識別子（CT-001）"
+            },
+            "basisCaseId": {
+              "type": "string",
+              "description": "どちらのメッシュ上で比べるか。利用者が指名する（XC-038）"
+            }
+          }
+        },
+        "report.create": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "definition",
+            "workspaceId"
+          ],
+          "properties": {
+            "workspaceId": {
+              "type": "string",
+              "description": "ワークスペース の識別子（CT-001）"
+            },
+            "definition": {
+              "type": "object",
+              "description": "CT-006 のレポート定義"
+            },
+            "sourceTemplateId": {
+              "type": "string",
+              "description": "元テンプレート の識別子（CT-001）"
+            },
+            "sourceTemplateRevision": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "版。省略も既定もしない — 誰も選んでいない固定は実行日の最新版に追随する"
+            }
+          }
+        },
+        "report.update": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "definition",
+            "reportId"
+          ],
+          "properties": {
+            "reportId": {
+              "type": "string",
+              "description": "レポート の識別子（CT-001）"
+            },
+            "definition": {
+              "type": "object",
+              "description": "CT-006"
+            }
+          }
+        },
+        "report.duplicate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "newName",
+            "reportId"
+          ],
+          "properties": {
+            "reportId": {
+              "type": "string",
+              "description": "レポート の識別子（CT-001）"
+            },
+            "newName": {
+              "type": "string",
+              "description": "複製の名前"
+            }
+          }
+        },
+        "report.rename": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "newName",
+            "reportId"
+          ],
+          "properties": {
+            "reportId": {
+              "type": "string",
+              "description": "レポート の識別子（CT-001）"
+            },
+            "newName": {
+              "type": "string",
+              "description": "新しい名前"
+            }
+          }
+        },
+        "report.delete": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reportId"
+          ],
+          "properties": {
+            "reportId": {
+              "type": "string",
+              "description": "レポート の識別子（CT-001）"
+            }
+          }
+        },
+        "report.export": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "reportId"
+          ],
+          "properties": {
+            "reportId": {
+              "type": "string",
+              "description": "レポート の識別子（CT-001）"
+            },
+            "path": {
+              "type": "string",
+              "description": "書き出し先"
+            }
+          }
+        },
+        "system.capabilities": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {}
+        },
+        "system.protocols": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {}
+        },
+        "history.undo": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "undoId"
+          ],
+          "properties": {
+            "undoId": {
+              "type": "string",
+              "description": "取り消し の識別子（CT-001）"
+            }
+          }
+        },
+        "history.list": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "workspaceId"
+          ],
+          "properties": {
+            "workspaceId": {
+              "type": "string",
+              "description": "ワークスペース の識別子（CT-001）"
+            }
+          }
+        },
+        "dataset.probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "datasetId",
+            "pointM",
+            "resultPosition"
+          ],
+          "properties": {
+            "datasetId": {
+              "type": "string",
+              "description": "データセット の識別子（CT-001）"
+            },
+            "pointM": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3,
+              "description": "正準フレームのメートル座標（INV-001）"
+            },
+            "resultPosition": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "結果軸上の位置。時間とは限らない（XC-131）"
+            }
+          }
+        },
+        "dataset.parts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "datasetId"
+          ],
+          "properties": {
+            "datasetId": {
+              "type": "string",
+              "description": "データセット の識別子（CT-001）"
+            }
+          }
+        },
+        "field.derive": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "datasetId",
+            "fieldName",
+            "quantity"
+          ],
+          "properties": {
+            "datasetId": {
+              "type": "string",
+              "description": "データセット の識別子（CT-001）"
+            },
+            "fieldName": {
+              "type": "string",
+              "description": "元のフィールド名"
+            },
+            "quantity": {
+              "type": "string",
+              "description": "15_derived_quantities.md のカタログにある量"
+            },
+            "frameId": {
+              "type": "string",
+              "description": "報告するフレーム の識別子（CT-001）"
+            }
+          }
+        },
+        "field.setDisplayUnit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "quantity",
+            "unitSymbol",
+            "workspaceId"
+          ],
+          "properties": {
+            "workspaceId": {
+              "type": "string",
+              "description": "ワークスペース の識別子（CT-001）"
+            },
+            "quantity": {
+              "type": "string",
+              "description": "表示単位を変える量"
+            },
+            "unitSymbol": {
+              "type": "string",
+              "description": "表示に使う単位。保存は正準のまま（INV-026）"
+            }
+          }
+        },
+        "frame.declare": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "axis",
+            "kind",
+            "name",
+            "origin",
+            "workspaceId"
+          ],
+          "properties": {
+            "workspaceId": {
+              "type": "string",
+              "description": "ワークスペース の識別子（CT-001）"
+            },
+            "name": {
+              "type": "string",
+              "description": "フレーム名"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "cartesian",
+                "cylindrical",
+                "spherical"
+              ]
+            },
+            "origin": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3,
+              "description": "正準フレームのメートル座標"
+            },
+            "axis": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3
+            }
+          }
+        },
+        "measurement.import": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "caseId",
+            "source",
+            "values"
+          ],
+          "properties": {
+            "caseId": {
+              "type": "string",
+              "description": "ケース の識別子（CT-001）"
+            },
+            "values": {
+              "type": "array",
+              "description": "値・単位・不確かさの組（XC-125）",
+              "items": {
+                "type": "object"
+              }
+            },
+            "source": {
+              "type": "string",
+              "description": "出所。試験機、装置、報告書など"
+            }
+          }
+        },
+        "case.proposeTags": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "caseIds"
+          ],
+          "properties": {
+            "caseIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "提案の対象とするケース"
+            }
+          }
+        },
+        "template.createFromItem": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "targetScope",
+            "workspaceItemId",
+            "workspaceItemRevision"
+          ],
+          "properties": {
+            "workspaceItemId": {
+              "type": "string",
+              "description": "ワークスペース項目 の識別子（CT-001）"
+            },
+            "workspaceItemRevision": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "版。省略も既定もしない — 誰も選んでいない固定は実行日の最新版に追随する"
+            },
+            "targetScope": {
+              "type": "string",
+              "enum": [
+                "workspace",
+                "shared"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "description": "テンプレート名"
+            }
+          }
+        },
+        "template.apply": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "targetSelection",
+            "templateId",
+            "templateRevision",
+            "workspaceId"
+          ],
+          "properties": {
+            "templateId": {
+              "type": "string",
+              "description": "テンプレート の識別子（CT-001）"
+            },
+            "templateRevision": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "版。省略も既定もしない — 誰も選んでいない固定は実行日の最新版に追随する"
+            },
+            "workspaceId": {
+              "type": "string",
+              "description": "適用先のワークスペース の識別子（CT-001）"
+            },
+            "targetSelection": {
+              "type": "object",
+              "description": "CT-007 の選択"
+            }
+          }
+        },
+        "template.promote": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "targetScope",
+            "templateId"
+          ],
+          "properties": {
+            "templateId": {
+              "type": "string",
+              "description": "テンプレート の識別子（CT-001）"
+            },
+            "targetScope": {
+              "type": "string",
+              "enum": [
+                "workspace",
+                "shared"
+              ]
+            }
+          }
+        },
+        "template.export": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "templateId"
+          ],
+          "properties": {
+            "templateId": {
+              "type": "string",
+              "description": "テンプレート の識別子（CT-001）"
+            },
+            "path": {
+              "type": "string",
+              "description": "書き出し先"
+            }
+          }
+        },
+        "template.import": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "targetScope"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "読み込むファイル"
+            },
+            "targetScope": {
+              "type": "string",
+              "enum": [
+                "workspace",
+                "shared"
+              ]
+            }
+          }
+        },
+        "library.list": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {
+            "scope": {
+              "type": "string",
+              "enum": [
+                "sample",
+                "workspace",
+                "shared"
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "view",
+                "graph",
+                "report",
+                "material",
+                "asset"
+              ]
+            }
+          }
+        },
+        "pipeline.create": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "definition",
+            "workspaceId"
+          ],
+          "properties": {
+            "workspaceId": {
+              "type": "string",
+              "description": "ワークスペース の識別子（CT-001）"
+            },
+            "definition": {
+              "type": "object",
+              "description": "CT-009 のパイプライン定義"
+            }
+          }
+        },
+        "pipeline.update": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "definition",
+            "pipelineId"
+          ],
+          "properties": {
+            "pipelineId": {
+              "type": "string",
+              "description": "パイプライン の識別子（CT-001）"
+            },
+            "definition": {
+              "type": "object",
+              "description": "CT-009"
+            }
+          }
+        },
+        "pipeline.dryRun": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "pipelineId"
+          ],
+          "properties": {
+            "pipelineId": {
+              "type": "string",
+              "description": "パイプライン の識別子（CT-001）"
+            },
+            "startingCases": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "対象集合の初期値"
+            }
+          }
+        },
+        "pipeline.run": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "pipelineId"
+          ],
+          "properties": {
+            "pipelineId": {
+              "type": "string",
+              "description": "パイプライン の識別子（CT-001）"
+            },
+            "startingCases": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "対象集合の初期値"
+            },
+            "destructiveAuthorisation": {
+              "type": "array",
+              "description": "破壊的ユニットの承認。単位ごとに、対象件数つき（XC-094）",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "unitId",
+                  "caseCount"
+                ],
+                "properties": {
+                  "unitId": {
+                    "type": "string"
+                  },
+                  "caseCount": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "pipeline.cancel": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runId"
+          ],
+          "properties": {
+            "runId": {
+              "type": "string",
+              "description": "実行 の識別子（CT-001）"
+            }
+          }
+        },
+        "script.run": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "authorisation"
+          ],
+          "properties": {
+            "authorisation": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "人が実行を指示したか、無人実行が有効か（XC-102）",
+              "properties": {
+                "byPerson": {
+                  "type": "boolean"
+                },
+                "unattended": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "scriptText": {
+              "type": "string",
+              "description": "スクリプト本文"
+            },
+            "path": {
+              "type": "string",
+              "description": "スクリプトファイルのパス"
+            }
+          },
+          "oneOf": [
+            {
+              "required": [
+                "scriptText"
+              ]
+            },
+            {
+              "required": [
+                "path"
+              ]
+            }
+          ],
+          "description": "本文かパスのどちらかが要ります。どちらも無ければ実行するものがありません"
+        },
+        "report.provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {
+            "exportedPath": {
+              "type": "string",
+              "description": "書き出された文書のパス"
+            },
+            "reportId": {
+              "type": "string",
+              "description": "レポート の識別子（CT-001）"
+            }
+          },
+          "oneOf": [
+            {
+              "required": [
+                "exportedPath"
+              ]
+            },
+            {
+              "required": [
+                "reportId"
+              ]
+            }
+          ],
+          "description": "書き出された文書か、レポート項目のどちらかを指してください"
+        },
+        "system.audit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {
+            "since": {
+              "type": "string",
+              "description": "この時刻より後の記録に限る。ISO 8601 の UTC"
+            }
+          }
+        },
+        "system.supportBundle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "consent",
+            "path"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "作成先"
+            },
+            "consent": {
+              "type": "boolean",
+              "description": "明示的な同意。既定はなく、無ければ拒否（XC-126）"
+            }
+          }
+        },
+        "workspace.pack": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "includeData",
+            "path",
+            "workspaceId"
+          ],
+          "properties": {
+            "workspaceId": {
+              "type": "string",
+              "description": "ワークスペース の識別子（CT-001）"
+            },
+            "path": {
+              "type": "string",
+              "description": "作成先"
+            },
+            "includeData": {
+              "type": "boolean",
+              "description": "入力データを同梱するか"
+            }
+          }
+        },
+        "output.prune": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runsToRemove",
+            "workspaceId"
+          ],
+          "properties": {
+            "workspaceId": {
+              "type": "string",
+              "description": "ワークスペース の識別子（CT-001）"
+            },
+            "runsToRemove": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "取り除く実行の識別子"
+            }
+          }
+        }
+      }
     }
   }
 }

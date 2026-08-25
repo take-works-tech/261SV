@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-21
+updated: 2026-08-25
 ---
 
 # Contract: engine API
@@ -37,6 +37,12 @@ a reason and changes nothing**; a failure carries a reason and states whether an
 
 The catalogue is the contract. Anything the interface can do appears here, and nothing appears here
 that the interface cannot do (INV-006).
+
+**The Parameters column says what each parameter means; `schema/CT-003.json` says what they are.**
+`$defs.operationParameters` carries one JSON Schema per operation - the name, the type, and whether it
+is required - and an implementation takes its accepted parameters from there rather than declaring its
+own (XC-249). The two are not two copies of one list: a schema cannot say that a template reference is
+optional *because the item may be original*, and a column cannot be compared against code.
 
 | Operation | Reads or writes | Parameters | Result |
 |---|---|---|---|

@@ -28,8 +28,13 @@ updated: 2026-08-25
   says so rather than reporting success
 - done: 2026-08-25. Every run prints what it checked and what it could not, and the blind spots
   are part of the output rather than a comment: no interface code to examine for AC-011, no
-  machine-readable keyboard scheme for AC-013, no machine-readable parameter list for OPEN-028, and -
-  where the gate is run somewhere without a `src/` tree - the generated catalogue it could not compare.
+  machine-readable keyboard scheme for AC-013, and - where the gate is run somewhere without a `src/`
+  tree - the generated catalogue it could not compare.
+  One of those blind spots closed the same day. OPEN-028 said CT-003 stated its parameters in prose, so
+  nothing compared a handler's declaration against the contract; the contract now carries a parameter
+  schema per operation - 134 parameters over 61 operations - the generated catalogue carries them into
+  the code, and a handler **cannot declare its own** any more. What CT-002 promises about an unknown
+  parameter is now a promise against the contract rather than against whatever the handler listed.
   A gate that finds nothing and reports success is worse than no gate, because it is believed.
 ### TASK-003 - Interface actions dispatch commands
 - satisfies: AC-011
