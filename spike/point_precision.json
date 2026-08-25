@@ -1,0 +1,35 @@
+{
+  "default_vtkPoints_data_type": 10,
+  "VTK_FLOAT": 10,
+  "VTK_DOUBLE": 11,
+  "cubes": {
+    "1.0": {
+      "exact": 1.0,
+      "float32": 0.9999999999999999,
+      "float32_relative_error": 1.1102230246251565e-16,
+      "float64": 0.9999999999999999,
+      "float64_relative_error": 1.1102230246251565e-16
+    },
+    "2.0": {
+      "exact": 8.0,
+      "float32": 7.999999999999999,
+      "float32_relative_error": 1.1102230246251565e-16,
+      "float64": 7.999999999999999,
+      "float64_relative_error": 1.1102230246251565e-16
+    },
+    "0.1": {
+      "exact": 0.0010000000000000002,
+      "float32": 0.0010000000447034842,
+      "float32_relative_error": 4.4703483970121014e-08,
+      "float64": 0.0010000000000000002,
+      "float64_relative_error": 0.0
+    },
+    "0.01": {
+      "exact": 1.0000000000000002e-06,
+      "float32": 9.99999932944776e-07,
+      "float32_relative_error": 6.705522414422509e-08,
+      "float64": 1.0000000000000002e-06,
+      "float64_relative_error": 0.0
+    }
+  }
+}

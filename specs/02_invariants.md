@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-24
+updated: 2026-08-25
 ---
 
 # Invariants
@@ -10,7 +10,10 @@ it. An invariant that cannot be judged is not an invariant - it is a wish.
 
 ### INV-001 - Reported numbers come from the canonical frame
 - statement: every number shown, exported or written into a @Report is computed on the @Dataset in the
-  canonical frame and its declared unit, never from display geometry
+  canonical frame and its declared unit, never from display geometry. The canonical frame's coordinates
+  are **float64**, refused otherwise at construction (XC-245): `vtkPoints` stores single precision by
+  default and a cell volume computed from it carries about 5e-8 of relative error (E-142), which
+  INV-017's volume weighting then multiplies into the reported value
 - rationale: display geometry is scaled, decimated and tessellated to make a picture; measuring it
   produces a number that is wrong in a way that looks right
 - checked_by: a test that renders a case at two zoom levels and two decimation settings and asserts
@@ -192,7 +195,9 @@ it. An invariant that cannot be judged is not an invariant - it is a wish.
   reported "average" that does not say which it is has not been reported. This is the single easiest way
   for this product to be confidently wrong
 - checked_by: a test on a mesh with deliberately non-uniform element sizes, asserting the two reductions
-  differ and that each output carries its weighting label
+  differ and that each output carries its weighting label. The weights are cell volumes, so this
+  invariant is why the canonical frame holds double-precision coordinates (XC-245, E-142) - the error in
+  a single-precision volume arrives in the weighted mean
 - decidedness: Fixed
 - basis: E-001 (T1)
 

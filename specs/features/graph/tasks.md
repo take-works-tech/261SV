@@ -160,17 +160,35 @@ updated: 2026-08-25
 - satisfies: AC-022
 - depends_on: TASK-001
 - done_when: reduction, scope and weighting are recorded and displayed, with the weighted default
-
+- done: 2026-08-25, `src/engine/analysis/summary.py` and `weights.py`. Cell data is volume-weighted and
+  point data dual-volume-weighted by default, and the reduction, the scope and the weighting are all on
+  the value rather than beside it.
+  Asking for a weighted reduction **without weights is refused**, never quietly downgraded to
+  arithmetic - the downgrade returns a different number under the label of the one that was asked for,
+  which is this invariant's whole subject. `min` and `max` are not weighted at all: an entry does not
+  become larger for occupying more space.
+  INV-017's own `checked_by` is executable now, on two cubes of side 1.0 and 0.1 - a thousand to one in
+  volume. The arithmetic mean is 25 MPa and the volume-weighted mean is 10.03 MPa, which is the gap
+  between a report that passes a limit and one that does not.
+  The side of 0.1 is deliberate: it is not exactly representable, which is the case where
+  single-precision coordinates put 4.5e-8 into the volume (E-142). A test on cubes of side 1 and 2 would
+  agree in both precisions and prove nothing.
 ### TASK-019 - Unweighted is labelled
 - satisfies: AC-023
 - depends_on: TASK-018
 - done_when: an unweighted reduction carries its label into tables, exports and reports
-
+- done: 2026-08-25. An unweighted reduction is labelled unweighted in the line the value is shown
+  as, not in a footnote available on request: the place a label goes missing is the place somebody reads
+  the number.
 ### TASK-020 - Empty scopes
 - satisfies: AC-024
 - depends_on: TASK-018
 - done_when: a scope with no valid entries reports unavailable rather than zero
-
+- done: 2026-08-25. A scope with no valid entries comes back **unavailable with the reason**,
+  never zero (AC-024). Zero is a number a reader compares against a limit, and "no entries" is not a
+  small average. The same holds where every entry is missing, and where the weights sum to zero - a
+  scope that is entirely surface has no volume to weight by, and that is a refusal rather than a
+  division.
 ### TASK-021 - Three-dimensional graph kinds
 - satisfies: AC-025
 - depends_on: TASK-001

@@ -1553,3 +1553,18 @@ Recorded so that nothing silently depends on them:
   any answer an evaluator produced would be one it invented. The same argument covers division, powers
   and every function that is not addition or comparison.
 - justifies: XC-242, pipeline/AC-030, pipeline/AC-031
+
+### E-142 - What single-precision coordinates cost a cell volume
+- tier: T1
+- url: spike/measure_point_precision.py
+- verified: 2026-08-25
+- says: measured on 2026-08-25 against **VTK 9.5.2**. `vtkPoints` stores coordinates in **float by
+  default** (`GetDataType()` returns `VTK_FLOAT`), and `vtkCellSizeFilter` computing the volume of a
+  unit-side cube reports a relative error of **4.5e-8 at side 0.1 and 6.7e-8 at side 0.01** from
+  single-precision points, against **0.0 at both** from the same coordinates stored as double. Sides of
+  1.0 and 2.0 agree to 1.1e-16 either way, because those coordinates are exactly representable in both
+  - so a check written against a cube of side 1 would find nothing.
+  The error is the coordinates', not the filter's: it is float32 epsilon carried into a product of three
+  numbers. It matters here because a volume-weighted mean multiplies field values by these volumes
+  (INV-017), so it does not stay in the geometry - it arrives in the reported number.
+- justifies: INV-001, XC-245, graph/AC-022

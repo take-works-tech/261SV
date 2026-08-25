@@ -4501,3 +4501,31 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a unit whose components are not integer powers of the four base quantities - a
   logarithmic unit such as a decibel, where a product of two values is a sum of two units
+
+### XC-245 - Geometry is held in double precision, and a dataset refuses anything else
+- decided: 2026-08-25
+- status: active
+- decision: `Dataset.points_m` is **float64**, checked at construction and refused otherwise. The
+  readers convert on load, at the same place the canonical-frame conversion already happens (INV-001),
+  and nothing downstream converts again
+- decided_by: the product owner, 2026-08-25
+- rationale: `vtkPoints` stores coordinates in float by default, and a cell volume computed from them
+  carries about 5e-8 of relative error where the same coordinates in double are exact (E-142). That
+  error does not stay in the geometry: INV-017 makes a summary statistic volume-weighted by default, so
+  every reported average multiplies field values by those volumes.
+  The measurement also shows why this had to be checked rather than assumed. Cubes of side 1.0 and 2.0
+  agree to 1.1e-16 in both precisions, because those coordinates are exactly representable - a test
+  written against a unit cube would have found nothing and reported that single precision was fine.
+  The readers were already converting. What was missing was the guarantee: a habit in one function is
+  not a property of the product, and the next reader is written by somebody who did not read that one
+- alternatives: converting silently inside the dataset accepts single-precision input and hides where
+  the conversion happened, which is the arrangement that makes a second conversion invisible when
+  somebody adds one. Holding single precision to halve the memory is a real trade for **display**
+  geometry, which is decimated and tessellated anyway and is already a separate object (XC-233) - it is
+  not a trade for the geometry numbers are computed on (INV-001)
+- basis: E-142 (T1)
+- affects: MOD-001, MOD-002, INV-001, INV-017, graph/AC-022
+- decidedness: Fixed
+- reversal_trigger: a dataset large enough that double-precision coordinates do not fit in LIM-001's
+  budget while single precision would, which would make this a choice between a wrong number and no
+  number rather than between two representations
