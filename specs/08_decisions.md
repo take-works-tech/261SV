@@ -4423,3 +4423,25 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Bounded
 - reversal_trigger: a consumer that needs interleaved output from several runs on one stream, which
   line delimiting alone does not disambiguate and which would need a run identifier on every line
+
+### OPEN-028 - What a command's parameters are, in a form something can check
+- question: CT-003's catalogue states each operation's parameters as prose in a table column - "case id,
+  file paths", "view id, width, height, format". A handler in `src/service/command` declares the names
+  it accepts, and the two are compared by nobody. CT-002 promises that an unknown parameter is rejected,
+  and today that promise is kept against whatever the handler happens to have declared rather than
+  against the contract
+- why_open: the prose column is doing two jobs and only one of them can be mechanised. It names the
+  parameters, which a machine could use, and it says what they mean in context - "source template id and
+  revision?", "region?" - which is what makes the table readable to a person deciding whether an
+  operation is the one they want. A parameter list generated from the prose would be a guess at where
+  the names stop; a second machine-readable list beside the prose is two places to edit, and the day
+  they disagree the checkable one wins silently
+- blocks: nothing yet. The surface refuses an unknown parameter against what its handler declares, so
+  the behaviour CT-002 asks for is present - what is missing is the check that a handler declares what
+  the contract says
+- closes_when: either CT-003's parameters become machine-readable in a form a person still reads
+  comfortably - a schema per operation, or a stricter column grammar - and `check_commands.py` compares
+  handler declarations against it, or a decision is recorded that the handler is the authority and the
+  contract's column is documentation
+- affects: CT-002, CT-003, MOD-012, validate/check_commands.py
+- decidedness: Open

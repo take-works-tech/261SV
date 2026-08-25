@@ -31,9 +31,12 @@ CATALOGUE = ROOT / "specs" / "contracts" / "CT-003_engine_api.md"
 UI_SPEC = ROOT / "specs" / "11_ui.md"
 SCHEMA = ROOT / "specs" / "contracts" / "schema" / "CT-003.json"
 SOURCE = ROOT / "src"
+GENERATED = ROOT / "src" / "service" / "command" / "catalogue.py"
+NEWLINE = chr(10)
 UI_DIRECTORIES = ("ui", "shell")
 
 OPERATION_ROW = re.compile(r"^\|\s*`([a-zA-Z]+\.[a-zA-Z]+)`\s*\|")
+FULL_ROW = re.compile(r"^\|\s*`([a-zA-Z]+\.[a-zA-Z]+)`\s*\|([^|]*)\|")
 OPERATION_MENTION = re.compile(r"`([a-z][a-zA-Z]*\.[a-z][a-zA-Z]*)`")
 
 # Words that look like an operation and are not: file suffixes, module paths, attribute access in
@@ -58,6 +61,96 @@ def catalogue_operations() -> list[str]:
         if match:
             operations.append(match.group(1))
     return operations
+
+
+def catalogue_rows() -> list[tuple[str, bool]]:
+    """Each operation with whether it writes, from the CT-003 table's second column."""
+    rows: list[tuple[str, bool]] = []
+    for line in CATALOGUE.read_text(encoding="utf-8").splitlines():
+        match = FULL_ROW.match(line.strip())
+        if match:
+            rows.append((match.group(1), "write" in match.group(2).lower()))
+    return rows
+
+
+def render() -> str:
+    """The catalogue as a Python module the product can import.
+
+    Generated rather than parsed at run time: a shipped product that read a specification file to learn
+    what its own operations are would fail wherever the specification is not installed, which is
+    everywhere it is installed.
+    """
+    rows = catalogue_rows()
+    writes = [name for name, is_write in rows if is_write]
+    reads = [name for name, is_write in rows if not is_write]
+    lines = [
+        '"""The operation catalogue of CT-003, as code.',
+        "",
+        "**Generated from `specs/contracts/CT-003_engine_api.md` by",
+        "`validate/check_commands.py --write`.** Do not edit by hand: the gate compares this file",
+        "against the contract on every run, so an edit here fails the build rather than changing",
+        "anything.",
+        "",
+        "The set is closed. An operation not in it is refused rather than attempted, which is what",
+        "CT-002 promises happens to an unknown command - and the refusal is what stops a caller",
+        "believing it disabled something when it merely misspelled it.",
+        '"""',
+        "",
+        "from __future__ import annotations",
+        "",
+        "#: Operations that change state. Each enters the undo history and may need authorisation.",
+        "WRITES = frozenset({",
+        *[f'    "{name}",' for name in writes],
+        "})",
+        "",
+        "#: Operations that only answer. A read never needs confirmation and never enters undo.",
+        "READS = frozenset({",
+        *[f'    "{name}",' for name in reads],
+        "})",
+        "",
+        "#: Every operation this build knows the name of, in the order the contract lists them.",
+        "OPERATIONS = (",
+        *[f'    "{name}",' for name, _ in rows],
+        ")",
+        "",
+        "",
+        "def writes(operation: str) -> bool:",
+        '    """Whether an operation changes state. Unknown operations raise rather than defaulting.',
+        "",
+        "    Defaulting either way is wrong in a way that is hard to see: defaulting to read lets a",
+        "    write escape the undo history, and defaulting to write puts a question in front of an",
+        "    answer somebody just asked for.",
+        '    """',
+        "    if operation in WRITES:",
+        "        return True",
+        "    if operation in READS:",
+        "        return False",
+        "    raise KeyError(operation)",
+        "",
+    ]
+    return NEWLINE.join(lines)
+
+
+def check_generated_matches(findings: list[Finding]) -> bool:
+    """The checked-in catalogue module against the contract it was generated from.
+
+    Returns False where there is no source tree to check - which is reported as a blind spot, never as
+    a pass. A gate that finds nothing and reports success is worse than no gate, because it is believed.
+    """
+    if not SOURCE.is_dir():
+        return False
+    if not GENERATED.exists():
+        findings.append(Finding(GENERATED.name, "the generated catalogue is missing: run --write"))
+        return
+    if GENERATED.read_text(encoding="utf-8") != render():
+        findings.append(
+            Finding(
+                GENERATED.name,
+                "the generated catalogue disagrees with CT-003. It is an artefact, so the fix is "
+                "`python validate/check_commands.py --write`, not an edit here",
+            )
+        )
+    return True
 
 
 def schema_operations() -> list[str] | None:
@@ -194,9 +287,18 @@ def check_components_are_unique(findings: list[Finding]) -> bool:
     return True
 
 
-def unchecked() -> list[str]:
+def unchecked(generated_checked: bool = True) -> list[str]:
     """What this gate could not examine. Printed every run, never silently omitted."""
     gaps: list[str] = []
+    if not generated_checked:
+        gaps.append(
+            "the generated catalogue against CT-003: there is no src/ tree here, so "
+            f"{GENERATED.relative_to(ROOT).as_posix()} was not compared"
+        )
+    gaps.append(
+        "a handler's parameter names against the contract (OPEN-028): CT-003 states parameters in "
+        "prose, so nothing compares them to what a handler declares it accepts"
+    )
     if not interface_directories():
         gaps.append(
             "interface actions dispatching commands (operations/AC-011): no interface code exists yet, "
@@ -217,8 +319,14 @@ def unchecked() -> list[str]:
 
 
 def main() -> int:
+    if "--write" in sys.argv:
+        GENERATED.write_text(render(), encoding="utf-8")
+        print(f"wrote {GENERATED.relative_to(ROOT).as_posix()} from CT-003")
+        return 0
+
     findings: list[Finding] = []
     check_catalogue_matches_schema(findings)
+    generated_checked = check_generated_matches(findings)
     check_mentions_resolve(findings)
     check_components_are_unique(findings)
 
@@ -227,7 +335,7 @@ def main() -> int:
 
     print()
     print(f"Checked: {len(catalogue_operations())} operations in the CT-003 catalogue.")
-    for gap in unchecked():
+    for gap in unchecked(generated_checked):
         print(f"NOT checked: {gap}")
     print()
 
