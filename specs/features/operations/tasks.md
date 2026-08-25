@@ -75,12 +75,30 @@ updated: 2026-08-25
 - satisfies: AC-007
 - depends_on: -
 - done_when: a test asserts no field value appears in any log line
-
+- done: 2026-08-25, `src/service/egress/diagnostics.py`. A log line **cannot carry a float**, and the
+  rule is the type rather than a review habit: names are strings, counts are integers (INV-015), and a
+  value measured from a dataset is a float - so refusing floats catches the shape a field value arrives
+  in. An array is refused for the same reason.
+  What it does **not** catch is a float somebody formatted into a string first, and there is a test
+  asserting that limit rather than leaving it to be discovered by whoever relies on the check. It makes
+  the accident hard and does not make the deliberate act impossible.
+  The log stays local, asserted structurally: the module reaches no network client, so it cannot send
+  itself whatever it currently does (XC-126).
 ### TASK-012 - Support bundle manifest
 - satisfies: AC-008
 - depends_on: TASK-011
 - done_when: the manifest lists case names and paths before the bundle is created
-
+- done: 2026-08-25. The manifest exists **before** the bundle: `create` takes the manifest rather
+  than the ingredients, so a bundle cannot come into being without a list having been shown. One that
+  reported its contents afterwards is a bundle somebody found out about.
+  Case names and file paths are listed **individually** rather than counted. "3 files" is a number
+  somebody accepts without reading; a customer's part name in the list is the thing they would have
+  objected to, and they can only object to what they can see - so the manifest also says which of its
+  entries are the customer's own information.
+  Two acceptances are needed and they are different: one for what goes into the bundle, one for sending
+  it. Accepting the manifest is not agreeing to send it anywhere, and the gate refuses without its own
+  consent (XC-126). What the audit records is the **manifest's own lines**, so what was audited is what
+  the user accepted - two descriptions of one bundle is one too many.
 ### TASK-013 - Consent and audit for transfer
 - satisfies: AC-009
 - depends_on: TASK-012, assistant/TASK-018

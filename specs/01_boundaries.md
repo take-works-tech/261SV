@@ -182,7 +182,12 @@ module; a surface owned by one of its callers is a dependency waiting to be inve
 - paths: src/service/egress
 - owns: **every request that leaves this machine** - language-model calls, web search, update checks -
   with the permission each requires, the audit of what was sent, and the offline state. Nothing else in
-  the product opens a connection
+  the product opens a connection.
+  It also owns the **local diagnostic log** and the **support bundle** (XC-126). They are not requests,
+  and they live here because the rule that governs them is the rule this module enforces: a log carries
+  no field value, a bundle lists what it contains before it exists, and neither goes anywhere without
+  consent. Splitting them off would put the redaction rule in one module and the sending rule in
+  another, which is how a value reaches a bundle that egress then faithfully sends
 - depends_on: domain-core
 - decidedness: Fixed
 - basis: E-001 (T1)
