@@ -4663,6 +4663,17 @@ model or the prompt, never in a description that quietly went stale.
   rendering falls under 8.12, or counsel reads the current terms and records the reading here with its
   date - the terms are versioned and the answer is only good for the version it was read against
 - affects: XC-037, MOD-003, OPEN-023, specs/09_technology.md
+- confirmed: 2026-08-25, the same day, and by a second primary source rather than by re-reading the
+  first. The Omniverse License Agreement shipped with `kit-cae` states it in as many words: **"you may
+  not use the Omniverse Products for the purpose of developing competing products or technologies"**
+  (E-151). A summarised fetch of the Product Specific Terms page taken minutes earlier reported that no
+  such clause existed; the licence text is what settles it, and the recorded evidence (E-009) was right.
+  So the question is not whether the clause exists - it does - but whether a CAE post-processor is a
+  competing product under it. That remains an answer NVIDIA gives, not one this project reads out.
+  Two further restrictions surfaced with it and narrow the question further: **the Kit itself may not be
+  distributed at all**, and public distribution must go through NVIDIA's Exchange or a fork of NVIDIA's
+  repository. XC-250 therefore places the whole Kit path outside what this product may embed, whatever
+  8.12 turns out to mean - which lowers what this question is worth deciding, without closing it
 - decidedness: Open
 
 ### XC-249 - What a command takes is stated by the contract, and a handler may not restate it
@@ -4695,3 +4706,44 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: an operation whose parameters genuinely depend on another parameter's value, which
   a flat per-operation schema cannot express and which would need the contract to carry a conditional
+
+### XC-250 - What may be embedded is decided by the licence on the part, not by the name on the box
+- decided: 2026-08-25
+- status: active
+- decision: "Omniverse" and "ParaView" are not single things, and this product decides part by part.
+  **Embeddable, and used freely**: VTK (BSD-3, E-002), ParaView's own readers (BSD-3, E-147, under
+  XC-248's reader-or-behaviour rule), **NVIDIA PhysX** (BSD-3, E-148), **NVIDIA MDL SDK** (BSD-3,
+  E-149), **NVIDIA Warp** (Apache-2.0, E-150), OpenUSD (E-005), OpenVDB (E-006), OpenUSD Exchange SDK
+  (E-007). None of these carries a hardware restriction, a field-of-use restriction or a
+  competing-products restriction; each carries a notice obligation, which goes in the notices file
+  (XC-025).
+  **Not embeddable**: the **Omniverse Kit SDK and everything that requires it** - the RTX and IndeX
+  render paths, and `kit-cae`. The agreement forbids distributing the Kit at all, requires public
+  distribution to go through NVIDIA's Exchange or a fork of NVIDIA's repository, and forbids use "for
+  the purpose of developing competing products or technologies" (E-151, E-152).
+  Where a capability exists on both sides of that line, **the permissive part is taken and the
+  restricted part is rebuilt or left out**, never depended upon
+- decided_by: the product owner, 2026-08-25
+- rationale: the question "can we use Omniverse" has no answer, and asking it that way produced two
+  wrong ones in this project already - first that Omniverse was simply available (XC-037's optional
+  path), then that ParaView was simply unavailable (XC-248's correction). The licence sits on the
+  **part**.
+  `kit-cae` is the case that makes the line visible. NVIDIA publishes OpenUSD file-format plugins for
+  CGNS, EnSight, VTK and OpenFOAM that compose scientific datasets without conversion - which is this
+  product's subject exactly - and they run on a Kit that may not be shipped inside somebody else's
+  application. What is worth taking from it is the **idea**, which is not licensed: composing a result
+  file as USD layers rather than converting it.
+  MDL is the piece that changes what is possible. MaterialX is already this product's canonical
+  material graph, MDL is what NVIDIA's renderers consume, and the SDK that translates between them is
+  BSD-3 with no hardware restriction - so the photorealistic direction is reachable without the
+  component that cannot be redistributed
+- alternatives: treating the Omniverse licence as governing everything NVIDIA publishes leaves PhysX,
+  MDL and Warp on the table for a restriction that does not apply to them. Treating BSD-3 on some NVIDIA
+  repositories as evidence about others is the same error in the other direction, and it is the one that
+  ends in a distribution somebody has to recall
+- basis: E-148 (T1), E-149 (T1), E-150 (T1), E-151 (T1), E-152 (T1), E-147 (T1), E-002 (T1)
+- affects: MOD-003, XC-025, XC-037, XC-248, OPEN-030, specs/09_technology.md
+- decidedness: Fixed
+- reversal_trigger: NVIDIA relicensing the Kit SDK permissively, which would move the whole RTX path
+  across the line - or any of PhysX, MDL or Warp gaining a field-of-use restriction, which would move
+  them back
