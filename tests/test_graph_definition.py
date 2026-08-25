@@ -39,7 +39,7 @@ from engine.graph.definition import (
 
 
 def stress(label: str = "応力", unit: str | None = "MPa") -> Series:
-    return Series(label, SourceKind.FIELD, Provenance.READ, unit=unit, field_name="stress")
+    return Series(label, SourceKind.FIELD, Provenance.DATASET, unit=unit, field_name="stress")
 
 
 class TestASeriesSaysWhatItIs:
@@ -70,10 +70,19 @@ class TestASeriesSaysWhatItIs:
         with pytest.raises(GraphError):
             Series("規格値", SourceKind.REFERENCE_FILE, Provenance.REFERENCE, unit="MPa")
 
-    def test_there_are_four_provenances_and_no_fifth_for_unknown(self) -> None:
-        """A value whose origin nobody recorded is not a fifth kind of origin - it is a value this
-        product should not be plotting, so there is nowhere to put it."""
-        assert {p.value for p in Provenance} == {"declared", "read", "computed", "reference"}
+    def test_the_provenance_vocabulary_is_the_products_one_and_not_a_second(self) -> None:
+        """GL-016's five, from `domain_core.reported_value`. The first version of this module defined
+        its own four, calling the file origin `read` where the rest of the product calls it `dataset` -
+        which would have made the same value look like two things depending on which module printed it.
+
+        There is no member for "unknown": a value whose origin nobody recorded is not a kind of origin,
+        it is a value this product should not be plotting, so there is nowhere to put it."""
+        from domain_core.reported_value import Provenance as Canonical
+
+        assert Provenance is Canonical
+        assert {p.value for p in Provenance} == {
+            "declared", "dataset", "computed", "measured", "reference"
+        }
 
     def test_a_unit_this_product_does_not_know_is_refused_when_the_series_is_made(self) -> None:
         with pytest.raises(GraphError):
@@ -108,10 +117,10 @@ class TestIncompatibleUnitsAreRefusedNamingBoth:
     def test_a_length_beside_a_time(self) -> None:
         """AC-003."""
         graph = new_graph("graph:001", "比較", "line")
-        add_series(graph, Series("長さ", SourceKind.FIELD, Provenance.READ, unit="mm"))
+        add_series(graph, Series("長さ", SourceKind.FIELD, Provenance.DATASET, unit="mm"))
 
         with pytest.raises(GraphError) as refusal:
-            add_series(graph, Series("時間", SourceKind.FIELD, Provenance.READ, unit="s"))
+            add_series(graph, Series("時間", SourceKind.FIELD, Provenance.DATASET, unit="s"))
 
         assert "mm" in str(refusal.value) and "s" in str(refusal.value)
 
@@ -151,7 +160,7 @@ class TestIncompatibleUnitsAreRefusedNamingBoth:
         add_series(graph, stress("上面", "MPa"))
 
         with pytest.raises(GraphError):
-            add_series(graph, Series("時間", SourceKind.FIELD, Provenance.READ, unit="s"))
+            add_series(graph, Series("時間", SourceKind.FIELD, Provenance.DATASET, unit="s"))
 
         assert len(graph["series"]) == 1
 

@@ -28,28 +28,14 @@ from typing import Any, Iterable, Sequence
 
 from domain_core.case_contents import ResultAxis, differing_axes
 from domain_core.dimension import Dimension, parse_symbol, symbol_for
+from domain_core.reported_value import UNDECLARED_MARKER, Provenance
 from domain_core.units import UndeclaredUnitError
 
-#: What an axis says where no unit was declared. One spelling, so a graph, a table and a report cannot
-#: disagree about how the same absence is written (XC-003).
-UNDECLARED_MARKER = "単位が宣言されていません"
+
 
 
 class GraphError(Exception):
     """Raised for a definition that would draw something misleading."""
-
-
-class Provenance(str, Enum):
-    """Where a quantity came from (INV-013). Four, and no fifth for "unknown".
-
-    A value whose origin nobody recorded is not a fifth kind of origin - it is a value this product
-    should not be plotting, so there is nowhere to put it.
-    """
-
-    DECLARED = "declared"      # a person typed it
-    READ = "read"              # it came out of the file
-    COMPUTED = "computed"      # MOD-004 produced it, and the expression travels with it
-    REFERENCE = "reference"    # it came from uploaded reference material
 
 
 class SourceKind(str, Enum):
@@ -60,10 +46,14 @@ class SourceKind(str, Enum):
     REFERENCE_FILE = "referenceFile"
 
 
+#: GL-016's five, in words. The vocabulary is `domain_core.reported_value.Provenance` and not a second
+#: one here: a graph that called the same origin `read` while a report called it `dataset` would make the
+#: same value look like two.
 PROVENANCE_WORD = {
     Provenance.DECLARED: "宣言値",
-    Provenance.READ: "ファイル由来",
+    Provenance.DATASET: "ファイル由来",
     Provenance.COMPUTED: "計算値",
+    Provenance.MEASURED: "実測値",
     Provenance.REFERENCE: "参考資料由来",
 }
 
@@ -254,7 +244,7 @@ def _provenance_of(source: dict[str, Any]) -> Provenance:
         return Provenance.REFERENCE
     if kind is SourceKind.DERIVED or source.get("expression"):
         return Provenance.COMPUTED
-    return Provenance.READ
+    return Provenance.DATASET
 
 
 def note_result_axes(graph: dict[str, Any], axes: Iterable[ResultAxis]) -> str | None:

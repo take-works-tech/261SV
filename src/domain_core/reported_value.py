@@ -51,11 +51,15 @@ class Caveat(str, Enum):
 # every safety factor look like a stress whose unit went missing. Found by writing the first ratio.
 DIMENSIONLESS = "1"
 
+#: What a value with no declared unit reads as, everywhere it is written. One spelling, in one place,
+#: so an axis label, a table cell and a report line cannot disagree about the same absence (XC-003).
+UNDECLARED_MARKER = "単位が宣言されていません"
+
 CAVEAT_TEXT: dict[Caveat, str] = {
     Caveat.PARTIAL_DATASET: "データセットの一部が欠落しています",
     Caveat.AVERAGED: "セル間で平均した値です",
     Caveat.FROM_REDUCED_GEOMETRY: "縮退した表示形状から測った値です",
-    Caveat.UNDECLARED_UNIT: "単位が宣言されていません",
+    Caveat.UNDECLARED_UNIT: UNDECLARED_MARKER,
 }
 
 

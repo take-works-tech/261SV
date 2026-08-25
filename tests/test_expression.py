@@ -48,8 +48,22 @@ class TestADimensionIsWhatDecides:
     def test_anything_else_is_composed_in_a_fixed_order(self) -> None:
         assert symbol_for(dimension_of("m").over(dimension_of("s"))) == "m·s^-1"
 
-    def test_a_dimensionless_value_has_no_unit_rather_than_an_empty_one(self) -> None:
-        assert symbol_for(DIMENSIONLESS) is None
+    def test_a_dimensionless_quantity_is_written_as_one_rather_than_as_nothing(self) -> None:
+        """SI writes a quantity that genuinely has no unit - a ratio, a safety factor - as `1`. It is
+        **not** the same as a unit nobody declared, and conflating the two makes every safety factor
+        look like a stress whose unit went missing.
+
+        The first version of this asserted `symbol_for(DIMENSIONLESS) is None`, which made the two
+        indistinguishable in exactly the way `reported_value` warns about.
+        """
+        assert symbol_for(DIMENSIONLESS) == "1"
+
+    def test_a_ratio_of_two_declared_lengths_is_dimensionless_and_says_so(self) -> None:
+        assert evaluate("1 m / 1 m").describe() == "1 1"
+
+    def test_a_product_of_two_bare_numbers_is_still_undeclared(self) -> None:
+        """Giving it `1` would be this product declaring a unit on somebody's behalf (XC-003)."""
+        assert "宣言されていません" in evaluate("2 * 3").describe()
 
     def test_an_odd_exponent_has_no_square_root_this_product_can_write(self) -> None:
         assert dimension_of("m").root() is None

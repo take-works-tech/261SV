@@ -42,12 +42,12 @@ def a_template() -> dict[str, Any]:
     graph = new_graph("template:001", "毎回の応力比較", "line")
     add_series(
         graph,
-        Series("上面の最大応力", SourceKind.FIELD, Provenance.READ, unit="MPa", field_name="peak_top"),
+        Series("上面の最大応力", SourceKind.FIELD, Provenance.DATASET, unit="MPa", field_name="peak_top"),
     )
     add_series(
         graph,
         Series(
-            "下面の最大応力", SourceKind.FIELD, Provenance.READ, unit="MPa", field_name="peak_bottom"
+            "下面の最大応力", SourceKind.FIELD, Provenance.DATASET, unit="MPa", field_name="peak_bottom"
         ),
     )
     return graph

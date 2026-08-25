@@ -154,7 +154,7 @@ def available_quantities(
     for values in per_case.values():
         for name, value in values.items():
             if name not in found:
-                found[name] = Quantity(name, value.declared, Provenance.READ)
+                found[name] = Quantity(name, value.declared, Provenance.DATASET)
     for quantity in computed:
         found.setdefault(quantity.name, quantity)
     for quantity in reference:
