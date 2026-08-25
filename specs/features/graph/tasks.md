@@ -149,13 +149,36 @@ updated: 2026-08-25
 - satisfies: AC-014
 - depends_on: TASK-007
 - done_when: proposals are produced from the data alone and each names the signal behind it
-
+- done: 2026-08-25, `src/engine/graph/recommend.py`. Correlation, distribution and change over a
+  sequence - AC-014's own three - each carrying the figures behind it: `r = 1.00（12 ケース、1 件は値が
+  ありません）` rather than "these look related". A recommendation with no number attached cannot be
+  judged and cannot be wrong, which is the same thing.
+  **A proposal is a suggestion of a figure and never a statement about the physics.** The correlation
+  says in the same sentence that it is a relation between numbers and not a cause - the vocabulary
+  E-071 bans in a report is banned here for the same reason, because a proposal phrased as a conclusion
+  has skipped the step where somebody decides whether it is one.
+  The minimums are as much of the feature as the signals. A correlation is not offered below five cases
+  because over two it is 1.0 by construction; a distribution is not offered below eight; a quantity that
+  does not vary has **no** correlation rather than zero, because zero reads as "measured, and
+  unrelated". And no proposals at all is an answer that is stated: a feature that always finds something
+  is finding it in the noise.
+  Change over a sequence is proposed only where the **file declared** one. Whether a quantity varies
+  along a sequence is a fact about the file, and guessing it from the values is what XC-240 refuses -
+  the proposal says so rather than calling the sequence time on its own authority.
 ### TASK-017 - Model-assisted recommendations
 - satisfies: AC-015
 - depends_on: TASK-016
 - done_when: proposals with an inferred purpose are marked as inferred, and a rejected proposal is not
   repeated in the session
-
+- done: 2026-08-25, the **rejection half only** (AC-016): a declined proposal does not come back in
+  the same session, and two proposals over the same quantities in either order are one proposal - or
+  declining "load against peak" would leave "peak against load" to return. The memory lasts the session
+  and is not stored: a proposal declined today because the study was half loaded is worth making again
+  next week, and a permanent refusal list is a product that quietly stops suggesting things.
+- blocked: 2026-08-25, on the other half. AC-015's proposals with an **inferred purpose, marked as
+  inferred** need a language model, and no model path exists in this build - MOD-014 egress and MOD-008
+  assistant are both unwritten. Marking something as inferred when nothing inferred it would be the
+  label without the thing it labels.
 ### TASK-018 - Weighted reductions
 - satisfies: AC-022
 - depends_on: TASK-001

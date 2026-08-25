@@ -275,6 +275,10 @@ is either missing a requirement or is not work this specification asked for.
   guesses it from two time values being identical (E-138). Until a file's own statement is reachable -
   CGNS's `SimulationType_t` is the nearest - a mode number and its frequency are indistinguishable from
   a step number and its time, and this product says undeclared rather than choosing (XC-240).
+  Re-measured 2026-08-25, after the CGNS reader landed. `vtkCGNSReader` exposes selections for bases,
+  families and flow solutions and **nothing for `SimulationType_t`** - its property list has no
+  `Simulation`, `Mode` or `Frequency` entry at all. The nearest declaration is still unreachable through
+  the reader this product uses, so the blocker is unchanged rather than merely unrevisited.
 ### TASK-025 - Harmonic results stay complex
 - satisfies: AC-042
 - depends_on: TASK-024
