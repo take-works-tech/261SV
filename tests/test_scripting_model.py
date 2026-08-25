@@ -61,7 +61,13 @@ def a_session() -> Session:
                 store[identifier] = before
 
         store[identifier] = str(parameters["newName"])
-        return Effect("名前を変更しました", changed=(identifier,), undo=undo)
+        # The result CT-003 states for a rename: the item and its new revision.
+        return Effect(
+            "名前を変更しました",
+            changed=(identifier,),
+            value={"id": identifier, "revision": len(store) + 1},
+            undo=undo,
+        )
 
     surface.register(
         Handler(
@@ -70,7 +76,10 @@ def a_session() -> Session:
         )
     )
     surface.register(
-        Handler("history.list", lambda p, t: Effect("読みました", value=dict(store)))
+        Handler(
+            "history.list",
+            lambda p, t: Effect("読みました", value={"entries": []}),
+        )
     )
     session = Session(surface, group_id="script:001")
     session.views.add(Named("view:001", "Pressure top"))

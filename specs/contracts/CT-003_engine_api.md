@@ -44,6 +44,15 @@ is required - and an implementation takes its accepted parameters from there rat
 own (XC-249). The two are not two copies of one list: a schema cannot say that a template reference is
 optional *because the item may be original*, and a column cannot be compared against code.
 
+**The Result column says the same about answers.** `$defs.operationResults` carries one JSON Schema per
+operation, and where an answer holds a measured number it holds a `$defs.reportedValue` - whose `value`,
+`unit`, `digits` and `provenance` are **required** (XC-253). That is the reason for doing this at all:
+XC-003, INV-013 and INV-014 are statements about what a result carries, and prose can ask for them while
+a schema can require them. The command surface fails a handler whose result carries a field the contract
+does not declare or omits one it requires - `failed` and not `refused`, because the caller did nothing
+wrong. A dry run is held to the field names and not to the required ones: it applies nothing, so it has
+no identifier to report.
+
 | Operation | Reads or writes | Parameters | Result |
 |---|---|---|---|
 | `workspace.open` | write | path | workspace id, unresolved cases, format version |
