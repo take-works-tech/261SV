@@ -177,6 +177,39 @@ module; a surface owned by one of its callers is a dependency waiting to be inve
 - decidedness: Fixed
 - basis: E-064 (T1)
 
+### MOD-015 - ui-logic
+- layer: ui-logic
+- paths: src/ui/logic
+- owns: view models, formatting for display, and interaction rules - what a panel shows given a state,
+  what a gesture means, and how a value is written for a person to read. It holds **no** React component
+  and **no** transport: a rule that can only be exercised by rendering a component is a rule nobody
+  tests
+- depends_on: state, client, domain-core
+- decidedness: Fixed
+- basis: E-001 (T1)
+
+### MOD-016 - state
+- layer: state
+- paths: src/ui/state
+- owns: the @Workspace document as the interface holds it, the current selection, and the undo history
+  as the interface presents it. It is the **client-side** view of state and never the authority: the
+  authority is MOD-007 through the command surface, and a divergence between the two is resolved by
+  asking rather than by merging
+- depends_on: client, domain-core
+- decidedness: Fixed
+- basis: E-001 (T1)
+
+### MOD-017 - client
+- layer: client
+- paths: src/ui/client
+- owns: typed calls to the local service and **nothing else** - one function per CT-003 operation,
+  the transport under them, and the failure of the transport itself. It holds no retry policy, no
+  caching and no interpretation of a result: each of those is a decision some layer above should be
+  making visibly
+- depends_on: domain-core
+- decidedness: Fixed
+- basis: E-001 (T1)
+
 ### MOD-014 - egress
 - layer: service
 - paths: src/service/egress

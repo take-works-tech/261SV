@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-24
+updated: 2026-08-25
 ---
 
 # Specifications
@@ -41,7 +41,7 @@ coverage:
 | Gate | Checks |
 |---|---|
 | `validate/check_specs.py` | the twenty-two checks of the specification model, plus `--report` for release readiness |
-| `validate/check_boundaries.py` | module ownership, layer direction and declared dependencies (01_boundaries.md) |
+| `validate/check_boundaries.py` | module ownership, layer direction and declared dependencies (01_boundaries.md); prints the five modules above `service` as **unchecked**, because it reads `*.py` and those layers are TypeScript (XC-252) |
 | `validate/check_commands.py` | the operation catalogue against its schema, prose references, and shared-component uniqueness (XC-127) |
 | `validate/check_constant_duplication.py` | the same constant defined in two files: contradictions, and copies that will become contradictions |
 | `validate/check_context_budget.py` | the instruction layer paid on every turn - CLAUDE.md and what it imports, AGENTS.md, rules, output styles - and the path-scoped layer, both charged |

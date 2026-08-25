@@ -4820,3 +4820,35 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: ANARI failing to ratify - it is 1.0 since August 2023 with 1.1 in preview, and
   conformance still waits on the Adopters Program (E-155). A standard that stalls is an abstraction
   with one implementation, which is worse than the vendor interface it replaced
+### XC-252 - The vocabulary crosses the language boundary by generation, not by a second definition
+- decided: 2026-08-25
+- status: active
+- decision: `domain-core` is Python and the four layers above `service` are TypeScript, and the layer
+  table says every one of them may depend on `domain-core`. That dependency is satisfied by
+  **generating TypeScript types from the contract schemas** - CT-001 to CT-012 - into `src/ui/client`,
+  by a gate that regenerates and compares, exactly as `object_compatibility.py` and `catalogue.py` are
+  generated on the Python side. Neither language's types are written by hand, and neither is derived
+  from the other: **both are derived from the schema**.
+  What is generated is the **shape of what crosses the wire** - documents, definitions, commands,
+  results. What is not generated is behaviour: units, dimensions, precision and the invariants stay in
+  Python and are reached by asking the service, never reimplemented above it
+- decided_by: the product owner, 2026-08-25
+- rationale: there are only three ways for a TypeScript interface to know what a @Case is, and two are
+  wrong. Writing the types by hand is a second definition of every contract, and the day it disagrees
+  with the schema the interface is confidently wrong about the shape of a document. Generating
+  TypeScript **from the Python** makes the Python the contract, which it is not - the schema is, and the
+  Python is generated from it too in the places that matter.
+  The behaviour half is the more important half. A TypeScript unit conversion, or a TypeScript
+  significant-digits rule, would be a second implementation of the thing this product's claim rests on,
+  and INV-002's promise that a renderer choice does not change numbers would become a promise about two
+  codebases agreeing. The interface formats what it is given and asks for what it does not have
+- alternatives: hand-written types are what most products do and are the source of the drift this
+  avoids. A shared IDL other than JSON Schema would be a third description of contracts that already
+  have one. Running Python in the interface through a bridge removes the duplication and puts an
+  interpreter in the render loop
+- basis: E-001 (T1)
+- affects: MOD-015, MOD-016, MOD-017, MOD-009, MOD-010, CT-001, CT-003, XC-015
+- decidedness: Fixed
+- reversal_trigger: a contract whose shape cannot be expressed in JSON Schema well enough to generate
+  from - which would mean the schema had stopped being the contract, and that is a larger problem than
+  this decision

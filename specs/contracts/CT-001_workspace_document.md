@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-24
+updated: 2026-08-25
 ---
 
 # Contract: workspace document
@@ -19,6 +19,10 @@ updated: 2026-08-24
   succeeds
 - decidedness: Fixed
 - basis: E-001 (T1), E-088 (T1)
+- note: 2026-08-25. This schema is what the interface's TypeScript types are **generated from**
+  (XC-252), alongside the Python that already reads it. Neither language's types are hand-written and
+  neither is derived from the other - a hand-written copy is a second definition of the document, and
+  the day it disagrees the interface is confidently wrong about the shape of somebody's work.
 
 ## Why preserve rather than reject
 
