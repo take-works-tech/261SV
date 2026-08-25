@@ -220,6 +220,19 @@ class Dataset:
     def __post_init__(self) -> None:
         if self.points_m.ndim != 2 or self.points_m.shape[1] != 3:
             raise ValueError("points must be an (n, 3) array of metres in the canonical frame")
+        if self.points_m.dtype != np.float64:
+            # Not fussiness about types. `vtkPoints` stores single precision by default, and a cell
+            # volume computed from single-precision coordinates carries about 5e-8 of relative error
+            # where the same coordinates in double are exact to the last bit (E-142). Every
+            # volume-weighted mean multiplies field values by those volumes, so the error does not stay
+            # in the geometry - it arrives in the number this product exists to be trusted about.
+            # The readers already convert on load; this is what makes that a guarantee rather than a
+            # habit.
+            raise ValueError(
+                f"points must be float64 and are {self.points_m.dtype}. Convert once, at the reader, "
+                "where the frame conversion already happens (INV-001) - a dataset that accepted single "
+                "precision would put 5e-8 of error into every volume-weighted average (E-142)"
+            )
         # A field is indexed by the points or the cells it is attached to. Checking it here is what
         # turns a whole class of silent wrongness into a refusal at construction: a field that is a
         # point longer than the geometry is not off by one entry, it is a different point set, and
