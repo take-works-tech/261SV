@@ -4445,3 +4445,30 @@ model or the prompt, never in a description that quietly went stale.
   contract's column is documentation
 - affects: CT-002, CT-003, MOD-012, validate/check_commands.py
 - decidedness: Open
+
+### OPEN-029 - Which commands a pipeline unit issues, given that the catalogue has no shape for one
+- question: pipeline/TASK-020 requires every unit to execute as commands from CT-002, with no execution
+  path that bypasses them. Attempting it stops at the catalogue: **CT-003 has no operation shaped like
+  "apply this pinned definition to this case"**, which is what every acting unit does. A `view` unit
+  under three cases produces three pictures from one definition; `view.render` takes a view id, and a
+  view id is a workspace item bound to its own source. The same gap holds for `graph`, `report` and
+  `export`, and `tag` is the only acting kind with an operation that already takes a case (`case.tag`)
+- why_open: there are three candidate answers and they differ in what the product *is*, not in how it
+  is written.
+  **One:** a unit is a sequence of existing operations - create a workspace item from the definition
+  with this case substituted, render it, remove it. Nothing new in the contract, and every pipeline run
+  litters the workspace with items it then deletes, which the undo history and the run record both see.
+  **Two:** the catalogue gains a per-case form of each artefact operation, taking a definition reference
+  and a case rather than an item id. Honest about what a pipeline does and it doubles part of the
+  catalogue, which INV-006 then requires the interface to be able to do as well.
+  **Three:** `template.apply` is already "apply a definition to a target selection" and a unit is that
+  operation with the pipeline's target set as the selection. Closest to what exists, and it makes a
+  workspace item's definition and a template behave alike in a place XC-109 deliberately separated them.
+  Guessing between them here would settle the product's semantics as a side effect of an implementation
+- blocks: pipeline/TASK-020, and through it the first half of pipeline/AC-021 - a headless run currently
+  executes the identical units because it calls the same runner, not because it goes through the same
+  command surface. pipeline/TASK-035 and pipeline/TASK-036 do not depend on this
+- closes_when: one of the three is chosen and CT-003 carries it, including what the operation returns
+  for a case that produced nothing
+- affects: CT-002, CT-003, CT-009, MOD-011, MOD-012, pipeline/AC-021, INV-006
+- decidedness: Open
