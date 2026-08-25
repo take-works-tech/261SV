@@ -198,6 +198,15 @@ than library-level - plot-over-line is a ParaView filter, not a VTK class - so t
 than inherited. Neither is a reason to narrow the promise; both are reasons to write the promise about
 VTK's readers rather than about ParaView's menu.
 
+**What may be embedded is decided by the licence on the part, not by the name on the box** (XC-250).
+"Omniverse" is not one thing: **PhysX, the MDL SDK and Warp are BSD-3 or Apache-2.0 with no hardware,
+field-of-use or competing-products restriction** (E-148, E-149, E-150), while the **Kit SDK and
+everything requiring it - the RTX and IndeX paths, and `kit-cae` - may not be distributed at all**, must
+be published through NVIDIA's own channels, and carry a prohibition on developing competing products
+(E-151, E-152). `kit-cae` is the case worth knowing: NVIDIA publishes OpenUSD file-format plugins for
+CGNS, EnSight, VTK and OpenFOAM that compose result files **without converting them** - this product's
+subject exactly - on a runtime this product cannot ship. What is takeable from it is the idea.
+
 **That is a maintenance decision and it was being read as a legal one.** ParaView is BSD-3-Clause
 (E-147), so its readers and filters may be embedded here on the same terms as VTK. XC-248 settles what
 to do with that: a **reader** ParaView has and VTK does not is worth copying in with its notice when a
@@ -236,6 +245,9 @@ nobody asked before taking on the dependency (check 20).
 | OpenUSD | export interchange | TOST 1.0, Apache-2.0 except trademarks (E-005) | the interchange format Blender, Omniverse and DCC tools read | Academy Software Foundation governance | glTF: no volumetric or simulation-field story |
 | OpenVDB | volumetric export | Apache-2.0 (E-006) | Academy Software Foundation project, used across VFX | ASWF governance | - |
 | OpenUSD Exchange SDK | higher-level USD writing | Apache-2.0 (E-007) | NVIDIA-published, redistributable | NVIDIA; optional, replaceable by OpenUSD directly | writing USD by hand for every schema |
+| NVIDIA MDL SDK | translating this product's MaterialX graph into what NVIDIA's renderers consume | BSD-3-Clause (E-149) | NVIDIA's own SDK, open-sourced 2018 and maintained since | NVIDIA; version pinned when adopted | writing an MDL emitter here: the language is NVIDIA's and the SDK is the reference |
+| NVIDIA Warp | GPU data-processing kernels from Python, if adopted | Apache-2.0 (E-150) | NVIDIA's own; `kit-cae` uses it for CAE visualisation algorithms (E-152) | NVIDIA | hand-written CUDA, which is a second language in the build |
+| NVIDIA PhysX | not used today; listed because it is available on the same terms | BSD-3-Clause (E-148) | NVIDIA's own, GPU kernels included since 2025 | NVIDIA | - |
 | gsplat | Gaussian splat training, if shipped (OPEN-016) | Apache-2.0 (E-015) | 654 commits from 25 contributors in six months | active, with a migration guide from the non-commercial implementation | the Inria reference implementation: non-commercial only (E-014) |
 | electron-builder | packaging, signing, updates | MIT | the default packaging path for Electron products | active | hand-rolled installers per platform |
 

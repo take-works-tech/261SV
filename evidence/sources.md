@@ -1664,3 +1664,73 @@ Recorded so that nothing silently depends on them:
   plot-over-line - may be taken into a commercial product on the same terms as VTK itself (E-002),
   which is a **licence** answer and not a maintenance one.
 - justifies: XC-248
+
+### E-148 - NVIDIA PhysX, licence read directly
+- tier: T1
+- url: https://raw.githubusercontent.com/NVIDIA-Omniverse/PhysX/main/LICENSE.md
+- verified: 2026-08-25
+- says: **BSD 3-Clause**, copyright NVIDIA Corporation 2008-2025. Source and binary redistribution both
+  permitted on the usual notice-and-disclaimer conditions; the only prohibition is endorsement using
+  NVIDIA's name. **No hardware restriction, no field-of-use restriction, no competing-products
+  restriction**, and no component of the repository under different terms. The GPU simulation kernels
+  are included under the same licence.
+- justifies: XC-250
+
+### E-149 - NVIDIA MDL SDK, licence read directly
+- tier: T1
+- url: https://raw.githubusercontent.com/NVIDIA/MDL-SDK/master/LICENSE.md
+- verified: 2026-08-25
+- says: **BSD 3-Clause**, copyright NVIDIA Corporation 2018-2026, with the usual notice conditions and
+  the endorsement prohibition. **No hardware, field-of-use or competing-products restriction** is
+  stated, and no component carries separate terms.
+- justifies: XC-250
+- note: this matters to this product specifically. MaterialX is already the canonical material graph
+  (XC-115 and the technology table), and MDL is the language NVIDIA's own renderers consume - so the
+  SDK is the piece that would let a MaterialX graph reach a photorealistic path **without** the piece
+  that cannot be redistributed.
+
+### E-150 - NVIDIA Warp, licence read directly
+- tier: T1
+- url: https://raw.githubusercontent.com/NVIDIA/warp/main/LICENSE.md
+- verified: 2026-08-25
+- says: **Apache License 2.0**, copyright NVIDIA Corporation & Affiliates 2022. Commercial
+  redistribution permitted on the usual attribution and licence-delivery conditions. No hardware,
+  field-of-use or competing-products restriction is stated.
+- justifies: XC-250
+
+### E-151 - What the Omniverse License Agreement actually forbids
+- tier: T1
+- url: https://raw.githubusercontent.com/NVIDIA-Omniverse/kit-cae/main/LICENSE
+- verified: 2026-08-25
+- says: the agreement governing Omniverse Kit and everything built on it states three things this
+  product cannot work around.
+  **"you may not use the Omniverse Products for the purpose of developing competing products or
+  technologies."**
+  **The Kit itself may not be distributed** - only specific extensions, snippets of thirty lines or
+  fewer, and derivative works meeting stated criteria.
+  **Public distribution "must take place either through the Exchange or through a fork of the Omniverse
+  GitHub Repository"**, and the terms a distributor imposes "must be at least as protective as the terms
+  of this license".
+  Attribution is required in the form "This software contains source code provided by NVIDIA
+  Corporation".
+- justifies: XC-250, OPEN-030
+- note: this **confirms E-009 against a contradicting reading taken the same day**. A summarised fetch of
+  the Product Specific Terms page reported that no competing-products clause and no benchmark clause
+  were stated; the licence text above states the competing-products prohibition in as many words. The
+  recorded evidence was right and the summary was not, which is the argument for reading licence texts
+  rather than pages about them.
+
+### E-152 - What `kit-cae` provides, and what it requires
+- tier: T1
+- url: https://github.com/NVIDIA-Omniverse/kit-cae
+- verified: 2026-08-25
+- says: NVIDIA publishes a Kit sample **for CAE** - OpenUSD schemas and file-format plugins that compose
+  and lazily access scientific datasets **without conversion**, with reference implementations for
+  **CGNS, EnSight, VTK and OpenFOAM**; Warp-based GPU data-processing and visualisation algorithms; RTX
+  and IndeX rendering of surfaces, volumes and particles; and capture and WebRTC streaming skills.
+  Its extensions **require the Omniverse Kit SDK**, and the repository states that development using
+  the Kit SDK is subject to the Omniverse licensing terms (E-151).
+- justifies: XC-250
+- note: this is the closest published work to this product's own subject, and it is the clearest case of
+  the distinction XC-250 draws: what it does is directly relevant, and what it runs on cannot be
+  shipped inside somebody else's desktop application.
