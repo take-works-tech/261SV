@@ -16,6 +16,14 @@ product: the priority of a requirement depends on which buyer it is for.
 > population evidence below as **one segment** rather than as the market. OPEN-036 records that the
 > denominator this changes is the one the revenue arithmetic divides by.
 
+
+> **The position this document argues for was changed on 2026-08-26 (XC-255).** What is sold is no
+> longer the finished deliverable as a capability but the **attestation** that one can be checked by
+> somebody who was not there; the verifier is free, source-available and permanent. Read the options
+> table and the attack below as the reasoning that led there - in particular the admission that the
+> moat is a user interface, which is what XC-255 answers. The revenue arithmetic in OPEN-036 is
+> unaffected: repositioning changes what is bought, not how many buyers there are.
+
 ## The finding that changes the premise, and its correction
 
 **A first pass concluded that an interactive 3D report in a single HTML file is not a differentiator,

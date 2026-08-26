@@ -4970,6 +4970,8 @@ model or the prompt, never in a description that quietly went stale.
 - closes_when: the record states which of the three it is - a capability gate accepting the self-build
   hole, a rights gate accepting the watermark hole, or a different mechanism - and says why
 - affects: XC-082, XC-071, XC-028
+- status: superseded
+- superseded_by: XC-255
 - decidedness: Open
 
 ### OPEN-034 - No asset is designated as the thing that takes time to copy
@@ -4995,6 +4997,8 @@ model or the prompt, never in a description that quietly went stale.
 - closes_when: one asset is named as the moat, with what it costs to build and what it would cost a
   competitor to reproduce
 - affects: XC-082, XC-049, XC-070
+- status: superseded
+- superseded_by: XC-255
 - decidedness: Open
 
 ### OPEN-035 - The sales channel decided in XC-035 conflicts with the owner's stated constraints
@@ -5062,3 +5066,52 @@ model or the prompt, never in a description that quietly went stale.
   12_business_model.md says which of its figures are segment figures rather than market figures
 - affects: XC-070, XC-035, XC-049, OPEN-012, OPEN-036
 - decidedness: Open
+
+### XC-255 - What is sold is that a result can be checked by somebody who was not there
+- decided: 2026-08-26
+- status: active
+- decision: the product is repositioned around **verification rather than presentation**. The free side
+  becomes reading, viewing **and checking**: a verifier that takes a deliverable and re-establishes its
+  claims - that each number came from the named input, at the digits the source supports, in the unit
+  somebody declared, and that the inputs have not changed since - is published, source-available,
+  offline, and free permanently. The paid side becomes **issuing**: a deliverable carries an attestation
+  naming the installation that produced it, and only a licensed installation can produce one that
+  checks. The assistant's commentary is issued only with its check result attached (report/AC-024,
+  report/AC-025, report/AC-026)
+- decided_by: the product owner, 2026-08-26
+- rationale: three things make this the answer rather than a repositioning for its own sake.
+  **The mechanism is already specified and mostly built.** report/AC-007 records the workspace, the
+  cases, the source files with their times, the declared units and the product version *inside the
+  document*; report/AC-043 records the content identity of every input; report/AC-044 can state that an
+  input has changed since; report/AC-028 to report/AC-030 resolve every citation to a retrieved document and
+  keep the retrieved text; XC-253 makes a number's unit, provenance and honest digits required by the
+  contract rather than by habit. **A deliverable this product produces already contains what a third
+  party needs in order to check it.** What does not exist is the act of checking, the claim, and the
+  issuer - and none of the three is large work.
+  **It is the one asset a better model makes more valuable, not less.** Generation is what models make
+  cheap, and organisations are about to receive many more engineering reports than anybody can read,
+  each one plausible. The scarce question stops being "can this be produced" and becomes "which of
+  these can be trusted". A deliverable that can be re-checked mechanically is worth **more** the more
+  unverifiable ones exist - it is an asset anti-correlated with the thing that threatens the rest of
+  the product, which is what resistance to model progress actually means. The previous defence -
+  that the intended user cannot write the script - is the barrier a capable model removes fastest, and
+  12_business_model.md already concedes it.
+  **It closes the hole in the paid boundary.** A capability gate is bypassed by compiling the published
+  source, which OPEN-033 recorded. An issuer identity is not: anybody may compile a signer and nobody
+  may produce a signature that chains to a trusted root. This project already pays for exactly that
+  economics under XC-051, because an unsigned installer is an installation failure rather than a saving.
+  And publishing the verifier's source is not a giveaway here - **verification you cannot inspect is not
+  verification**, so the source-available position of XC-082 stops being a risk to the business model
+  and becomes a requirement of it
+- alternatives: keep the capability gate - bypassed by the source, and it competes on usability, which
+  is the barrier a model removes first. Close the source - forfeits the strongest form of the claim in
+  XC-026, which is the thing this buyer wants most. Sell support and deployment (option C of
+  12_business_model.md) - demonstrably where money moves in this category, and revenue scales with
+  hours rather than copies, which is the one thing a single developer cannot scale
+- basis: E-001 (T1), E-050 (T1)
+- affects: XC-082, XC-071, XC-072, OPEN-033, OPEN-034
+- decidedness: Bounded
+- reversal_trigger: **the willingness to pay is a hypothesis and no evidence in this set establishes
+  it.** Five conversations with the intended buyer in which nobody can name an occasion when a result
+  was doubted, disputed or re-run because its provenance was unclear, would refute it. So would an
+  incumbent shipping attested output first, which would make this a feature rather than a position
