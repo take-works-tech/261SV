@@ -1,12 +1,20 @@
 ---
 status: draft
-updated: 2026-08-19
+updated: 2026-08-26
 ---
 
 # Business model
 
 What is sold, to whom, at what price, and why they pay. Kept in the spec set because it constrains the
 product: the priority of a requirement depends on which buyer it is for.
+
+
+> **The figures in this document describe CAE.** The owner stated on 2026-08-26 that the product is not
+> CAE-specific, and the code already reaches past it - `.stl` among the readers, and metrological
+> uncertainty in `domain_core/measurement.py`, which is the vocabulary of a test rig rather than a
+> solver. Until OPEN-037 settles the scope, read the category size, the vendor comparison and the
+> population evidence below as **one segment** rather than as the market. OPEN-036 records that the
+> denominator this changes is the one the revenue arithmetic divides by.
 
 ## The finding that changes the premise, and its correction
 

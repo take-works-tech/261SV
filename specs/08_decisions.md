@@ -4949,3 +4949,116 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a deliverable kind where partial output is worth more than none - a very large
   report where one unrepresentable block should not stop the other forty - which would need the refusal
   to become per-block rather than per-document
+### OPEN-033 - The paid boundary is a capability, and the licence permits building it yourself
+- question: XC-082 puts the finished deliverable - report generation and export - and the assistant on
+  the paid side, and publishes the whole source under the Functional Source License. FSL forbids
+  offering a competing commercial substitute; **it permits internal use**. A customer with a developer
+  may therefore build the paid part from the published source and use it inside their own organisation,
+  legally and without paying. Nothing in the record says whether that is intended
+- why_open: it decides what is actually being sold. The comparison worth making is BioRender, whose
+  free tier produces a figure with a watermark that cannot be removed and whose terms forbid using it
+  in a paper, a grant application or anything commercial: what is sold there is **the right to publish**,
+  not a feature. This product sells a feature, and a feature whose source the buyer holds is a feature
+  the buyer can decline to buy.
+  The alternative shape fits this product's own differentiator unusually well - the paid tier would be
+  the right to send the deliverable to somebody outside the organisation, which is exactly the thing the
+  free tools cannot produce and exactly what the customer wants it for. But it collides head-on with
+  XC-082: a watermark whose source is published is a watermark somebody removes, and forbidding that
+  is a licence term rather than a mechanism
+- blocks: nothing today; the paid tier does not exist. It blocks the first pricing page and the licence
+  text (both in the release backlog), and it should be settled before either is written
+- closes_when: the record states which of the three it is - a capability gate accepting the self-build
+  hole, a rights gate accepting the watermark hole, or a different mechanism - and says why
+- affects: XC-082, XC-071, XC-028
+- decidedness: Open
+
+### OPEN-034 - No asset is designated as the thing that takes time to copy
+- question: XC-082's defence is a licence, and the "Attacking the recommendation" section already
+  concedes that the differentiator is a user interface and that interfaces are copied. Nothing in the
+  record names an asset whose reproduction costs **time** rather than effort
+- why_open: a moat made of software logic is reproduced by anyone who decides the segment is worth
+  having, and a moat made of "our users find the alternative hard to learn" is the barrier a capable
+  language model removes fastest - which the same section names as the vulnerability without recording
+  a defence.
+  There is a candidate already half-built. XC-049's two tiers - verified and offered - describe a
+  claim about **real files from real solvers**, checked round-trip, with what was dropped named. A
+  corpus of those, accumulated through customers over years, cannot be generated: it needs the files,
+  and the files come with relationships. That is the shape of BioRender's fifty thousand curated icons
+  rather than the shape of a feature.
+  A second candidate, unclaimed: this product's discipline is that a number arrives with its unit, its
+  provenance and its honest digits, and that discipline is enforced by contract and gate rather than by
+  habit (XC-253). As ungrounded output becomes cheap and abundant, a deliverable that cannot carry an
+  unsourced figure is worth **more**, not less. The record notes the vulnerability to better models and
+  does not note this
+- blocks: nothing mechanical. It blocks knowing which work compounds, which is what decides the order
+  of the release backlog
+- closes_when: one asset is named as the moat, with what it costs to build and what it would cost a
+  competitor to reproduce
+- affects: XC-082, XC-049, XC-070
+- decidedness: Open
+
+### OPEN-035 - The sales channel decided in XC-035 conflicts with the owner's stated constraints
+- question: XC-035 fixes the first release as **invoice-based domestic business-to-business**: Japanese
+  interface, a perpetual licence under JPY 399,000, an offline installer, sold directly. The owner's
+  evaluation constraints of 2026-08-26 require a marketplace channel precisely to avoid the friction of
+  internal approval, invoicing and contracts, and say direct business-to-business selling is to be
+  avoided at first for reasons of credibility. **These are not compatible**, and one of them is wrong
+- why_open: the reasoning behind XC-035 is strong and measured - the independent visualisation vendors
+  total about USD 5 million between them (E-043), so a volume self-serve motion aims at a market that
+  has not existed for anybody, while the differentiator is worth most to the buyer who cannot use a
+  hosted tool. The reasoning behind the constraint is also strong: a single individual invoicing a
+  manufacturer is a credibility problem before it is a sales problem.
+  What makes it a real fork rather than a preference is that **there is no marketplace for this shape of
+  product**. A standalone desktop application has no store; the stores that exist in this field sell
+  add-ons to a host application, and becoming an add-on changes what the product is - it would mean
+  selling deliverable generation inside somebody else's tool, which fits XC-082's paid boundary and does
+  not fit XC-035's offline buyer
+- blocks: the pricing page, the licence text, and the decision about whether the first release is a
+  standalone application at all
+- closes_when: either XC-035 is reaffirmed and the constraint relaxed for this product with the reason
+  recorded, or XC-035 is superseded by a channel decision that satisfies the constraint
+- affects: XC-035, XC-036, XC-071, XC-050
+- decidedness: Open
+
+### OPEN-036 - The buyer population is measured in people, and the buyer is an organisation
+- question: E-029 measures 14,128 cumulative passes of the JSME computational mechanics certification
+  from 2003 to 2025. XC-035's buyer is a **company**. No source in the record says how many
+  organisations perform this work
+- why_open: the target decides everything downstream and cannot be checked without this number. At the
+  published prices of E-027 (USD 3,330 a year), JPY 20 million of annual revenue is about 40 seats; at
+  XC-071's JPY 399,000 perpetual licence it is about **50 sales every year**, because a perpetual
+  licence produces no recurring revenue. Fifty a year against a population of a few thousand people is
+  a plausible share; fifty a year against a few hundred organisations is most of the market, every year.
+  **The two readings differ by an order of magnitude and the record cannot tell them apart.**
+  E-029 is also an upper bound on people, not a count of practitioners: it is cumulative over
+  twenty-two years, it counts one person once per field across three fields, and the certification is
+  voluntary, so it over-counts and under-counts at the same time
+- blocks: any statement about whether the revenue target is reachable
+- closes_when: a primary source gives the number of organisations performing this work in the first
+  release's market, and the required customer count is restated against it
+- affects: XC-070, XC-035, XC-071
+- decidedness: Open
+
+### OPEN-037 - The specification frames the product as CAE, and the owner states it is not CAE-specific
+- question: every document in this set is written about CAE result files, and the market analysis of
+  12_business_model.md is bounded by that framing - the category size, the vendor comparison and the
+  population evidence are all CAE. **The owner stated on 2026-08-26 that the software is not
+  CAE-specific.** Nothing records how far the scope extends, and the whole commercial analysis inherits
+  the narrower reading
+- why_open: the code already reaches past CAE, so this is not a hypothetical. Measured in this
+  repository on 2026-08-26: the readers accept `.stl` alongside `.vtu`, `.vtp`, `.pvtu`, `.cgns`,
+  `.e`, `.ex2` and `.exo` - and `.stl` is generic geometry, not a solver result. More telling,
+  `domain_core/measurement.py` carries **metrological uncertainty** - standard and expanded, with the
+  coverage factor required rather than optional (E-070) - which is the vocabulary of a test rig, a
+  sensor and a calibration laboratory, not of a solver.
+  What the engine actually is, on the evidence of its own code, is a path from a field dataset to a
+  self-contained deliverable whose numbers carry their units and their provenance. CAE is the first
+  vertical rather than the boundary. If that is right, then the population evidence in E-029, the
+  vendor comparison in E-043 and the category size in XC-070 all describe **one segment of the
+  addressable market**, and OPEN-036's arithmetic is being done against the wrong denominator
+- blocks: XC-070's estimate, OPEN-036's denominator, and the priority order of the format work, which
+  currently follows a CAE reading of OPEN-012
+- closes_when: the scope is stated - which domains the first release serves and which it does not - and
+  12_business_model.md says which of its figures are segment figures rather than market figures
+- affects: XC-070, XC-035, XC-049, OPEN-012, OPEN-036
+- decidedness: Open
