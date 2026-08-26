@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-25
+updated: 2026-08-26
 ---
 
 # Sources
@@ -1805,3 +1805,33 @@ Recorded so that nothing silently depends on them:
 - note: VisRTX's **source** is BSD-3; running it needs OptiX, which is NVIDIA's own licence and NVIDIA
   hardware. The permissive licence removes the redistribution problem, not the hardware one - which is
   the same shape as CUDA and a different shape from the Kit SDK, where redistribution itself is barred.
+
+### E-157 - A marketplace for this shape of product exists, and the customer spends budget already held
+- tier: T1
+- url: https://www.siemens.com/en-us/partners/software/join-partner-program/build/advanced-partner-alliance/
+- verified: 2026-08-26
+- says: the Advanced Partner Alliance - the former Altair Partner Alliance, reached today by following
+  altair.com's own redirect - distributes independent vendors' software to customers who access it
+  "using the Altair Units licensing system, which allows customers to access multiple engineering tools
+  using a shared pool of licenses". **The customer therefore spends units already bought rather than
+  making a separate purchase.** The stated criteria are "high-quality, specialized technology that adds
+  real value to the workflow", "relevance to the engineering and industrial software space" and "a
+  professional, dedicated company committed to supporting customers". Partners "retain ownership of
+  your intellectual property, define your product roadmap and manage your own technology and support
+  strategy", and reach customers through the catalogue, marketing, events and the Siemens sales
+  organisation. **Partner compensation and revenue share are not stated on the page**
+- justifies: OPEN-035
+- note: two ownership changes were found on the way to this page and both bear on a channel decision -
+  altair.com redirects to siemens.com, and ansys.com redirects to ansys.synopsys.com
+
+### E-158 - The Ansys Store accepts third-party applications, on terms this project could not read
+- tier: T2
+- url: https://developer.ansys.com/partner_home
+- verified: 2026-08-26
+- says: the store lists third-party applications under a curated verification process - partnership
+  review, virus and code scan, quality assurance testing and a documentation review, with results
+  communicated within 45 days, and the submitter supporting the app. **Recorded at T2 because the
+  primary pages could not be read here**: developer.ansys.com now redirects to developer.synopsys.com,
+  which returns HTTP 403, as does the partner guidelines PDF. The description above comes from search
+  summaries of those pages rather than from the pages themselves, so it may not justify a Fixed value
+- justifies: OPEN-035

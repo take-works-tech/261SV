@@ -5022,6 +5022,20 @@ model or the prompt, never in a description that quietly went stale.
 - closes_when: either XC-035 is reaffirmed and the constraint relaxed for this product with the reason
   recorded, or XC-035 is superseded by a channel decision that satisfies the constraint
 - affects: XC-035, XC-036, XC-071, XC-050
+- basis: E-157 (T1), E-158 (T2)
+- correction: **the claim in this item's own reasoning that "there is no marketplace for this shape of
+  product" was wrong, and was corrected on 2026-08-26 by reading one.** The Advanced Partner Alliance
+  distributes independent vendors' software to customers who pay with licence units they already hold
+  (E-157), which removes the procurement friction this item was written about - there is no separate
+  purchase to approve. The Ansys Store lists third-party applications under a curated review (E-158).
+  Two consequences follow that the item did not anticipate. **The offline requirement and a marketplace
+  channel are not in conflict**: XC-035's buyer cannot send geometry outside their network, and an
+  application distributed through a catalogue still runs on their machine, so the constraint is about
+  where the data goes rather than about where the software was bought. And **the channel argues for
+  incorporating rather than against it**: the alliance's stated criteria include "a professional,
+  dedicated company committed to supporting customers", which is the customer requirement XC-036 named
+  as its own trigger. What remains unknown is what a partner is paid, which neither source states, and
+  whether an individual is accepted at all
 - decidedness: Open
 
 ### OPEN-036 - The buyer population is measured in people, and the buyer is an organisation
