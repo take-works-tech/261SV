@@ -23,6 +23,7 @@ glossary, limits, contracts, invariants and the per-feature specs.
 | `mockups/ui/` | the executable UI catalogue; design states only, never evidence of implemented behaviour |
 | `validate/check_specs.py` | the spec linter; it defines what "complete" means |
 | `.agents/skills/spec-authoring/` | the authoring procedure and the question bank |
+| `.claude/skills/` | vendored + project design skills; `solvia-ui` binds the generic ones to this product's tokens and rules, and its README records each licence |
 | `archive/` | Git-ignored legacy and private local material; never a source of truth |
 
 The walking-skeleton engine lives under `src/`. Earlier root-level implementations and tool settings
