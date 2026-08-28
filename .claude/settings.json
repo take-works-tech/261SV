@@ -3,9 +3,7 @@
     "SHELL": "C:\\Program Files\\Git\\usr\\bin\\bash.exe",
     "BASH_EXECUTABLE": "C:\\Program Files\\Git\\usr\\bin\\bash.exe"
   },
-  "outputStyle": "sim-viewer",
   "permissions": {
-    "defaultMode": "acceptEdits",
     "allow": [
       "Read(*)",
       "Grep(*)",
@@ -36,15 +34,6 @@
       "Bash(npm run lint*)",
       "Bash(npm run build*)"
     ],
-    "ask": [
-      "Bash(git push*)",
-      "Bash(git remote add*)",
-      "Bash(git remote set-url*)",
-      "Bash(gh repo create*)",
-      "Bash(gh pr create*)",
-      "Bash(gh secret*)",
-      "Bash(gh api*)"
-    ],
     "deny": [
       "Bash(git push --force*)",
       "Bash(git push -f*)",
@@ -57,7 +46,17 @@
       "Bash(rm -rf*)",
       "Bash(gh pr merge:*)",
       "Bash(gh pr merge*)"
-    ]
+    ],
+    "ask": [
+      "Bash(git push*)",
+      "Bash(git remote add*)",
+      "Bash(git remote set-url*)",
+      "Bash(gh repo create*)",
+      "Bash(gh pr create*)",
+      "Bash(gh secret*)",
+      "Bash(gh api*)"
+    ],
+    "defaultMode": "acceptEdits"
   },
   "hooks": {
     "SessionStart": [
@@ -92,5 +91,9 @@
         ]
       }
     ]
+  },
+  "outputStyle": "sim-viewer",
+  "enabledPlugins": {
+    "frontend-design@claude-plugins-official": true
   }
 }
