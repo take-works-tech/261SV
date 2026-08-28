@@ -6,12 +6,18 @@ on the date shown; upstream commit ids make a later diff cheap.
 
 | Skill | Source | Commit | Licence | Verified |
 |---|---|---|---|---|
-| `frontend-design` | github.com/anthropics/skills `skills/frontend-design` | 3b3fad9 | Apache-2.0 (its own LICENSE.txt, read in full) | 2026-08-29 |
 | `web-design-guidelines` | github.com/vercel-labs/agent-skills `skills/web-design-guidelines` | 063bee9 | MIT (repository README declaration) | 2026-08-29 |
 | `react-best-practices` | github.com/vercel-labs/agent-skills `skills/react-best-practices` | 063bee9 | MIT (repository README + its own frontmatter) | 2026-08-29 |
 | `composition-patterns` | github.com/vercel-labs/agent-skills `skills/composition-patterns` | 063bee9 | MIT (repository README declaration) | 2026-08-29 |
 | `solvia-ui` | written here | - | project's | - |
 | `spec-authoring` | written here | - | project's | - |
+
+`frontend-design` is deliberately **not** vendored here: it arrives as the official plugin
+`frontend-design@claude-plugins-official`, declared at project scope in `.claude/settings.json`
+(`enabledPlugins`), so any clone of this repository gets it from the marketplace. Installed version
+0620a687ddd5 was diffed against anthropics/skills commit 3b3fad9 on 2026-08-29 and the content is
+identical apart from line endings; the licence is Apache-2.0, read in full at that commit. A vendored
+copy under the same name would collide with the plugin's skill - one name, one owner.
 
 Update by re-cloning upstream and diffing against the commit above - never by editing the vendored
 copy in place, which would be a fork nobody records.
@@ -20,7 +26,7 @@ copy in place, which would be a fork nobody records.
 
 `solvia-ui` binds the generic skills to this product: tokens only, seven states, instrument-screen
 rules, and an explicit adopt/reject map for `frontend-design`'s editorial advice. On any UI work,
-load `solvia-ui` first. Where skills disagree, solvia-ui wins; where solvia-ui and the specs
+load `solvia-ui` first (the plugin-delivered `frontend-design` included). Where skills disagree, solvia-ui wins; where solvia-ui and the specs
 disagree, the specs win - and say which, rather than proceeding (AGENTS.md).
 
 These are development-time tools. Nothing here ships in the product, so XC-025's attribution file
