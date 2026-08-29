@@ -14,6 +14,9 @@
  */
 import type { ReactNode } from "react";
 import { session } from "../../state/session";
+import { CreateFromTemplate } from "../../shared/CreateFromTemplate";
+import { NewItemButtons } from "../../shared/NewItemButtons";
+import { SaveAsTemplate } from "../../shared/SaveAsTemplate";
 import { submit } from "../../client/operations";
 import { QuantityChip } from "../../shared/QuantityChip";
 import { ProvenanceBadge } from "../../shared/ProvenanceBadge";
@@ -211,16 +214,62 @@ export function SimulationScreen(props: { variant: string }) {
           シミュレーションは、1回以上の外部ソルバー実行の条件をまとめて保存するフローです。
           r1では定義の保存と編集までを行い、実行と結果ケースの作成は行いません（XC-091）。
         </p>
+        {/* The creation row of 11_ui.md, as one component: five separately-written buttons drift
+            into five different words for "create" across five areas (MOD-010). */}
+        <NewItemButtons
+          onCreate={(kind) =>
+            submit({ operation: "workspace.save", parameters: { item: kind, action: "create" } })
+          }
+          disabled={{
+            view: "ケースが読み込まれていません",
+            graph: "ケースが読み込まれていません",
+            report: "ケースが読み込まれていません",
+          }}
+        />
         <div className="actions">
-          <button
-            className="btn primary"
-            onClick={() => submit({ operation: "workspace.save", parameters: { item: "simulation", action: "create" } })}
-          >
-            ＋ 新規シミュレーション
-          </button>
           <button className="btn ghost" onClick={() => session.navigate("pipeline")}>
             パイプライン取込を開く
           </button>
+        </div>
+        <div style={{ marginTop: 18, textAlign: "left", display: "grid", gap: 18 }}>
+          <CreateFromTemplate
+            templates={[
+              {
+                id: "tpl-std",
+                name: "標準強度確認（社内様式）",
+                origin: "ワークスペース",
+                revision: 3,
+                unresolved: [],
+              },
+              {
+                id: "tpl-thermal",
+                name: "熱連成 一次確認",
+                origin: "サンプル",
+                revision: 1,
+                unresolved: [
+                  { what: "フィールド「温度」", missing: "このワークスペースに同名の量がありません" },
+                  { what: "変数「基準温度」", missing: "宣言されていません" },
+                ],
+              },
+            ]}
+            selectedId="tpl-thermal"
+            onSelect={(id) => submit({ operation: "library.list", parameters: { select: id } })}
+            onCreate={(id) => submit({ operation: "template.apply", parameters: { templateId: id } })}
+          />
+          <SaveAsTemplate
+            itemName="標準強度確認"
+            becomeRequirements={[
+              { what: "対象ケース", boundTo: "Run 12" },
+              { what: "フィールド", boundTo: "stress（節点・MPa）" },
+            ]}
+            stayPinned={[
+              { what: "ページ体裁", boundTo: "社内様式 rev 3" },
+              { what: "カラーマップ", boundTo: "Viridis（範囲固定 0–250 MPa）" },
+            ]}
+            name=""
+            onName={() => undefined}
+            onSave={() => submit({ operation: "template.createFromItem", parameters: {} })}
+          />
         </div>
       </div>
     );

@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { session, useSession } from "../state/session";
 import { NotificationHistory, type Notice } from "../shared/NotificationHistory";
+import { ScriptView, type ScriptLine } from "../shared/ScriptView";
 
 type MenuItem = { label: string; key?: string; noKeyBecause?: string; disabled?: string };
 
@@ -43,10 +44,27 @@ const NOTICES: Notice[] = [
   { id: "n3", at: "09:58", severity: "info", title: "読み込み完了", detail: "Run 12 — 1,127,844 点" },
 ];
 
+/* XC-046: every interface action has a written form, and it is the same command surface a script
+   would use. These are the last few, as they would read after opening Run 12 and probing it. */
+const RECENT: ScriptLine[] = [
+  { at: "10:24", operation: "workspace.open", parameters: '"D:/studies/bracket.svw"', outcome: "applied" },
+  { at: "10:24", operation: "dataset.load", parameters: '"Run 12"', outcome: "applied" },
+  { at: "10:25", operation: "field.declareUnit", parameters: '"stress", "MPa"', outcome: "applied" },
+  { at: "10:26", operation: "dataset.probe", parameters: '"stress", node="GlobalNodeId 1003"', outcome: "answered" },
+  {
+    at: "10:31",
+    operation: "report.export",
+    parameters: '"強度確認", format="html"',
+    outcome: "refused",
+    reason: "せん断の単位が未宣言のため（XC-003）",
+  },
+];
+
 export function Topbar() {
   const s = useSession();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [showNotices, setShowNotices] = useState(false);
+  const [showScript, setShowScript] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -54,6 +72,7 @@ export function Topbar() {
       if (!barRef.current?.contains(event.target as Node)) {
         setOpenMenu(null);
         setShowNotices(false);
+        setShowScript(false);
       }
     };
     window.addEventListener("mousedown", onDown);
@@ -128,6 +147,28 @@ export function Topbar() {
               <header>通知履歴</header>
               <div className="body">
                 <NotificationHistory notices={NOTICES} />
+              </div>
+            </div>
+          ) : null}
+        </span>
+        <span style={{ position: "relative" }}>
+          <button
+            className="icon-button"
+            aria-pressed={showScript}
+            aria-label="操作の記録"
+            title="いま行った操作を、同じことをするコマンドとして読む（XC-046）"
+            onClick={() => setShowScript(!showScript)}
+          >
+            {"{ }"}
+          </button>
+          {showScript ? (
+            <div className="popover" style={{ right: 0, top: "calc(100% + 6px)" }}>
+              <header>操作の記録</header>
+              <div className="body">
+                <ScriptView
+                  lines={RECENT}
+                  onCopy={(text) => void navigator.clipboard?.writeText(text)}
+                />
               </div>
             </div>
           ) : null}

@@ -17,6 +17,7 @@ import { ProbeReadout } from "../../shared/ProbeReadout";
 import { Outliner, type OutlinerNode } from "../../shared/Outliner";
 import { UnresolvedList } from "../../shared/UnresolvedList";
 import { WorkspaceItemList } from "../../shared/WorkspaceItemList";
+import { ConversationDrawer } from "../../shared/ConversationDrawer";
 import { ColourMapControl, type ColourMapId } from "../../shared/ColourMapControl";
 import { FieldSelector } from "../../shared/FieldSelector";
 import { QuantityChip } from "../../shared/QuantityChip";
@@ -656,56 +657,34 @@ function PresetPanel() {
 
 function AssistantDrawer() {
   const [draft, setDraft] = useState("");
+  /* The shared drawer (MOD-010, XC-150): the instruction bar, this drawer and the Chat area are
+     three forms of one conversation. One implementation, so opening the drawer cannot quietly
+     become a second thread. */
   return (
-    <aside className="vi-drawer" aria-label="会話ドロワー">
-      <header>
-        <b>会話 — このワークスペース</b>
-        <button className="icon-button" aria-label="ドロワーを閉じる" onClick={() => session.navigate("view", "default")}>×</button>
-      </header>
-      <div className="vi-thread">
-        <div className="vi-turn">
-          <span className="who">あなた</span>
-          <p>最大応力が最も厳しいケースが分かるように、ケース比較のビューにして。</p>
-        </div>
-        <div className="vi-turn">
-          <span className="who">アシスタント</span>
-          <p>
-            比較「ケース比較・ミーゼス応力」の案を作りました。軸はケース、メンバーは Run 12・Run 11・Run 09・Run 07、
-            カラーマップと範囲（{SHARED_RANGE}）は共有です。まだ適用していません。内容を確認して適用してください。
-          </p>
-          <div className="vi-row-actions">
-            <button className="btn primary" onClick={() => submit({ operation: "template.apply", parameters: { proposal: "case-comparison" } })}>
-              適用
-            </button>
-            <button className="btn ghost" onClick={() => submit({ operation: "history.list", parameters: {} })}>差分を確認</button>
-          </div>
-        </div>
-      </div>
-      <footer>
-        <form
-          style={{ display: "flex", gap: 6 }}
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (draft.trim() === "") return;
-            submit({ operation: "script.run", parameters: { instruction: draft.trim() } });
-            setDraft("");
-          }}
-        >
-          <input
-            className="field-input"
-            style={{ flex: 1, minWidth: 0 }}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="続けて指示（同じ会話）"
-            aria-label="会話への指示"
-          />
-          <button className="btn" type="submit" disabled={draft.trim() === ""}>送る</button>
-        </form>
-        <p className="prop-note" style={{ margin: 0 }}>
-          下の入力欄・会話画面と同じスレッドです（XC-150）。右のプロパティ欄と素材ライブラリはこのまま使えます。
-        </p>
-      </footer>
-    </aside>
+    <ConversationDrawer
+      turns={[
+        {
+          id: "t1",
+          from: "person",
+          text: "最大応力が最も厳しいケースが分かるように、ケース比較のビューにして。",
+        },
+        {
+          id: "t2",
+          from: "assistant",
+          text:
+            `比較「ケース比較・ミーゼス応力」の案を作りました。軸はケース、メンバーは Run 12・Run 11・Run 09・Run 07、` +
+            `カラーマップと範囲（${SHARED_RANGE}）は共有です。まだ適用していません。内容を確認して適用してください。`,
+          commands: ['template.apply({ proposal: "case-comparison" })'],
+        },
+      ]}
+      draft={draft}
+      onDraft={setDraft}
+      onSend={() => {
+        submit({ operation: "script.run", parameters: { instruction: draft.trim() } });
+        setDraft("");
+      }}
+      onClose={() => session.navigate("view", "default")}
+    />
   );
 }
 
