@@ -95,7 +95,8 @@ ran. Every gate in `validate/` runs in `.github/workflows/ci.yml`, and
 
 ## Working agreements
 
-- **One remote, named** (XC-186): `take-works-tech/261SV`, private. Pushing
+- **One remote, named** (XC-186): `take-works-tech/261SV`, **public** since 2026-08-30 under
+  FSL-1.1-MIT (LICENSE.md, XC-082). Pushing
   there is authorised; any other repository is not. Force-push, hard reset, rebase and history rewriting
   are refused - the record of a correction is part of what this project ships.
 - **Automatic merge is on, and it ends at the first working prototype** (XC-218). Work lands through a

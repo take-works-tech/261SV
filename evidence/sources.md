@@ -1835,3 +1835,15 @@ Recorded so that nothing silently depends on them:
   which returns HTTP 403, as does the partner guidelines PDF. The description above comes from search
   summaries of those pages rather than from the pages themselves, so it may not justify a Fixed value
 - justifies: OPEN-035
+
+### E-159 - The Functional Source License text, from its steward
+- tier: T1
+- url: https://raw.githubusercontent.com/getsentry/fsl.software/main/FSL-1.1-MIT.template.md
+- verified: 2026-08-30
+- says: FSL-1.1-MIT grants use, copying, modification, derivative works, public performance/display
+  and redistribution for any Permitted Purpose - any purpose other than a Competing Use, defined as
+  making the software available in a commercial product or service that substitutes for it or for a
+  product the licensor offers with it. Each version becomes available under the MIT licence on the
+  second anniversary of its release. The template's only variables are the year and the licensor
+  name; LICENSE.md instantiates it verbatim with 2026 and take-works-tech (Take)
+- justifies: XC-082, XC-186
