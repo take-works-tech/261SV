@@ -173,6 +173,18 @@ def test_the_gate_reports_shared_components_as_unexamined(project: Path) -> None
     assert "shared components" in result.stdout
 
 
+def test_the_gate_prints_only_ascii() -> None:
+    """A gate is read by a subprocess, and on Windows that subprocess decodes as cp932 by default.
+
+    Printing a Japanese component name made `result.stdout` None for every caller - the gate broke
+    the thing it reports to. Found by this repository's own tests failing with a UnicodeDecodeError
+    rather than an assertion, which is why the blind-spot line now names table rows, not labels.
+    """
+    result = subprocess.run([sys.executable, str(GATE)], capture_output=True, text=True, cwd=ROOT)
+    assert result.stdout is not None
+    assert result.stdout.isascii(), "the gate printed a non-ASCII character"
+
+
 def test_shared_components_are_examined_once_interface_code_exists() -> None:
     """The expiry of the test above, asserted rather than assumed: with src/ui present in this
     repository, the unexamined line is gone - the components are checked, not excused."""

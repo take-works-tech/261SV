@@ -17,6 +17,7 @@ import { disabledBecause } from "../../logic/format";
 import { FieldSelector, type FieldOption } from "../../shared/FieldSelector";
 import { ProvenanceBadge } from "../../shared/ProvenanceBadge";
 import { QuantityChip } from "../../shared/QuantityChip";
+import { ExpressionEditor } from "../../shared/ExpressionEditor";
 import { UnitLabel } from "../../shared/UnitLabel";
 import { NumberCell } from "../../shared/NumberCell";
 import { UnresolvedList } from "../../shared/UnresolvedList";
@@ -182,46 +183,33 @@ export function FindScreen(props: { variant: string }) {
 
           {mode === "expression" ? (
             <div>
-              <textarea
-                key={variant}
-                className="field-input fi-mono"
-                rows={2}
-                defaultValue={expressionText}
-                spellCheck={false}
-                aria-label="条件式"
-                aria-invalid={variant === "unresolvable"}
-                placeholder="例：相当応力 > 180 [MPa]"
+              {/* The shared editor (MOD-010): names in scope, the unit signature, and an
+                  unresolvable name marked at its character position - one implementation, so the
+                  three surfaces that write expressions cannot drift apart. */}
+              <ExpressionEditor
+                value={expressionText}
+                readOnly
+                namesInScope={FIELDS.map((field) => ({
+                  name: field.name,
+                  unit: field.unit,
+                  kind: field.association === "point" ? "節点フィールド" : "要素フィールド",
+                }))}
+                resultUnit={variant === "default" ? "MPa" : undefined}
+                problem={
+                  variant === "unresolvable"
+                    ? {
+                        at: BAD_POSITION,
+                        length: BAD_NAME.length,
+                        message: `名前「${BAD_NAME}」を解決できません`,
+                      }
+                    : undefined
+                }
               />
-              {variant === "unresolvable" ? (
-                <pre className="fi-caret" aria-hidden="true">
-                  <span className="fi-ghost">{BAD_EXPRESSION.slice(0, BAD_POSITION)}</span>
-                  <span className="fi-mark">{"^".repeat(BAD_NAME.length)}</span>
-                </pre>
-              ) : null}
-              {variant === "default" ? (
-                <p className="fi-status good" role="status">
-                  次元検査：左辺 MPa（「相当応力」の宣言単位）＝右辺 MPa — 一致
-                </p>
-              ) : variant === "empty" ? (
+              {variant === "empty" ? (
                 <p className="fi-status" role="status">
                   式が空です — 検索は行われず、前の選択には触れません
                 </p>
-              ) : (
-                <p className="fi-status error" role="alert">
-                  {BAD_POSITION + 1}文字目：名前「{BAD_NAME}」を解決できません
-                </p>
-              )}
-              <div className="fi-scope" aria-label="スコープにある名前">
-                {FIELDS.map((field) => (
-                  <span className="fi-scope-chip" key={field.name}>
-                    <b>{field.name}</b>
-                    <span>
-                      <UnitLabel unit={field.unit} />
-                      ・{field.association === "point" ? "節点" : "要素"}
-                    </span>
-                  </span>
-                ))}
-              </div>
+              ) : null}
             </div>
           ) : mode === "ids" ? (
             <div>

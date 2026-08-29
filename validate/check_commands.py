@@ -372,7 +372,9 @@ def check_components_are_unique(findings: list[Finding]) -> bool:
     if not directories:
         return False
     for name in shared_components():
-        slug = name.lower().replace(" ", "").replace("-", "")
+        if not matchable(name):
+            continue  # reported by unchecked(); a row no filename can carry is a blind spot, not a pass
+        slug = component_slug(name)
         matches = [
             path
             for directory in directories
@@ -383,6 +385,22 @@ def check_components_are_unique(findings: list[Finding]) -> bool:
             where = ", ".join(str(path.relative_to(ROOT)) for path in matches)
             findings.append(Finding(UI_SPEC.name, f"'{name}' has more than one implementation: {where}"))
     return True
+
+
+def component_slug(name: str) -> str:
+    return name.lower().replace(" ", "").replace("-", "")
+
+
+def matchable(name: str) -> bool:
+    """Whether this component's name can be carried by a filename at all.
+
+    Three rows of 11_ui.md are written as their labels rather than as names - the creation row is
+    five Japanese labels separated by slashes, and two others are Japanese verbs. A slug built from
+    them is not a filename any implementation could have, so the match silently finds zero and zero
+    matches is not a finding. Saying which rows those are turns a silent pass into a stated gap.
+    """
+    slug = component_slug(name)
+    return slug.isascii() and "/" not in slug and slug != ""
 
 
 def operation_results() -> dict[str, dict]:
@@ -517,6 +535,17 @@ def unchecked(generated_checked: bool = True) -> list[str]:
             f"{found} components of 11_ui.md were not examined, for the same reason"
             if found
             else "shared components (operations/AC-024): 11_ui.md was not found, so no component list was read"
+        )
+    unmatchable = [name for name in shared_components() if not matchable(name)]
+    if unmatchable:
+        # Reported by ROW NUMBER, not by name. The names are Japanese labels, and this gate's output
+        # is read by a subprocess whose default encoding on Windows is cp932 - printing them made
+        # every caller's stdout undecodable, which is a gate breaking the thing it reports to.
+        rows = [str(index + 1) for index, name in enumerate(shared_components()) if not matchable(name)]
+        gaps.append(
+            f"{len(unmatchable)} shared-component row(s) of 11_ui.md - rows {', '.join(rows)} of the "
+            "component table - carry Japanese labels rather than names, so no filename can match them "
+            "and a duplicate implementation of one would not be found"
         )
     gaps.append(
         "keyboard reachability (operations/AC-013): the scheme is specified in prose and has no "

@@ -7,6 +7,7 @@
 import type { ReactNode } from "react";
 import { session, useSession, type ScreenId } from "../state/session";
 import { InstructionBar } from "../shared/InstructionBar";
+import { MaterialLibraryShelf, type ShelfAsset, type ShelfState } from "../shared/MaterialLibraryShelf";
 import { Topbar } from "./Topbar";
 import { WorkToolbar } from "./WorkToolbar";
 import { LeftSidebar } from "./LeftSidebar";
@@ -48,6 +49,26 @@ const SHELF_CARDS: Partial<Record<ScreenId, string[]>> = {
   view: ["テンプレート", "マテリアル", "背景", "ガイド", "フォント"],
   graph: ["テンプレート", "スタイル", "フォント"],
   report: ["テンプレート", "レイアウト", "スタイル", "フォント"],
+};
+
+/* Assets drawn as themselves (XC-215). The swatches are token gradients, not images: the shelf is
+   chrome, and the one place a real colour map appears is the legend, which is data (XC-256). */
+const SHELF_ASSETS: Partial<Record<ScreenId, ShelfAsset[]>> = {
+  view: [
+    { id: "a-steel", name: "鋼（つや消し）", source: "sample", swatch: "linear-gradient(135deg, var(--g-ink-faint), var(--g-active))" },
+    { id: "a-neutral", name: "中間グレー", source: "sample", swatch: "var(--g-raise)" },
+    { id: "a-glass", name: "半透明", source: "workspace", swatch: "linear-gradient(135deg, var(--g-active), var(--g-panel))" },
+    { id: "a-result", name: "結果マテリアル", source: "sample", swatch: "var(--map-viridis)", newerSampleExists: true },
+    { id: "a-studio", name: "スタジオ背景", source: "shared" },
+  ],
+  graph: [
+    { id: "g-line", name: "折れ線（既定）", source: "sample", swatch: "var(--g-raise)" },
+    { id: "g-mono", name: "単色スタイル", source: "workspace", swatch: "var(--map-greys)" },
+  ],
+  report: [
+    { id: "r-journal", name: "論文体裁", source: "sample" },
+    { id: "r-internal", name: "社内様式", source: "workspace" },
+  ],
 };
 
 export function App() {
@@ -155,55 +176,24 @@ export function App() {
 
           <div className="canvas-wrap">{canvas}</div>
 
-          {SHELF_SCREENS.includes(s.screen) ? (() => {
-            // The material-library shelf's six states are catalogued view variants (mockup 1's
-            // library-*); the shelf itself is shell furniture, so the states live here.
-            const shelfState = s.screen === "view" && s.variant.startsWith("library-")
-              ? s.variant.replace("library-", "")
-              : "one-row";
-            const cards = SHELF_CARDS[s.screen] ?? [];
-            const searching = shelfState === "searching";
-            const rows = shelfState === "expanded" ? [cards, cards] : [cards];
-            return (
-              <div className="shelf">
-                <header>
-                  <b>ライブラリ</b>
-                  <span className="type-caption" style={{ color: "var(--ink-faint)" }}>
-                    サンプル／ワークスペース
-                  </span>
-                  {searching ? (
-                    <span className="side-search" style={{ margin: 0, height: 24 }}>
-                      <input defaultValue="鋼" aria-label="ライブラリを検索" />
-                    </span>
-                  ) : null}
-                  {shelfState === "narrow" ? (
-                    <span className="type-caption" style={{ color: "var(--ink-muted)", marginLeft: "auto" }}>
-                      幅が足りないため下段ドロワーで開きます
-                    </span>
-                  ) : null}
-                </header>
-                {shelfState !== "collapsed" && shelfState !== "narrow"
-                  ? rows.map((row, index) => (
-                      <div key={index} className="shelf-row">
-                        {row
-                          .filter((name) => !searching || name.includes("マテリアル") || name.includes("テンプレート"))
-                          .map((name) => (
-                            <button
-                              key={`${index}:${name}`}
-                              className="shelf-card"
-                              aria-pressed={shelfState === "selected" && name === cards[0]}
-                              title={shelfState === "selected" ? "選択中 — 適用はドラッグか適用ボタンで" : undefined}
-                            >
-                              <span className="thumb">{name}</span>
-                              <span className="name">{name}</span>
-                            </button>
-                          ))}
-                      </div>
-                    ))
-                  : null}
-              </div>
-            );
-          })() : null}
+          {SHELF_SCREENS.includes(s.screen) ? (
+            <MaterialLibraryShelf
+              title="ライブラリ"
+              categories={SHELF_CARDS[s.screen] ?? []}
+              activeCategory={(SHELF_CARDS[s.screen] ?? [])[0]}
+              assets={SHELF_ASSETS[s.screen] ?? []}
+              // The six shelf states are catalogued view variants (mockup 1's library-*). The shelf
+              // is shell furniture, so the shell reads the variant; the component owns the states.
+              state={
+                s.screen === "view" && s.variant.startsWith("library-")
+                  ? (s.variant.replace("library-", "") as ShelfState)
+                  : "one-row"
+              }
+              selectedId={(SHELF_ASSETS[s.screen] ?? [])[0]?.id ?? null}
+              query={s.variant === "library-searching" ? "鋼" : ""}
+              onSelect={(id) => submit({ operation: "library.list", parameters: { select: id } })}
+            />
+          ) : null}
 
           {!isChat ? (
             <InstructionBar

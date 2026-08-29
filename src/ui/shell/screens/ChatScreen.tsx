@@ -13,6 +13,7 @@
  */
 import { useState, type ReactNode } from "react";
 import { NumberCell } from "../../shared/NumberCell";
+import { OutboundRequestNotice, type OutboundDecision as NoticeDecision } from "../../shared/OutboundRequestNotice";
 import { ProbeReadout } from "../../shared/ProbeReadout";
 import { ProgressAndCancel } from "../../shared/ProgressAndCancel";
 import { ProvenanceBadge } from "../../shared/ProvenanceBadge";
@@ -307,49 +308,27 @@ function OutboundRequestCard() {
     );
   }
 
+  /* The shared notice (MOD-010): the verbatim request, the withheld terms, and the three
+     decisions. One implementation, because the network screen shows the same thing and two
+     wordings of "what leaves this machine" is one wording too many (XC-106). */
   return (
-    <section className="ch-outbound" role="group" aria-label="外部送信の確認">
-      <header>
-        <b>外部送信の確認</b>
-        <small>まだ何も送信していません（XC-106）</small>
-      </header>
-      <div className="ch-outbound-body">
-        <div className="ch-outbound-row">
-          <span>送信する検索語</span>
-          <code className="ch-outbound-query">{query}</code>
-        </div>
-        <div className="ch-outbound-row">
-          <span>送信先ホスト</span>
-          <span className="ch-outbound-keep">{host}（この 1 ホストのみ・HTTPS）</span>
-        </div>
-        <div className="ch-outbound-row">
-          <span>送信しないもの</span>
-          <span className="ch-outbound-keep">
-            ケース名、ファイルパス、形状、節点値・要素値、ワークスペース名、この会話の本文
-          </span>
-        </div>
-        <div className="ch-outbound-row">
-          <span>記録</span>
-          <span className="ch-outbound-keep">許可・拒否のどちらでも、ホスト・日時・判断をローカル監査に記録します。</span>
-        </div>
-      </div>
-      <footer>
-        <button type="button" className="btn ghost" title="送信せず、オフラインのまま続けます" onClick={() => decide("refused")}>
-          拒否
-        </button>
-        <button
-          type="button"
-          className="btn"
-          title="このワークスペースでこのホストを継続許可します。要求ごとの記録は続きます"
-          onClick={() => decide("workspace")}
-        >
-          許可（このホストを継続）
-        </button>
-        <button type="button" className="btn primary" title="表示した検索語だけを 1 回送信します" onClick={() => decide("once")}>
-          今回だけ
-        </button>
-      </footer>
-    </section>
+    <OutboundRequestNotice
+      purpose="形式仕様書の検索"
+      host={host}
+      content={`GET https://${host}/search?q=${encodeURIComponent(query)}`}
+      withheld={[
+        "ケース名",
+        "ファイルパス",
+        "形状",
+        "節点値・要素値",
+        "ワークスペース名",
+        "この会話の本文",
+      ]}
+      outcome="awaiting"
+      onDecide={(next: NoticeDecision) =>
+        decide(next === "refuse" ? "refused" : next === "always" ? "workspace" : "once")
+      }
+    />
   );
 }
 
