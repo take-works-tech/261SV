@@ -1,0 +1,198 @@
+/* Find screen (condition-based point/cell selection) - screen-local layout only.
+ * Every colour and size references a token (XC-187, XC-256); shared classes come from app.css. */
+
+.fi-canvas {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: clamp(280px, 34%, 380px) minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.fi-builder {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--line-strong);
+  background: var(--surface-panel);
+}
+
+.fi-result {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Segmented choices: association kind, and the three ways to state a condition. */
+.fi-seg {
+  display: flex;
+  gap: 2px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-m);
+  background: var(--surface-ground);
+  padding: 2px;
+  min-width: 0;
+}
+.fi-seg button {
+  flex: 1;
+  min-width: 0;
+  border-radius: var(--radius-s);
+  padding: 3px 8px;
+  color: var(--ink-muted);
+  font-size: var(--text-body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fi-seg button:hover:not(:disabled) { background: var(--surface-raise); color: var(--ink); }
+.fi-seg button[aria-pressed="true"] { background: var(--surface-active); color: var(--ink-strong); }
+.fi-seg button:disabled { color: var(--ink-faint); }
+
+.fi-mono { font-family: var(--family-mono); }
+
+textarea.fi-mono {
+  height: auto;
+  min-height: 52px;
+  padding: 6px 7px;
+  resize: vertical;
+  line-height: var(--leading-tight);
+  white-space: pre-wrap;
+}
+
+/* The caret line under the expression: a hidden copy of the text up to the failing name keeps the
+ * mark at the exact character position whatever mix of widths the glyphs have. */
+.fi-caret {
+  margin: 2px 0 0;
+  padding: 0 8px;
+  font-family: var(--family-mono);
+  font-size: var(--text-body);
+  line-height: var(--leading-tight);
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+.fi-caret .fi-ghost { visibility: hidden; }
+.fi-caret .fi-mark { color: var(--state-error); font-weight: var(--weight-bold); }
+
+.fi-status {
+  margin: 6px 0 0;
+  font-size: var(--text-caption);
+  line-height: var(--leading-tight);
+  color: var(--ink-muted);
+}
+.fi-status.good { color: var(--state-good); }
+.fi-status.error { color: var(--state-error); }
+
+/* Names in scope: informative chips, one per resolvable name, with unit or the undeclared marker. */
+.fi-scope {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+  min-width: 0;
+}
+.fi-scope-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  background: var(--surface-ground);
+  padding: 1px 6px;
+  font-size: var(--text-caption);
+  min-width: 0;
+}
+.fi-scope-chip b { color: var(--ink-strong); font-weight: var(--weight-medium); }
+.fi-scope-chip span { color: var(--ink-muted); }
+
+.fi-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 12px;
+}
+
+/* Result panel below the viewport. */
+.fi-result-panel {
+  flex: 0 0 auto;
+  max-height: 48%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line-strong);
+  background: var(--surface-panel);
+}
+.fi-result-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+  padding: 8px 12px 6px;
+}
+.fi-result-head > b {
+  color: var(--ink-strong);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wide);
+}
+.fi-count { color: var(--ink-strong); font-size: var(--text-emphasis); font-weight: var(--weight-medium); }
+.fi-count-rest { color: var(--ink-muted); font-size: var(--text-body); }
+
+.fi-id { font-family: var(--family-mono); }
+
+.fi-keep {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+.fi-keep input { flex: 1; min-width: 0; }
+.fi-keep .btn { flex: 0 0 auto; white-space: nowrap; }
+
+/* Rail: kept named selections - two-line rows, name truncated with the full text on the title. */
+.fi-sel {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: var(--radius-s);
+  text-align: left;
+  color: var(--ink);
+  font-size: var(--text-body);
+}
+.fi-sel:hover { background: var(--surface-raise); }
+.fi-sel .name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.fi-sel .meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  color: var(--ink-faint);
+  font-size: var(--text-caption);
+  min-width: 0;
+}
+
+.fi-summary-expr {
+  margin: 0;
+  padding: 6px 8px;
+  font-family: var(--family-mono);
+  font-size: var(--text-caption);
+  line-height: var(--leading-tight);
+  color: var(--ink);
+  background: var(--surface-ground);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  white-space: pre-wrap;
+  overflow-x: auto;
+}

@@ -162,11 +162,23 @@ def test_the_gate_always_states_what_it_did_not_check() -> None:
     assert "operations/AC-011" in result.stdout
 
 
-def test_the_gate_reports_shared_components_as_unexamined() -> None:
-    """With no interface code, uniqueness is unknown - and saying so is the point (AC-024)."""
-    result = subprocess.run([sys.executable, str(GATE)], capture_output=True, text=True, cwd=ROOT)
+def test_the_gate_reports_shared_components_as_unexamined(project: Path) -> None:
+    """With no interface code, uniqueness is unknown - and saying so is the point (AC-024).
+
+    Run against a project with no src/ui or src/shell, because this repository stopped being that
+    project on 2026-08-30: mockup 2 put interface code under src/ui, and the gate began examining."""
+    shutil.copy2(ROOT / "specs" / "11_ui.md", project / "specs" / "11_ui.md")
+    result = run(project)
     assert "operations/AC-024" in result.stdout
     assert "shared components" in result.stdout
+
+
+def test_shared_components_are_examined_once_interface_code_exists() -> None:
+    """The expiry of the test above, asserted rather than assumed: with src/ui present in this
+    repository, the unexamined line is gone - the components are checked, not excused."""
+    result = subprocess.run([sys.executable, str(GATE)], capture_output=True, text=True, cwd=ROOT)
+    assert "shared components" not in result.stdout
+    assert (ROOT / "src" / "ui").is_dir()
 
 
 def test_a_duplicated_component_implementation_fails(project: Path) -> None:

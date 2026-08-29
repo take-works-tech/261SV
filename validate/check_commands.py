@@ -497,6 +497,15 @@ def unchecked(generated_checked: bool = True) -> list[str]:
             f"{GENERATED.relative_to(ROOT).as_posix()} was not compared"
         )
 
+    if interface_directories():
+        # Interface code exists, and this gate reads filenames, not TypeScript. Examining the
+        # component names is not examining what an action dispatches - saying so is the difference
+        # between a blind spot and a silence that reads as coverage.
+        gaps.append(
+            "interface actions dispatching commands (operations/AC-011): this gate matches component "
+            "filenames and parses no TypeScript, so whether an action goes through the command "
+            "surface was not examined"
+        )
     if not interface_directories():
         gaps.append(
             "interface actions dispatching commands (operations/AC-011): no interface code exists yet, "

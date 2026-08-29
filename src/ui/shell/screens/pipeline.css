@@ -1,0 +1,120 @@
+/* Pipeline (automation) screen - design states only (XC-256).
+ * Every colour and type size references a token from shared/tokens.css; spacing follows app.css
+ * conventions. Classes are prefixed "pi-" per the screen contract. */
+
+.pi-canvas { flex: 1; min-height: 0; overflow: auto; padding: 14px; }
+.pi-flow { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+
+/* ---- header --------------------------------------------------------------------------------- */
+
+.pi-header { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.pi-title { min-width: 0; flex: 1; display: grid; gap: 1px; }
+.pi-eyebrow { color: var(--ink-faint); font-size: var(--text-caption); letter-spacing: var(--tracking-wide); }
+.pi-title b { color: var(--ink-strong); font-size: var(--text-title); font-weight: var(--weight-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pi-title small { color: var(--ink-muted); font-size: var(--text-caption); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pi-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+
+/* ---- the ordered unit list ------------------------------------------------------------------ */
+
+.pi-units { display: flex; flex-direction: column; }
+.pi-link { width: 1px; height: 10px; margin: 0 auto; background: var(--line-strong); }
+.pi-boundary {
+  display: flex; align-items: baseline; justify-content: center; gap: 8px;
+  border: 1px dashed var(--line-strong); border-radius: 999px; padding: 4px 14px;
+  color: var(--ink-muted); font-size: var(--text-caption);
+}
+.pi-boundary b { color: var(--ink); font-weight: var(--weight-medium); letter-spacing: var(--tracking-wide); }
+
+.pi-unit, .pi-zone-head {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 10px;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-m);
+  background: var(--surface-panel); padding: 8px 10px;
+}
+.pi-unit:hover, .pi-zone-head:hover { background: var(--surface-raise); }
+.pi-unit.selected, .pi-zone-head.selected { background: var(--sel-bg); border-color: var(--sel-line); box-shadow: inset 2px 0 0 var(--sel-line); }
+.pi-unit.failed { border-left: 3px solid var(--state-error); }
+.pi-unit.destructive { border-left: 3px solid var(--state-warn); }
+
+.pi-glyph {
+  width: 24px; height: 24px; display: grid; place-items: center; flex: 0 0 auto;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-s);
+  background: var(--surface-raise); color: var(--ink-muted); font-size: var(--text-body);
+}
+.pi-main { min-width: 0; display: grid; gap: 1px; }
+.pi-main b { color: var(--ink-strong); font-size: var(--text-body); font-weight: var(--weight-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pi-main small { color: var(--ink-muted); font-size: var(--text-caption); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pi-ref { display: block; color: var(--ink-muted); font-size: var(--text-caption); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pi-warn { color: var(--state-warn); }
+.pi-err { color: var(--state-error); }
+
+.pi-side { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; min-width: 0; }
+.pi-count {
+  color: var(--ink); font-size: var(--text-caption); white-space: nowrap;
+  border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; background: var(--surface-ground);
+}
+.pi-badge {
+  display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+  border: 1px solid var(--line-strong); border-radius: 999px; padding: 1px 8px;
+  background: var(--surface-ground); color: var(--ink-muted); font-size: var(--text-caption);
+}
+.pi-badge.err { color: var(--state-error); border-color: var(--state-error); background: var(--state-error-ground); }
+.pi-badge.warn { color: var(--state-warn); border-color: var(--state-warn); background: var(--state-warn-ground); }
+.pi-badge.good { color: var(--state-good); border-color: var(--state-good); background: var(--state-good-ground); }
+
+.pi-controls { display: flex; gap: 2px; flex: 0 0 auto; }
+.pi-controls button {
+  width: 20px; height: 20px; display: grid; place-items: center;
+  border-radius: var(--radius-s); color: var(--ink-faint); font-size: var(--text-caption);
+}
+.pi-controls button:hover:not(:disabled) { background: var(--surface-active); color: var(--ink-strong); }
+
+/* ---- bounded zones (loop / condition) ------------------------------------------------------- */
+
+.pi-zone { border: 1px dashed var(--line-strong); border-radius: var(--radius-m); padding: 8px; display: grid; gap: 6px; }
+.pi-zone.selected { border-color: var(--sel-line); background: var(--sel-bg); }
+.pi-zone-children { display: grid; gap: 6px; margin-left: 12px; padding-left: 10px; border-left: 2px solid var(--line-strong); }
+.pi-zone-foot { margin: 0; color: var(--ink-faint); font-size: var(--text-caption); padding: 0 2px; }
+
+/* Notices are rendered as <p> here; the shared .notice does not reset paragraph margins. */
+.pi-note { margin: 0; }
+
+.pi-insert {
+  display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;
+  border: 1px dashed var(--line); border-radius: var(--radius-m); padding: 5px;
+  color: var(--ink-faint); font-size: var(--text-caption);
+}
+.pi-insert:hover:not(:disabled) { color: var(--ink); border-color: var(--line-strong); background: var(--surface-raise); }
+.pi-insert:disabled { border-color: var(--line); }
+
+/* ---- dry-run preview and run record --------------------------------------------------------- */
+
+.pi-run-record { display: grid; gap: 6px; }
+.pi-record-title { margin: 0; color: var(--ink-strong); font-size: var(--text-emphasis); font-weight: var(--weight-medium); }
+.pi-drytable { min-width: 620px; }
+.pi-nest { display: block; color: var(--ink-faint); font-size: var(--text-caption); }
+.pi-mono { font-family: var(--family-mono); font-size: var(--text-caption); color: var(--ink); }
+
+/* ---- rail: palette / settings / history ----------------------------------------------------- */
+
+.pi-palette { display: grid; gap: 4px; }
+.pi-palette button {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-s);
+  background: var(--surface-ground); padding: 5px 8px; text-align: left;
+}
+.pi-palette button:hover:not(:disabled) { background: var(--surface-raise); }
+.pi-palette button:disabled { background: var(--surface-panel); }
+.pi-tag {
+  color: var(--ink-faint); font-size: var(--text-caption); white-space: nowrap;
+  border: 1px solid var(--line); border-radius: 999px; padding: 0 6px;
+}
+.pi-tag.warn { color: var(--state-warn); border-color: var(--state-warn); }
+
+.pi-selected-unit { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pi-check { display: flex; align-items: center; gap: 6px; color: var(--ink); font-size: var(--text-body); }
+.pi-refstates { display: grid; gap: 6px; }
+
+.pi-files { display: grid; gap: 2px; margin: 6px 0 0; padding: 0; list-style: none; }
+.pi-files li { display: flex; gap: 8px; align-items: baseline; min-width: 0; font-size: var(--text-caption); }
+.pi-files .name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--family-mono); color: var(--ink); }
+.pi-files .size { flex: 0 0 auto; color: var(--ink-muted); }
