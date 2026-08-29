@@ -28,6 +28,10 @@ RUNNER_PATTERNS = (
     "noxfile.py",
     "tox.ini",
     ".claude/settings.json",
+    # The push hook runs every validate/check_*.py by glob, so it invokes gates this file could not
+    # see. Omitting it made a gate that runs on every push report as wired to nothing - a false
+    # negative in the direction that matters, because it argues for deleting a check that works.
+    ".githooks/pre-push",
 )
 
 
@@ -38,8 +42,17 @@ def runners() -> list[pathlib.Path]:
     return found
 
 
+#: A runner that invokes gates by glob names none of them individually. Matching on the literal
+#: filename alone reported a gate that runs on every push as invoked by nothing - a false negative
+#: in the direction that matters, because it argues for deleting a check that works. A runner
+#: containing this glob invokes every validator, and that is what the hook does.
+GLOB_INVOCATION = "validate/check_*.py"
+
+
 def unwired() -> list[str]:
     invoked = "\n".join(path.read_text(encoding="utf-8", errors="replace") for path in runners())
+    if GLOB_INVOCATION in invoked:
+        return []
     return [
         path.name
         for path in sorted(VALIDATORS.glob("*.py"))
