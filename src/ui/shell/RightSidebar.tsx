@@ -50,11 +50,37 @@ const TABS: Partial<Record<ScreenId, RailTab[]>> = {
   ],
 };
 
+/* Variants whose design state lives in the rail rather than the canvas. Deep-linking one of them
+ * has to land on its tab: a catalogue whose state is real and unreachable is a catalogue that
+ * cannot be reviewed, and eight states failed exactly that way before this map existed. A variant
+ * whose name IS a tab id needs no entry - that case is handled by the name match below. */
+const VARIANT_TAB: Record<string, string> = {
+  "object-analysis-mesh": "objects",
+  "object-reference-mesh": "objects",
+  "object-point-cloud": "objects",
+  "object-scalar-field": "objects",
+  "object-vector-field": "objects",
+  "object-trajectory": "objects",
+  "object-annotation": "objects",
+  "object-effect": "objects",
+  "material-composition": "materials",
+  "develop-grade": "rendering",
+  cameras: "camera",
+  "camera-unresolved": "camera",
+  theme: "style",
+};
+
 export function RightSidebar(props: { render: (tab: string) => ReactNode }) {
   const s = useSession();
   const tabs = TABS[s.screen] ?? [];
-  const [active, setActive] = useState<string>(tabs[0]?.id ?? "overall");
-  const current = tabs.some((tab) => tab.id === active) ? active : (tabs[0]?.id ?? "overall");
+  const wanted = tabs.some((tab) => tab.id === s.variant)
+    ? s.variant
+    : (VARIANT_TAB[s.variant] ?? null);
+  const [active, setActive] = useState<string | null>(null);
+  // The variant chooses the tab until a person does; after that the person's choice holds, because
+  // a rail that jumped back on every re-render would be a rail nobody could use.
+  const chosen = active ?? wanted ?? tabs[0]?.id ?? "overall";
+  const current = tabs.some((tab) => tab.id === chosen) ? chosen : (tabs[0]?.id ?? "overall");
 
   const onSplitterKey = useCallback((event: React.KeyboardEvent) => {
     if (event.key === "ArrowLeft") session.setRightWidth(s.rightWidth + 12);
