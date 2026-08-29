@@ -1,0 +1,119 @@
+/* Chat (mockup 2, XC-256): one conversation as a reading-width vertical thread - no left-right
+ * bubbles (catalogue: chat.default). The composer lives here because the shell's instruction bar
+ * is absent in chat: the composer moved, the conversation did not fork (XC-150).
+ * Colours and sizes reference tokens.css only; every class carries the ch- prefix. */
+
+.ch-canvas { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--surface-ground); }
+.ch-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+
+/* ---- the thread: one reading width, shared with the composer ------------------------------- */
+.ch-thread {
+  width: 100%; max-width: 720px; margin: 0 auto;
+  padding: 20px 20px 28px; display: flex; flex-direction: column; gap: 24px; min-width: 0;
+}
+.ch-thread-note { text-align: center; color: var(--ink-faint); font-size: var(--text-caption); }
+
+.ch-turn { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ch-turn-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ch-turn-head b { color: var(--ink-strong); font-size: var(--text-body); font-weight: var(--weight-medium); }
+.ch-turn-head small {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--ink-faint); font-size: var(--text-caption);
+}
+.ch-role-mark {
+  flex: 0 0 auto; width: 20px; height: 20px; display: grid; place-items: center;
+  border: 1px solid var(--line-strong); border-radius: 50%;
+  background: var(--surface-panel); color: var(--ink-muted); font-size: var(--text-caption);
+}
+.ch-turn-user .ch-role-mark { background: var(--surface-active); color: var(--ink-strong); }
+.ch-turn-body { display: flex; flex-direction: column; gap: 10px; padding-left: 28px; min-width: 0; }
+.ch-turn-body p { margin: 0; color: var(--ink); font-size: var(--text-emphasis); line-height: var(--leading-normal); overflow-wrap: anywhere; }
+.ch-turn-user .ch-turn-body p { color: var(--ink-strong); }
+
+/* Truncated state: a long instruction clamps to two lines and keeps a way to read it all. */
+.ch-clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.ch-inline-btn {
+  align-self: flex-start; border: 0; background: none; padding: 0; cursor: pointer;
+  color: var(--ink-muted); font-size: var(--text-caption); text-decoration: underline;
+}
+.ch-inline-btn:hover { color: var(--ink-strong); }
+
+/* ---- what the instruction was mapped to: command names from the operation contract ---------- */
+.ch-cmds { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.ch-cmds > small { color: var(--ink-faint); font-size: var(--text-caption); letter-spacing: var(--tracking-wide); }
+.ch-cmd {
+  font-family: var(--family-mono); font-size: var(--text-caption); color: var(--ink);
+  border: 1px solid var(--line-strong); border-radius: var(--radius-s);
+  background: var(--surface-panel); padding: 1px 6px; overflow-wrap: anywhere;
+}
+.ch-cmd-notrun { color: var(--ink-faint); border-style: dashed; }
+.ch-cmd-state { margin-left: 6px; font-family: var(--family-ui); color: var(--state-warn); }
+
+/* ---- results: value + unit + provenance, digits per INV-014 --------------------------------- */
+.ch-results {
+  display: flex; flex-direction: column; gap: 10px; min-width: 0;
+  border: 1px solid var(--line); border-radius: var(--radius-m);
+  background: var(--surface-panel); padding: 10px 12px;
+}
+.ch-result-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; min-width: 0; }
+.ch-result-line > .ch-result-label { min-width: 0; color: var(--ink-muted); font-size: var(--text-body); }
+.ch-result-note { margin: 0; color: var(--ink-faint); font-size: var(--text-caption); line-height: var(--leading-tight); }
+.ch-dim { color: var(--ink-faint); font-size: var(--text-caption); }
+.ch-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.ch-table { border: 1px solid var(--line); border-radius: var(--radius-s); }
+
+/* ---- outbound review: shown before anything leaves (XC-106) --------------------------------- */
+.ch-outbound {
+  min-width: 0; overflow: hidden;
+  border: 1px solid var(--line-strong); border-left: 3px solid var(--state-warn);
+  border-radius: var(--radius-m); background: var(--surface-panel);
+}
+.ch-outbound > header {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px;
+  padding: 8px 12px; border-bottom: 1px solid var(--line);
+}
+.ch-outbound > header b { color: var(--ink-strong); font-size: var(--text-emphasis); font-weight: var(--weight-medium); }
+.ch-outbound > header small { color: var(--ink-faint); font-size: var(--text-caption); }
+.ch-outbound-body { display: grid; gap: 10px; padding: 10px 12px; }
+.ch-outbound-row { display: grid; grid-template-columns: minmax(0, 118px) minmax(0, 1fr); gap: 8px; align-items: start; }
+.ch-outbound-row > span:first-child { color: var(--ink-muted); font-size: var(--text-body); }
+.ch-outbound-query {
+  display: block; font-family: var(--family-mono); font-size: var(--text-body); color: var(--ink-strong);
+  border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--surface-well);
+  padding: 6px 8px; overflow-wrap: anywhere;
+}
+.ch-outbound-keep { color: var(--ink); font-size: var(--text-body); line-height: var(--leading-normal); overflow-wrap: anywhere; }
+.ch-outbound > footer {
+  display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px;
+  padding: 10px 12px; border-top: 1px solid var(--line);
+}
+
+/* ---- empty conversation: examples, nothing pretends work was done --------------------------- */
+.ch-suggestions { display: flex; flex-direction: column; gap: 6px; width: min(100%, 440px); margin: 4px auto 0; }
+.ch-suggestion {
+  min-width: 0; text-align: left;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-m);
+  background: var(--surface-panel); color: var(--ink);
+  padding: 8px 12px; font-size: var(--text-body); line-height: var(--leading-tight);
+}
+.ch-suggestion:hover { background: var(--surface-raise); color: var(--ink-strong); }
+
+/* ---- the composer: the conversation's own input, aligned to the thread width ---------------- */
+.ch-composer { flex: 0 0 auto; border-top: 1px solid var(--line-strong); background: var(--surface-panel); }
+.ch-composer-inner {
+  width: 100%; max-width: 720px; margin: 0 auto; min-width: 0;
+  padding: 8px 20px 12px; display: flex; flex-direction: column; gap: 7px;
+}
+.ch-seam-note { color: var(--ink-faint); font-size: var(--text-caption); }
+.ch-composer textarea {
+  width: 100%; min-height: 46px; max-height: 180px; resize: vertical;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-m);
+  background: var(--surface-ground); color: var(--ink-strong);
+  font-family: var(--family-ui); font-size: var(--text-emphasis); line-height: var(--leading-normal);
+  padding: 8px 10px;
+}
+.ch-composer textarea::placeholder { color: var(--ink-faint); }
+.ch-composer-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.ch-composer-row .ch-spacer { flex: 1; }
+.ch-composer-row select.field-input { width: auto; }
+.ch-fineprint { color: var(--ink-faint); font-size: var(--text-caption); line-height: var(--leading-tight); }

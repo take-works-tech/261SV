@@ -76,4 +76,5 @@ The frontend-design skill is written for editorial surfaces. Split its advice:
   `check_mockup_states.py` can sweep them
 - No horizontal scroll on the page body at 100-200% zoom - check with the longest translation, not
   the shortest
-- Dark theme: **do not invent one.** Its existence is an undecided question; raise it, don't ship it.
+- Theme: **dark, monochrome, decided** (XC-256). Chrome runs white-to-black with no readable hue;
+  saturation belongs to colour maps and the muted semantic trio. Composition follows mockup 1.

@@ -1,0 +1,143 @@
+/* View screen (mockup 2) - canvas overlays and rail pieces the shell classes do not cover.
+ * Colours and type reference semantic tokens only (XC-187, XC-256); layout spacing follows the
+ * px practice of app.css. Every class is vi- prefixed per the screen contract. */
+
+.vi-canvas { position: relative; flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+
+/* Stacked notices docked top-left over the well; they never sit behind data, they sit on chrome. */
+.vi-overlays { position: absolute; top: 10px; left: 10px; z-index: 4; display: grid; gap: 6px; width: min(460px, calc(100% - 20px)); }
+
+/* A one-line design-state note at the canvas foot (library states, camera sync). */
+.vi-canvas-note {
+  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 4;
+  max-width: min(600px, calc(100% - 20px)); min-width: 0;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-m);
+  background: var(--surface-panel); box-shadow: var(--shadow-pop);
+  padding: 6px 10px; font-size: var(--text-body); color: var(--ink);
+}
+.vi-canvas-note b { color: var(--ink-strong); }
+.vi-canvas-note small { display: block; margin-top: 2px; color: var(--ink-muted); font-size: var(--text-caption); line-height: var(--leading-tight); }
+
+/* Comparison strip above the grid: the swept axis and what is shared, stated at the seam. */
+.vi-comparison-bar {
+  flex: 0 0 auto; display: flex; align-items: baseline; gap: 8px; min-width: 0;
+  padding: 5px 10px; border-bottom: 1px solid var(--line); background: var(--surface-panel);
+}
+.vi-comparison-bar .axis-chip {
+  flex: 0 0 auto; border: 1px solid var(--line-strong); border-radius: var(--radius-s);
+  padding: 1px 7px; font-size: var(--text-caption); color: var(--ink-strong); white-space: nowrap;
+}
+.vi-comparison-bar small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-muted); font-size: var(--text-caption); }
+.vi-comparison-bar .btn { margin-left: auto; flex: 0 0 auto; }
+
+/* More than four members exceeds SplitLayout's contract, so the comparison lays its own grid. */
+.vi-comparison-grid { display: grid; flex: 1; min-height: 0; min-width: 0; gap: 1px; background: var(--line-strong); }
+
+/* INV-024: the exaggeration factor is drawn into the picture, because an exported image has no rail. */
+.vi-stamp {
+  position: absolute; left: 10px; bottom: 10px; z-index: 3;
+  border: 1px dashed var(--line-strong); border-radius: var(--radius-s);
+  background: var(--surface-panel); color: var(--ink-strong);
+  padding: 3px 8px; font-size: var(--text-caption); letter-spacing: var(--tracking-wide);
+}
+
+/* Floating panel (bookmarks above the playback bar, playback presets bottom-right). */
+.vi-panel {
+  position: absolute; z-index: 5; width: min(360px, calc(100% - 20px)); min-width: 0;
+  display: flex; flex-direction: column; overflow: hidden;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-m);
+  background: var(--surface-panel); box-shadow: var(--shadow-pop);
+}
+.vi-panel > header { display: flex; align-items: baseline; gap: 8px; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+.vi-panel > header b { color: var(--ink-strong); font-size: var(--text-emphasis); font-weight: var(--weight-medium); }
+.vi-panel > header small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-muted); font-size: var(--text-caption); }
+.vi-panel > .body { min-height: 0; max-height: 300px; overflow: auto; padding: 8px 10px; display: grid; gap: 6px; }
+.vi-panel > footer { padding: 6px 10px; border-top: 1px solid var(--line); color: var(--ink-faint); font-size: var(--text-caption); line-height: var(--leading-tight); }
+
+/* A named row: name, its rule, its per-case resolution - cameras, bookmarks, slots, presets. */
+.vi-row {
+  display: grid; gap: 2px; text-align: left; min-width: 0; width: 100%;
+  border: 1px solid var(--line); border-radius: var(--radius-s);
+  background: var(--surface-panel); padding: 6px 8px;
+  font-size: var(--text-body); color: var(--ink); font-family: inherit;
+}
+button.vi-row { cursor: pointer; }
+button.vi-row:hover { background: var(--surface-raise); }
+.vi-row[aria-selected="true"] { background: var(--sel-bg); box-shadow: inset 2px 0 0 var(--sel-line); }
+.vi-row > b { color: var(--ink-strong); font-weight: var(--weight-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vi-row .rule { color: var(--ink-muted); font-size: var(--text-caption); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vi-row .state { color: var(--ink-muted); font-size: var(--text-caption); }
+.vi-row .state.error { color: var(--state-error); }
+.vi-row .state.good { color: var(--state-good); }
+.vi-row .line { display: flex; align-items: baseline; gap: 6px; min-width: 0; flex-wrap: wrap; }
+.vi-row .line > .who { flex: 0 0 auto; color: var(--ink-muted); font-size: var(--text-caption); }
+
+.vi-row-actions { display: flex; gap: 6px; }
+
+/* Comparison member row in the rail: index, resolved label, honesty flag. */
+.vi-member { display: flex; align-items: baseline; gap: 8px; min-width: 0; padding: 3px 0; border-bottom: 1px solid var(--line); }
+.vi-member:last-child { border-bottom: 0; }
+.vi-member .index {
+  flex: 0 0 auto; width: 18px; text-align: center; border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s); color: var(--ink-muted); font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+.vi-member b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-strong); font-size: var(--text-body); font-weight: var(--weight-regular); }
+.vi-member .flag { flex: 0 0 auto; color: var(--state-warn); font-size: var(--text-caption); font-style: italic; }
+
+/* XC-215: a choice about appearance shown as an appearance - drawn samples, name beneath. */
+.vi-sample-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; }
+.vi-sample {
+  display: grid; gap: 4px; min-width: 0; padding: 4px; cursor: pointer;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-s);
+  background: var(--surface-raise); font-family: inherit;
+}
+.vi-sample:hover { background: var(--surface-active); }
+.vi-sample[aria-checked="true"] { box-shadow: 0 0 0 1px var(--sel-line); background: var(--surface-active); }
+.vi-sample .thumb { height: 30px; border-radius: var(--radius-s); border: 1px solid var(--line); min-width: 0; }
+.vi-sample .name { font-size: var(--text-caption); color: var(--ink); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The drawn kinds, painted from surface tokens - monochrome chrome, no readable hue (XC-256). */
+.vi-thumb-solid { background: var(--surface-well); }
+.vi-thumb-gradient { background-image: linear-gradient(var(--surface-active), var(--surface-well)); }
+.vi-thumb-image { background-image: repeating-linear-gradient(45deg, var(--surface-active) 0 4px, var(--surface-well) 4px 10px); }
+.vi-thumb-environment { background-image: linear-gradient(var(--surface-active) 0 55%, var(--surface-well) 55% 100%); }
+.vi-thumb-grade-flat { background-image: linear-gradient(90deg, var(--surface-raise), var(--ink-faint)); }
+.vi-thumb-grade-present { background-image: linear-gradient(90deg, var(--surface-well), var(--ink-muted)); }
+.vi-thumb-grade-contrast { background-image: linear-gradient(90deg, var(--surface-well), var(--ink-strong)); }
+
+/* The conversation drawer over the canvas: same thread as the instruction bar (XC-150). */
+.vi-drawer {
+  position: absolute; top: 0; right: 0; bottom: 0; z-index: 5;
+  width: min(360px, 78%); min-width: 0; display: flex; flex-direction: column;
+  border-left: 1px solid var(--line-strong); background: var(--surface-panel); box-shadow: var(--shadow-pop);
+}
+.vi-drawer > header { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.vi-drawer > header b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-strong); font-size: var(--text-emphasis); font-weight: var(--weight-medium); }
+.vi-thread { min-height: 0; flex: 1; overflow: auto; padding: 10px; display: grid; gap: 10px; align-content: start; }
+.vi-turn { display: grid; gap: 3px; min-width: 0; }
+.vi-turn .who { color: var(--ink-faint); font-size: var(--text-caption); letter-spacing: var(--tracking-wide); }
+.vi-turn p { margin: 0; color: var(--ink); font-size: var(--text-body); line-height: var(--leading-normal); overflow-wrap: anywhere; }
+.vi-drawer > footer { display: grid; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--line); }
+
+/* Preflight rows: what was checked, what it found, whether output may start. */
+.vi-check { display: flex; align-items: baseline; gap: 8px; min-width: 0; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.vi-check:last-child { border-bottom: 0; }
+.vi-check .what { flex: 0 0 auto; color: var(--ink-strong); font-size: var(--text-body); font-weight: var(--weight-medium); }
+.vi-check .detail { flex: 1; min-width: 0; color: var(--ink-muted); font-size: var(--text-caption); }
+.vi-check .verdict { flex: 0 0 auto; font-size: var(--text-caption); }
+.vi-check .verdict.pass { color: var(--state-good); }
+.vi-check .verdict.warn { color: var(--state-warn); }
+.vi-check .verdict.blocked { color: var(--state-error); }
+
+/* Selection card at the top of a selection-scoped rail tab. */
+.vi-selection {
+  display: grid; gap: 2px; min-width: 0; margin: 10px 12px 0;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-s);
+  background: var(--surface-raise); padding: 7px 9px;
+}
+.vi-selection small { color: var(--ink-faint); font-size: var(--text-caption); letter-spacing: var(--tracking-wide); }
+.vi-selection b { color: var(--ink-strong); font-size: var(--text-emphasis); font-weight: var(--weight-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vi-selection em { color: var(--ink-muted); font-size: var(--text-caption); font-style: normal; }
+
+/* Bookmark markers on the playback axis. */
+.vi-mark { position: absolute; top: 50%; width: 6px; height: 6px; transform: translate(-50%, -50%) rotate(45deg); background: var(--ink-muted); }

@@ -5142,3 +5142,33 @@ model or the prompt, never in a description that quietly went stale.
   it.** Five conversations with the intended buyer in which nobody can name an occasion when a result
   was doubted, disputed or re-run because its provenance was unclear, would refute it. So would an
   incumbent shipping attested output first, which would make this a feature rather than a position
+
+### XC-256 - The interface is dark and monochrome, because colour belongs to the data
+- decided: 2026-08-29
+- status: active
+- decision: the production interface (mockup 2 and what ships from it) is **dark by default** and its
+  chrome runs **white to black with no saturation** - greys only, with a micro-tint permitted where a
+  state would otherwise be invisible, kept so small it cannot be read as a hue. Saturated colour is
+  reserved for what the data owns: colour maps, legends, and the semantic trio (error, warning, good),
+  which stays muted and appears only where a state genuinely differs. **Composition and placement
+  follow mockup 1** - the topbar, area tabs, left/right sidebars, workbench grid, outliner and
+  properties rail keep their structure; what changes is the skin, not the arrangement
+- decided_by: the product owner, 2026-08-29, including the monochrome constraint and its reason in
+  their own words: the interface colour must not interfere with the colour maps
+- rationale: this product's claim is trustworthy numbers, and a contour plot is a number read through
+  colour. Chrome that carries its own hues sits in the same visual channel as the data and biases the
+  reading - the field's own conventions (dark, near-neutral surfaces around the viewport) exist for
+  this reason. Monochrome chrome also makes the appearance-is-appearance rule cheap to keep: when the
+  interface owns no hue, any hue on screen is data, and a reader can trust that distinction without
+  being told. Inheriting mockup 1's composition keeps ninety designed states valid as structure and
+  turns mockup 2 into a re-skin plus the missing screens, rather than a redesign nobody asked for
+- alternatives: a light theme matches office documents but puts the brightest surface on screen next
+  to the data; a branded accent colour is what most tools do and is exactly what a colour-mapped
+  surface cannot afford; theming both light and dark doubles every token before the first screen ships
+  and was explicitly not asked for
+- basis: E-001 (T1)
+- affects: MOD-010, specs/11_ui.md, XC-187, .claude/skills/solvia-ui
+- decidedness: Fixed
+- reversal_trigger: a deliverable surface (the exported report) needing a light reading mode for
+  print - which is the document's own style (GL-013), not the tool's, and so would not reverse this
+  decision but would test whether its boundary was drawn correctly

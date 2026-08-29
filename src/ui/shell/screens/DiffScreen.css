@@ -1,0 +1,110 @@
+/* Diff screen (di-) - layout only; every colour, face and type size comes from the token layer
+ * (XC-187, XC-256). The grid makes XC-038's rule literal: the result column and the disclosure
+ * column are cells of one grid, so the result cannot render without the three disclosures beside
+ * it - there is no layout state in which they separate. */
+
+.di-screen { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+
+/* ---- definition strip: what is subtracted from what, in that order ------------------------- */
+.di-def {
+  display: flex; flex-wrap: wrap; gap: 4px 20px; padding: 7px 12px;
+  border-bottom: 1px solid var(--line); background: var(--surface-panel);
+}
+.di-def-item { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.di-def-item > .k {
+  flex: 0 0 auto; color: var(--ink-muted); font-size: var(--text-caption);
+  letter-spacing: var(--tracking-wide);
+}
+.di-def-item > .v {
+  min-width: 0; display: flex; align-items: baseline; gap: 5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--ink); font-size: var(--text-body);
+}
+.di-def-item > .v b {
+  color: var(--ink-strong); font-weight: var(--weight-medium); font-variant-numeric: tabular-nums;
+}
+
+/* ---- result region: canvas column + disclosure column, never one without the other --------- */
+.di-result { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 248px; }
+.di-canvas { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+
+.di-disclosure {
+  min-width: 0; min-height: 0; overflow: auto;
+  border-left: 1px solid var(--line-strong); background: var(--surface-panel);
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 10px;
+}
+.di-disclosure > header { display: grid; gap: 2px; }
+.di-disclosure > header b {
+  color: var(--ink-strong); font-size: var(--text-emphasis); font-weight: var(--weight-medium);
+}
+.di-disclosure > header span { color: var(--ink-faint); font-size: var(--text-caption); }
+.di-disc-list { display: grid; gap: 8px; }
+.di-disc-item { display: grid; gap: 3px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.di-disc-item:last-child { border-bottom: 0; padding-bottom: 0; }
+.di-disc-item .k {
+  color: var(--ink-muted); font-size: var(--text-caption); letter-spacing: var(--tracking-wide);
+}
+.di-disc-item .v {
+  color: var(--ink-strong); font-size: var(--text-emphasis); font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere;
+}
+.di-disc-item .n { color: var(--ink-faint); font-size: var(--text-caption); line-height: var(--leading-tight); }
+.di-disc-note { margin: 0; color: var(--ink-faint); font-size: var(--text-caption); line-height: var(--leading-tight); }
+
+/* ---- the value table under the picture ----------------------------------------------------- */
+.di-table {
+  flex: 0 0 auto; display: flex; flex-direction: column; max-height: 46%;
+  border-top: 1px solid var(--line-strong); background: var(--surface-panel);
+}
+.di-table > .table-scroll { flex: 1 1 auto; }
+.di-table-title { display: flex; align-items: baseline; gap: 8px; padding: 7px 10px 4px; min-width: 0; }
+.di-table-title b {
+  color: var(--ink-muted); font-size: var(--text-caption); font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wide); flex: 0 0 auto;
+}
+.di-table-title span {
+  color: var(--ink-faint); font-size: var(--text-caption);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.di-foot {
+  margin: 0; padding: 6px 10px; border-top: 1px solid var(--line);
+  color: var(--ink-faint); font-size: var(--text-caption); line-height: var(--leading-tight);
+}
+.di-row-selected { background: var(--sel-bg); box-shadow: inset 2px 0 0 var(--sel-line); }
+
+/* ---- the not-computed / no-diff well: stated absence where the picture would be ------------ */
+.di-well {
+  position: relative; flex: 1; min-height: 0; min-width: 0; overflow: auto;
+  display: grid; place-items: center; background: var(--surface-well);
+}
+
+/* ---- method form (the method variant's canvas and the rail's 方法 tab share it) ------------- */
+.di-split { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(280px, 400px) minmax(0, 1fr); }
+.di-method-col {
+  min-width: 0; min-height: 0; overflow: auto;
+  border-right: 1px solid var(--line-strong); background: var(--surface-panel);
+}
+.di-group { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.di-group > h4 {
+  margin: 0 0 6px; color: var(--ink-muted); font-size: var(--text-caption);
+  font-weight: var(--weight-bold); letter-spacing: var(--tracking-wide);
+}
+.di-group > .notice { margin-top: 6px; }
+.di-choice {
+  display: flex; align-items: flex-start; gap: 8px; padding: 5px 6px;
+  border-radius: var(--radius-s); color: var(--ink); font-size: var(--text-body);
+}
+.di-choice:hover { background: var(--surface-raise); }
+.di-choice:focus-within { outline: 1px solid var(--focus-ring); outline-offset: -1px; }
+.di-choice input { flex: 0 0 auto; margin-top: 2px; }
+.di-choice .t { min-width: 0; }
+.di-choice .why {
+  display: block; color: var(--ink-faint); font-size: var(--text-caption);
+  line-height: var(--leading-tight);
+}
+.di-choice.disabled { color: var(--ink-faint); }
+.di-choice.disabled:hover { background: transparent; }
+.di-actions { display: grid; gap: 6px; padding: 10px 12px; }
+
+/* ---- the one-sided refusal band (unresolved variant) --------------------------------------- */
+.di-refusal { padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--surface-panel); }

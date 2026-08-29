@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-26
+updated: 2026-08-29
 ---
 
 # Modules and dependency direction
@@ -135,7 +135,8 @@ touches a file, a device or a clock.
 ### MOD-010 - shared-ui
 - layer: ui
 - paths: src/ui/shared
-- owns: the components named in [11_ui.md](11_ui.md) - one implementation each
+- owns: the components named in [11_ui.md](11_ui.md) - one implementation each, and the token layer
+  they draw from: dark, monochrome chrome whose saturation belongs to the data (XC-256)
 - depends_on: domain-core
 - decidedness: Fixed
 - basis: E-001 (T1)

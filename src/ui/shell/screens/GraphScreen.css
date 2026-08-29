@@ -1,0 +1,310 @@
+/* Graph screen styles (mockup 2). Every class carries the gr- prefix; every colour and type size
+ * references a token from src/ui/shared/tokens.css (XC-187, XC-256). Flex children that hold text
+ * carry min-width: 0 before any ellipsis - nothing overflows silently. */
+
+/* ---- canvas -------------------------------------------------------------------------------- */
+
+.gr-canvas {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  overflow: auto;
+}
+
+.gr-head { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gr-eyebrow {
+  color: var(--ink-faint);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wide);
+}
+.gr-title {
+  margin: 0;
+  color: var(--ink-strong);
+  font-size: var(--text-heading);
+  font-weight: var(--weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gr-sub { margin: 0; color: var(--ink-muted); font-size: var(--text-body); }
+
+.gr-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-m);
+  background: var(--surface-panel);
+  padding: 12px;
+}
+
+.gr-plotrow { display: flex; flex-wrap: wrap; gap: 14px; min-width: 0; }
+.gr-svgwrap { flex: 1 1 320px; min-width: 0; }
+.gr-svg { display: block; width: 100%; height: auto; }
+.gr-svg text { font-family: var(--family-ui); }
+.gr-tick { font-size: var(--text-caption); fill: var(--ink-muted); }
+.gr-axis-title { font-size: var(--text-body); fill: var(--ink-muted); font-weight: var(--weight-medium); }
+.gr-axis-title.warn { fill: var(--state-warn); font-style: italic; }
+.gr-missing-t { font-size: var(--text-caption); fill: var(--state-warn); font-style: italic; }
+
+.gr-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 0 1 200px;
+  min-width: 150px;
+}
+.gr-legend-row { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.gr-legend-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gr-legend-label {
+  color: var(--ink);
+  font-size: var(--text-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gr-legend-sub {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--ink-muted);
+  font-size: var(--text-caption);
+  min-width: 0;
+}
+
+.gr-mini { flex: 0 0 auto; width: 34px; height: 12px; margin-top: 3px; }
+
+.gr-prov {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: var(--ink-muted);
+  font-size: var(--text-caption);
+  min-width: 0;
+}
+.gr-prov > span { min-width: 0; }
+
+/* ---- empty variant: the three offers ------------------------------------------------------- */
+
+.gr-entry {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 26px 20px;
+  text-align: center;
+}
+.gr-entry > h2 { margin: 0; color: var(--ink-strong); font-size: var(--text-display); font-weight: var(--weight-medium); }
+.gr-entry > p { margin: 0; color: var(--ink-muted); max-width: 52ch; font-size: var(--text-body); line-height: var(--leading-normal); }
+
+.gr-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  width: min(720px, 100%);
+}
+.gr-entry-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-m);
+  background: var(--surface-panel);
+  text-align: left;
+}
+.gr-entry-card:hover { background: var(--surface-raise); }
+.gr-entry-card b { color: var(--ink-strong); font-size: var(--text-emphasis); font-weight: var(--weight-medium); }
+.gr-entry-card p { margin: 0; color: var(--ink-muted); font-size: var(--text-body); line-height: var(--leading-tight); }
+.gr-entry-card .gr-entry-note { color: var(--ink-faint); font-size: var(--text-caption); }
+
+.gr-candidates { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.gr-candidate {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: var(--surface-raise);
+  padding: 4px 8px;
+  color: var(--ink);
+  font-size: var(--text-caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- no-points variant --------------------------------------------------------------------- */
+
+.gr-nopoints { gap: 10px; }
+.gr-warnglyph { color: var(--state-warn); font-size: var(--text-display); line-height: var(--leading-none); }
+.gr-cond {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  width: min(46ch, 100%);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  background: var(--surface-panel);
+  padding: 10px 12px;
+  text-align: left;
+  font-size: var(--text-body);
+}
+.gr-cond .step { display: flex; justify-content: space-between; gap: 8px; min-width: 0; }
+.gr-cond .step > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gr-cond .count { flex: 0 0 auto; color: var(--ink-strong); }
+.gr-cond .count.warn { color: var(--state-warn); }
+
+/* ---- rail: series list --------------------------------------------------------------------- */
+
+.gr-serieslist { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; min-width: 0; }
+.gr-series-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 5px 6px;
+  border-radius: var(--radius-s);
+  text-align: left;
+}
+.gr-series-row:hover { background: var(--surface-raise); }
+.gr-series-row[aria-selected="true"],
+.gr-series-row[aria-checked="true"] {
+  background: var(--sel-bg);
+  box-shadow: inset 2px 0 0 var(--sel-line);
+}
+.gr-series-row .gr-srtext { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.gr-series-row b {
+  color: var(--ink);
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gr-series-row[aria-selected="true"] b { color: var(--ink-strong); }
+.gr-series-row small {
+  color: var(--ink-muted);
+  font-size: var(--text-caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gr-series-row .gr-flag { flex: 0 0 auto; color: var(--state-warn); font-size: var(--text-caption); }
+.gr-listops { display: flex; gap: 6px; }
+
+/* ---- rail: axis picker --------------------------------------------------------------------- */
+
+.gr-axis-picker { display: flex; gap: 4px; min-width: 0; }
+.gr-axis-picker button {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  background: var(--surface-panel);
+  color: var(--ink-muted);
+  font-size: var(--text-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gr-axis-picker button:hover:not(:disabled) { background: var(--surface-raise); color: var(--ink); }
+.gr-axis-picker button[aria-selected="true"] {
+  background: var(--surface-active);
+  border-color: var(--sel-line);
+  color: var(--ink-strong);
+}
+.gr-axis-picker button:disabled { color: var(--ink-faint); background: var(--surface-panel); }
+
+/* ---- rail: drawn samples (XC-215) ---------------------------------------------------------- */
+
+.gr-caption {
+  display: block;
+  margin: 8px 0 4px;
+  color: var(--ink-muted);
+  font-size: var(--text-caption);
+}
+.gr-samples { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.gr-samples.cols4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.gr-sample {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 5px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  background: var(--surface-panel);
+}
+.gr-sample:hover { background: var(--surface-raise); }
+.gr-sample[aria-checked="true"] { background: var(--surface-active); box-shadow: 0 0 0 1px var(--sel-line); }
+.gr-sample .thumb {
+  height: 26px;
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: var(--surface-well);
+  overflow: hidden;
+}
+.gr-sample .thumb svg { display: block; width: 100%; height: 100%; }
+/* The name stays under the sample (XC-215). */
+.gr-sample .name {
+  color: var(--ink-muted);
+  font-size: var(--text-caption);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gr-sample[aria-checked="true"] .name { color: var(--ink-strong); }
+
+/* ---- rail: readouts, checks, footers ------------------------------------------------------- */
+
+.gr-readout {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ink);
+  font-size: var(--text-body);
+}
+.gr-readout small { color: var(--ink-faint); font-size: var(--text-caption); }
+.gr-pending { color: var(--ink-faint); font-size: var(--text-body); font-style: italic; }
+
+.gr-specimen {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: var(--surface-well);
+  color: var(--ink-strong);
+  font-size: var(--text-emphasis);
+}
+
+.gr-checks { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.gr-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.gr-actions .prop-note { flex-basis: 100%; }
+
+.gr-tabfoot { padding: 8px 12px 12px; }
