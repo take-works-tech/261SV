@@ -91,6 +91,32 @@ recorded rather than estimated.
   a renderer" is a solved and free problem**, and a product whose value is that conversion is
   competing with free
 
+## E-169 - Difference-on-geometry with a colour scale is already free, and already scriptable
+- tier: T1
+- url: https://www.cloudcompare.org/doc/wiki/index.php/Cloud-to-Mesh_Distance and .../Command_line_mode
+- verified: 2026-08-30
+- says: CloudCompare computes cloud-to-mesh and cloud-to-cloud distance, stores the result as a
+  scalar field, displays it with an editable colour scale, converts that scalar field to RGB for
+  export, and **runs from the command line**. It is free and open source
+- justifies: OPEN-037
+- note: **this is the single most important competitive fact for a "faithful difference viewer".**
+  The operation at the centre of ICT as-built management - overlay a point cloud on design geometry,
+  show the deviation as a heat map - is not a gap. It is a free, mature, scriptable tool. What is not
+  free is everything around it: the ministry's delivery specification, the forms, the tolerance
+  judgement, the traceable record
+
+## E-170 - What a paid inspection product costs, and what it is built on
+- tier: T2
+- url: https://www.artec3d.com/3d-software/geomagic-control-x and reseller listings
+- verified: 2026-08-30
+- says: Geomagic Control X is 3D inspection and metrology software for model-to-scan comparison and
+  reporting, "built on a CAD kernel", integrating with scanners and PCMMs. Reseller listings give a
+  perpetual licence with first-year maintenance from **USD 7,249 to USD 21,745** depending on tier
+- justifies: XC-070, XC-071
+- note: recorded at T2 - the price comes from resellers rather than from the vendor's own page.
+  The band it implies is the same shape as everywhere else in this survey: **free at the bottom
+  (CloudCompare), nothing published in the middle, five figures at the top**
+
 ---
 
 ## What the survey says about the direction
