@@ -78,6 +78,29 @@ produce a document to somebody else's specification, and pay to get it right?**
   requirement - what remains is a crowded, mature, individually-priced market with two established
   incumbents and a wave of AI entrants
 
+## E-186 - Safety data sheets: a mandate expanding threefold, and no small-scale price
+- tier: T2
+- url: journal.smartsds.jp, asahi-ghs.com/ghs_assistant/price.html, jei-inc.co.jp, ecoangel.jp,
+  jcdb.co.jp/service/ezsds/
+- verified: 2026-08-30
+- says: SDS preparation is mandated in Japan by three laws (the chemical-substance management act,
+  the occupational safety and health act, and the poisonous and deleterious substances control law)
+  and the form is fixed by **JIS Z 7253**. **The scope is expanding sharply: 896 substances subject
+  to the exchange obligation as of 2024-04-01, rising to roughly 2,900 by April 2026**, with further
+  expansion planned for 2027.
+  Prices: **outsourced preparation at JPY 39,800, JPY 45,000 and JPY 82,500 per sheet** depending on
+  provider, the last adding a per-substance charge beyond ten components.
+  **GHS Assistant**, a preparation tool, is **JPY 75,000 a month** for the single-PC Japanese-only
+  Personal edition, JPY 110,000 with one extra language, JPY 150,000 for the multi-user Server
+  edition, **minimum term one year** - and its page does not state a sheet-count limit
+- justifies: OPEN-036, OPEN-037
+- note: recorded T2 - vendor and agency pages. **This is the first candidate in the whole survey where
+  every condition holds at once**: the form is fixed by a JIS standard, the obligation is legal, the
+  obliged party includes very small chemical handlers, the numbers on the sheet are concentrations and
+  physical properties that must be sourced, **and the cheapest tool costs JPY 75,000 a month against
+  an outsourcing price of JPY 40,000 per sheet**. A business preparing two or three sheets a year has
+  no software option at all - only the agency
+
 ---
 
 ## What the two have in common, and what separates them from everything earlier
