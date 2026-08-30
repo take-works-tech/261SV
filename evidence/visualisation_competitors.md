@@ -200,6 +200,23 @@ recorded rather than estimated.
   four orders of magnitude, and it is closing from below every quarter. A product whose value is
   "cheaper than the agency" is entering the same race generative video is already winning
 
+## E-181 - Attention across the four layers of CAE work, measured
+- tier: T1
+- url: GitHub API, measured 2026-08-30
+- says: stars / forks / last push - **ParaView 1,690 / 492 / today**; **PyVista 3,788 / 652 / today**;
+  **CloudCompare 4,703 / 1,209 / yesterday**; **OpenFOAM-dev 2,215 / 728 / three days ago**;
+  **meshio 2,326 / 452 / 2024-07-23**; **FreeCAD 33,139 / 5,965 / today**;
+  **matplotlib 23,122 / 8,459 / today**; **plotly.py 18,761 / 2,838**; **pandas 49,592 / 20,305**;
+  **scipy 14,968 / 5,898**
+- justifies: XC-070, OPEN-036
+- note: stars measure developer attention, not buyers, and the general-purpose libraries serve every
+  field rather than CAE alone - so these numbers compare layers, not markets. Read that way the
+  ordering is stark: **the charting and tabular layer (matplotlib 23k, plotly 19k, pandas 50k) has an
+  order of magnitude more attention than the 3D post-processing layer (ParaView 1.7k, PyVista 3.8k)**,
+  and ParaView - the reference product this project measures itself against - has **fewer stars than
+  CloudCompare**. No public source breaks CAE vendor revenue into solver, pre- and post-processing, so
+  this is the closest available proxy for the relative size of the layers
+
 ---
 
 ## What the survey says about the direction
