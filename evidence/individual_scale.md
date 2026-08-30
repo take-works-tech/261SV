@@ -59,6 +59,25 @@ produce a document to somebody else's specification, and pay to get it right?**
   units, significant figures or provenance. That is the line between them and anything this project
   would build
 
+## E-185 - The journal-figure gap is already served, at individual-scale prices
+- tier: T2
+- url: graphpad.com user guide "Exporting for publishing in journals" and FAQ 18/1402/1547;
+  Prism pricing listings (capterra, saasworthy, freshscientific)
+- verified: 2026-08-30
+- says: **GraphPad Prism prices**: about **USD 18 a month for students**, **USD 142 a year** for a
+  personal subscription, USD 500 for an academic group, and over USD 800 for an individual perpetual
+  corporate licence. **Prism's own documentation covers journal submission directly**: a dedicated
+  "Exporting for publishing in journals" chapter, TIFF/EPS/SVG guidance, DPI advice up to 1200 with a
+  warning against 100, the white-background and alpha-channel handling journals require, RGB versus
+  CMYK selection, and font-to-outline conversion on export
+- justifies: OPEN-037
+- note: **this closes the journal-figure candidate.** The gap proposed was "plot your own data to the
+  journal's specification"; Prism does exactly that, documents it chapter and verse, and sells to
+  individuals at USD 18-142. Origin sits beside it from USD 495. The AI illustration tools at
+  USD 12-30 occupy the neighbouring concept-diagram niche. There is no vacant band and no unserved
+  requirement - what remains is a crowded, mature, individually-priced market with two established
+  incumbents and a wave of AI entrants
+
 ---
 
 ## What the two have in common, and what separates them from everything earlier
