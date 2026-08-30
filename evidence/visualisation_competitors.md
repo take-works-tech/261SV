@@ -117,6 +117,23 @@ recorded rather than estimated.
   The band it implies is the same shape as everywhere else in this survey: **free at the bottom
   (CloudCompare), nothing published in the middle, five figures at the top**
 
+## E-174 - Adjacent product-data domains, priced
+- tier: T2
+- url: CLO and Browzwear listings on SaaS directories; robodk.com/pricing; Isaac Sim license FAQ;
+  gazebosim.org
+- verified: 2026-08-30
+- says: **apparel 3D** - CLO 3D is quoted at USD 50/month or USD 450/year; Browzwear VStitcher from
+  USD 75/month, USD 750/year (Freelancer) to USD 3,950/year (Teams), enterprise by quote.
+  **Robot simulation** - Gazebo is Apache-2.0 and free; **Isaac Sim is free for internal R&D**, source
+  under Apache-2.0 with no per-seat limit, with Omniverse Enterprise quoted around USD 4,500 per
+  GPU/year for commercial production; **RoboDK publishes no price** and raised it in April 2024
+- justifies: XC-070, OPEN-037
+- note: recorded T2 - the apparel prices come from software directories rather than the vendors' own
+  pages, and the Isaac Sim enterprise figure from a forum thread. Two patterns hold regardless of the
+  decimals: **apparel is an order of magnitude cheaper per seat than engineering software**, and
+  **robot simulation has been made free at the point of use by its largest vendors** - NVIDIA and Open
+  Robotics both give the simulator away, which removes the pricing floor from that domain entirely
+
 ---
 
 ## What the survey says about the direction
