@@ -101,11 +101,54 @@ produce a document to somebody else's specification, and pay to get it right?**
   an outsourcing price of JPY 40,000 per sheet**. A business preparing two or three sheets a year has
   no software option at all - only the agency
 
+## E-187 - The population obliged to supply an SDS, measured
+
+- tier: T1
+- url: https://www.meti.go.jp/statistics/tyo/kkj/pdf/seizo_gaikyo2024.pdf (2024 年経済構造実態調査
+  二次集計結果、製造業事業所調査、第 1 表) and
+  https://www.stat.go.jp/data/e-census/2021/kekka/pdf/oroshikouri_outline.pdf (令和 3 年経済
+  センサス-活動調査、卸売業、第 1 表)
+- verified: 2026-08-30
+- says: establishments, quoted from the tables themselves.
+  Manufacturing, 2024 (survey date 1 June, **individual proprietorships excluded** by the table's own
+  note): **16 化学工業 5,641** (5,664 in 2023, -0.4 %), **17 石油製品・石炭製品製造業 1,291**,
+  **18 プラスチック製品製造業 13,745**, **19 ゴム製品製造業 2,380**; all manufacturing 222,200.
+  Wholesale, as of 2021-06-01: **532 化学製品卸売業 17,852 establishments and 190,880 employees**
+  (5.1 % and 4.9 % of wholesale), **533 石油・鉱物卸売業 5,804**; all wholesale 348,889
+- justifies: OPEN-036
+- note: **this settles the population question and it settles it in favour of the candidate.** The
+  parties who manufacture or resell chemicals - all of whom owe an SDS on transfer under 安衛法
+  57 条の 2 - number roughly **46,700 establishments** (5,641 + 1,291 + 13,745 + 2,380 + 17,852 +
+  5,804). That is one to two orders of magnitude above every other measured population in this
+  survey: 454 measurement institutions (E-172), 9,210 3D printers a year (E-179).
+  Two qualifications, both material. **The chemical wholesalers average 10.7 employees per
+  establishment** (190,880 / 17,852) - the individual-scale test is passed on the measured average,
+  not assumed. And **the manufacturing counts exclude 個人経営 by construction**, so the smallest
+  operators - precisely the ones the owner's constraint names - are outside the only number
+  available. The figure is a floor, and it cannot be turned into a ceiling from published statistics
+
+## E-188 - What the substance count actually rests on
+
+- tier: T1
+- url: https://anzeninfo.mhlw.go.jp/anzen/gmsds/gmsds640.html
+- verified: 2026-08-30
+- says: the ministry's own 職場のあんぜんサイト publishes the list of ラベル表示・SDS 交付義務対象
+  物質 as an Excel file, currently at **2025-04-01**, and keeps the prior **2024-04-01 list of 896
+  substances** beside it for reference
+- justifies: OPEN-036
+- note: **a correction to the tier E-186 claimed, not to its content.** 896 substances at 2024-04-01
+  is confirmed at T1, from the ministry rather than from a vendor page. **The expansion to roughly
+  2,900 by April 2026 is not.** The 政令改正 (令和 5 年政令第 265 号) and the 令和 8 年 4 月 1 日
+  addition list exist and are cited by the ministry, but neither the ministry's Q&A page nor its
+  意見聴取 page states a total in the text that could be read here; the 2,900 figure remains a
+  T2 vendor and agency claim. It is the strongest single driver of the thesis and it is the one
+  number in it still unverified at primary level
+
 ---
 
-## What the two have in common, and what separates them from everything earlier
+## What the three have in common, and what separates them from everything earlier
 
-Both satisfy the constraint the owner set, and no earlier candidate did:
+All three satisfy the constraint the owner set, and no earlier candidate did:
 
 | | Buyer | Form fixed by | Price the buyer already pays |
 |---|---|---|---|
@@ -114,16 +157,32 @@ Both satisfy the constraint the owner set, and no earlier candidate did:
 | (as-built management) | a construction firm | MLIT | not published |
 | (workplace measurement) | one of 454 institutions | the labour ministry | not published |
 | (CAE reporting) | a company | nobody | not published |
+| **Safety data sheets** | **~46,700 establishments, 10.7 employees average** | **JIS Z 7253** | **JPY 39,800-82,500 per sheet outsourced; JPY 75,000/month for the cheapest tool** |
 
-The first two are **the only measured cases in this whole survey where a form is mandated AND the
-buyer is one person AND a price is published**.
+These are **the only measured cases in this whole survey where a form is fixed outside the buyer AND
+the buyer is one person or close to it AND a price is published**. Of the three, only the safety data
+sheet has all four of a legal obligation, a measured population, a published gap between what the
+buyer pays and what the cheapest tool costs, and a form whose content is numbers requiring a source.
+Patent drawings fail on the fourth; journal figures fail on the third (E-185).
 
 ## What is not settled
 
-**Whether either needs this product's discipline.** A patent drawing needs correct line work, not
-correct units. A journal figure needs correct axes, units and error bars - which is this product's
-subject - but the tools currently selling into that space are illustration generators, which suggests
-the money there is in drawing pictures rather than in plotting data honestly.
+**Whether either of the first two needs this product's discipline.** A patent drawing needs correct
+line work, not correct units. A journal figure needs correct axes, units and error bars - which is
+this product's subject - but the tools selling into that space are illustration generators, and the
+band is occupied anyway (E-185).
 
-**And the population of neither is measured here.** Sci-draw's "35,000+" is a vendor claim about
-users of one tool, not a market.
+**What an SDS candidate would cost this project.** The fit is asymmetric and should be said plainly:
+`domain_core`'s discipline - a declared unit, provenance travelling with a value, digits the source
+supports, a stated absence rather than a substituted default - is the working vocabulary of an SDS,
+and the deliverable writer already refuses to emit a document it cannot account for. **Everything
+built for geometry would be discarded**: the reader, the decimation, the tessellation, the viewer,
+and the visualisation half of the interface. The owner has said sunk cost is not a consideration;
+this records what the cost is, not whether to pay it.
+
+**And the hard part of an SDS is not the document.** It is classifying a mixture under JIS Z 7252
+from its components, which needs a hazard database and cut-off rules, not a specification read
+carefully. NITE publishes government GHS classifications openly, which makes the data question
+answerable; the expertise question is not answered here. A wrong SDS is a wrong legal document, and
+that is the same failure this project's whole discipline exists to prevent - stated as the reason the
+fit is interesting, not as evidence the risk is small.
