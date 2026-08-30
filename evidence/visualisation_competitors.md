@@ -182,6 +182,24 @@ recorded rather than estimated.
   enterprise-priced and out of reach. It is not. What remains unserved by the free tier is
   **non-Windows** and **offline** use - neither of which is a pain somebody pays a monthly fee for
 
+## E-180 - Video: the outsourced price, and the floor generative models put under it
+- tier: T2
+- url: Japanese production-agency cost pages (tebiki, locus-inc, douga-kanji, atsoho); AI video API
+  pricing comparisons (modelslab, buildmvpfast, vo3ai)
+- verified: 2026-08-30
+- says: **outsourced manual/instruction video** in Japan is quoted at JPY 100,000-2,000,000 in total,
+  broken down as planning and script JPY 50,000-300,000, shooting JPY 100,000-1,000,000 (live action
+  JPY 100,000-300,000 per shooting day), editing JPY 100,000-500,000, direction JPY 50,000-200,000.
+  3DCG video was quoted separately at **JPY 1,000,000-1,400,000 per minute** (E-165 context).
+  **Generative video** is quoted at **USD 0.09-0.14 per second** (Kling 3.0), USD 0.10/sec (Sora 2),
+  USD 0.40-0.75/sec (Veo 3.1), with subscriptions from **USD 7.99-12 a month**
+- justifies: XC-070, OPEN-037
+- note: recorded T2 throughout - agency marketing pages and third-party API-pricing round-ups, not
+  vendor contracts. The arithmetic is what matters. **A minute of generative video costs about USD 6
+  at Kling's rate; a minute of outsourced 3DCG costs about JPY 1.2 million.** That is a gap of roughly
+  four orders of magnitude, and it is closing from below every quarter. A product whose value is
+  "cheaper than the agency" is entering the same race generative video is already winning
+
 ---
 
 ## What the survey says about the direction
