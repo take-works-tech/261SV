@@ -107,6 +107,41 @@ middle with a price on the page.
   JPY 14,400 per seat per year - two orders of magnitude below Tecplot and one below Origin, and it
   is what "an individual can adopt without procurement" costs in this market
 
+## E-178 - The platform image rules that act like a specification
+- tier: T2
+- url: sellercentral.amazon.co.jp help and seller forums; help.minne.com; Creema listing guidance
+- verified: 2026-08-30
+- says: Amazon's main-image rule requires a **pure white background**, the product filling **at least
+  85 per cent** of the frame, and **no inserted text** or seller information; sub-images may carry
+  text and non-white backgrounds. minne accepts **up to 5 images**; Creema **up to 20**, each under
+  8 MB, square or 2:3. minne's own guidance tells sellers to photograph "見えにくいところ" - detail,
+  reverse sides, internal structure
+- justifies: OPEN-037
+- note: recorded T2 - the Amazon requirements come from seller-forum threads and help pages rather
+  than a single canonical policy document, and enforcement is described there as inconsistent. The
+  structure is what matters: **the main image is specified by the platform and the rest is free**,
+  which is the same "form fixed outside the vendor" shape as the mandated-report fields - at consumer
+  scale, and with far weaker enforcement
+
+## E-179 - The two candidate populations, measured
+- tier: T2
+- url: orixrentec / ShareLab reporting of Yano Research 3D-printer figures; imitsu.jp, jpc-ltd.co.jp
+  and print-solution.com catalogue-cost pages
+- verified: 2026-08-30
+- says: **3D printers**: Japanese domestic shipments were **9,210 units in 2020**, roughly flat on the
+  prior year, against world shipments of 364,000; Japanese use is reported as concentrated in
+  prototyping and tooling rather than consumer making. **Catalogue production**: design/DTP is quoted
+  at **JPY 20,000-40,000 per page** (JPY 20,000-100,000 including proofing), photography at
+  **JPY 30,000-80,000 for a half to full day**, and a worked example of an A4 16-page catalogue at
+  **about JPY 320,000 in design** plus JPY 120,000 printing for 1,000 copies
+- justifies: OPEN-036, OPEN-037
+- note: recorded T2 - the printer figures are a research firm's, reported at second hand and now five
+  years old; the catalogue prices are agency marketing pages. Two readings follow. **The 3D-printing
+  seller population is small and mostly not consumer**: 9,210 units a year, largely into prototyping,
+  so "individuals selling 3D-printed goods" is a fraction of a fraction. And **catalogue spend is
+  page-based, not image-based** - the money is in design and layout, with photography a
+  half-day line item, so a tool that produces one better image displaces a small part of the cost
+
 ---
 
 ## The three holes, as the evidence supports them
