@@ -134,6 +134,54 @@ recorded rather than estimated.
   **robot simulation has been made free at the point of use by its largest vendors** - NVIDIA and Open
   Robotics both give the simulator away, which removes the pricing floor from that domain entirely
 
+## E-175 - The technical-illustration pipeline is already in the pinned build
+- tier: T1
+- url: measured here on 2026-08-30 against the pinned VTK 9.5.2 wheel
+- verified: 2026-08-30
+- says: the build carries `vtkHiddenLineRemovalPass`, `vtkFeatureEdges`, `vtkPolyDataSilhouette`,
+  `vtkExplodeDataSet`, and vector exporters - `vtkSVGExporter`, `vtkPDFExporter` and
+  `vtkGL2PSExporter` (PostScript/EPS). Fourteen outline filters and twenty-one exporters are present
+- justifies: OPEN-037
+- note: **the parts of a technical illustrator are already installed.** Hidden-line removal, feature
+  edges, silhouettes, exploded views, and SVG/PDF/EPS output at zero additional cost. What is not
+  present is a CAD kernel: these operate on meshes, so the line work is mesh-derived rather than
+  B-rep-exact. For an assembly instruction from mesh or scan data that is enough; for a
+  drawing-grade illustration from STEP it is not
+
+## E-176 - What a technical illustrator costs, and what the simple-simulation floor is
+- tier: T2
+- url: novedge.com listing for Creo Illustrate Professional; simscale.com/product/pricing;
+  autodesk.com Fusion pricing and Simulation Extension pages; freecad.org FEM workbench docs
+- verified: 2026-08-30
+- says: **Creo Illustrate Professional is listed at USD 14,500 a year** (concurrent user, maintenance
+  included, about USD 1,341/month if split); Cortona3D RapidAuthor publishes no price.
+  **SimScale**: a Community tier that is free ("10 unrestricted simulations", "up to 3000 core
+  hours"), and Mechanical / Professional / Enterprise all **"Request pricing"**.
+  **Fusion**: JPY 35,640 a year (JPY 4,320/month), and **static stress is not in the base
+  subscription** - it needs the paid Simulation Extension.
+  **FreeCAD's FEM workbench** is free on Windows, macOS and Linux, bundles **CalculiX** for static
+  structural and modal analysis, and offers Elmer, Z88 and Mystran alongside, with Gmsh/Netgen
+  meshing and **VTK-based post-processing**
+- justifies: XC-070, OPEN-037
+- note: recorded T2 - Creo's figure is a reseller's, and the Fusion extension boundary comes from
+  Autodesk's marketing pages rather than a licence document. Two conclusions hold anyway.
+  **Technical illustration is priced two orders of magnitude above a USD 49-149/month idea**, and
+  **the simple-simulation floor is not empty**: FreeCAD plus CalculiX is a free, cross-platform,
+  GUI-equipped static and modal solver whose post-processing is already VTK
+
+## E-177 - Simplygon is free, with two stated limits
+- tier: T1
+- url: https://contents.simplygon.com/eulas/Simplygon_Free_License_Terms.pdf
+- verified: 2026-08-30
+- says: the Simplygon Free licence terms (Microsoft) state "You may install and use **any number of
+  copies** of the software to develop and test your applications, and **solely for use on Windows**"
+  and "The software requires an internet connection. **You may not use the software in an offline
+  environment**"
+- justifies: OPEN-037
+- note: recorded because a mesh-optimisation product was proposed on the premise that Simplygon is
+  enterprise-priced and out of reach. It is not. What remains unserved by the free tier is
+  **non-Windows** and **offline** use - neither of which is a pain somebody pays a monthly fee for
+
 ---
 
 ## What the survey says about the direction
