@@ -144,6 +144,68 @@ produce a document to somebody else's specification, and pay to get it right?**
   T2 vendor and agency claim. It is the strongest single driver of the thesis and it is the one
   number in it still unverified at primary level
 
+## E-189 - What it costs to enter this field, measured barrier by barrier
+
+- tier: T1
+- url: https://www.chem-info.nite.go.jp/chem/ghs/ghs_download.html (NITE, 政府による GHS 分類結果);
+  https://www.mhlw.go.jp/stf/newpage_11237.html (厚生労働省, 化学物質対策 Q&A, Q9-2 and Q15-2);
+  https://webdesk.jsa.or.jp/books/W11M0090/index/?bunsyo_id=JIS+Z+7253:2019 (日本規格協会)
+- verified: 2026-09-02
+- says: **the data.** NITE publishes the government GHS classifications as Excel, last updated
+  **2026.07**, with the stated condition "本分類結果は、GHS に基づくラベルや SDS を作成する際に
+  **自由に引用又は複写していただけます**" - and immediately after it, "引用又は複写により作成された
+  ラベルや SDS に対する**責任は、ラベルや SDS の作成者にあります**". The same page states the
+  classification is 参考 and that a supplier is free to record something different.
+  **The obligation.** The ministry's Q&A states "ラベル表示及び SDS 交付の義務は、**化学品の譲渡・
+  提供者にあります**" (Q9-2), and that since **2024-04-01 every 事業場 that manufactures, handles or
+  supplies a リスクアセスメント対象物 must appoint a 化学物質管理者** whose duties include creating
+  labels and SDS (Q15-2). **No qualification is stated anywhere for the author of an SDS.**
+  **The standard.** JIS Z 7253:2019 is 100 pages at **JPY 5,720 including tax**
+- justifies: OPEN-036, OPEN-037
+- note: **every structural barrier to entry that could have existed here is absent, and each absence
+  is quoted rather than inferred.** No licence to practise, unlike the 作業環境測定士 of E-172. The
+  reference data is free and explicitly copyable. The statutory duty sits with the customer, not with
+  whoever supplied the tool - which bounds the vendor's exposure to contract and reputation, and does
+  not remove it. The specification costs less than a day's work. And the 2024 appointment rule means
+  each of E-187's establishments now contains **a named person whose job this is** - a buyer that
+  exists by law rather than by inference
+
+## E-190 - An individual is already doing this work, at a price that changes the argument
+
+- tier: T1
+- url: https://coconala.com/services/1402824 and neighbouring listings in the same category
+- verified: 2026-09-02
+- says: on ココナラ, a consumer skills marketplace, the seller りすま offers
+  「GHS/JIS 準拠の SDS を丁寧に作成・修正します」 at **JPY 15,000**, with **304 sales on this
+  listing, 335 in total, a rating of 5.0 from 269 reviews**, platinum seller rank, identity verified,
+  and **インボイス発行事業者 未登録** - the registration status of an operator below the consumption
+  tax threshold. Turnaround is stated as **about 4 days (measured)** and first reply within 4 hours.
+  Options are priced: foreign-language SDS +JPY 5,000, HS code +JPY 2,000, label specimen
+  +JPY 5,000. Two further individuals sell the same service in the same category at **JPY 10,000**
+  (Rino, メーカー研究職) and **JPY 15,000** (Chan25). A buyer's review reads
+  「**個人事業者で知識がない中**、とても丁寧に説明や質問の回答をいただき」
+- justifies: OPEN-036, OPEN-037
+- correction: 2026-09-02. **This corrects the price floor E-186 recorded.** E-186 gave outsourced
+  preparation as JPY 39,800 / 45,000 / 82,500 per sheet, from three agency pages, and reasoned from
+  it that "a business preparing two or three sheets a year has no software option at all - only the
+  agency". The agency prices are real and are not withdrawn. **But they are not the floor.** The
+  floor is JPY 10,000-15,000, charged by individuals on a consumer marketplace, and the gap E-186
+  described is between the JPY 75,000-a-month tool and JPY 15,000 a sheet rather than JPY 40,000 -
+  a factor of five narrower than recorded, and in the direction that weakens the case for a tool.
+- note: two readings, and both are load-bearing. **The entry question is answered by observation, not
+  by argument**: one person, no licence, no employer, has sold 304 safety data sheets at JPY 15,000
+  and holds a 5.0 rating - roughly JPY 4.5 million gross from a single listing. Individual entry into
+  this field is not a hypothesis here; it is a measured fact, and the platform that carries it is
+  reachable by anyone.
+  **And the same fact is the strongest argument against building a tool for the smallest buyer.** A
+  business preparing two or three sheets a year can pay JPY 30,000-45,000 to a human who needs no
+  chemistry from them, carries the work, and delivers in four days. No subscription undercuts that,
+  and no tool removes the buyer's need to understand what they are declaring. **The very segment the
+  owner's constraint names is already served - by individuals, at a price a tool cannot beat.** What
+  remains unserved is the buyer with tens to hundreds of sheets to write and re-write as the
+  substance list expands, which is where per-sheet human work stops scaling and the JPY 75,000 tool
+  begins - and that buyer is no longer individual scale
+
 ---
 
 ## What the three have in common, and what separates them from everything earlier
@@ -157,7 +219,7 @@ All three satisfy the constraint the owner set, and no earlier candidate did:
 | (as-built management) | a construction firm | MLIT | not published |
 | (workplace measurement) | one of 454 institutions | the labour ministry | not published |
 | (CAE reporting) | a company | nobody | not published |
-| **Safety data sheets** | **~46,700 establishments, 10.7 employees average** | **JIS Z 7253** | **JPY 39,800-82,500 per sheet outsourced; JPY 75,000/month for the cheapest tool** |
+| **Safety data sheets** | **~46,700 establishments, 10.7 employees average** | **JIS Z 7253** | **JPY 15,000 per sheet to an individual (E-190), JPY 39,800-82,500 to an agency; JPY 75,000/month for the cheapest tool** |
 
 These are **the only measured cases in this whole survey where a form is fixed outside the buyer AND
 the buyer is one person or close to it AND a price is published**. Of the three, only the safety data
@@ -179,6 +241,17 @@ and the deliverable writer already refuses to emit a document it cannot account 
 built for geometry would be discarded**: the reader, the decimation, the tessellation, the viewer,
 and the visualisation half of the interface. The owner has said sunk cost is not a consideration;
 this records what the cost is, not whether to pay it.
+
+**Whether an individual can enter is no longer a question.** E-189 measures the barriers and finds
+none of the structural ones present: no licence, free and explicitly copyable reference data, the
+statutory duty resting on the customer, a JPY 5,720 standard, and a buyer named by law inside every
+obliged establishment. E-190 then observes the thing directly - one person, 304 sheets sold at
+JPY 15,000, rated 5.0. **The field is enterable and someone has already entered it.**
+
+**What that same observation costs the software case** is recorded in E-190 and should not be read
+past: it is the service that is enterable at individual scale, not the tool, and the smallest buyers
+are already served by people at a price no subscription undercuts. The unserved buyer is the one
+with tens or hundreds of sheets - which is a larger customer than the constraint allows.
 
 **And the hard part of an SDS is not the document.** It is classifying a mixture under JIS Z 7252
 from its components, which needs a hazard database and cut-off rules, not a specification read
