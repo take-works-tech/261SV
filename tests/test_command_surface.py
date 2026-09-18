@@ -165,11 +165,16 @@ class TestRegistrationIsAgainstTheCatalogue:
         assert "newName" in handler.required
 
     def test_every_operation_in_the_catalogue_has_its_parameters_stated(self) -> None:
-        """134 parameters over 61 operations, so a handler for any of them is checkable."""
+        """135 parameters over 61 operations, so a handler for any of them is checkable.
+
+        The count is pinned rather than recomputed: it is a contract change, and a contract change
+        that nothing notices is one nobody read. It went from 134 to 135 on 2026-09-18 when CT-003
+        2.2.0 gave `dataset.probe` the `fieldName` it needed to be answerable at all.
+        """
         from service.command.catalogue import OPERATIONS, PARAMETERS
 
         assert set(PARAMETERS) == set(OPERATIONS)
-        assert sum(len(accepted) for accepted, _ in PARAMETERS.values()) == 134
+        assert sum(len(accepted) for accepted, _ in PARAMETERS.values()) == 135
 
     def test_what_is_not_implemented_is_reportable(self) -> None:
         """A build that answers "unimplemented" for most of the catalogue should be able to say which,
