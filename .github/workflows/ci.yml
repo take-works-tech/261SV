@@ -51,6 +51,8 @@ jobs:
         if: '!cancelled()'
       - run: python validate/check_automerge_policy.py
         if: '!cancelled()'
+      - run: python validate/check_client_types.py
+        if: '!cancelled()'
 
   # XC-219: the review becomes a merge gate on the day the secret exists, and this is what stops that
   # day passing unnoticed. The secret is only visible from inside a workflow, so the check lives here

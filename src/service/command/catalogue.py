@@ -354,6 +354,13 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
 #: the engine's floor is refused politely rather than answered in a shape it cannot read.
 PROTOCOL_VERSION = "2.2.0"
 
+#: The wire's own names, from CT-003's `$defs.transport` (XC-258). The interface generates
+#: the same values from the same place; neither side is derived from the other (XC-252).
+TOKEN_HEADER = "X-Solvia-Token"
+COMMAND_PATH = "/command"
+HANDLE_PATH = "/handle/"
+HEALTH_PATH = "/health"
+
 
 def writes(operation: str) -> bool:
     """Whether an operation changes state. Unknown operations raise rather than defaulting.

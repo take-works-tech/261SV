@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-25
+updated: 2026-09-19
 ---
 
 # Contract: engine API
@@ -129,6 +129,20 @@ would have to reach past the surface to do it. The gate compares the catalogue a
 
 Adding an operation is additive and needs no change to existing callers. **Changing what one means is
 forbidden**; the replacement is a new name and the old one is retired with a pointer to it.
+
+## How it is carried
+
+The envelope above is the shape; **HTTP/1.1 with JSON bodies on the loopback interface is how it
+travels** (XC-258). `POST /command` takes one request and answers with one response; `GET /handle/{id}`
+fetches the bytes a response named; `GET /health` answers the protocol versions and nothing else. The
+engine binds 127.0.0.1 on a port the operating system chooses and writes that port and a per-session
+token to a file the shell reads. **Every request but `/health` carries the token**, and one without it
+is refused with `authorisation.required` - loopback is reachable by every process running as the user,
+so a port without a token is a command surface any program on the machine can drive.
+
+The hosted transport (XC-032) is the same framing with a different host and a certificate. A
+WebSocket becomes right the day the engine must speak first, and is added beside this rather than
+instead of it, because one request and one response fits both.
 
 ## Large payloads
 
