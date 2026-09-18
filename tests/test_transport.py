@@ -24,6 +24,7 @@ import os
 import stat
 import urllib.error
 import urllib.request
+from urllib.parse import quote
 from pathlib import Path
 
 import pytest
@@ -240,6 +241,19 @@ class TestHandlesAreFetchedSeparately:
 
         assert status == 410
         assert json.loads(body)["reason"]["id"] == "handle.expired"
+
+    def test_a_percent_encoded_identifier_finds_its_bytes(self, engine) -> None:
+        """A handle's identifier holds a colon, which a correct client percent-encodes in a path
+        segment. Reading the raw segment looked up `handle%3Aab12`, found nothing, and answered
+        "expired" for a handle issued a second earlier - a message that sends whoever reads it
+        looking for the wrong fault. The browser encodes; the listener decodes."""
+        issued = engine.engine.session.handles.issue(b"picture bytes")
+        assert ":" in issued["id"], "the identifier is the kind, a colon and an opaque tail"
+
+        status, body = fetch(engine, f"/handle/{quote(issued['id'], safe='')}")
+
+        assert status == 200
+        assert body == b"picture bytes"
 
     def test_bytes_put_in_the_store_come_back_whole(self, engine) -> None:
         issued = engine.engine.session.handles.issue(b"\x89PNG\r\n\x1a\nnot really a picture")

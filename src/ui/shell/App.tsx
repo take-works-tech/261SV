@@ -4,8 +4,10 @@
  * composes its own navigation without workspace sidebars (XC-165); chat swaps the navigator for the
  * conversation list and owns its composer (XC-150); network hides the case tree because permission
  * is workspace-wide. */
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { session, useSession, type ScreenId } from "../state/session";
+import { connectionFromEnvironment, engineState, useEngine } from "../state/engine";
+import { EngineRefusal } from "../shared/EngineStatus";
 import { InstructionBar } from "../shared/InstructionBar";
 import { MaterialLibraryShelf, type ShelfAsset, type ShelfState } from "../shared/MaterialLibraryShelf";
 import { Topbar } from "./Topbar";
@@ -73,6 +75,16 @@ const SHELF_ASSETS: Partial<Record<ScreenId, ShelfAsset[]>> = {
 
 export function App() {
   const s = useSession();
+  const e = useEngine();
+
+  // Connect once, to whatever the shell was told about. There is no retry loop and no polling: a
+  // reconnection is a thing a person asks for, and a loop that quietly reattaches hides an engine
+  // that keeps dying (#306 carries the recovery this build does not have).
+  useEffect(() => {
+    const connection = connectionFromEnvironment();
+    if (connection) void engineState.connect(connection);
+    else engineState.disconnect();
+  }, []);
 
   const canvas = ((): ReactNode => {
     switch (s.screen) {
@@ -113,7 +125,10 @@ export function App() {
         <header className="app-header">
           <Topbar />
         </header>
-        <div className="centre-column" style={{ flex: 1, minHeight: 0 }}>{canvas}</div>
+        <div className="centre-column" style={{ flex: 1, minHeight: 0 }}>
+          <EngineRefusal refusal={e.refusal} onDismiss={() => engineState.clearRefusal()} />
+          {canvas}
+        </div>
         <CatalogDrawer />
       </section>
     );
@@ -174,7 +189,10 @@ export function App() {
             </div>
           ) : null}
 
-          <div className="canvas-wrap">{canvas}</div>
+          <div className="canvas-wrap">
+            <EngineRefusal refusal={e.refusal} onDismiss={() => engineState.clearRefusal()} />
+            {canvas}
+          </div>
 
           {SHELF_SCREENS.includes(s.screen) ? (
             <MaterialLibraryShelf

@@ -10,6 +10,7 @@
  *   importing       - a cancellable read with the file named; the source is never modified
  *   unreadable-file - the named rejection with its reason; no partial case exists (XC-007)
  */
+import { EngineOpen } from "../../shared/EngineOpen";
 import { useState } from "react";
 import { session } from "../../state/session";
 import { submit } from "../../client/operations";
@@ -671,7 +672,18 @@ function UnreadableFileState() {
 /* ---- the screen ----------------------------------------------------------------------------- */
 
 export function HomeScreen(props: { variant: string }) {
-  switch (props.variant) {
+  // The way into a connected engine, above whatever design state this variant is. It renders
+  // nothing at all when no engine is reachable, so the ninety-nine catalogued states are unchanged.
+  return (
+    <>
+      <EngineOpen />
+      {homeCanvas(props.variant)}
+    </>
+  );
+}
+
+function homeCanvas(variant: string) {
+  switch (variant) {
     case "first-run":
       return <FirstRun />;
     case "importing":
