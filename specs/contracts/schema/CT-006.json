@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-006 report definition",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "type": "object",
   "additionalProperties": true,
   "required": [
@@ -44,6 +44,15 @@
           },
           "viewId": {
             "type": "string"
+          },
+          "form": {
+            "type": "string",
+            "enum": [
+              "still",
+              "video",
+              "interactive"
+            ],
+            "description": "which form of a view block this is (16_application_model). A still is a picture with its legend as text; interactive needs the viewer bundle and video a camera path, and a build that has neither says so rather than substituting a still (XC-254, report/AC-001)"
           },
           "graphId": {
             "type": "string"

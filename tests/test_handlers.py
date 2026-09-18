@@ -621,6 +621,65 @@ class TestProbingAPoint:
         assert "fieldName" in PARAMETERS["dataset.probe"][1]
 
 
+@needs_offscreen
+class TestADeliverableCarriesAStill:
+    """Step 5 through the surface: a report whose view block asked for a still gets the picture, its
+    legend as text, and the sentence that says it does not turn."""
+
+    @staticmethod
+    def _with_view(surface: Surface, dataset_id: str, form: str | None) -> tuple[str, str]:
+        view = surface.submit(Command("view.create", {"workspaceId": "ws:1", "definition": {
+            "name": "応力の全体図", "datasetId": dataset_id, "representation": "surface",
+            "colouring": {"fieldName": "stress", "association": "point", "colourMap": "viridis"},
+        }})).value["id"]
+        block: dict[str, object] = {"kind": "view", "viewId": view}
+        if form is not None:
+            block["form"] = form
+        report = surface.submit(Command("report.create", {"workspaceId": "ws:1", "definition": {
+            "name": "Run 1", "targets": ["html"],
+            "blocks": [block, {"kind": "valueTable", "fields": ["stress"]}],
+        }})).value["id"]
+        return view, report
+
+    def test_the_picture_its_legend_and_the_still_statement_are_in_the_file(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path)
+        surface.submit(Command("field.declareUnit", {"datasetId": dataset_id, "fieldName": "stress", "unitSymbol": "MPa"}))
+        _, report_id = self._with_view(surface, dataset_id, "still")
+        target = tmp_path / "with-figure.html"
+
+        result = surface.submit(Command("report.export", {"reportId": report_id, "path": str(target)}))
+
+        assert result.status is Status.APPLIED, result.reason
+        text = target.read_text(encoding="utf-8")
+        assert "data:image/png;base64," in text
+        assert "静止画です" in text
+        assert "MPa" in text and "viridis" in text
+        assert "40" in text, "the legend's upper end, from the full field"
+        assert result.value["reductions"] == []
+        assert not any("view" in one and "vtk.js" in one for one in result.value["omitted"])
+
+    def test_a_view_that_asked_to_rotate_is_named_rather_than_given_a_photograph(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path)
+        _, report_id = self._with_view(surface, dataset_id, "interactive")
+        target = tmp_path / "interactive.html"
+
+        result = surface.submit(Command("report.export", {"reportId": report_id, "path": str(target)}))
+
+        assert result.status is Status.APPLIED, result.reason
+        assert any("vtk.js" in one for one in result.value["omitted"])
+        assert "data:image/png;base64," not in target.read_text(encoding="utf-8")
+
+    def test_a_view_block_with_no_form_is_named_rather_than_given_the_writable_one(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path)
+        _, report_id = self._with_view(surface, dataset_id, None)
+        target = tmp_path / "formless.html"
+
+        result = surface.submit(Command("report.export", {"reportId": report_id, "path": str(target)}))
+
+        assert result.status is Status.APPLIED, result.reason
+        assert any("どの形" in one for one in result.value["omitted"])
+
+
 class TestWhenNoPictureCanBeDrawn:
     """E-194: with no display the toolkit does not refuse, it segfaults. The engine therefore asks a
     child process first, and a machine that cannot draw gets a refusal that names the requirement."""

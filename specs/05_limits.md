@@ -125,9 +125,10 @@ applies the matching row; the class it chose is visible in settings, and can be 
 - open: OPEN-008
 
 ### LIM-006 - Report file size
-- value: 20
-- unit: megabytes
-- source_of_truth: planned: src/engine/report_limits.py:MAX_REPORT_BYTES
+- value: 20971520
+- unit: bytes
+- human_value: 20 MiB, which is what the common mail systems accept as an attachment
+- source_of_truth: src/engine/report_limits.py:MAX_REPORT_BYTES
 - rationale: measured here, one million-point surface costs 16.1 MB as compressed geometry and 34.4 MB
   through the free export path. A deliverable an engineer emails has to stay under what a mail system
   accepts, so the report path reduces geometry until it fits and says by how much - the numbers stay

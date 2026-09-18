@@ -12,23 +12,30 @@ XC-001, XC-003.
 
 from __future__ import annotations
 
+import base64
+
 from pathlib import Path
 
 import pytest
 
 from domain_core.recorded_time import RecordedTime
-from domain_core.reported_value import Caveat, Provenance as Origin, ReportedValue
+from domain_core.reported_value import UNDECLARED_MARKER, Caveat, Provenance as Origin, ReportedValue
 from engine.report.document import (
+    EXTERNAL,
     Block,
     BlockKind,
     Document,
+    Figure,
+    Legend,
     Provenance,
     ReportError,
     SourceFile,
     ValueRow,
+    ViewForm,
 )
 from engine.report.html import (
     BASIC_LATIN,
+    MAX_REPORT_BYTES,
     STATIC_KINDS,
     Capability,
     EmbeddedFont,
@@ -177,18 +184,42 @@ class TestEveryNumberIsText:
 class TestItSaysWhatItCannotCarryBeforeItWrites:
     def test_a_rotatable_view_is_named_as_unsupported(self) -> None:
         """AC-001's second half needs the vtk.js bundle. A still picture would satisfy the sentence and
-        not the requirement, so the kind is refused and named rather than quietly downgraded."""
-        document = a_document(Block(BlockKind.VIEW, "全体図"))
+        not the requirement, so a block that asked to rotate is refused and named rather than quietly
+        given a photograph (CT-006 2.1.0 made "which form" a thing a block can say)."""
+        document = a_document(Block(BlockKind.VIEW, "全体図", form=ViewForm.INTERACTIVE))
 
         found = unrepresentable(document)
 
         assert any("vtk.js" in one.what for one in found)
         assert any(one.where == "全体図" for one in found)
 
+    def test_a_video_is_named_by_what_a_video_needs(self) -> None:
+        document = a_document(Block(BlockKind.VIEW, "回転", form=ViewForm.VIDEO))
+
+        found = unrepresentable(document)
+
+        assert any("カメラパス" in one.what for one in found)
+
+    def test_a_view_that_did_not_say_which_form_is_not_given_the_writable_one(self) -> None:
+        """XC-001 at the level of a block: the writer has exactly one form it can write, and choosing
+        it for a definition that did not ask would be a plausible default."""
+        document = a_document(Block(BlockKind.VIEW, "全体図"))
+
+        found = unrepresentable(document)
+
+        assert any("どの形" in one.what for one in found)
+
+    def test_a_still_with_no_picture_says_the_picture_is_missing(self) -> None:
+        document = a_document(Block(BlockKind.VIEW, "全体図", form=ViewForm.STILL))
+
+        found = unrepresentable(document)
+
+        assert any("静止画が描かれていません" in one.what for one in found)
+
     def test_writing_is_refused_until_the_list_is_accepted(self, tmp_path: Path) -> None:
         """AC-014: said **before** the file exists. A list produced alongside it is one somebody found
         afterwards."""
-        document = a_document(Block(BlockKind.VIEW, "全体図"))
+        document = a_document(Block(BlockKind.VIEW, "全体図", form=ViewForm.INTERACTIVE))
 
         with pytest.raises(ReportError) as refusal:
             write(document, tmp_path / "report.html")
@@ -199,7 +230,7 @@ class TestItSaysWhatItCannotCarryBeforeItWrites:
     def test_accepting_it_writes_the_statement_into_the_document(self, tmp_path: Path) -> None:
         """Refusing and then writing a file that kept the omission to itself would move the silence one
         step along rather than ending it."""
-        document = a_document(Block(BlockKind.VIEW, "全体図"))
+        document = a_document(Block(BlockKind.VIEW, "全体図", form=ViewForm.INTERACTIVE))
 
         export = write(document, tmp_path / "report.html", accepted=True)
 
@@ -216,7 +247,9 @@ class TestItSaysWhatItCannotCarryBeforeItWrites:
         assert export.stated == ()
 
     def test_the_static_kinds_are_written_down(self) -> None:
-        assert BlockKind.VIEW not in STATIC_KINDS
+        """VIEW joined them on 2026-09-18 and is the conditional one: writable as a still that has a
+        picture, named by its form otherwise."""
+        assert BlockKind.VIEW in STATIC_KINDS
         assert BlockKind.VALUE_TABLE in STATIC_KINDS
 
 
@@ -328,3 +361,103 @@ class TestTextIsEscaped:
 def _all_characters() -> set[str]:
     """Every character a test document holds, so a font can be declared to cover it."""
     return set(render(a_document()))
+
+
+#: A one-pixel PNG: the smallest thing that is honestly a picture. The tests here are about what the
+#: document does with a figure, not about what the renderer drew - that is tests/test_render.py.
+ONE_PIXEL_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+)
+
+
+def a_figure(**changes) -> Figure:
+    legend = Legend(
+        field_name="stress", unit="MPa", minimum=10.0, maximum=241.7, digits=4,
+        colour_map="viridis", uniform=True,
+    )
+    settings = {"png": ONE_PIXEL_PNG, "width": 640, "height": 480, "legend": legend, "description": "全体図"}
+    settings.update(changes)
+    return Figure(**settings)
+
+
+class TestAStillIsCarriedWithItsLegendAsText:
+    """XC-257 step 5. The picture is embedded and the words are typeset by the document, because the
+    toolkit's own faces draw this product's language as nothing at all (E-192)."""
+
+    def test_a_still_with_a_picture_needs_no_acceptance(self, tmp_path: Path) -> None:
+        document = a_document(Block(BlockKind.VIEW, "全体図", form=ViewForm.STILL, figure=a_figure()))
+        font = EmbeddedFont("Test Sans", "OFL-1.1", b"\x00font", frozenset(render(document)))
+
+        export = write(document, tmp_path / "report.html", capability=Capability(font=font))
+
+        assert export.stated == (), "a still with a picture is a thing this build carries"
+
+    def test_the_picture_is_in_the_file_and_not_fetched_from_anywhere(self, tmp_path: Path) -> None:
+        """AC-001, INV-007: a picture fetched from somewhere is a picture the recipient may not get."""
+        text = render(a_document(Block(BlockKind.VIEW, "全体図", form=ViewForm.STILL, figure=a_figure())))
+
+        assert "data:image/png;base64," in text
+        assert base64.b64encode(ONE_PIXEL_PNG).decode("ascii") in text
+        assert not EXTERNAL.search(text)
+
+    def test_the_legend_is_text_the_document_typesets(self, tmp_path: Path) -> None:
+        text = render(a_document(Block(BlockKind.VIEW, "全体図", form=ViewForm.STILL, figure=a_figure())))
+
+        assert "stress" in text and "MPa" in text
+        assert "241.7" in text, "the range at the digits it carries (INV-014)"
+        assert "241.69999" not in text
+        assert "viridis" in text
+
+    def test_an_undeclared_unit_says_so_in_the_legend(self) -> None:
+        figure = a_figure(legend=Legend("stress", None, 0.0, 1.0, 6, "viridis", True))
+
+        text = render(a_document(Block(BlockKind.VIEW, "全体図", form=ViewForm.STILL, figure=figure)))
+
+        assert UNDECLARED_MARKER in text
+
+    def test_a_map_that_is_not_perceptually_uniform_carries_the_note(self) -> None:
+        """XC-111: selecting one records a note on the view and in any report using it."""
+        figure = a_figure(legend=Legend("stress", "MPa", 0.0, 1.0, 4, "jet", False))
+
+        text = render(a_document(Block(BlockKind.VIEW, "全体図", form=ViewForm.STILL, figure=figure)))
+
+        assert "知覚均等ではありません" in text
+
+    def test_the_document_says_the_view_is_a_still(self) -> None:
+        """A reader who cannot turn it should be told it does not turn."""
+        text = render(a_document(Block(BlockKind.VIEW, "全体図", form=ViewForm.STILL, figure=a_figure())))
+
+        assert "静止画です" in text
+
+    def test_the_picture_carries_alternative_text(self) -> None:
+        text = render(a_document(Block(BlockKind.VIEW, "全体図", form=ViewForm.STILL, figure=a_figure())))
+
+        assert 'alt="全体図"' in text
+
+    def test_a_figure_on_anything_but_a_still_is_refused_at_construction(self) -> None:
+        with pytest.raises(ReportError):
+            Block(BlockKind.VIEW, "全体図", form=ViewForm.INTERACTIVE, figure=a_figure())
+        with pytest.raises(ReportError):
+            Block(BlockKind.VALUE_TABLE, "表", form=ViewForm.STILL)
+
+    def test_an_empty_picture_is_refused(self) -> None:
+        with pytest.raises(ReportError):
+            a_figure(png=b"")
+
+
+class TestADeliverableHasAWeightLimit:
+    """LIM-006. An embedded picture makes the size a real question, so it is measured before the file
+    exists rather than discovered by a mail system."""
+
+    def test_a_document_over_the_limit_is_refused_and_no_file_is_written(self, tmp_path: Path) -> None:
+        huge = a_figure(png=ONE_PIXEL_PNG + b"x" * (MAX_REPORT_BYTES + 1))
+        document = a_document(Block(BlockKind.VIEW, "全体図", form=ViewForm.STILL, figure=huge))
+
+        with pytest.raises(ReportError) as refusal:
+            write(document, tmp_path / "big.html", accepted=True)
+
+        assert "LIM-006" in str(refusal.value)
+        assert not (tmp_path / "big.html").exists()
+
+    def test_the_limit_is_the_one_the_specification_names(self) -> None:
+        assert MAX_REPORT_BYTES == 20971520
