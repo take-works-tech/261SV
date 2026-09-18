@@ -582,3 +582,67 @@ class TestEveryOperationSaysWhatItAnswers:
         figure that does not say which it is cannot be checked."""
         assert "weighting" in RESULT_FIELDS["field.statistics"][1]
         assert "scope" in RESULT_FIELDS["field.statistics"][1]
+
+
+class TestAReportedValueIsHeldToItsShape:
+    """XC-253 made value, unit, digits and provenance required of a reported value **in the contract**;
+    the surface checked only the top-level field names, so a probe that answered `{"value": 1.0}` was
+    `answered` (XC-257). A bare number with no unit beside it is a number in whatever unit the reader
+    assumed (XC-003), and it is the build's defect rather than the caller's, so it **fails**."""
+
+    @staticmethod
+    def _probe(value: object) -> Surface:
+        surface = Surface(clock=at(9))
+        surface.register(Handler("dataset.probe", lambda p, t: Effect("読みました", value=value)))
+        return surface
+
+    @staticmethod
+    def _ask(surface: Surface):
+        return surface.submit(
+            Command("dataset.probe", {"datasetId": "d", "pointM": [0.0, 0.0, 0.0], "resultPosition": 0})
+        )
+
+    def test_a_bare_number_where_the_contract_wants_a_reported_value_fails(self) -> None:
+        result = self._ask(self._probe({"value": 182.4}))
+
+        assert result.status is Status.FAILED
+        assert "単位" in (result.reason or "")
+
+    def test_a_reported_value_missing_its_unit_fails_and_names_it(self) -> None:
+        result = self._ask(self._probe({"value": {"value": 182.4, "digits": 6, "provenance": "dataset"}}))
+
+        assert result.status is Status.FAILED
+        assert "unit" in (result.reason or "")
+
+    def test_a_complete_reported_value_is_answered(self) -> None:
+        result = self._ask(self._probe({
+            "value": {"value": 182.4, "unit": "MPa", "digits": 6, "provenance": "dataset"},
+        }))
+
+        assert result.status is Status.ANSWERED
+
+    def test_a_stated_absence_is_a_null_value_with_its_unit_still_beside_it(self) -> None:
+        """XC-001: missing stays missing, and it still says what unit it would have been in."""
+        result = self._ask(self._probe({
+            "value": {"value": None, "unit": "MPa", "digits": 6, "provenance": "dataset"},
+        }))
+
+        assert result.status is Status.ANSWERED
+
+    def test_every_reported_value_field_the_contract_names_is_checked(self) -> None:
+        """The table is generated from CT-003; this pins the six fields it holds today so that a
+        contract change that adds one is noticed here rather than silently checked."""
+        from service.command.catalogue import REPORTED_VALUES
+
+        named = {(op, field) for op, fields in REPORTED_VALUES.items() for field in fields}
+        assert named == {
+            ("dataset.probe", "value"),
+            ("field.statistics", "minimum"),
+            ("field.statistics", "maximum"),
+            ("field.statistics", "mean"),
+            ("variable.detach", "keptValue"),
+            ("diff.create", "roundTripError"),
+        }
+        for fields in REPORTED_VALUES.values():
+            for keys in fields.values():
+                assert keys >= {"value", "unit", "digits", "provenance"}

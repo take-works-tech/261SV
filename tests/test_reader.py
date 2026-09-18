@@ -630,3 +630,44 @@ class TestExodusReadsItsResults:
         with pytest.raises(reader.UnsupportedFormatError) as refusal:
             reader.read(tmp_path / "case.ex2")
         assert "read_case" in str(refusal.value)
+
+
+def test_a_float32_field_is_stored_as_float32_and_claims_six_digits(tmp_path: Path) -> None:
+    """XC-246 and INV-014, at the reader: store what the file gave, and let the digits follow.
+
+    `write_grid` writes its fields as `vtkFloatArray`, which is what a solver writes. Until 2026-09-18
+    the reader promoted every field to float64 on the way in, so the same field claimed fifteen
+    significant digits - and nothing noticed, because the one end-to-end test declared its digits by
+    hand (XC-257). This is the test that would have noticed.
+    """
+    path = tmp_path / "case.vtu"
+    write_grid(path)
+
+    dataset = reader.read(path)
+
+    for name in ("stress", "element_stress"):
+        field = dataset.fields[name]
+        assert field.values.dtype == np.float32, f"{name} was promoted; the file holds float32"
+        assert field.significant_digits == 6
+    # Geometry is the exception, and stays one: volumes weight every average (XC-245).
+    assert dataset.points_m.dtype == np.float64
+
+
+def test_a_part_read_through_read_case_carries_the_source_frame(tmp_path: Path) -> None:
+    """ingest/AC-028 holds for a part as it holds for a file read on its own.
+
+    `read` recorded the frame and `read_case` did not, so every dataset that arrived through a
+    composite - every Exodus and CGNS part - had no source at all (XC-257). A coordinate whose
+    conversion cannot be explained is a coordinate that is merely trusted.
+    """
+    path = tmp_path / "case.vtu"
+    write_grid(path)
+
+    case = reader.read_case(path)
+
+    assert len(case.parts) == 1
+    source = case.parts[0].dataset.source
+    assert source is not None
+    assert source.up_axis == "Z"
+    assert source.scale_to_metres == 1.0
+    assert "Reader" in source.reader

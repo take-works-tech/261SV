@@ -136,3 +136,19 @@ class TestTheQuantityDeclaresWhichItIs:
         with pytest.raises(UndeclaredUnitError) as refusal:
             kind_of({"kind": "relatve"})
         assert "INV-028" in str(refusal.value)
+
+
+def test_declaring_a_unit_keeps_an_integration_point_field_whole() -> None:
+    """A unit declaration returns the same field with a unit - association and points per cell
+    included. Until 2026-09-18 `declared()` rebuilt the field without `points_per_cell`, so declaring
+    a unit on an integration-point field raised at construction (XC-257): the one kind of field whose
+    values the product refuses to average was the one kind that could not be given a unit."""
+    values = np.arange(16, dtype=np.float32)
+    field = Field("sigma", Association.INTEGRATION_POINT, values, points_per_cell=8)
+
+    declared = field.declared("MPa")
+
+    assert declared.unit == "MPa"
+    assert declared.association is Association.INTEGRATION_POINT
+    assert declared.points_per_cell == 8
+    assert field.unit is None

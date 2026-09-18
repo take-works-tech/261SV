@@ -105,6 +105,12 @@ def check_parameters_are_stated(findings: list[Finding]) -> None:
             findings.append(Finding(SCHEMA.name, f"{name} has a parameter schema and is not in the catalogue"))
 
 
+#: What makes a result field a reported value: the four keys XC-253 requires of `$defs.reportedValue`.
+#: Read from each field's own `required` rather than from a `$ref`, because CT-003 inlines the shape
+#: into every result that carries it, and a check keyed on the definition alone would find none.
+REPORTED_VALUE_KEYS = frozenset({"value", "unit", "digits", "provenance"})
+
+
 def render() -> str:
     """The catalogue as a Python module the product can import.
 
@@ -125,6 +131,21 @@ def render() -> str:
     def answered(name: str) -> tuple[list[str], list[str]]:
         one = answers.get(name, {})
         return sorted(one.get("properties", {})), sorted(one.get("required", []))
+
+    def reported(name: str) -> dict[str, list[str]]:
+        """The result fields of one operation that are reported values, with the keys each must hold."""
+        one = answers.get(name, {})
+        return {
+            field: sorted(node.get("required") or [])
+            for field, node in sorted((one.get("properties") or {}).items())
+            if isinstance(node, dict)
+            and node.get("type") == "object"
+            and REPORTED_VALUE_KEYS <= set(node.get("required") or [])
+        }
+
+    def reported_row(name: str) -> str:
+        inner = ", ".join(f"{field!r}: frozenset({keys!r})" for field, keys in reported(name).items())
+        return f'    "{name}": {{{inner}}},'
     lines = [
         '"""The operation catalogue of CT-003, as code.',
         "",
@@ -174,6 +195,15 @@ def render() -> str:
             f'    "{name}": (frozenset({answered(name)[0]!r}), frozenset({answered(name)[1]!r})),'
             for name, _ in rows
         ],
+        "}",
+        "",
+        "#: The result fields that are a **reported value** - an object carrying value, unit, digits",
+        "#: and provenance (XC-253) - and the keys each must hold. Checked one level down from",
+        "#: RESULT_FIELDS: a probe that answered `{\"value\": 1.0}` passed the top-level check and was",
+        "#: `answered`, and a number with no unit beside it is a number in whatever unit the reader",
+        "#: assumed (XC-003).",
+        "REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {",
+        *[reported_row(name) for name, _ in rows],
         "}",
         "",
         "",

@@ -123,8 +123,14 @@ class Field:
         return format_value(float(self.values[index]), self.significant_digits, missing=missing)
 
     def declared(self, symbol: str) -> "Field":
-        """Return the same field with a unit the user declared."""
-        return Field(self.name, self.association, self.values, symbol)
+        """Return the same field with a unit the user declared.
+
+        The same field: association **and** points per cell travel with it. Rebuilding without the
+        latter made declaring a unit on an integration-point field raise, because the rebuilt field no
+        longer said how many values each cell holds - a unit declaration that destroys the field's
+        shape is not the same field (XC-257).
+        """
+        return Field(self.name, self.association, self.values, symbol, self.points_per_cell)
 
 
 @dataclass(frozen=True, slots=True)
@@ -317,10 +323,14 @@ class Dataset:
             position = int(np.argmax(field.values if mask is None else np.where(mask, field.values, -np.inf)))
             location = location_of(self.identifiers.get(field.association), position)
 
+        # Accumulated in double whatever the field is stored in (INV-031, XC-246). The extremum and
+        # the count are exact in any type; the sum and the mean are not, and summing a float32 field
+        # of 300 ± 0.001 in float32 returns exactly 300.0 with the variation gone (E-143). The
+        # storage stays what the file gave - only the accumulator is widened.
         result = {
             Aggregate.EXTREMUM: lambda: float(np.max(values)),
-            Aggregate.TOTAL: lambda: float(np.sum(values)),
-            Aggregate.MEAN: lambda: float(np.mean(values)),
+            Aggregate.TOTAL: lambda: float(np.sum(values, dtype=np.float64)),
+            Aggregate.MEAN: lambda: float(np.mean(values, dtype=np.float64)),
             Aggregate.COUNT: lambda: float(values.size),
         }[aggregate]()
         return ReportedValue(
