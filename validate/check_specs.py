@@ -572,9 +572,25 @@ class Linter:
                 if not reference:
                     self.report(14, spec.path, index, f"{cells[0]} is verified automatically but names no test")
                     continue
-                test_file = reference.group(0).split("::")[0]
-                if not (self.root / test_file).exists():
+                test_file, _, test_id = reference.group(0).partition("::")
+                location = self.root / test_file
+                if not location.exists():
                     self.report(14, spec.path, index, f"{cells[0]} names test file '{test_file}', which does not exist")
+                    continue
+                if not test_id:
+                    continue
+                # The **named test**, not merely the file. A row claiming a test nobody wrote points at
+                # a file full of other tests, and the row reads as covered by whatever happens to be in
+                # it - which is how a plan drifts from the suite without either changing.
+                body = location.read_text(encoding="utf-8")
+                for part in test_id.split("::"):
+                    name = part.split("[")[0]
+                    if not re.search(rf"^\s*(?:async\s+def|def|class)\s+{re.escape(name)}\b", body, re.M):
+                        self.report(
+                            14, spec.path, index,
+                            f"{cells[0]} names '{test_id}' and '{name}' is not defined in {test_file}",
+                        )
+                        break
 
     # check 15 --------------------------------------------------------------
     def check_bounded_has_principles(self) -> None:
@@ -798,12 +814,17 @@ class Linter:
         return self.findings
 
 
-def planned_acceptance(files: list[SpecFile]) -> set[tuple[str, str]]:
+def planned_acceptance(files: list[SpecFile], *, only_existing: bool = False) -> set[tuple[str, str]]:
     """(feature, acceptance id) pairs listed in a verification plan **table row**.
 
     Prose is not a plan: a sentence explaining why a criterion is hard to check would otherwise count as
     checking it. And the pair matters, not the number: two features each numbering from AC-001 means a
     bare id would mark one feature's criterion covered by the other's row.
+
+    `only_existing` narrows it to rows whose method does **not** say `(planned)` - the ones claiming a
+    test that exists today. The two answers are different questions and were one number until
+    2026-09-18: the report said 384 of 384 criteria had a verification while 74 of the 89 view rows
+    were intentions. A plan is a promise to check; a test is a check.
     """
     planned: set[tuple[str, str]] = set()
     for spec in files:
@@ -812,6 +833,10 @@ def planned_acceptance(files: list[SpecFile]) -> set[tuple[str, str]]:
         for raw in spec.text.splitlines():
             if not raw.lstrip().startswith("|"):
                 continue
+            if only_existing:
+                cells = [cell.strip() for cell in raw.strip().strip("|").split("|")]
+                if len(cells) < 2 or "planned" in cells[1].lower():
+                    continue
             qualified = {
                 (match.group(1), f"{match.group(2)}-{match.group(3)}")
                 for match in QUALIFIED_ID_RE.finditer(raw)
@@ -831,9 +856,23 @@ def planned_acceptance(files: list[SpecFile]) -> set[tuple[str, str]]:
 def build_report(linter: "Linter") -> dict:
     """Summarise readiness. Counts, not judgement: the numbers say what is left, not whether to ship."""
     requirements = [item for spec in linter.files for item in spec.items if item.kind == "REQ" and item.active]
-    acceptance = [(item, ac_id) for item in requirements for ac_id, _, _ in item.acceptance]
+    # Every criterion as (feature, id). The pair is the identity: each feature numbers from AC-001, so
+    # a bare id counts one feature's criterion as covered by another's row - which is how the
+    # per-feature breakdown first read "workspace 214 of 369" for a feature with 42 criteria.
+    scoped: list[tuple[str, str]] = []
+    for spec in linter.files:
+        parts = spec.path.parts
+        scope = parts[parts.index("features") + 1] if "features" in parts else PROJECT_SCOPE
+        for item in spec.items:
+            if item.kind == "REQ" and item.active:
+                scoped += [(scope, ac_id) for ac_id, _, _ in item.acceptance]
 
-    planned = {identifier for _, identifier in planned_acceptance(linter.files)}
+    planned = planned_acceptance(linter.files)
+    tested = planned_acceptance(linter.files, only_existing=True)
+
+    def covered(pairs: set[tuple[str, str]], scope: str, ac_id: str) -> bool:
+        """Whether a plan row covers this criterion - by its own feature, or project-wide."""
+        return (scope, ac_id) in pairs or (PROJECT_SCOPE, ac_id) in pairs
 
     by_phase: dict[str, dict[str, int]] = {}
     for item in requirements:
@@ -859,21 +898,34 @@ def build_report(linter: "Linter") -> dict:
         if item.active and (item.attrs.get("decidedness") == "Open" or item.kind == "OPEN")
     )
 
-    unverified = sorted({ac_id for _, ac_id in acceptance if ac_id not in planned})
+    unverified = sorted({f"{scope}/{ac_id}" for scope, ac_id in scoped if not covered(planned, scope, ac_id)})
+    untested = sorted({f"{scope}/{ac_id}" for scope, ac_id in scoped if not covered(tested, scope, ac_id)})
+    # Where the promises sit, so "which part of the product is unchecked" is answerable without
+    # reading 384 rows. A feature with one tested criterion out of eighty-nine is a feature whose
+    # verification is an intention, and the number is the thing that says so.
+    by_feature: dict[str, dict[str, int]] = {}
+    for scope, ac_id in scoped:
+        counts = by_feature.setdefault(scope, {"criteria": 0, "tested": 0})
+        counts["criteria"] += 1
+        if covered(tested, scope, ac_id):
+            counts["tested"] += 1
     blocking = [
         item.id
         for item in requirements
         if item.attrs.get("phase") == "r1"
         and item.attrs.get("priority") == "MUST"
-        and any(ac_id not in planned for ac_id, _, _ in item.acceptance)
+        and any(ac_id not in {one for _, one in planned} for ac_id, _, _ in item.acceptance)
     ]
 
     return {
         "requirements": len(requirements),
         "by_phase": by_phase,
-        "acceptance_criteria": len(acceptance),
-        "verified_in_plan": len(acceptance) - len(unverified),
+        "acceptance_criteria": len(scoped),
+        "verified_in_plan": len(scoped) - len(unverified),
         "unverified": unverified,
+        "verified_by_a_test": len(scoped) - len(untested),
+        "untested": untested,
+        "by_feature": by_feature,
         "fixed_values": len(fixed),
         "fixed_by_tier": tiers,
         "with_source_of_truth": sum(1 for item in fixed if item.attrs.get("source_of_truth")),
@@ -915,9 +967,16 @@ def render_report(report: dict) -> str:
         lines.append(f"  phase {phase:<15} {counts}")
     lines.append("")
     lines.append(f"acceptance criteria     {report['acceptance_criteria']}")
-    lines.append(f"  with a verification    {report['verified_in_plan']}")
+    lines.append(f"  with a row in the plan {report['verified_in_plan']}")
     if report["unverified"]:
         lines.append(f"  without one            {', '.join(report['unverified'])}")
+    # The number that says what is checked. A row in the plan is an intention; a row naming a test is
+    # a check. The two were one figure until 2026-09-18 and it read as the larger of them.
+    lines.append(f"  verified by a test     {report['verified_by_a_test']}")
+    lines.append(f"  planned, not yet tested {report['acceptance_criteria'] - report['verified_by_a_test']}")
+    for scope in sorted(report["by_feature"]):
+        counts = report["by_feature"][scope]
+        lines.append(f"    {scope:<20} {counts['tested']} of {counts['criteria']}")
     lines.append("")
     lines.append(f"Fixed values            {report['fixed_values']}")
     tiers = ", ".join(f"{tier} {count}" for tier, count in sorted(report["fixed_by_tier"].items())) or "-"
