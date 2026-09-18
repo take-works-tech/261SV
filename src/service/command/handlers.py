@@ -6,10 +6,10 @@ catalogue operations was answered 「カタログにありますが、このビ�
 module is what joins them: one `Session` holding what the engine has in memory, and `build_surface`,
 which registers a handler for each operation this build can honestly perform.
 
-What is deliberately **not** registered is as much the point as what is. `view.render` and
-`dataset.probe` have no handler here - the renderer is step 3 of the path and the probe step 4 - so
-the surface keeps answering "no implementation" for them, which is true, rather than a picture or a
-number that is not.
+What is deliberately **not** registered is as much the point as what is. `dataset.probe` has no
+handler here - the probe is step 4 of the path - so the surface keeps answering "no implementation"
+for it, which is true, rather than a number that is not. `view.render` arrived with step 3: it draws
+through the native offscreen path and answers with a handle to the bytes.
 
 Every handler answers in the shape CT-003 states and is held to it by the surface (RESULT_FIELDS,
 REPORTED_VALUES). A caller's mistake - a case that is not there, a file that cannot be read, a unit
@@ -47,6 +47,7 @@ from engine.report.document import (
     build as build_document,
 )
 from engine.visualization.backends import REQUIRES, Backend, probe
+from engine.visualization.render import Camera, Colouring, RenderError, render_view
 from service.command.catalogue import PROTOCOL_VERSION
 from service.command.surface import Effect, Handler, Result, Status, Surface
 from service.workspace import items, sources
@@ -291,6 +292,7 @@ def handlers(session: Session) -> tuple[Handler, ...]:
         Handler("field.statistics", lambda p, t: field_statistics(session, p)),
         Handler("view.create", lambda p, t: item_create(session, "views", p)),
         Handler("view.update", lambda p, t: item_update(session, "views", "viewId", p)),
+        Handler("view.render", lambda p, t: view_render(session, p)),
         Handler("report.create", lambda p, t: item_create(session, "reports", p)),
         Handler("report.export", lambda p, t: report_export(session, p)),
         Handler("report.provenance", lambda p, t: report_provenance(session, p)),
@@ -627,6 +629,89 @@ def item_update(session: Session, kind: str, key: str, parameters: Mapping[str, 
         changed=(item_id,),
         value={"id": item_id, "revision": previous + 1},
         undo=undo,
+    )
+
+
+#: The picture formats this build writes. CT-003 also names jpeg and webp; each is refused by name
+#: until it exists, because a png handed back under another name is a lie about the bytes.
+IMAGE_FORMATS = ("png",)
+
+
+def colouring_of(stated: Mapping[str, Any]) -> Colouring | Result:
+    """CT-004's `colouring` as the renderer's, or the refusal that says which part it cannot take."""
+    association = {"point": Association.POINT, "cell": Association.CELL}.get(str(stated.get("association", "")))
+    if association is None:
+        return refused(f"colouring.association は point か cell です（'{stated.get('association')}' が渡されました）")
+    stated_range = stated.get("range") or {}
+    try:
+        return Colouring(
+            field_name=str(stated.get("fieldName", "")),
+            association=association,
+            colour_map=str(stated.get("colourMap") or Colouring.__dataclass_fields__["colour_map"].default),
+            range_mode=str(stated_range.get("mode") or "dataRange"),
+            minimum=stated_range.get("min"),
+            maximum=stated_range.get("max"),
+            out_of_range=str(stated.get("outOfRange") or "clamp"),
+        )
+    except RenderError as error:
+        return refused(str(error))
+
+
+def camera_of(stated: Mapping[str, Any] | None) -> Camera | Result:
+    if not stated:
+        return Camera()
+    try:
+        return Camera(
+            position_m=tuple(stated["position_m"]) if stated.get("position_m") else None,
+            focal_point_m=tuple(stated["focalPoint_m"]) if stated.get("focalPoint_m") else None,
+            view_up=tuple(stated["viewUp"]) if stated.get("viewUp") else None,
+            parallel_scale_m=stated.get("parallelScale_m"),
+            projection=str(stated.get("projection") or "perspective"),
+        )
+    except (RenderError, TypeError, ValueError) as error:
+        return refused(f"camera が読めません：{error}")
+
+
+def view_render(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
+    workspace = session.open_workspace()
+    if isinstance(workspace, Result):
+        return workspace
+    image_format = str(parameters["format"])
+    if image_format not in IMAGE_FORMATS:
+        return refused(f"この版が書ける画像は {list(IMAGE_FORMATS)} です（'{image_format}' が求められました）")
+    try:
+        item = items.find(workspace.raw, "views", str(parameters["viewId"]))
+    except ItemError as error:
+        return refused(str(error))
+    definition = item["definition"]
+    if str(definition.get("representation", "surface")) != "surface":
+        return refused(
+            f"表現 '{definition.get('representation')}' はこの版では描けません（surface のみ）。"
+            "描けない表現を surface で描いて返すことはしません"
+        )
+    loaded = session.loaded(str(definition.get("datasetId", "")))
+    if isinstance(loaded, Result):
+        return loaded
+    stated = definition.get("colouring")
+    if not isinstance(stated, Mapping):
+        return refused("着色（colouring）のないビューはこの版では描きません：何で色付けするかを定義に書いてください")
+    colouring = colouring_of(stated)
+    if isinstance(colouring, Result):
+        return colouring
+    camera = camera_of(definition.get("camera"))
+    if isinstance(camera, Result):
+        return camera
+    try:
+        rendered = render_view(
+            loaded.datasets(), colouring,
+            width=int(parameters["width"]), height=int(parameters["height"]), camera=camera,
+        )
+    except RenderError as error:
+        return refused(str(error))
+    handle = session.handles.issue(rendered.png)
+    return Effect(
+        f"{rendered.width}x{rendered.height} の画像を描きました（{handle['bytes']} バイト）",
+        value={"handle": handle["id"], "reduced": rendered.reduced},
     )
 
 

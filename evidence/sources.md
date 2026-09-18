@@ -1893,3 +1893,23 @@ Recorded so that nothing silently depends on them:
   against the wrong baseline was read as "not drawn" (the digits had changed font). Only a count
   against an untitled bar in the same face measures the words. Both wrong readings are kept in the
   script's comments
+
+### E-193 - Viridis and plasma are released by their authors under CC0, and the tables are theirs
+- tier: T1
+- url: https://raw.githubusercontent.com/BIDS/colormap/master/colormaps.py
+- verified: 2026-09-18
+- says: the header of the authors' own file reads: "New matplotlib colormaps by Nathaniel J. Smith,
+  Stefan van der Walt, and (in the case of viridis) Eric Firing. This file and the colormaps in it are
+  released under the CC0 license / public domain dedication. We would appreciate credit if you use or
+  redistribute these colormaps, but do not impose any legal restrictions." The file holds
+  `_viridis_data` and `_plasma_data` as 256 rows of three floats; the first row of viridis is
+  `[0.267004, 0.004874, 0.329415]` and its last `[0.993248, 0.906157, 0.143936]`, and the same rows
+  in matplotlib's `lib/matplotlib/_cm_listed.py` at the commit read the same day are identical
+- justifies: XC-111, XC-257
+- note: `src/engine/visualization/colour_maps.py` is generated from this file (archive
+  script, not shipped): the 256 rows rounded to sRGB hex, which puts viridis's ends at `#440154` and
+  `#fde725` and plasma's at `#0d0887` and `#f0f921` - **exactly the two stops the interface's own
+  tokens already used for its legend gradients**, so the picture and the chrome agree. The third map,
+  `greys`, is generated as a straight sRGB line between the token's two stops and needs no licence.
+  Credit is given in the module docstring as the authors ask; no restriction applies. Issue #275
+  (カラーマップの出所とライセンス) is answered for these three; any map added later needs its own row

@@ -942,7 +942,7 @@ deliberate `Save as template` action creates or revises a reusable blueprint.
   compared to last year's report is a result nobody trusts - but selecting one **records a note on the
   view and in any report using it**, stating that the map is not perceptually uniform. Colour maps do
   not follow the interface theme (XC-098)
-- basis: E-001 (T1)
+- basis: E-001 (T1), E-193 (T1)
 - alternatives: removing rainbow entirely is the technically correct choice and makes the product
   unusable next to a decade of existing reports
 - affects: GL-018, CT-004, XC-098
