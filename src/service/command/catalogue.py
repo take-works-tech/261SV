@@ -350,6 +350,10 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
     "output.prune": {},
 }
 
+#: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below
+#: the engine's floor is refused politely rather than answered in a shape it cannot read.
+PROTOCOL_VERSION = "2.1.0"
+
 
 def writes(operation: str) -> bool:
     """Whether an operation changes state. Unknown operations raise rather than defaulting.

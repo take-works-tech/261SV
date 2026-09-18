@@ -131,7 +131,10 @@ class Handler:
     """
 
     operation: str
-    perform: Callable[[Mapping[str, Any], tuple[str, ...]], Effect]
+    #: What the handler does. An `Effect` is what happened or would happen; a `Result` is a refusal
+    #: with its reason - the caller's mistake, returned rather than raised, because raising is how a
+    #: caller's mistake gets reported as the build's failure.
+    perform: Callable[[Mapping[str, Any], tuple[str, ...]], "Effect | Result"]
     needs: frozenset[Permission] = frozenset()
 
     @property
@@ -346,6 +349,14 @@ class Surface:
             effect = handler.perform(command.parameters, command.targets)
         except Exception as error:  # noqa: BLE001 - a handler may fail in any way it likes
             return Result(Status.FAILED, reason=str(error)[:400])
+        if isinstance(effect, Result):
+            # A handler's refusal: the caller named a case that is not there, a file that cannot be
+            # read, a unit this product does not know. Returned as it is, before the undo check - a
+            # refusal applied nothing and has nothing to put back (`Result` itself refuses to be a
+            # refusal that changed something). Until 2026-09-18 this branch was missing, so a handler
+            # had no way to refuse: raising became FAILED, which blames the build for the caller's
+            # mistake, and CT-002 keeps the two words apart for a reason.
+            return effect
         if writes(command.operation) and not command.dry_run and effect.undo is None:
             return Result(
                 Status.FAILED,

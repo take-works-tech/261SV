@@ -146,6 +146,9 @@ def render() -> str:
     def reported_row(name: str) -> str:
         inner = ", ".join(f"{field!r}: frozenset({keys!r})" for field, keys in reported(name).items())
         return f'    "{name}": {{{inner}}},'
+
+    version = re.search(r"^- version:\s*(\S+)", CATALOGUE.read_text(encoding="utf-8"), re.M)
+    protocol_version = version.group(1) if version else ""
     lines = [
         '"""The operation catalogue of CT-003, as code.',
         "",
@@ -205,6 +208,10 @@ def render() -> str:
         "REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {",
         *[reported_row(name) for name, _ in rows],
         "}",
+        "",
+        "#: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below",
+        "#: the engine's floor is refused politely rather than answered in a shape it cannot read.",
+        f'PROTOCOL_VERSION = "{protocol_version}"',
         "",
         "",
         "def writes(operation: str) -> bool:",
