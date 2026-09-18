@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-26
+updated: 2026-09-18
 ---
 
 # Business model
@@ -9,12 +9,15 @@ What is sold, to whom, at what price, and why they pay. Kept in the spec set bec
 product: the priority of a requirement depends on which buyer it is for.
 
 
-> **The figures in this document describe CAE.** The owner stated on 2026-08-26 that the product is not
-> CAE-specific, and the code already reaches past it - `.stl` among the readers, and metrological
-> uncertainty in `domain_core/measurement.py`, which is the vocabulary of a test rig rather than a
-> solver. Until OPEN-037 settles the scope, read the category size, the vendor comparison and the
-> population evidence below as **one segment** rather than as the market. OPEN-036 records that the
-> denominator this changes is the one the revenue arithmetic divides by.
+> **The figures in this document describe CAE, and CAE is the first release (XC-257, 2026-09-18).**
+> The owner stated on 2026-08-26 that the product is not CAE-specific, and the code reaches past it -
+> `.stl` among the readers, and metrological uncertainty in `domain_core/measurement.py`. OPEN-037
+> asked how far the scope extends; XC-257 answers that the first vertical is CAE result visualisation
+> and that nothing is built for another domain until this one has a paying customer. So the category
+> size, the vendor comparison and the population evidence below are **the first release's market**.
+> They remain segment figures of whatever wider market the other domains would add, and that wider
+> market is not estimated here because no release serves it. OPEN-036's denominator is therefore the
+> CAE segment, and its open question - how many organisations - is unchanged.
 
 
 > **The position this document argues for was changed on 2026-08-26 (XC-255).** What is sold is no
