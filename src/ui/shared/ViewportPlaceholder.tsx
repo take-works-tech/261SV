@@ -13,8 +13,13 @@ export function ViewportPlaceholder(props: {
   legendTicks?: string[];
   reducedNote?: string;
   children?: React.ReactNode;
+  /** A frame the engine drew, when one exists. With it this is not a placeholder at all: the
+   *  silhouette is replaced by the picture, and the label stops saying "design state" because it no
+   *  longer is one. Without it nothing changes - the catalogue of design states is what it was. */
+  imageUrl?: string | null;
 }) {
   const map = props.map ?? "viridis";
+  const drawn = Boolean(props.imageUrl);
   return (
     <div className="viewport-pane">
       <div className="pane-badge">
@@ -22,7 +27,14 @@ export function ViewportPlaceholder(props: {
         {props.fieldLabel ? <span>{props.fieldLabel}</span> : null}
       </div>
 
-      {/* A monochrome silhouette stands in for geometry - deliberately not a rendering. */}
+      {drawn ? (
+        <img
+          src={props.imageUrl ?? undefined}
+          alt={`${props.caseName}${props.fieldLabel ? "・" + props.fieldLabel : ""}`}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }}
+        />
+      ) : (
+      /* A monochrome silhouette stands in for geometry - deliberately not a rendering. */
       <svg
         viewBox="0 0 400 300"
         style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
@@ -42,6 +54,7 @@ export function ViewportPlaceholder(props: {
           <line x1="30" y1="270" x2="56" y2="288" />
         </g>
       </svg>
+      )}
 
       {props.fieldLabel ? (
         <div className="legend">
