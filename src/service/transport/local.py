@@ -32,6 +32,7 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import unquote
 
 from service.command.catalogue import (
     COMMAND_PATH,
@@ -262,7 +263,11 @@ def _handler_class(engine: Engine) -> type[BaseHTTPRequestHandler]:
                 self._refuse(TransportError(UNAUTHORISED, "トークンがありません（XC-258）", status=401))
                 return
             if self.path.startswith(HANDLE_PATH):
-                identifier = self.path[len(HANDLE_PATH):]
+                # Decoded: a handle's identifier holds a colon, which a correct client percent-encodes
+                # in a path segment. Reading the raw segment looks up `handle%3Aab12` and finds
+                # nothing, and the answer is "expired" for a handle issued a second ago - a message
+                # that sends whoever reads it looking for the wrong fault entirely.
+                identifier = unquote(self.path[len(HANDLE_PATH):])
                 try:
                     self._send(200, engine.handle(identifier), "application/octet-stream")
                 except TransportError as error:

@@ -1,6 +1,8 @@
 /* The top bar (MOD-009): brand, the six menus, the workspace/list switch, and the global actions.
  * Composition follows mockup 1 (XC-256). A destructive command shows キーなし and its confirmation
  * path rather than gaining a single key (XC-193). */
+import { useEngine } from "../state/engine";
+import { EngineStatus } from "../shared/EngineStatus";
 import { useEffect, useRef, useState } from "react";
 import { session, useSession } from "../state/session";
 import { NotificationHistory, type Notice } from "../shared/NotificationHistory";
@@ -61,6 +63,7 @@ const RECENT: ScriptLine[] = [
 ];
 
 export function Topbar() {
+  const e = useEngine();
   const s = useSession();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [showNotices, setShowNotices] = useState(false);
@@ -173,6 +176,7 @@ export function Topbar() {
             </div>
           ) : null}
         </span>
+        <EngineStatus reachability={e.reachability} busy={e.busy} />
         <button className="icon-button" aria-label="設定" title="設定" onClick={() => session.navigate("settings")}>
           ⚙
         </button>

@@ -437,3 +437,24 @@ button:disabled { cursor: not-allowed; color: var(--ink-faint); }
 .catalog-item[aria-current="true"] { background: var(--sel-bg); color: var(--ink-strong); }
 .catalog-item .id { flex: 0 0 auto; font-family: var(--family-mono); color: var(--ink-faint); }
 .catalog-item .intent { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-muted); }
+
+/* Which mode the interface is in (XC-257 step 7). Monochrome like all chrome: the dot carries a
+   micro-tint only where a state would otherwise be invisible, and the words carry the meaning -
+   a coloured dot alone says "something" and not "what". */
+.engine-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-caption);
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+.engine-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+}
+.engine-dot.reachable { background: var(--state-good); }
+.engine-dot.absent { background: var(--ink-faint); }
+.engine-busy { color: var(--ink-faint); }

@@ -680,6 +680,35 @@ def camera_of(stated: Mapping[str, Any] | None) -> Camera | Result:
         return refused(f"camera が読めません：{error}")
 
 
+#: The ground a picture is drawn on when the view does not say. White, because the deliverable is the
+#: harder case: a document printed on paper wants a white ground, and a screen can ask for its own.
+DEFAULT_BACKGROUND = (1.0, 1.0, 1.0)
+
+
+def background_of(stated: Any) -> tuple[float, float, float] | Result:
+    """CT-004's `background` as three channels, or the refusal that says what is wrong with it.
+
+    A screen wants the dark ground its chrome is built on (XC-256) and a page wants white. Neither is
+    guessed from context: the view says which, and a view that says nothing gets the document's.
+    """
+    if not stated:
+        return DEFAULT_BACKGROUND
+    if not isinstance(stated, Mapping):
+        return refused(f"background はオブジェクトです（{type(stated).__name__} が渡されました）")
+    channels = stated.get("rgb")
+    if channels is None:
+        return DEFAULT_BACKGROUND
+    if not isinstance(channels, (list, tuple)) or len(channels) != 3:
+        return refused("background.rgb は 0..1 の 3 つの値です")
+    try:
+        values = tuple(float(one) for one in channels)
+    except (TypeError, ValueError):
+        return refused("background.rgb の値が数値ではありません")
+    if any(one < 0.0 or one > 1.0 for one in values):
+        return refused(f"background.rgb は 0..1 の範囲です（{list(values)} が渡されました）")
+    return values  # type: ignore[return-value]
+
+
 def view_render(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
     workspace = session.open_workspace()
     if isinstance(workspace, Result):
@@ -714,10 +743,14 @@ def view_render(session: Session, parameters: Mapping[str, Any]) -> Effect | Res
         # Asked before drawing, because drawing without a context does not fail - it takes the
         # process down (E-194). A refusal that names the requirement is what the caller can act on.
         return refused(f"描画できません：{detail}")
+    ground = background_of(definition.get("background"))
+    if isinstance(ground, Result):
+        return ground
     try:
         rendered = render_view(
             loaded.datasets(), colouring,
             width=int(parameters["width"]), height=int(parameters["height"]), camera=camera,
+            background=ground,
         )
     except RenderError as error:
         return refused(str(error))
