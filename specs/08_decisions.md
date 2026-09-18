@@ -5264,7 +5264,15 @@ model or the prompt, never in a description that quietly went stale.
   (L). (3) The native renderer for XC-087's image role: display surface plus a field sampled through
   `source_points` - colours from the display surface, numbers never from it - to a lookup table, a
   scalar bar carrying the unit or 単位未宣言, a camera from CT-004, and PNG bytes, with the reduction
-  statement attached (M-L). (4) The probe: a pick on the display geometry mapped to a source point and
+  statement attached (M-L).
+  **Correction, 2026-09-18, same day**: the scalar bar in the image does **not** carry the unit or
+  単位未宣言. Measured after this was written (E-192): the toolkit's embedded faces render a Japanese
+  title as nothing at all - no glyph and no warning, the bar merely laid out shorter - and 単位未宣言
+  is exactly the string the prototype must show. So the native image carries the colour ramp and
+  Latin tick digits only, and the title, the unit and 単位未宣言 are typeset by whatever shows the
+  image: the document, which already embeds a font and checks its coverage per character, and the
+  interface. The sentence above is kept because the design it describes looked complete and was not,
+  and a legend that silently lost its one honest word is the failure XC-001 exists to refuse. (4) The probe: a pick on the display geometry mapped to a source point and
   answered by `Dataset.value` with its location (M). (5) The deliverable carries a still: CT-006 gains
   the `form` field 16_application_model.md already names, `html.py` accepts a VIEW block whose form is
   `still` as an embedded image with its legend, and the document states that it is a still - the

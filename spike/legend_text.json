@@ -1,0 +1,23 @@
+{
+  "measured": "2026-09-18",
+  "vtk_version": "9.5.2",
+  "python": "3.11.9",
+  "platform": "Windows-10-10.0.26200-SP0",
+  "title": "応力 単位未宣言",
+  "criterion": "near-white pixels beyond those of an untitled bar; a hash difference alone was not enough",
+  "text_pixels": {
+    "untitled": 388,
+    "latin": 531,
+    "japanese_embedded": 388,
+    "untitled_font_file": 131,
+    "japanese_font_file": 262
+  },
+  "latin_title_drawn": true,
+  "japanese_title_drawn_with_embedded_font": false,
+  "font_file_found": "C:\\Windows\\Fonts\\meiryo.ttc",
+  "japanese_title_drawn_with_font_file": true,
+  "frames_differ_by_hash": {
+    "japanese_embedded_vs_untitled": true
+  },
+  "seconds_total": 0.55
+}
