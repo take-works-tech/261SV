@@ -18,9 +18,17 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
-from conftest import requires_vtk
+from conftest import REQUIRE_VTK, offscreen_rendering_available, requires_vtk
 
 requires_vtk()
+
+#: The rendering tests below run where the product's own probe says a picture can be drawn. Elsewhere
+#: they skip with the probe's reason - except in CI, where test_render.py has already failed the run
+#: for the same reason, because a renderer never exercised is a renderer nobody has seen work.
+OFFSCREEN_AVAILABLE, OFFSCREEN_DETAIL = offscreen_rendering_available()
+needs_offscreen = pytest.mark.skipif(
+    not OFFSCREEN_AVAILABLE and not REQUIRE_VTK, reason=f"no offscreen rendering here: {OFFSCREEN_DETAIL}"
+)
 
 import numpy as np  # noqa: E402
 from vtkmodules.util.numpy_support import numpy_to_vtk  # noqa: E402
@@ -542,6 +550,47 @@ class TestExportingADeliverable:
         assert result.status is Status.REFUSED
 
 
+class TestWhenNoPictureCanBeDrawn:
+    """E-194: with no display the toolkit does not refuse, it segfaults. The engine therefore asks a
+    child process first, and a machine that cannot draw gets a refusal that names the requirement."""
+
+    def test_view_render_refuses_before_drawing_when_the_probe_says_no(self, tmp_path: Path) -> None:
+        session = Session(clock=at(9), issue=counting_issuer(), native_offscreen=lambda: (False, "テスト：ディスプレイ無し"))
+        surface = build_surface(session)
+        workspace = a_workspace(tmp_path)
+        assert surface.submit(Command("workspace.open", {"path": str(workspace)})).status is Status.APPLIED
+        source = tmp_path / "case.vtu"
+        write_grid(source)
+        dataset_id = surface.submit(Command("dataset.load", {"caseId": "case:1", "filePaths": [str(source)]})).value["datasetId"]
+        view_id = surface.submit(Command("view.create", {"workspaceId": "ws:1", "definition": {
+            "datasetId": dataset_id, "representation": "surface",
+            "colouring": {"fieldName": "stress", "association": "point"},
+        }})).value["id"]
+
+        result = surface.submit(Command("view.render", {"viewId": view_id, "width": 10, "height": 10, "format": "png"}))
+
+        assert result.status is Status.REFUSED
+        assert "ディスプレイ無し" in (result.reason or "")
+
+    def test_capabilities_carry_the_same_answer_and_ask_only_once(self) -> None:
+        asked = {"count": 0}
+
+        def probe() -> tuple[bool, str]:
+            asked["count"] += 1
+            return False, "テスト：無し"
+
+        session = Session(clock=at(9), issue=counting_issuer(), native_offscreen=probe)
+        surface = build_surface(session)
+
+        surface.submit(Command("system.capabilities", {}))
+        result = surface.submit(Command("system.capabilities", {}))
+
+        renderers = {one["backend"]: one for one in result.value["renderers"]}
+        assert renderers["nativeOffscreen"]["available"] is False
+        assert asked["count"] == 1, "a child process is not free; the answer is kept for the session"
+
+
+@needs_offscreen
 class TestRenderingAView:
     """Step 3 through the surface: a view definition names the dataset, the field and the map; the
     answer is a handle to PNG bytes and the sentence about reduction, which is what CT-003 states."""

@@ -1913,3 +1913,25 @@ Recorded so that nothing silently depends on them:
   `greys`, is generated as a straight sRGB line between the token's two stops and needs no licence.
   Credit is given in the module docstring as the authors ask; no restriction applies. Issue #275
   (カラーマップの出所とライセンス) is answered for these three; any map added later needs its own row
+
+### E-194 - Without a display, the published toolkit wheel does not refuse to render: it segfaults
+- tier: T1
+- url: https://github.com/take-works-tech/261SV/actions/runs/35350960523/job/105618715764 (CI run of
+  pull request #352, `tests` job, 2026-09-18)
+- verified: 2026-09-18
+- says: on `ubuntu-latest` with the pinned **VTK 9.5.2** wheel from PyPI and no display, the first
+  call to `vtkRenderWindow.Render()` on an offscreen window ended the interpreter with
+  "Fatal Python error: Segmentation fault" at `render.py:209` and "Process completed with exit
+  code 139". No exception, no toolkit message: the process was gone. The same call on this Windows
+  machine with a discrete GPU rendered in 0.26 s (E-191)
+- justifies: XC-257, XC-045
+- note: two consequences, both built the same day. **The engine must ask before it draws, and ask
+  in a process it can afford to lose**: `render.probe_offscreen` renders an empty window in a child
+  process and reports its exit status, `system.capabilities` reports that answer, and `view.render`
+  refuses with the requirement named when the answer is no - a refusal where the alternative is the
+  engine process disappearing under the interface, which is the reason XC-045 isolated the readers.
+  And **CI provides a virtual display** (`xvfb-run` with Mesa's software OpenGL), because a renderer
+  whose tests skip on the runner is a renderer nobody has seen work; the test suite fails the run
+  rather than skipping when the probe says no under `SIM_VIEWER_REQUIRE_VTK=1`. E-191's closing
+  sentence - that a machine without a discrete GPU or a CI runner was not measured - is now measured,
+  and the answer was worse than a slow frame

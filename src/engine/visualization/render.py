@@ -406,6 +406,53 @@ def _refuse_an_empty_frame(frame: object, background: tuple[float, float, float]
         )
 
 
+#: What the probe runs in a process of its own: the smallest render there is. It is a separate
+#: process because on a machine with no display the toolkit does not refuse - it **segfaults** in
+#: `Render()` (E-194, measured on a GitHub runner), and a segfault in the engine process takes the
+#: engine down with it (XC-045's reason for isolating the readers, now the renderer's too).
+_PROBE_SCRIPT = """
+import vtkmodules.vtkRenderingOpenGL2
+from vtkmodules.vtkRenderingCore import vtkRenderer, vtkRenderWindow
+window = vtkRenderWindow()
+window.SetOffScreenRendering(1)
+window.AddRenderer(vtkRenderer())
+window.SetSize(8, 8)
+window.Render()
+print(window.ReportCapabilities().splitlines()[0] if window.ReportCapabilities() else "rendered")
+"""
+
+PROBE_TIMEOUT_SECONDS = 30
+
+
+def probe_offscreen(timeout_seconds: int = PROBE_TIMEOUT_SECONDS) -> tuple[bool, str]:
+    """Whether this machine can render offscreen, found by trying it where a crash cannot hurt.
+
+    An import proves the module is present, not that a context exists; only a render proves that,
+    and a failed render may not return. So the attempt runs in a child process, and its exit status
+    is the answer: (True, the OpenGL vendor line) or (False, what happened).
+    """
+    import subprocess
+    import sys
+
+    try:
+        completed = subprocess.run(
+            [sys.executable, "-c", _PROBE_SCRIPT],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired:
+        return False, f"オフスクリーン描画の確認が {timeout_seconds} 秒で終わりませんでした"
+    except OSError as error:
+        return False, f"確認用のプロセスを起動できません：{error}"
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout).strip().splitlines()
+        last = detail[-1] if detail else f"終了コード {completed.returncode}"
+        return False, (
+            f"この機械ではオフスクリーン描画ができません（確認プロセスが終了コード {completed.returncode}："
+            f"{last[:160]}）。ディスプレイか、ディスプレイ無しで動く OpenGL が要ります"
+        )
+    return True, (completed.stdout.strip().splitlines() or ["rendered"])[-1][:160]
+
+
 class NativeOffscreenRenderer:
     """XC-087's native path, in the shape `backends.Renderer` names."""
 

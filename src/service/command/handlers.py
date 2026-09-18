@@ -47,7 +47,7 @@ from engine.report.document import (
     build as build_document,
 )
 from engine.visualization.backends import REQUIRES, Backend, probe
-from engine.visualization.render import Camera, Colouring, RenderError, render_view
+from engine.visualization.render import Camera, Colouring, RenderError, probe_offscreen, render_view
 from service.command.catalogue import PROTOCOL_VERSION
 from service.command.surface import Effect, Handler, Result, Status, Surface
 from service.workspace import items, sources
@@ -197,16 +197,14 @@ class HandleStore:
 
 
 def native_offscreen_available() -> tuple[bool, str]:
-    """Whether the native toolkit's OpenGL path can be loaded here - and no more than that.
+    """Whether the native toolkit can render offscreen here, found by rendering in a child process.
 
-    An import proves the module is present, not that a context can be created (E-191 measured that
-    on one machine). Saying which of the two was checked is what keeps `system.capabilities` honest.
+    Not by importing: an import proves the module is present, and on a machine with no display the
+    toolkit segfaults in `Render()` rather than refusing (E-194). The child process is what keeps that
+    from being the engine's segfault, and its answer is what `system.capabilities` reports and what
+    `view.render` checks before it draws.
     """
-    try:
-        import vtkmodules.vtkRenderingOpenGL2  # noqa: F401
-    except ImportError as error:
-        return False, f"読み込めません：{error}"
-    return True, "モジュールは読み込めました（描画コンテキストの作成は未検証）"
+    return probe_offscreen()
 
 
 @dataclass(slots=True)
@@ -227,9 +225,17 @@ class Session:
     revisions: dict[str, int] = dataclass_field(default_factory=dict)
     handles: HandleStore = dataclass_field(default=None)  # type: ignore[assignment]
 
+    _offscreen: tuple[bool, str] | None = None
+
     def __post_init__(self) -> None:
         if self.handles is None:
             self.handles = HandleStore(self.clock)
+
+    def offscreen(self) -> tuple[bool, str]:
+        """The offscreen probe's answer, asked once per session: a child process is not free."""
+        if self._offscreen is None:
+            self._offscreen = self.native_offscreen()
+        return self._offscreen
 
     def loaded(self, dataset_id: str) -> Loaded | Result:
         found = self.datasets.get(dataset_id)
@@ -701,6 +707,11 @@ def view_render(session: Session, parameters: Mapping[str, Any]) -> Effect | Res
     camera = camera_of(definition.get("camera"))
     if isinstance(camera, Result):
         return camera
+    available, detail = session.offscreen()
+    if not available:
+        # Asked before drawing, because drawing without a context does not fail - it takes the
+        # process down (E-194). A refusal that names the requirement is what the caller can act on.
+        return refused(f"描画できません：{detail}")
     try:
         rendered = render_view(
             loaded.datasets(), colouring,
@@ -823,7 +834,7 @@ def report_provenance(session: Session, parameters: Mapping[str, Any]) -> Effect
 
 
 def system_capabilities(session: Session) -> Effect:
-    native, detail = session.native_offscreen()
+    native, detail = session.offscreen()
     availability = probe(
         {
             Backend.NATIVE_OFFSCREEN: native,

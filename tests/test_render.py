@@ -14,9 +14,10 @@ import hashlib
 from pathlib import Path
 
 import pytest
-from conftest import requires_vtk
+from conftest import requires_offscreen_rendering, requires_vtk
 
 requires_vtk()
+requires_offscreen_rendering()
 
 import numpy as np  # noqa: E402
 from vtkmodules.util.numpy_support import vtk_to_numpy  # noqa: E402
@@ -32,6 +33,7 @@ from engine.visualization.render import (  # noqa: E402
     NativeOffscreenRenderer,
     RenderError,
     Scene,
+    probe_offscreen,
     render_view,
     resolve_range,
 )
@@ -81,6 +83,29 @@ class TestTheColourMapsShipWithTheirProvenance:
     def test_every_map_here_says_it_is_uniform_and_cc0_maps_say_so(self) -> None:
         assert all(one.uniform for one in COLOUR_MAPS.values())
         assert "CC0" in VIRIDIS.licence and "CC0" in PLASMA.licence
+
+
+class TestTheProbeAsksInAnotherProcess:
+    def test_the_probe_answers_yes_here_with_the_vendor_line(self) -> None:
+        """This module only runs where the probe said yes, so the answer is known; what is tested is
+        that it is reached through a child process and carries something a person can read."""
+        available, detail = probe_offscreen()
+
+        assert available is True
+        assert detail
+
+    def test_a_probe_that_cannot_start_answers_no_rather_than_raising(self, monkeypatch) -> None:
+        import subprocess
+
+        def cannot_start(*args, **kwargs):
+            raise OSError("no interpreter here")
+
+        monkeypatch.setattr(subprocess, "run", cannot_start)
+
+        available, detail = probe_offscreen()
+
+        assert available is False
+        assert "no interpreter here" in detail
 
 
 class TestAPictureIsProduced:

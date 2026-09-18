@@ -5304,7 +5304,7 @@ model or the prompt, never in a description that quietly went stale.
   new dependency, a geometry serialisation that does not exist, and a JavaScript build, and it is not
   what makes a number trustworthy; the image route reaches a shown, probed, exported number sooner
   and every piece of it is kept
-- basis: E-160 (T1), E-163 (T1), E-166 (T1), E-167 (T1), E-187 (T1), E-190 (T1), E-191 (T1)
+- basis: E-160 (T1), E-163 (T1), E-166 (T1), E-167 (T1), E-187 (T1), E-190 (T1), E-191 (T1), E-194 (T1)
 - affects: OPEN-037 (closed by this), OPEN-036 (its denominator is now the CAE segment by decision;
   how many organisations remains open), OPEN-035 (the channel stays open; nothing here decides it),
   OPEN-012 (format priority follows the CAE reading), XC-070, XC-035, XC-218 (its end is now defined),

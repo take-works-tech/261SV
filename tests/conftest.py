@@ -54,6 +54,37 @@ def requires_vtk() -> None:
         pytest.skip(message, allow_module_level=True)
 
 
+_OFFSCREEN: tuple[bool, str] | None = None
+
+
+def offscreen_rendering_available() -> tuple[bool, str]:
+    """Whether this machine can render offscreen, asked once per session through the product's own
+    child-process probe - never by rendering in the test process, which on a machine with no display
+    segfaults instead of failing (E-194)."""
+    global _OFFSCREEN
+    if _OFFSCREEN is None:
+        from engine.visualization.render import probe_offscreen
+
+        _OFFSCREEN = probe_offscreen()
+    return _OFFSCREEN
+
+
+def requires_offscreen_rendering() -> None:
+    """Skip the caller unless offscreen rendering works here - or fail, under the same rule as VTK.
+
+    Call at module scope after `requires_vtk()`. In CI a skip is not an acceptable answer: the
+    renderer's tests are the ones that prove the picture, and a suite allowed to skip them would report
+    success for a renderer that was never run. CI provides a virtual display for exactly this reason.
+    """
+    available, detail = offscreen_rendering_available()
+    if available:
+        return
+    message = f"offscreen rendering is not available in this interpreter ({sys.executable}): {detail}"
+    if REQUIRE_VTK:
+        pytest.fail(message + " SIM_VIEWER_REQUIRE_VTK=1 forbids skipping this - give the runner a display.", pytrace=False)
+    pytest.skip(message, allow_module_level=True)
+
+
 def requires_h5py() -> None:
     """Skip the caller unless h5py is importable, under the same rule as VTK.
 
