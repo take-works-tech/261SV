@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -38,6 +38,7 @@
         "view.rename",
         "view.delete",
         "view.render",
+        "view.pick",
         "graph.create",
         "graph.update",
         "graph.duplicate",
@@ -1477,6 +1478,42 @@
                 "type": "string"
               },
               "description": "取り除く実行の識別子"
+            }
+          }
+        },
+        "view.pick": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "viewId",
+            "width",
+            "height",
+            "x",
+            "y"
+          ],
+          "properties": {
+            "viewId": {
+              "type": "string",
+              "description": "ビュー の識別子（CT-001）"
+            },
+            "width": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "描画したときの幅。ピクセルはこの大きさの絵の上の位置"
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "x": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "左からのピクセル"
+            },
+            "y": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "上からのピクセル"
             }
           }
         }
@@ -3686,6 +3723,81 @@
                 "type": "string"
               },
               "description": "消したファイル。名前で（AC-053）"
+            }
+          }
+        },
+        "view.pick": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value"
+          ],
+          "properties": {
+            "value": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "digits",
+                "provenance",
+                "unit",
+                "value"
+              ],
+              "properties": {
+                "value": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "description": "値。無ければ null であって 0 ではない（XC-001）"
+                },
+                "unit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "宣言された単位。無ければ null で、未宣言として表示される（XC-003）"
+                },
+                "digits": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "この値が正直に持つ有効桁（INV-014）"
+                },
+                "provenance": {
+                  "type": "string",
+                  "enum": [
+                    "declared",
+                    "dataset",
+                    "computed",
+                    "measured",
+                    "reference"
+                  ],
+                  "description": "GL-016 の五つ"
+                },
+                "formula": {
+                  "type": "string",
+                  "description": "計算値ならその式（INV-013、GL-032）"
+                },
+                "caveats": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "読み手が知る必要のあること（部分データ、平均済み、縮退形状由来、単位未宣言）"
+                },
+                "missingBecause": {
+                  "type": "string",
+                  "description": "値が無い理由。理由のない欠測は見落としに読める"
+                },
+                "location": {
+                  "type": "string",
+                  "description": "ソース自身の言葉での位置。配列添字ではない（INV-023）"
+                }
+              },
+              "description": "この製品が報告する一つの数値。単位・来歴・有効桁は必須"
+            },
+            "association": {
+              "type": "string",
+              "description": "節点の値か要素の値か（INV-003）"
             }
           }
         }

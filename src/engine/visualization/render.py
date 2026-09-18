@@ -437,6 +437,71 @@ def probe_offscreen(timeout_seconds: int = PROBE_TIMEOUT_SECONDS) -> tuple[bool,
     return True, (completed.stdout.strip().splitlines() or ["rendered"])[-1][:160]
 
 
+@dataclass(frozen=True, slots=True)
+class PickedRay:
+    """Where a pixel points, in the frame the geometry lives in."""
+
+    near_m: tuple[float, float, float]
+    far_m: tuple[float, float, float]
+
+
+def ray_through(
+    datasets: Sequence[Dataset],
+    pixel: tuple[int, int],
+    *,
+    width: int,
+    height: int,
+    camera: Camera | None = None,
+) -> PickedRay:
+    """The line into the scene through one pixel of a frame drawn at this size.
+
+    **The camera is the engine's, so the unprojection is the engine's.** An interface has a pixel a
+    person clicked and nothing that turns it into a point of the model; doing the arithmetic there
+    would need the projection the picture was drawn with, which the interface never saw. So the same
+    scene is set up the same way - the same bounds, the same reset, the same default turn - and the
+    toolkit is asked where that pixel points.
+
+    Nothing is rendered: a ray needs the camera, not the pixels, and drawing a frame to throw it away
+    would make a pick cost what a render costs.
+    """
+    if not 0 <= pixel[0] < width or not 0 <= pixel[1] < height:
+        raise RenderError(f"画素 {pixel} は {width}x{height} の絵の外です")
+    renderer = vtkRenderer()
+    for dataset in datasets:
+        renderer.AddActor(_plain_actor(display_geometry(dataset)))
+    renderer.ResetCamera()
+    _aim(renderer, camera)
+    # The toolkit measures y from the bottom and every interface from the top.
+    display_y = height - 1 - pixel[1]
+    renderer.SetViewport(0.0, 0.0, 1.0, 1.0)
+    window = vtkRenderWindow()
+    window.SetOffScreenRendering(1)
+    window.AddRenderer(renderer)
+    window.SetSize(width, height)
+    renderer.SetDisplayPoint(float(pixel[0]), float(display_y), 0.0)
+    renderer.DisplayToWorld()
+    near = renderer.GetWorldPoint()
+    renderer.SetDisplayPoint(float(pixel[0]), float(display_y), 1.0)
+    renderer.DisplayToWorld()
+    far = renderer.GetWorldPoint()
+    return PickedRay(near_m=_homogeneous(near), far_m=_homogeneous(far))
+
+
+def _homogeneous(point: Sequence[float]) -> tuple[float, float, float]:
+    """A toolkit world point, divided through by its fourth component."""
+    w = point[3] if len(point) > 3 and point[3] != 0.0 else 1.0
+    return (point[0] / w, point[1] / w, point[2] / w)
+
+
+def _plain_actor(geometry: DisplayGeometry) -> vtkActor:
+    """The surface with no colours: a ray needs where the geometry is, not what it means."""
+    mapper = vtkPolyDataMapper()
+    mapper.SetInputData(as_polydata(geometry))
+    actor = vtkActor()
+    actor.SetMapper(mapper)
+    return actor
+
+
 class NativeOffscreenRenderer:
     """XC-087's native path, in the shape `backends.Renderer` names."""
 

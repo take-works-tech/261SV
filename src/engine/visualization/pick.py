@@ -24,14 +24,16 @@ from dataclasses import dataclass, replace
 from typing import Sequence
 
 import numpy as np
-from vtkmodules.vtkCommonCore import reference
+from vtkmodules.vtkCommonCore import reference, vtkIdList, vtkPoints
 from vtkmodules.vtkCommonDataModel import vtkStaticCellLocator
+from vtkmodules.vtkFiltersGeneral import vtkOBBTree
 
 from domain_core.association import Association
-from domain_core.dataset import Dataset
+from domain_core.dataset import Dataset, Field
 from domain_core.identifiers import location_of
 from domain_core.reported_value import Provenance, ReportedValue
 from engine.limits import MAX_INTERACTIVE_TRIANGLES
+from domain_core.mesh import DisplayGeometry
 from engine.visualization.display import as_polydata, display_geometry
 
 #: How far from the surface a pick may land and still be on the model, as a fraction of the model's
@@ -53,6 +55,50 @@ class Pick:
     distance_m: float
     #: Which display triangle the pick fell in, or -1 when it fell on nothing.
     triangle: int = -1
+
+
+def along_ray(
+    dataset: Dataset,
+    field_name: str,
+    near_m: Sequence[float],
+    far_m: Sequence[float],
+    *,
+    budget: int = MAX_INTERACTIVE_TRIANGLES,
+) -> Pick:
+    """The value where a line first meets the surface, or a stated absence where it misses.
+
+    The line is what a pixel points along (`render.ray_through`). **The first surface it meets** is
+    the one a person clicked: taking any other would answer with a value from the far side of the
+    part, which looks right and is a reading of somewhere else entirely.
+    """
+    field = dataset.fields.get(field_name)
+    if field is None:
+        raise PickError(f"'{field_name}' というフィールドはありません（{sorted(dataset.fields)}）")
+    if field.association is Association.INTEGRATION_POINT:
+        raise PickError(
+            f"'{field_name}' は積分点の値で、一つの点や要素の値として答えられません（XC-123）"
+        )
+    geometry = display_geometry(dataset, budget=budget)
+    surface = as_polydata(geometry)
+    locator = vtkOBBTree()
+    locator.SetDataSet(surface)
+    locator.BuildLocator()
+    points, cells = vtkPoints(), vtkIdList()
+    hit = locator.IntersectWithLine(
+        [float(one) for one in near_m], [float(one) for one in far_m], points, cells
+    )
+    if not hit or points.GetNumberOfPoints() == 0:
+        return Pick(
+            value=ReportedValue.unavailable(
+                "その画素の先にモデルはありません。近くの値を代わりに出すことはしません（view/AC-029）",
+                unit=field.unit, digits=field.significant_digits, provenance=Provenance.DATASET,
+            ),
+            association=field.association,
+            distance_m=float("inf"),
+        )
+    landed = np.asarray(points.GetPoint(0), dtype=np.float64)
+    triangle = int(cells.GetId(0)) if cells.GetNumberOfIds() else -1
+    return _value_at(dataset, field, geometry, triangle, landed, distance=0.0)
 
 
 def probe(
@@ -97,14 +143,31 @@ def probe(
             distance_m=distance,
         )
 
+    return _value_at(dataset, field, geometry, triangle, np.asarray(closest, dtype=np.float64), distance)
+
+
+def _value_at(
+    dataset: Dataset,
+    field: Field,
+    geometry: DisplayGeometry,
+    triangle: int,
+    landed: np.ndarray,
+    distance: float,
+) -> Pick:
+    """The value of the display triangle that was hit, traced back to the dataset it came from.
+
+    Shared by the coordinate probe and the pixel pick so that the two answer the same way. Two
+    implementations of "which value is under this triangle" is two answers waiting to differ, and
+    the difference would be a number, not a crash.
+    """
     if field.association is Association.POINT:
         corners = geometry.triangles[triangle]
         # The display vertex nearest the landing point, then the dataset point it came from. Not an
         # interpolation across the triangle: that would be a number no point of the mesh holds.
-        offsets = geometry.points_m[corners] - np.asarray(closest, dtype=np.float64)
+        offsets = geometry.points_m[corners] - landed
         vertex = int(corners[int(np.argmin(np.einsum("ij,ij->i", offsets, offsets)))])
         source = int(geometry.source_points[vertex])
-        value = dataset.value(field_name, source)
+        value = dataset.value(field.name, source)
         location = location_of(dataset.identifiers.get(Association.POINT), source)
         return Pick(replace(value, location=location), Association.POINT, distance, triangle)
 
@@ -122,6 +185,6 @@ def probe(
             distance_m=distance,
             triangle=triangle,
         )
-    value = dataset.value(field_name, source_cell)
+    value = dataset.value(field.name, source_cell)
     location = location_of(dataset.identifiers.get(Association.CELL), source_cell)
     return Pick(replace(value, location=location), Association.CELL, distance, triangle)

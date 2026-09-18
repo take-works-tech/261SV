@@ -9,7 +9,8 @@
 import { useState, type ReactNode } from "react";
 import "./view.css";
 import { session, useSession } from "../../state/session";
-import { useEngine } from "../../state/engine";
+import { engineState, useEngine } from "../../state/engine";
+import { EngineField } from "../../shared/EngineField";
 import { submit } from "../../client/operations";
 import { disabledBecause, formatValue } from "../../logic/format";
 import { SplitLayout } from "../../shared/SplitLayout";
@@ -302,12 +303,15 @@ function ViewCanvas({ variant }: { variant: string }) {
           ? `${e.fieldName}（${e.fields.find((one) => one.name === e.fieldName)?.unit ?? UNDECLARED}）`
           : null,
         reduced: e.reduced && !e.reduced.startsWith("全三角形") ? e.reduced : null,
-        // **No pick yet, and that is a stated absence rather than an omission.** A click gives a
-        // fraction of a pane; `dataset.probe` takes a point in canonical metres. Turning one into
-        // the other needs the camera's unprojection, and passing the fraction along as if it were
-        // metres would put a number into the readout that belongs to a place nobody clicked - the
-        // exact shape of wrongness this product exists to refuse (INV-001, XC-001). The probe is
-        // reachable and tested over the wire; what is missing is the interface's half of it.
+        // A drag turns the model and a click reads the value under it. Both go to the engine as
+        // what the interface actually has - pixels moved, and a pixel of the drawn frame - because
+        // the camera the picture was made with only exists there (CT-003 2.3.0, view/AC-027).
+        onOrbit: (by: { x: number; y: number }) => {
+          void engineState.orbit(by.x * 0.4, -by.y * 0.4);
+        },
+        onPickPixel: (at: { x: number; y: number }) => {
+          void engineState.pick(at.x, at.y);
+        },
       }
     : undefined;
 
@@ -409,6 +413,8 @@ function buildPanes(
     fieldLabel: string | null;
     legendTicks?: string[];
     reduced: string | null;
+    onOrbit: (by: { x: number; y: number }) => void;
+    onPickPixel: (at: { x: number; y: number }) => void;
   },
 ): ReactNode[] {
   const others = variant === "camera-unresolved" ? ["Run 09"] : ["Run 11", "Run 09", "Run 07"];
@@ -434,6 +440,8 @@ function buildPanes(
             : undefined
         }
         imageUrl={index === 0 ? live?.imageUrl ?? null : null}
+        onOrbit={index === 0 ? live?.onOrbit : undefined}
+        onPickPixel={index === 0 ? live?.onPickPixel : undefined}
       >
         {showCamera ? (
           <div className="pane-badge" style={{ left: "auto", right: 8 }} title="この画面が覗くカメラ">
@@ -833,7 +841,14 @@ function RendererErrorCanvas() {
 /* ================================ rail ====================================================== */
 
 export function ViewRail(props: { tab: string; variant: string }) {
-  return <RailBody key={`${props.tab}:${props.variant}`} tab={props.tab} variant={props.variant} />;
+  return (
+    <>
+      {/* What an engine makes possible, above the design state's own rail. Renders nothing when
+          there is no engine, so the catalogue is unchanged. */}
+      <EngineField />
+      <RailBody key={`${props.tab}:${props.variant}`} tab={props.tab} variant={props.variant} />
+    </>
+  );
 }
 
 const RAIL_TAB_LABEL: Record<string, string> = {

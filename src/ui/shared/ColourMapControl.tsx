@@ -4,7 +4,9 @@
 
 export type ColourMapId = "viridis" | "plasma" | "greys";
 
-const MAPS: { id: ColourMapId; name: string; uniform: boolean }[] = [
+/** The maps this build ships. Exported because the engine-driven rail offers the same three,
+ *  and a second list of them is a second answer to what this product can draw. */
+export const COLOUR_MAPS: { id: ColourMapId; name: string; uniform: boolean }[] = [
   { id: "viridis", name: "Viridis", uniform: true },
   { id: "plasma", name: "Plasma", uniform: true },
   { id: "greys", name: "グレー", uniform: true },
@@ -16,7 +18,7 @@ export function ColourMapControl(props: {
 }) {
   return (
     <div role="radiogroup" aria-label="カラーマップ" style={{ display: "flex", gap: 6 }}>
-      {MAPS.map((map) => (
+      {COLOUR_MAPS.map((map) => (
         <button
           key={map.id}
           role="radio"
