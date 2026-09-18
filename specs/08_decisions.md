@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-18
+updated: 2026-09-19
 ---
 
 # Decisions and open questions
@@ -5318,3 +5318,46 @@ model or the prompt, never in a description that quietly went stale.
   the differentiator E-166 measures. The individual-scale constraint that this decision relaxes is
   not itself a trigger: it was a way of finding the first customer, and the first trigger above is the
   direct test of whether one exists
+
+### XC-258 - The engine is reached over HTTP on loopback, with a per-session token
+- decided: 2026-09-19
+- status: active
+- decision: CT-003's envelope travels as **HTTP/1.1 with JSON bodies over the loopback interface**.
+  `POST /command` takes one request object and answers with one response object; `GET /handle/{id}`
+  fetches the bytes a response named (CT-003 "Large payloads"); `GET /health` answers the protocol
+  versions and nothing else. The engine binds **127.0.0.1 on a port the operating system chooses**,
+  and writes the port and a **per-session token** to a file the shell reads - the shell's own
+  process, never an argument another process can read from a process list. **Every request but
+  `/health` carries the token**, and one without it is refused with `authorisation.required`. The
+  same framing serves the hosted transport (XC-032): what changes is the host and the certificate,
+  not the shape
+- decided_by: the engineering judgement XC-045 left open, recorded when it was built rather than
+  before, so the decision names what the code does
+- rationale: **the choice is between HTTP, a WebSocket and a pipe, and the deliverable decides it.**
+  A picture and a geometry payload are bytes a browser must fetch; over HTTP that is a `GET` with a
+  content type, and the browser's own cache, range requests and `<img src>` all work without this
+  product writing any of it. Over a pipe or a WebSocket the same bytes need a framing, a correlation
+  id and a reassembly - three things to get wrong for no gain, because nothing in the prototype
+  pushes from the engine.
+  **A WebSocket becomes right the moment the engine must speak first** - a long read reporting
+  progress, a watched file changing - and that day it is added beside this, not instead of it: the
+  command envelope is already one request and one response, which is what makes both shapes able to
+  carry it.
+  **And loopback is not private.** Any process running as the user can reach 127.0.0.1, so a port
+  with no token is a command surface every program on the machine can drive - including one that can
+  ask this engine to read and write files anywhere the user can. The token costs a header and closes
+  it. It is written to a file rather than passed as an argument because arguments are visible in the
+  process list to every user on the machine; JupyterLab's local server is the same shape for the same
+  reason (E-024)
+- alternatives: **stdio with a length prefix** - no port to secure and no listener at all, which is
+  genuinely simpler, and it cannot serve an image to a browser without a second channel that is
+  HTTP anyway. **A WebSocket** - one connection, server-push available, and every large payload then
+  needs its own framing on top. **A Unix socket or named pipe** - closes the port question and is two
+  different implementations on the two platforms, with the browser unable to reach either
+- basis: E-024 (T1)
+- affects: XC-045, XC-032, XC-040, MOD-017, CT-003
+- decidedness: Bounded
+- reversal_trigger: the engine needing to speak first - progress on a long read, a watched input
+  changing - which is a WebSocket beside this one rather than a replacement for it. Or a measured
+  cost: if fetching geometry through `GET` is slower than the same bytes over a socket by enough to
+  matter at LIM-002's budget, the payload path moves and the command path stays

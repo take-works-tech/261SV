@@ -3690,6 +3690,29 @@
           }
         }
       }
+    },
+    "transport": {
+      "type": "object",
+      "description": "How the envelope is carried on loopback (XC-258). Not part of a message: the names both sides must agree on, in the one place both generate from.",
+      "additionalProperties": false,
+      "properties": {
+        "tokenHeader": {
+          "const": "X-Solvia-Token",
+          "description": "the header every request but /health carries"
+        },
+        "commandPath": {
+          "const": "/command",
+          "description": "one request object in, one response object out"
+        },
+        "handlePath": {
+          "const": "/handle/",
+          "description": "the prefix a handle's bytes are fetched under"
+        },
+        "healthPath": {
+          "const": "/health",
+          "description": "the one endpoint that needs no token"
+        }
+      }
     }
   }
 }

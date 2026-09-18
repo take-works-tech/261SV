@@ -149,6 +149,14 @@ def render() -> str:
 
     version = re.search(r"^- version:\s*(\S+)", CATALOGUE.read_text(encoding="utf-8"), re.M)
     protocol_version = version.group(1) if version else ""
+    # The names both sides of the wire must agree on, from CT-003's `$defs.transport` (XC-258). Read
+    # from the contract rather than written here, so the header a request carries and the header the
+    # listener checks cannot drift apart in a way only a failing request would reveal.
+    transport = json.loads(SCHEMA.read_text(encoding="utf-8")).get("$defs", {}).get("transport", {})
+    wire = {
+        name: node.get("const", "")
+        for name, node in (transport.get("properties") or {}).items()
+    }
     lines = [
         '"""The operation catalogue of CT-003, as code.',
         "",
@@ -212,6 +220,13 @@ def render() -> str:
         "#: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below",
         "#: the engine's floor is refused politely rather than answered in a shape it cannot read.",
         f'PROTOCOL_VERSION = "{protocol_version}"',
+        "",
+        "#: The wire's own names, from CT-003's `$defs.transport` (XC-258). The interface generates",
+        "#: the same values from the same place; neither side is derived from the other (XC-252).",
+        f'TOKEN_HEADER = "{wire.get("tokenHeader", "")}"',
+        f'COMMAND_PATH = "{wire.get("commandPath", "")}"',
+        f'HANDLE_PATH = "{wire.get("handlePath", "")}"',
+        f'HEALTH_PATH = "{wire.get("healthPath", "")}"',
         "",
         "",
         "def writes(operation: str) -> bool:",
