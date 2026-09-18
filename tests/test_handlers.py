@@ -131,10 +131,10 @@ class TestWhatThisBuildRegisters:
         assert registered == {
             "workspace.open", "dataset.load", "dataset.describe", "dataset.parts",
             "field.declareUnit", "field.statistics", "view.create", "view.update", "view.render",
-            "dataset.probe", "report.create", "report.export", "report.provenance",
+            "dataset.probe", "view.pick", "report.create", "report.export", "report.provenance",
             "system.capabilities", "system.protocols",
         }
-        assert len(surface.unimplemented()) == len(OPERATIONS) - 15
+        assert len(surface.unimplemented()) == len(OPERATIONS) - 16
 
     def test_an_unimplemented_operation_is_refused_and_named_as_such(self) -> None:
         surface, _ = a_surface()
@@ -619,6 +619,78 @@ class TestProbingAPoint:
         from service.command.catalogue import PARAMETERS
 
         assert "fieldName" in PARAMETERS["dataset.probe"][1]
+
+
+@needs_offscreen
+class TestPickingAPixel:
+    """XC-257's "picks a point", from the thing an interface actually has. CT-003 2.3.0 adds
+    `view.pick`: a view and a pixel in, the same answer `dataset.probe` gives out."""
+
+    @staticmethod
+    def _view(surface: Surface, dataset_id: str, field: str = "temperature", association: str = "point") -> str:
+        return surface.submit(Command("view.create", {"workspaceId": "ws:1", "definition": {
+            "name": "全体図", "datasetId": dataset_id, "representation": "surface",
+            "colouring": {"fieldName": field, "association": association, "colourMap": "viridis"},
+        }})).value["id"]
+
+    def test_a_pixel_on_the_model_answers_with_a_value_from_the_dataset(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        surface.submit(Command("field.declareUnit", {"datasetId": dataset_id, "fieldName": "temperature", "unitSymbol": "K"}))
+        view_id = self._view(surface, dataset_id)
+
+        result = surface.submit(Command("view.pick", {"viewId": view_id, "width": 400, "height": 300, "x": 200, "y": 150}))
+
+        assert result.status is Status.ANSWERED, result.reason
+        value = result.value["value"]
+        assert value["value"] in {float(one) for one in range(1, 9)}, "a value the cube actually holds"
+        assert value["unit"] == "K"
+        assert value["digits"] == 6
+        assert value["provenance"] == "dataset"
+        assert result.value["association"] == "point"
+
+    def test_a_pixel_in_the_corner_is_off_the_model_and_says_so(self, tmp_path: Path) -> None:
+        """view/AC-029: nothing there is reported as nothing, never as the nearest value there is."""
+        surface, _, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        view_id = self._view(surface, dataset_id)
+
+        result = surface.submit(Command("view.pick", {"viewId": view_id, "width": 400, "height": 300, "x": 2, "y": 2}))
+
+        assert result.status is Status.ANSWERED, "a well-formed question about empty space is answered"
+        assert result.value["value"]["value"] is None
+        assert "モデル" in result.value["value"]["missingBecause"]
+
+    def test_a_pixel_outside_the_frame_is_refused(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        view_id = self._view(surface, dataset_id)
+
+        result = surface.submit(Command("view.pick", {"viewId": view_id, "width": 400, "height": 300, "x": 400, "y": 10}))
+
+        assert result.status is Status.REFUSED
+
+    def test_two_pixels_far_apart_on_a_gradient_read_different_values(self, tmp_path: Path) -> None:
+        """The pick lands where it is pointed. A pick that answered the same everywhere would pass
+        every test above and be useless - this is the one that says the pixel matters."""
+        surface, _, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        view_id = self._view(surface, dataset_id)
+        size = {"viewId": view_id, "width": 600, "height": 450}
+
+        found = {
+            (x, y): surface.submit(Command("view.pick", {**size, "x": x, "y": y})).value["value"]["value"]
+            for x, y in ((240, 300), (240, 170), (360, 300))
+        }
+
+        present = [one for one in found.values() if one is not None]
+        assert len(present) >= 2, f"at least two pixels landed on the cube: {found}"
+        assert len(set(present)) > 1, f"the pixel decides which value is read: {found}"
+
+    def test_a_cell_field_is_picked_as_a_cell_s_value(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path)
+        view_id = self._view(surface, dataset_id, field="element_stress", association="cell")
+
+        result = surface.submit(Command("view.pick", {"viewId": view_id, "width": 300, "height": 300, "x": 150, "y": 150}))
+
+        assert result.status is Status.ANSWERED, result.reason
+        assert result.value["association"] == "cell"
 
 
 @needs_offscreen

@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "2.2.0";
+export const PROTOCOL_VERSION = "2.3.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -78,6 +78,7 @@ export type Operation =
   | "system.supportBundle"
   | "workspace.pack"
   | "output.prune"
+  | "view.pick"
   ;
 
 export const OPERATIONS: readonly Operation[] = [
@@ -142,6 +143,7 @@ export const OPERATIONS: readonly Operation[] = [
   "system.supportBundle",
   "workspace.pack",
   "output.prune",
+  "view.pick",
 ];
 
 /** What each operation takes. From CT-003's $defs.operationParameters. */
@@ -406,6 +408,13 @@ export interface Parameters {
   "output.prune": {
     workspaceId: string;
     runsToRemove: readonly (string)[];
+  };
+  "view.pick": {
+    viewId: string;
+    width: number;
+    height: number;
+    x: number;
+    y: number;
   };
 }
 
@@ -798,6 +807,19 @@ export interface Results {
     removedRunIds: readonly (string)[];
     freedBytes: number;
     deletedFiles: readonly (string)[];
+  };
+  "view.pick": {
+    value: {
+      value: number | null;
+      unit: string | null;
+      digits: number;
+      provenance: "declared" | "dataset" | "computed" | "measured" | "reference";
+      formula?: string;
+      caveats?: readonly (string)[];
+      missingBecause?: string;
+      location?: string;
+    };
+    association?: string;
   };
 }
 

@@ -47,6 +47,7 @@ from engine.report.document import (
     build as build_document,
 )
 from engine.visualization import pick
+from engine.visualization import render as render_module
 from engine.visualization.backends import REQUIRES, Backend, probe
 from engine.visualization.render import Camera, Colouring, RenderError, probe_offscreen, render_view
 from service.command.catalogue import PROTOCOL_VERSION
@@ -301,6 +302,7 @@ def handlers(session: Session) -> tuple[Handler, ...]:
         Handler("view.update", lambda p, t: item_update(session, "views", "viewId", p)),
         Handler("view.render", lambda p, t: view_render(session, p)),
         Handler("dataset.probe", lambda p, t: dataset_probe(session, p)),
+        Handler("view.pick", lambda p, t: view_pick(session, p)),
         Handler("report.create", lambda p, t: item_create(session, "reports", p)),
         Handler("report.export", lambda p, t: report_export(session, p)),
         Handler("report.provenance", lambda p, t: report_provenance(session, p)),
@@ -798,6 +800,72 @@ def dataset_probe(session: Session, parameters: Mapping[str, Any]) -> Effect | R
     return Effect(
         f"'{name}' の値を読みました" if not value.is_missing else f"'{name}' の値はそこにありません",
         value={"value": reported(value), "association": ASSOCIATION_WORD[found.association]},
+    )
+
+
+def view_pick(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
+    """The value under one pixel of a frame drawn at a stated size (view/AC-027 to AC-029).
+
+    `dataset.probe` is the same answer from a point in metres, which is what a script has. This is
+    what an **interface** has: a pixel. The camera the picture was drawn with is the engine's, so
+    the unprojection is the engine's - an interface computing it would be computing with a camera it
+    never saw.
+    """
+    workspace = session.open_workspace()
+    if isinstance(workspace, Result):
+        return workspace
+    try:
+        item = items.find(workspace.raw, "views", str(parameters["viewId"]))
+    except ItemError as error:
+        return refused(str(error))
+    definition = item["definition"]
+    loaded = session.loaded(str(definition.get("datasetId", "")))
+    if isinstance(loaded, Result):
+        return loaded
+    stated = definition.get("colouring")
+    if not isinstance(stated, Mapping):
+        return refused("着色のないビューは、どのフィールドの値を読むかを言えません")
+    colouring = colouring_of(stated)
+    if isinstance(colouring, Result):
+        return colouring
+    camera = camera_of(definition.get("camera"))
+    if isinstance(camera, Result):
+        return camera
+    available, detail = session.offscreen()
+    if not available:
+        # The unprojection needs the same scene the picture was drawn in, and that needs the toolkit
+        # to be able to set one up at all (E-194).
+        return refused(f"画素から座標を求められません：{detail}")
+
+    width, height = int(parameters["width"]), int(parameters["height"])
+    pixel = (int(parameters["x"]), int(parameters["y"]))
+    datasets = loaded.datasets()
+    try:
+        ray = render_module.ray_through(datasets, pixel, width=width, height=height, camera=camera)
+    except RenderError as error:
+        return refused(str(error))
+
+    # A case may hold several parts and the ray meets the nearest. Each is asked and the one that
+    # answers with a value wins - a part the ray missed says so rather than being silently skipped.
+    found: list[tuple[Part, pick.Pick]] = []
+    for part in loaded.holders(colouring.field_name):
+        assert part.dataset is not None
+        try:
+            found.append((part, pick.along_ray(part.dataset, colouring.field_name, ray.near_m, ray.far_m)))
+        except pick.PickError as error:
+            return refused(str(error))
+    if not found:
+        return refused(f"'{colouring.field_name}' を持つパートがありません")
+    hit = [pair for pair in found if not pair[1].value.is_missing]
+    part, answer = hit[0] if hit else found[0]
+    value = answer.value
+    if value.location and len(found) > 1:
+        value = replace(value, location=f"{part.label}：{value.location}")
+    if loaded.case.is_partial:
+        value = value.with_caveat(Caveat.PARTIAL_DATASET)
+    return Effect(
+        f"画素 {pixel} の値を読みました" if not value.is_missing else f"画素 {pixel} の先には何もありません",
+        value={"value": reported(value), "association": ASSOCIATION_WORD[answer.association]},
     )
 
 

@@ -54,9 +54,50 @@ export interface EngineState {
   readonly probe: Reported | null;
   readonly probeLocation: string | null;
   readonly statistics: Results["field.statistics"] | null;
+  readonly bounds: readonly [number[], number[]] | null;
+  readonly turntable: Turntable;
   /** What the engine last refused, in its own words. Shown rather than swallowed (XC-001). */
   readonly refusal: string | null;
   readonly busy: boolean;
+}
+
+/** The size the on-screen frame is drawn at. A pick is a pixel **of a frame of this size**, so the
+ *  two must agree: asking for a pick against a size the picture was not drawn at reads the value of
+ *  somewhere else (CT-003 2.3.0). */
+export const FRAME = { width: 1280, height: 960 } as const;
+
+/** Where the camera is, as the three numbers a drag moves. A camera is a **definition** (CT-004),
+ *  not a measurement, so the interface may hold one - but the position it becomes is computed here
+ *  from the model's own bounds, which the engine reported. */
+export interface Turntable {
+  azimuthDegrees: number;
+  elevationDegrees: number;
+  /** Distance from the focal point, as a multiple of the model's bounding diagonal. */
+  distance: number;
+}
+
+const START: Turntable = { azimuthDegrees: 30, elevationDegrees: 20, distance: 2.2 };
+
+function cameraFrom(turntable: Turntable, bounds: readonly [number[], number[]] | null) {
+  if (!bounds) return undefined;
+  const at = (side: readonly number[], index: number) => side[index] ?? 0;
+  const [low, high] = bounds;
+  const centre = [0, 1, 2].map((i) => (at(low, i) + at(high, i)) / 2) as [number, number, number];
+  const diagonal =
+    Math.hypot(at(high, 0) - at(low, 0), at(high, 1) - at(low, 1), at(high, 2) - at(low, 2)) || 1;
+  const azimuth = (turntable.azimuthDegrees * Math.PI) / 180;
+  const elevation = (Math.max(-85, Math.min(85, turntable.elevationDegrees)) * Math.PI) / 180;
+  const radius = diagonal * turntable.distance;
+  return {
+    position_m: [
+      centre[0] + radius * Math.cos(elevation) * Math.sin(azimuth),
+      centre[1] - radius * Math.cos(elevation) * Math.cos(azimuth),
+      centre[2] + radius * Math.sin(elevation),
+    ],
+    focalPoint_m: centre,
+    viewUp: [0, 0, 1],
+    projection: "perspective",
+  };
 }
 
 const EMPTY: EngineState = {
@@ -77,6 +118,8 @@ const EMPTY: EngineState = {
   probe: null,
   probeLocation: null,
   statistics: null,
+  bounds: null,
+  turntable: { ...START },
   refusal: null,
   busy: false,
 };
@@ -210,8 +253,43 @@ export const engineState = {
       probe: null,
       probeLocation: null,
       statistics: null,
+      turntable: { ...START },
+    });
+    const described = await ask("dataset.describe", { datasetId: loaded.datasetId });
+    setState({
+      bounds: described?.boundsM ? [described.boundsM.minM as number[], described.boundsM.maxM as number[]] : null,
     });
     return true;
+  },
+
+  /** Class 1: turn the model. The camera is a definition the view carries, so moving it is an
+   *  update to that definition and a redraw - not a thing the interface does to a picture. */
+  async orbit(byAzimuth: number, byElevation: number): Promise<void> {
+    setState({
+      turntable: {
+        ...state.turntable,
+        azimuthDegrees: state.turntable.azimuthDegrees + byAzimuth,
+        elevationDegrees: state.turntable.elevationDegrees + byElevation,
+      },
+    });
+    await engineState.refresh();
+  },
+
+  /** The value under one pixel of the frame on screen (CT-003 2.3.0). */
+  async pick(x: number, y: number): Promise<void> {
+    if (!state.viewId) return;
+    setState({ refusal: null });
+    const answer = await ask("view.pick", {
+      viewId: state.viewId,
+      width: FRAME.width,
+      height: FRAME.height,
+      x: Math.round(x),
+      y: Math.round(y),
+    });
+    setState({
+      probe: answer?.value ?? null,
+      probeLocation: (answer?.value as { location?: string } | undefined)?.location ?? null,
+    });
   },
 
   /** Class 2: a unit is a declaration with an author. Declaring it changes labels and conversions
@@ -256,6 +334,7 @@ export const engineState = {
       representation: "surface",
       name: state.fieldName,
       colouring: { fieldName: state.fieldName, association, colourMap: state.colourMap },
+      camera: cameraFrom(state.turntable, state.bounds),
       // The screen's ground, not the document's. The viewport well is the darkest surface the
       // interface has (XC-256) and a white picture inside it fights the chrome it sits in; a
       // report asks for its own ground, and the view is what says which (CT-004).
@@ -273,7 +352,7 @@ export const engineState = {
       setState({ viewId });
     }
     if (!viewId) return;
-    const rendered = await ask("view.render", { viewId, width: 1280, height: 960, format: "png" });
+    const rendered = await ask("view.render", { viewId, ...FRAME, format: "png" });
     if (rendered?.handle) {
       try {
         const blob = await engine.handle(rendered.handle);

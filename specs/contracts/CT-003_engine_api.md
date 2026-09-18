@@ -10,7 +10,15 @@ updated: 2026-09-19
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 2.2.0
+- version: 2.3.0
+- correction: 2026-09-19, version 2.2.0 to 2.3.0. `dataset.probe` takes a point in canonical metres,
+  which is the right thing for a script and the wrong thing for a person: an interface has a **pixel**
+  a person clicked, and turning one into the other needs the camera the picture was drawn with. The
+  interface does not have that camera; the engine drew with it. So `view.pick` is added, taking the
+  view and a pixel and answering what `dataset.probe` answers. Additive - `dataset.probe` is
+  unchanged and is still how a script asks. Recorded because the alternative was the interface
+  passing something it had computed from a fraction of a pane, which would put a number in the
+  readout belonging to a place nobody clicked
 - correction: 2026-09-18, version 2.1.0 to 2.2.0. `dataset.probe` took a dataset id, a point and a
   result position and answered "the value at that point" - **of no named field**. The operation could
   not be implemented as written: a dataset holds several fields and nothing in the request said
@@ -80,6 +88,7 @@ no identifier to report.
 | `view.rename` | write | view id, new name | new revision; stored id references unchanged |
 | `view.delete` | write | view id | deleted id; dependent pipeline units retained as unresolved |
 | `view.render` | read | view id, width, height, format | image bytes or a handle to them |
+| `view.pick` | read | view id, width, height, pixel x and y | the value under that pixel with its unit, digits, provenance and location, and which point or cell it is - or nothing, where the pixel is off the model (view/AC-027, view/AC-029) |
 | `graph.create` | write | workspace id, definition (CT-005), source template id and revision? | workspace graph id and revision (XC-109) |
 | `graph.update` | write | graph id, definition | new graph revision |
 | `graph.duplicate` | write | graph id, new name | new independent workspace graph id |
