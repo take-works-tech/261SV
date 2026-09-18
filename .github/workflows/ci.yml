@@ -163,3 +163,35 @@ jobs:
       - run: python validate/check_mockup_states.py
         env:
           MOCKUP_BASE_URL: http://localhost:3000
+
+  interface:
+    name: interface typecheck and render
+    runs-on: ubuntu-latest
+    # src/ui is the production interface. Until 2026-09-18 CI never looked at it: it was neither
+    # typechecked nor swept, so `check_interface_states.py` existed, passed nothing, and reported
+    # exit 3 - "not run here" - on every machine including this one. A gate nothing runs is a gate
+    # that says what somebody hoped rather than what is true.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/ui/package-lock.json
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: npm ci
+        working-directory: src/ui
+      - run: npm run typecheck
+        working-directory: src/ui
+      - run: npm run build
+        working-directory: src/ui
+      - name: serve the built interface
+        run: npm run preview -- --port 4173 --strictPort &
+        working-directory: src/ui
+      - name: wait for it
+        run: for i in $(seq 1 30); do curl -sf http://localhost:4173/ >/dev/null && exit 0; sleep 2; done; echo "the interface did not start"; exit 1
+      - run: python validate/check_interface_states.py
+        env:
+          INTERFACE_BASE_URL: http://localhost:4173
