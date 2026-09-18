@@ -255,10 +255,15 @@ def write(
         )
 
     destination = Path(path)
-    destination.write_text(text, encoding="utf-8")
+    # Written as the bytes that were measured, never through a text stream: on Windows `write_text`
+    # turns every "\n" into "\r\n", so the file was 25 bytes larger than the size this returned and
+    # differed from the same document written elsewhere. A deliverable's stated size is its size
+    # (LIM-006), and the same document is the same bytes on every platform (XC-046).
+    encoded = text.encode("utf-8")
+    destination.write_bytes(encoded)
     return Export(
         destination,
-        len(text.encode("utf-8")),
+        len(encoded),
         tuple(one.describe() for one in cannot),
     )
 

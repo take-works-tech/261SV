@@ -646,3 +646,58 @@ class TestAReportedValueIsHeldToItsShape:
         for fields in REPORTED_VALUES.values():
             for keys in fields.values():
                 assert keys >= {"value", "unit", "digits", "provenance"}
+
+
+class TestAHandlerMayRefuse:
+    """CT-002 keeps two words apart: a **refusal** is the caller's mistake and changes nothing; a
+    **failure** is the build's. Until 2026-09-18 a handler had no way to return the first - the surface
+    read `.undo` off whatever came back, so a returned `Result` crashed and a raised one became
+    FAILED. A handler that wanted to say "that case is not here" could only say "I am broken"."""
+
+    @staticmethod
+    def _refusing(operation: str, reason: str) -> Surface:
+        surface = Surface(clock=at(9))
+        surface.register(Handler(operation, lambda p, t: Result(Status.REFUSED, reason=reason)))
+        return surface
+
+    def test_a_refusal_returned_by_a_write_handler_is_refused_not_failed(self) -> None:
+        surface = self._refusing("view.rename", "そのビューはありません")
+
+        result = surface.submit(Command("view.rename", {"viewId": "v", "newName": "n"}))
+
+        assert result.status is Status.REFUSED
+        assert result.reason == "そのビューはありません"
+        assert result.changed == ()
+        assert result.undo_id is None, "a refusal applied nothing, so there is nothing to undo"
+
+    def test_a_refusal_returned_by_a_read_handler_is_refused_too(self) -> None:
+        # `system.protocols` takes no parameters, so the command reaches the handler - the first
+        # version of this used `history.list`, whose missing `workspaceId` had the surface refuse
+        # before the handler ran, and the test passed for a reason that was not the one it named.
+        surface = self._refusing("system.protocols", "この版は答えられません")
+
+        result = surface.submit(Command("system.protocols", {}))
+
+        assert result.status is Status.REFUSED
+        assert result.reason == "この版は答えられません"
+
+    def test_a_refusal_is_logged_as_one(self) -> None:
+        surface = self._refusing("view.rename", "そのビューはありません")
+
+        surface.submit(Command("view.rename", {"viewId": "v", "newName": "n"}))
+
+        assert surface.history()[-1].status is Status.REFUSED
+
+    def test_raising_still_reads_as_the_build_s_failure(self) -> None:
+        """The other word keeps its meaning: an exception is a defect here, not a caller's error."""
+        surface = Surface(clock=at(9))
+
+        def broken(parameters, targets):
+            raise RuntimeError("壊れています")
+
+        surface.register(Handler("system.protocols", broken))
+
+        result = surface.submit(Command("system.protocols", {}))
+
+        assert result.status is Status.FAILED
+        assert "壊れています" in (result.reason or "")
