@@ -117,10 +117,17 @@ jobs:
       # it copies cell values into points (INV-012). A stub would assert what we believe it does.
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e ".[dev]"
+      # The renderer's tests draw. On this runner the published toolkit wheel does not refuse to draw
+      # without a display - it segfaults in Render() (E-194, measured here on 2026-09-18) - so the
+      # suite runs under a virtual X display with Mesa's software OpenGL. The tests themselves ask the
+      # product's own child-process probe first, so a machine without either fails with a sentence
+      # rather than a core dump.
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgl1 libglx-mesa0 libegl1
       # SIM_VIEWER_REQUIRE_VTK turns the local "VTK is not installed, skipping" into a failure. A skip
       # is a reasonable answer on a laptop and never a reasonable answer here, and a suite that is
-      # allowed to skip in CI reports success for tests that did not run.
-      - run: python -m pytest tests -q
+      # allowed to skip in CI reports success for tests that did not run. The same rule covers the
+      # offscreen probe: a runner that cannot draw fails the run rather than skipping the renderer.
+      - run: xvfb-run -a python -m pytest tests -q
         env:
           SIM_VIEWER_REQUIRE_VTK: "1"
 

@@ -18,9 +18,17 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
-from conftest import requires_vtk
+from conftest import REQUIRE_VTK, offscreen_rendering_available, requires_vtk
 
 requires_vtk()
+
+#: The rendering tests below run where the product's own probe says a picture can be drawn. Elsewhere
+#: they skip with the probe's reason - except in CI, where test_render.py has already failed the run
+#: for the same reason, because a renderer never exercised is a renderer nobody has seen work.
+OFFSCREEN_AVAILABLE, OFFSCREEN_DETAIL = offscreen_rendering_available()
+needs_offscreen = pytest.mark.skipif(
+    not OFFSCREEN_AVAILABLE and not REQUIRE_VTK, reason=f"no offscreen rendering here: {OFFSCREEN_DETAIL}"
+)
 
 import numpy as np  # noqa: E402
 from vtkmodules.util.numpy_support import numpy_to_vtk  # noqa: E402
@@ -115,25 +123,25 @@ def loaded(tmp_path: Path, *, write=write_grid, name: str = "case.vtu") -> tuple
 
 
 class TestWhatThisBuildRegisters:
-    def test_thirteen_operations_have_handlers_and_two_on_the_path_do_not(self) -> None:
+    def test_fourteen_operations_have_handlers_and_the_probe_on_the_path_does_not(self) -> None:
         surface, _ = a_surface()
 
         registered = set(surface.registered())
 
         assert registered == {
             "workspace.open", "dataset.load", "dataset.describe", "dataset.parts",
-            "field.declareUnit", "field.statistics", "view.create", "view.update",
+            "field.declareUnit", "field.statistics", "view.create", "view.update", "view.render",
             "report.create", "report.export", "report.provenance",
             "system.capabilities", "system.protocols",
         }
-        # The renderer is step 3 and the probe step 4. Until they exist the surface says so.
-        assert {"view.render", "dataset.probe"} <= set(surface.unimplemented())
-        assert len(surface.unimplemented()) == len(OPERATIONS) - 13
+        # The probe is step 4. Until it exists the surface says so.
+        assert "dataset.probe" in set(surface.unimplemented())
+        assert len(surface.unimplemented()) == len(OPERATIONS) - 14
 
     def test_an_unimplemented_operation_is_refused_and_named_as_such(self) -> None:
         surface, _ = a_surface()
 
-        result = surface.submit(Command("view.render", {"viewId": "v", "width": 1, "height": 1, "format": "png"}))
+        result = surface.submit(Command("dataset.probe", {"datasetId": "d", "pointM": [0, 0, 0], "resultPosition": 0}))
 
         assert result.status is Status.REFUSED
         assert "実装がありません" in (result.reason or "")
@@ -540,3 +548,133 @@ class TestExportingADeliverable:
         result = surface.submit(Command("report.provenance", {"exportedPath": str(tmp_path / "x.html")}))
 
         assert result.status is Status.REFUSED
+
+
+class TestWhenNoPictureCanBeDrawn:
+    """E-194: with no display the toolkit does not refuse, it segfaults. The engine therefore asks a
+    child process first, and a machine that cannot draw gets a refusal that names the requirement."""
+
+    def test_view_render_refuses_before_drawing_when_the_probe_says_no(self, tmp_path: Path) -> None:
+        session = Session(clock=at(9), issue=counting_issuer(), native_offscreen=lambda: (False, "テスト：ディスプレイ無し"))
+        surface = build_surface(session)
+        workspace = a_workspace(tmp_path)
+        assert surface.submit(Command("workspace.open", {"path": str(workspace)})).status is Status.APPLIED
+        source = tmp_path / "case.vtu"
+        write_grid(source)
+        dataset_id = surface.submit(Command("dataset.load", {"caseId": "case:1", "filePaths": [str(source)]})).value["datasetId"]
+        view_id = surface.submit(Command("view.create", {"workspaceId": "ws:1", "definition": {
+            "datasetId": dataset_id, "representation": "surface",
+            "colouring": {"fieldName": "stress", "association": "point"},
+        }})).value["id"]
+
+        result = surface.submit(Command("view.render", {"viewId": view_id, "width": 10, "height": 10, "format": "png"}))
+
+        assert result.status is Status.REFUSED
+        assert "ディスプレイ無し" in (result.reason or "")
+
+    def test_capabilities_carry_the_same_answer_and_ask_only_once(self) -> None:
+        asked = {"count": 0}
+
+        def probe() -> tuple[bool, str]:
+            asked["count"] += 1
+            return False, "テスト：無し"
+
+        session = Session(clock=at(9), issue=counting_issuer(), native_offscreen=probe)
+        surface = build_surface(session)
+
+        surface.submit(Command("system.capabilities", {}))
+        result = surface.submit(Command("system.capabilities", {}))
+
+        renderers = {one["backend"]: one for one in result.value["renderers"]}
+        assert renderers["nativeOffscreen"]["available"] is False
+        assert asked["count"] == 1, "a child process is not free; the answer is kept for the session"
+
+
+@needs_offscreen
+class TestRenderingAView:
+    """Step 3 through the surface: a view definition names the dataset, the field and the map; the
+    answer is a handle to PNG bytes and the sentence about reduction, which is what CT-003 states."""
+
+    PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+
+    @staticmethod
+    def _view(surface: Surface, dataset_id: str, **changes) -> str:
+        definition = {
+            "name": "応力の等高線",
+            "datasetId": dataset_id,
+            "representation": "surface",
+            "colouring": {"fieldName": "stress", "association": "point", "colourMap": "viridis"},
+        }
+        definition.update(changes)
+        created = surface.submit(Command("view.create", {"workspaceId": "ws:1", "definition": definition}))
+        assert created.status is Status.APPLIED, created.reason
+        return created.value["id"]
+
+    def test_a_view_renders_to_a_handle_whose_bytes_are_a_png(self, tmp_path: Path) -> None:
+        surface, session, dataset_id = loaded(tmp_path)
+        view_id = self._view(surface, dataset_id)
+
+        result = surface.submit(Command("view.render", {"viewId": view_id, "width": 240, "height": 180, "format": "png"}))
+
+        assert result.status is Status.ANSWERED, result.reason
+        assert result.value["reduced"] == "全三角形を表示しています"
+        assert session.handles.fetch(result.value["handle"]).startswith(self.PNG_MAGIC)
+
+    def test_a_camera_in_the_definition_is_used(self, tmp_path: Path) -> None:
+        surface, session, dataset_id = loaded(tmp_path)
+        plain = self._view(surface, dataset_id)
+        turned = self._view(surface, dataset_id, name="別の向き", camera={
+            "position_m": [3.0, -3.0, 4.0], "focalPoint_m": [0.5, 0.5, 0.0], "viewUp": [0.0, 0.0, 1.0],
+            "projection": "orthographic", "parallelScale_m": 1.2,
+        })
+        size = {"width": 160, "height": 120, "format": "png"}
+
+        first = surface.submit(Command("view.render", {"viewId": plain, **size}))
+        second = surface.submit(Command("view.render", {"viewId": turned, **size}))
+
+        assert first.status is Status.ANSWERED and second.status is Status.ANSWERED
+        assert session.handles.fetch(first.value["handle"]) != session.handles.fetch(second.value["handle"])
+
+    def test_a_format_this_build_cannot_write_is_refused_by_name(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path)
+        view_id = self._view(surface, dataset_id)
+
+        result = surface.submit(Command("view.render", {"viewId": view_id, "width": 10, "height": 10, "format": "jpeg"}))
+
+        assert result.status is Status.REFUSED
+        assert "jpeg" in (result.reason or "")
+
+    def test_a_view_that_does_not_exist_is_refused(self, tmp_path: Path) -> None:
+        surface, _, _ = loaded(tmp_path)
+
+        result = surface.submit(Command("view.render", {"viewId": "view:9999", "width": 10, "height": 10, "format": "png"}))
+
+        assert result.status is Status.REFUSED
+
+    def test_a_view_without_colouring_is_refused_rather_than_drawn_grey(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path)
+        view_id = self._view(surface, dataset_id, colouring=None)
+
+        result = surface.submit(Command("view.render", {"viewId": view_id, "width": 10, "height": 10, "format": "png"}))
+
+        assert result.status is Status.REFUSED
+        assert "colouring" in (result.reason or "")
+
+    def test_a_representation_this_build_cannot_draw_is_refused(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path)
+        view_id = self._view(surface, dataset_id, representation="wireframe")
+
+        result = surface.submit(Command("view.render", {"viewId": view_id, "width": 10, "height": 10, "format": "png"}))
+
+        assert result.status is Status.REFUSED
+        assert "wireframe" in (result.reason or "")
+
+    def test_a_renderer_refusal_reaches_the_caller_as_a_refusal(self, tmp_path: Path) -> None:
+        """The map name is wrong: the caller's mistake, said so, not a failure of the build."""
+        surface, _, dataset_id = loaded(tmp_path)
+        view_id = self._view(surface, dataset_id, colouring={"fieldName": "stress", "association": "point", "colourMap": "jet"})
+
+        result = surface.submit(Command("view.render", {"viewId": view_id, "width": 10, "height": 10, "format": "png"}))
+
+        assert result.status is Status.REFUSED
+        assert "jet" in (result.reason or "")

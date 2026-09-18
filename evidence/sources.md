@@ -1893,3 +1893,45 @@ Recorded so that nothing silently depends on them:
   against the wrong baseline was read as "not drawn" (the digits had changed font). Only a count
   against an untitled bar in the same face measures the words. Both wrong readings are kept in the
   script's comments
+
+### E-193 - Viridis and plasma are released by their authors under CC0, and the tables are theirs
+- tier: T1
+- url: https://raw.githubusercontent.com/BIDS/colormap/master/colormaps.py
+- verified: 2026-09-18
+- says: the header of the authors' own file reads: "New matplotlib colormaps by Nathaniel J. Smith,
+  Stefan van der Walt, and (in the case of viridis) Eric Firing. This file and the colormaps in it are
+  released under the CC0 license / public domain dedication. We would appreciate credit if you use or
+  redistribute these colormaps, but do not impose any legal restrictions." The file holds
+  `_viridis_data` and `_plasma_data` as 256 rows of three floats; the first row of viridis is
+  `[0.267004, 0.004874, 0.329415]` and its last `[0.993248, 0.906157, 0.143936]`, and the same rows
+  in matplotlib's `lib/matplotlib/_cm_listed.py` at the commit read the same day are identical
+- justifies: XC-111, XC-257
+- note: `src/engine/visualization/colour_maps.py` is generated from this file (archive
+  script, not shipped): the 256 rows rounded to sRGB hex, which puts viridis's ends at `#440154` and
+  `#fde725` and plasma's at `#0d0887` and `#f0f921` - **exactly the two stops the interface's own
+  tokens already used for its legend gradients**, so the picture and the chrome agree. The third map,
+  `greys`, is generated as a straight sRGB line between the token's two stops and needs no licence.
+  Credit is given in the module docstring as the authors ask; no restriction applies. Issue #275
+  (カラーマップの出所とライセンス) is answered for these three; any map added later needs its own row
+
+### E-194 - Without a display, the published toolkit wheel does not refuse to render: it segfaults
+- tier: T1
+- url: https://github.com/take-works-tech/261SV/actions/runs/35350960523/job/105618715764 (CI run of
+  pull request #352, `tests` job, 2026-09-18)
+- verified: 2026-09-18
+- says: on `ubuntu-latest` with the pinned **VTK 9.5.2** wheel from PyPI and no display, the first
+  call to `vtkRenderWindow.Render()` on an offscreen window ended the interpreter with
+  "Fatal Python error: Segmentation fault" at `render.py:209` and "Process completed with exit
+  code 139". No exception, no toolkit message: the process was gone. The same call on this Windows
+  machine with a discrete GPU rendered in 0.26 s (E-191)
+- justifies: XC-257, XC-045
+- note: two consequences, both built the same day. **The engine must ask before it draws, and ask
+  in a process it can afford to lose**: `render.probe_offscreen` renders an empty window in a child
+  process and reports its exit status, `system.capabilities` reports that answer, and `view.render`
+  refuses with the requirement named when the answer is no - a refusal where the alternative is the
+  engine process disappearing under the interface, which is the reason XC-045 isolated the readers.
+  And **CI provides a virtual display** (`xvfb-run` with Mesa's software OpenGL), because a renderer
+  whose tests skip on the runner is a renderer nobody has seen work; the test suite fails the run
+  rather than skipping when the probe says no under `SIM_VIEWER_REQUIRE_VTK=1`. E-191's closing
+  sentence - that a machine without a discrete GPU or a CI runner was not measured - is now measured,
+  and the answer was worse than a slow frame
