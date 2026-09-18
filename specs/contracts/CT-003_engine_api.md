@@ -10,7 +10,12 @@ updated: 2026-08-25
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 2.1.0
+- version: 2.2.0
+- correction: 2026-09-18, version 2.1.0 to 2.2.0. `dataset.probe` took a dataset id, a point and a
+  result position and answered "the value at that point" - **of no named field**. The operation could
+  not be implemented as written: a dataset holds several fields and nothing in the request said
+  which. It now takes a `fieldName`. Additive to an operation no release has shipped, and recorded
+  here rather than silently, because the row read as complete for three weeks and was not
 - strictness: unknown fields are **rejected** - a request carrying a parameter the engine does not
   understand is refused, because the caller believes something is happening that is not (CT-002)
 - compatibility: an operation name and its parameters keep their meaning once shipped. Behaviour
@@ -92,7 +97,7 @@ no identifier to report.
 | `system.protocols` | read | - | protocol versions this engine speaks |
 | `history.undo` | write | undo id | ids restored |
 | `history.list` | read | workspace id | operations with origin, time and outcome |
-| `dataset.probe` | read | dataset id, point in metres, result position | value, association, unit, significant digits, provenance - missing where there is none (view/AC-027) |
+| `dataset.probe` | read | dataset id, field name, point in metres, result position | value, association, unit, significant digits, provenance - missing where there is none (view/AC-027) |
 | `dataset.parts` | read | dataset id | source-named parts with type, parent identifier where present, counts and bounds (GL-029, GL-042); absent hierarchy remains absent |
 | `field.derive` | read | dataset id, field name, quantity from the catalogue, frame? | the derived field with the formula and conventions it used (INV-020) |
 | `field.setDisplayUnit` | write | workspace id, quantity, unit symbol | - - presentation only; storage stays canonical (INV-026) |

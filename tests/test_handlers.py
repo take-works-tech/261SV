@@ -123,7 +123,7 @@ def loaded(tmp_path: Path, *, write=write_grid, name: str = "case.vtu") -> tuple
 
 
 class TestWhatThisBuildRegisters:
-    def test_fourteen_operations_have_handlers_and_the_probe_on_the_path_does_not(self) -> None:
+    def test_every_operation_on_the_path_has_a_handler(self) -> None:
         surface, _ = a_surface()
 
         registered = set(surface.registered())
@@ -131,17 +131,16 @@ class TestWhatThisBuildRegisters:
         assert registered == {
             "workspace.open", "dataset.load", "dataset.describe", "dataset.parts",
             "field.declareUnit", "field.statistics", "view.create", "view.update", "view.render",
-            "report.create", "report.export", "report.provenance",
+            "dataset.probe", "report.create", "report.export", "report.provenance",
             "system.capabilities", "system.protocols",
         }
-        # The probe is step 4. Until it exists the surface says so.
-        assert "dataset.probe" in set(surface.unimplemented())
-        assert len(surface.unimplemented()) == len(OPERATIONS) - 14
+        assert len(surface.unimplemented()) == len(OPERATIONS) - 15
 
     def test_an_unimplemented_operation_is_refused_and_named_as_such(self) -> None:
         surface, _ = a_surface()
+        assert "graph.data" in surface.unimplemented()
 
-        result = surface.submit(Command("dataset.probe", {"datasetId": "d", "pointM": [0, 0, 0], "resultPosition": 0}))
+        result = surface.submit(Command("graph.data", {"graphId": "g"}))
 
         assert result.status is Status.REFUSED
         assert "実装がありません" in (result.reason or "")
@@ -548,6 +547,78 @@ class TestExportingADeliverable:
         result = surface.submit(Command("report.provenance", {"exportedPath": str(tmp_path / "x.html")}))
 
         assert result.status is Status.REFUSED
+
+
+class TestProbingAPoint:
+    """Step 4 through the surface. The answer is held to CT-003's nested reported-value shape, a
+    point off the model is an answer of nothing rather than a refusal, and a result position this
+    build cannot walk to is refused by name."""
+
+    def test_a_vertex_answers_with_its_value_and_says_it_is_a_point_s(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path)
+        surface.submit(Command("field.declareUnit", {"datasetId": dataset_id, "fieldName": "stress", "unitSymbol": "MPa"}))
+
+        result = surface.submit(Command("dataset.probe", {
+            "datasetId": dataset_id, "fieldName": "stress", "pointM": [0.0, 1.0, 0.0], "resultPosition": 0,
+        }))
+
+        assert result.status is Status.ANSWERED, result.reason
+        assert result.value["association"] == "point"
+        value = result.value["value"]
+        assert value["value"] == 40.0
+        assert value["unit"] == "MPa"
+        assert value["digits"] == 6
+        assert value["provenance"] == "dataset"
+        assert value["location"], "where, in the source's words - or the statement that it had none"
+
+    def test_a_cell_field_answers_with_the_cell_s_value(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path)
+
+        result = surface.submit(Command("dataset.probe", {
+            "datasetId": dataset_id, "fieldName": "element_stress", "pointM": [0.7, 0.2, 0.0], "resultPosition": 0,
+        }))
+
+        assert result.status is Status.ANSWERED, result.reason
+        assert result.value["association"] == "cell"
+        assert result.value["value"]["value"] == 100.0
+
+    def test_a_point_off_the_model_is_an_answer_of_nothing(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path)
+
+        result = surface.submit(Command("dataset.probe", {
+            "datasetId": dataset_id, "fieldName": "stress", "pointM": [9.0, 9.0, 9.0], "resultPosition": 0,
+        }))
+
+        assert result.status is Status.ANSWERED, "a well-formed question with nothing there is answered, not refused"
+        value = result.value["value"]
+        assert value["value"] is None
+        assert "外" in value["missingBecause"]
+        assert value["unit"] is None and value["digits"] == 6
+
+    def test_a_result_position_this_build_cannot_reach_is_refused_by_name(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path)
+
+        result = surface.submit(Command("dataset.probe", {
+            "datasetId": dataset_id, "fieldName": "stress", "pointM": [0.0, 0.0, 0.0], "resultPosition": 3,
+        }))
+
+        assert result.status is Status.REFUSED
+        assert "resultPosition=3" in (result.reason or "")
+
+    def test_an_unknown_field_is_refused(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path)
+
+        result = surface.submit(Command("dataset.probe", {
+            "datasetId": dataset_id, "fieldName": "nothing", "pointM": [0.0, 0.0, 0.0], "resultPosition": 0,
+        }))
+
+        assert result.status is Status.REFUSED
+
+    def test_the_contract_now_names_the_field(self) -> None:
+        """CT-003 2.2.0: a probe without a field name was a question with no answer."""
+        from service.command.catalogue import PARAMETERS
+
+        assert "fieldName" in PARAMETERS["dataset.probe"][1]
 
 
 class TestWhenNoPictureCanBeDrawn:

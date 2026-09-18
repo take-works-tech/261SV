@@ -599,7 +599,9 @@ class TestAReportedValueIsHeldToItsShape:
     @staticmethod
     def _ask(surface: Surface):
         return surface.submit(
-            Command("dataset.probe", {"datasetId": "d", "pointM": [0.0, 0.0, 0.0], "resultPosition": 0})
+            Command("dataset.probe", {
+                "datasetId": "d", "fieldName": "stress", "pointM": [0.0, 0.0, 0.0], "resultPosition": 0,
+            })
         )
 
     def test_a_bare_number_where_the_contract_wants_a_reported_value_fails(self) -> None:

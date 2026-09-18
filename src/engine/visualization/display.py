@@ -26,7 +26,7 @@ Specification: MOD-003, INV-001, LIM-002, ingest/AC-030, AC-031. Evidence: E-132
 from __future__ import annotations
 
 import numpy as np
-from vtkmodules.util.numpy_support import numpy_to_vtk, vtk_to_numpy
+from vtkmodules.util.numpy_support import numpy_to_vtk, numpy_to_vtkIdTypeArray, vtk_to_numpy
 from vtkmodules.vtkCommonCore import vtkPoints
 from vtkmodules.vtkCommonDataModel import vtkCellArray, vtkPolyData, vtkUnstructuredGrid
 from vtkmodules.vtkFiltersCore import vtkDecimatePro, vtkTriangleFilter
@@ -154,6 +154,25 @@ def display_geometry(
     )
     dataset.display_by_budget[budget] = geometry
     return geometry
+
+
+def as_polydata(geometry: DisplayGeometry) -> vtkPolyData:
+    """The display surface as the toolkit's own polygon type - points and triangles, nothing else.
+
+    Shared by the renderer and the pick, so that what is drawn and what is picked are one surface:
+    a pick against a second triangulation would land on triangles the picture does not show.
+    """
+    points = vtkPoints()
+    points.SetData(numpy_to_vtk(np.ascontiguousarray(geometry.points_m, dtype=np.float64), deep=True))
+    count = geometry.triangles.shape[0]
+    connectivity = np.ascontiguousarray(geometry.triangles.reshape(-1), dtype=np.int64)
+    offsets = np.arange(0, 3 * count + 1, 3, dtype=np.int64)
+    cells = vtkCellArray()
+    cells.SetData(numpy_to_vtkIdTypeArray(offsets, deep=True), numpy_to_vtkIdTypeArray(connectivity, deep=True))
+    surface = vtkPolyData()
+    surface.SetPoints(points)
+    surface.SetPolys(cells)
+    return surface
 
 
 def _cells_from_points(
