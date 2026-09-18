@@ -29,9 +29,8 @@ from dataclasses import dataclass
 from typing import Sequence
 
 import numpy as np
-from vtkmodules.util.numpy_support import numpy_to_vtk, numpy_to_vtkIdTypeArray, vtk_to_numpy
-from vtkmodules.vtkCommonCore import vtkLookupTable, vtkPoints
-from vtkmodules.vtkCommonDataModel import vtkCellArray, vtkPolyData
+from vtkmodules.util.numpy_support import numpy_to_vtk, vtk_to_numpy
+from vtkmodules.vtkCommonCore import vtkLookupTable
 from vtkmodules.vtkIOImage import vtkPNGWriter
 from vtkmodules.vtkRenderingAnnotation import vtkScalarBarActor
 from vtkmodules.vtkRenderingCore import (
@@ -49,7 +48,7 @@ from domain_core.dataset import Dataset, Field
 from domain_core.mesh import DisplayGeometry
 from engine.limits import MAX_INTERACTIVE_TRIANGLES
 from engine.visualization.colour_maps import COLOUR_MAPS, DEFAULT_COLOUR_MAP, ColourMap
-from engine.visualization.display import display_geometry
+from engine.visualization.display import as_polydata, display_geometry
 
 #: The largest image edge this renderer produces. Not yet a LIM: the offscreen buffer's ceiling has
 #: not been measured, and this is a guard against a mistyped size rather than a measured limit.
@@ -297,23 +296,8 @@ def _lookup_table(colour_map: ColourMap, low: float, high: float, out_of_range: 
     return table
 
 
-def _polydata(geometry: DisplayGeometry) -> vtkPolyData:
-    """The reduced surface as the toolkit's own polygon type - points and triangles, nothing else."""
-    points = vtkPoints()
-    points.SetData(numpy_to_vtk(np.ascontiguousarray(geometry.points_m, dtype=np.float64), deep=True))
-    count = geometry.triangles.shape[0]
-    connectivity = np.ascontiguousarray(geometry.triangles.reshape(-1), dtype=np.int64)
-    offsets = np.arange(0, 3 * count + 1, 3, dtype=np.int64)
-    cells = vtkCellArray()
-    cells.SetData(numpy_to_vtkIdTypeArray(offsets, deep=True), numpy_to_vtkIdTypeArray(connectivity, deep=True))
-    surface = vtkPolyData()
-    surface.SetPoints(points)
-    surface.SetPolys(cells)
-    return surface
-
-
 def _actor(geometry: DisplayGeometry, field: Field, table: vtkLookupTable, low: float, high: float) -> vtkActor:
-    surface = _polydata(geometry)
+    surface = as_polydata(geometry)
     values = np.asarray(field.values)
     if field.association is Association.POINT:
         # The value of the dataset point each display vertex came from - never the value at the

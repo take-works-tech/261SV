@@ -187,7 +187,7 @@ PARAMETERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "system.protocols": (frozenset([]), frozenset([])),
     "history.undo": (frozenset(['undoId']), frozenset(['undoId'])),
     "history.list": (frozenset(['workspaceId']), frozenset(['workspaceId'])),
-    "dataset.probe": (frozenset(['datasetId', 'pointM', 'resultPosition']), frozenset(['datasetId', 'pointM', 'resultPosition'])),
+    "dataset.probe": (frozenset(['datasetId', 'fieldName', 'pointM', 'resultPosition']), frozenset(['datasetId', 'fieldName', 'pointM', 'resultPosition'])),
     "dataset.parts": (frozenset(['datasetId']), frozenset(['datasetId'])),
     "field.derive": (frozenset(['datasetId', 'fieldName', 'frameId', 'quantity']), frozenset(['datasetId', 'fieldName', 'quantity'])),
     "field.setDisplayUnit": (frozenset(['quantity', 'unitSymbol', 'workspaceId']), frozenset(['quantity', 'unitSymbol', 'workspaceId'])),
@@ -352,7 +352,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
 
 #: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below
 #: the engine's floor is refused politely rather than answered in a shape it cannot read.
-PROTOCOL_VERSION = "2.1.0"
+PROTOCOL_VERSION = "2.2.0"
 
 
 def writes(operation: str) -> bool:

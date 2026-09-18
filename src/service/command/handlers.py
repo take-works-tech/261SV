@@ -6,10 +6,10 @@ catalogue operations was answered 「カタログにありますが、このビ�
 module is what joins them: one `Session` holding what the engine has in memory, and `build_surface`,
 which registers a handler for each operation this build can honestly perform.
 
-What is deliberately **not** registered is as much the point as what is. `dataset.probe` has no
-handler here - the probe is step 4 of the path - so the surface keeps answering "no implementation"
-for it, which is true, rather than a number that is not. `view.render` arrived with step 3: it draws
-through the native offscreen path and answers with a handle to the bytes.
+Every operation on XC-257's path is registered here. Those it took a step to earn say so in their
+handler: `view.render` arrived with step 3 and draws through the native offscreen path; `dataset.probe`
+with step 4 and reads one value off the full dataset through the surface that was picked. What the
+build still cannot do inside an operation is refused by name rather than approximated.
 
 Every handler answers in the shape CT-003 states and is held to it by the surface (RESULT_FIELDS,
 REPORTED_VALUES). A caller's mistake - a case that is not there, a file that cannot be read, a unit
@@ -20,7 +20,7 @@ module comes back as a failure, because that is the difference the two words mar
 from __future__ import annotations
 
 import secrets
-from dataclasses import dataclass, field as dataclass_field
+from dataclasses import dataclass, field as dataclass_field, replace
 from datetime import datetime, timezone
 from importlib import metadata
 from pathlib import Path
@@ -46,6 +46,7 @@ from engine.report.document import (
     ValueRow,
     build as build_document,
 )
+from engine.visualization import pick
 from engine.visualization.backends import REQUIRES, Backend, probe
 from engine.visualization.render import Camera, Colouring, RenderError, probe_offscreen, render_view
 from service.command.catalogue import PROTOCOL_VERSION
@@ -299,6 +300,7 @@ def handlers(session: Session) -> tuple[Handler, ...]:
         Handler("view.create", lambda p, t: item_create(session, "views", p)),
         Handler("view.update", lambda p, t: item_update(session, "views", "viewId", p)),
         Handler("view.render", lambda p, t: view_render(session, p)),
+        Handler("dataset.probe", lambda p, t: dataset_probe(session, p)),
         Handler("report.create", lambda p, t: item_create(session, "reports", p)),
         Handler("report.export", lambda p, t: report_export(session, p)),
         Handler("report.provenance", lambda p, t: report_provenance(session, p)),
@@ -723,6 +725,46 @@ def view_render(session: Session, parameters: Mapping[str, Any]) -> Effect | Res
     return Effect(
         f"{rendered.width}x{rendered.height} の画像を描きました（{handle['bytes']} バイト）",
         value={"handle": handle["id"], "reduced": rendered.reduced},
+    )
+
+
+def dataset_probe(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
+    """One value at a point, from the nearest part (view/AC-027 to AC-029).
+
+    A case may hold several parts; the pick is tried on each and the part whose surface the point is
+    nearest to answers, its label in front of the location so a node number in an assembly says which
+    part's numbering it belongs to. A point on no part's surface is a stated absence, not a refusal:
+    the question was well formed and the answer is "nothing is there".
+    """
+    loaded = session.loaded(str(parameters["datasetId"]))
+    if isinstance(loaded, Result):
+        return loaded
+    if int(parameters["resultPosition"]) != 0:
+        return refused(
+            f"resultPosition={parameters['resultPosition']} は読めません：この版は各ファイルの既定のステップ"
+            "だけを読みます（結果軸を辿るのは後の段）。位置 0 で問い合わせてください"
+        )
+    name = str(parameters["fieldName"])
+    holders = loaded.holders(name)
+    if not holders:
+        return refused(f"'{name}' というフィールドはこのデータセットにありません")
+    point = parameters["pointM"]
+    picks: list[tuple[Part, pick.Pick]] = []
+    for part in holders:
+        assert part.dataset is not None
+        try:
+            picks.append((part, pick.probe(part.dataset, name, point)))
+        except pick.PickError as error:
+            return refused(str(error))
+    part, found = min(picks, key=lambda pair: pair[1].distance_m)
+    value = found.value
+    if value.location and len(holders) > 1:
+        value = replace(value, location=f"{part.label}：{value.location}")
+    if loaded.case.is_partial:
+        value = value.with_caveat(Caveat.PARTIAL_DATASET)
+    return Effect(
+        f"'{name}' の値を読みました" if not value.is_missing else f"'{name}' の値はそこにありません",
+        value={"value": reported(value), "association": ASSOCIATION_WORD[found.association]},
     )
 
 
