@@ -69,7 +69,7 @@ class UnreadableFileError(Exception):
     """Raised when a supported format cannot be read: truncated, damaged, or empty of geometry."""
 
 
-def _declared_frame(path: Path, data: vtkDataSet | None) -> FrameDeclaration:
+def _declared_frame(path: Path, data: vtkDataObject | None) -> FrameDeclaration:
     """What this file declares about its frame.
 
     Every format this build reads declares **nothing**: the VTK XML formats carry no frame or unit
@@ -264,7 +264,12 @@ def _fields(data: vtkDataSet) -> dict[str, Field]:
                 # The element-block number Exodus writes onto every cell. An identity, carried on the
                 # part rather than offered as a quantity to plot (XC-236, E-136).
                 continue
-            values = vtk_to_numpy(array).astype(np.float64, copy=True)
+            # Stored at the precision the file gave it: a float32 result stays float32 (XC-246), so
+            # that `Field.significant_digits` says six and not fifteen (INV-014). The copy is what
+            # detaches the array from VTK's memory; the dtype is not touched. Promoting here was the
+            # defect XC-257 names first - it doubled the case against LIM-001 and, worse, made every
+            # float32 field claim double precision on the one path that reaches a document.
+            values = np.array(vtk_to_numpy(array), copy=True)
             name = array.GetName() or f"{association.value}_array_{index}"
             found[name] = Field(name=name, association=association, values=values, unit=None)
     return found
@@ -286,7 +291,7 @@ def _block_name(parent: vtkCompositeDataSet, index: int, fallback: str) -> str:
 
 
 def _walk(node: vtkDataObject, path: tuple[str, ...], found: list[Part], absent: list[str],
-          partitions: list[int]) -> None:
+          partitions: list[int], source: SourceFrame | None = None) -> None:
     """Collect the leaves of a composite as parts, keeping absent ones as absences.
 
     An empty leaf is a named `None` (E-133's measurement companion): the file said there was a part
@@ -300,7 +305,7 @@ def _walk(node: vtkDataObject, path: tuple[str, ...], found: list[Part], absent:
         if not present:
             absent.append(" / ".join(path) or "unnamed partitioned dataset")
             return
-        found.append(Part(name=path[-1], path=path, dataset=_combine(present)))
+        found.append(Part(name=path[-1], path=path, dataset=_combine(present, source)))
         return
 
     if isinstance(node, vtkCompositeDataSet):
@@ -319,7 +324,7 @@ def _walk(node: vtkDataObject, path: tuple[str, ...], found: list[Part], absent:
             if child is None:
                 absent.append(" / ".join(path + (name,)))
                 continue
-            _walk(child, path + (name,), found, absent, partitions)
+            _walk(child, path + (name,), found, absent, partitions, source)
         return
 
     # From here on the disposition is CT-012's, read from the contract rather than restated.
@@ -327,12 +332,14 @@ def _walk(node: vtkDataObject, path: tuple[str, ...], found: list[Part], absent:
     row = handling(node.GetClassName())
 
     if row.disposition is Disposition.READ and isinstance(node, vtkDataSet):
-        found.append(Part(name=path[-1], path=path, dataset=_as_dataset(node)))
+        found.append(Part(name=path[-1], path=path, dataset=_as_dataset(node, source=source)))
         return
 
     if row.disposition is Disposition.CONVERT:
         converted, record = to_unstructured(node)
-        found.append(Part(name=path[-1], path=path, dataset=_as_dataset(converted, conversion=record)))
+        found.append(Part(
+            name=path[-1], path=path, dataset=_as_dataset(converted, source=source, conversion=record),
+        ))
         return
 
     raise UnsupportedFormatError(
@@ -415,7 +422,7 @@ def _as_dataset(
     )
 
 
-def _combine(pieces: list[vtkDataSet]) -> Dataset:
+def _combine(pieces: list[vtkDataSet], source: SourceFrame | None = None) -> Dataset:
     """The partitions of one part, as the one mesh they were cut from.
 
     They are concatenated and **not merged**: the reader performs no point merging (E-039), so the
@@ -423,8 +430,8 @@ def _combine(pieces: list[vtkDataSet]) -> Dataset:
     welding them here would need a tolerance (XC-232).
     """
     if len(pieces) == 1:
-        return _as_dataset(pieces[0])
-    datasets = [_as_dataset(piece) for piece in pieces]
+        return _as_dataset(pieces[0], source=source)
+    datasets = [_as_dataset(piece, source=source) for piece in pieces]
     offset = 0
     points, offsets, connectivity, types = [], [np.zeros(1, np.int64)], [], []
     base = 0
@@ -450,6 +457,7 @@ def _combine(pieces: list[vtkDataSet]) -> Dataset:
         cells=Cells(np.concatenate(offsets), np.concatenate(connectivity), np.concatenate(types)),
         fields=fields,
         partitioning=Partitioning(partitions=len(pieces)),
+        source=source,
     )
 
 
@@ -483,7 +491,14 @@ def read_case(path: str | Path) -> LoadedCase:
     found: list[Part] = []
     absent: list[str] = []
     partitions: list[int] = []
-    _walk(data, (location.stem,), found, absent, partitions)
+    # The frame is resolved once for the file and carried onto every part, exactly as `read` carries
+    # it onto its one dataset: a part that arrived through a composite is no less converted, and a
+    # coordinate whose conversion cannot be explained is a coordinate that is merely trusted
+    # (ingest/AC-028). Until 2026-09-18 the parts of a case had no source at all.
+    source = SourceFrame(
+        *resolve_frame(_declared_frame(location, data)), reader=choice.factory.__name__
+    )
+    _walk(data, (location.stem,), found, absent, partitions, source)
 
     if not found:
         raise UnreadableFileError(
