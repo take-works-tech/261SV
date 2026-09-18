@@ -34,7 +34,7 @@ touches a file, a device or a clock.
 
 ### MOD-001 - domain-core
 - layer: domain-core
-- paths: src/domain_core, src/engine/limits.py, src/engine/render_limits.py
+- paths: src/domain_core, src/engine/limits.py, src/engine/render_limits.py, src/engine/report_limits.py
 - owns: the vocabulary of glossary section 1 as types - @Workspace, @Case, @Variable, @Field, units,
   the canonical frame, ID rules, and the invariants that guard them. Including the **two** geometries
   a @Dataset holds - the connectivity the file declared and the surface it is drawn as, which INV-001

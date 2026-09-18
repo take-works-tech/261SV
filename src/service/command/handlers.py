@@ -38,7 +38,7 @@ from engine import reader
 from engine.analysis import weights as field_weights
 from engine.analysis.summary import Reduction, Summary, SummaryError, Weighting, summarise
 from engine.limits import MachineClass
-from engine.report import html
+from engine.report import document as document_module, html
 from engine.report.document import (
     Provenance as ReportProvenance,
     ReportError,
@@ -800,6 +800,76 @@ def rows_for_report(session: Session, definition: Mapping[str, Any]) -> tuple[di
     return rows, involved
 
 
+#: How large a still is drawn for a deliverable, and how far it is cut down when the document would
+#: exceed LIM-006. Two retries, halving each time: a picture a quarter of the edge is a quarter of the
+#: page and still a picture, and a third halving would be a thumbnail nobody can read a contour from.
+FIGURE_SIZES = ((1200, 900), (800, 600), (560, 420))
+
+
+def figures_for_report(
+    session: Session, definition: Mapping[str, Any], size: tuple[int, int],
+) -> tuple[dict[str, document_module.Figure], list[Loaded]]:
+    """Draw a still for each view block that asked for one, at `size`.
+
+    A block asking for an interactive view or a video gets no figure and no substitute: the writer
+    names what it could not carry, which is the honest answer to a request this build cannot meet.
+    """
+    workspace = session.workspace
+    figures: dict[str, document_module.Figure] = {}
+    involved: list[Loaded] = []
+    if workspace is None:
+        return figures, involved
+    for index, block in enumerate(definition.get("blocks", []) or []):
+        if block.get("kind") != "view" or block.get("form") != "still":
+            continue
+        view_id = str(block.get("viewId") or "")
+        key = view_id or str(index)
+        try:
+            item = items.find(workspace.raw, "views", view_id)
+        except ItemError as error:
+            raise ReportError(f"{key} 番目の view ブロック：{error}") from None
+        view = item["definition"]
+        loaded = session.datasets.get(str(view.get("datasetId", "")))
+        if loaded is None:
+            raise ReportError(f"ビュー '{view_id}' のデータセットが読み込まれていません")
+        stated = view.get("colouring")
+        if not isinstance(stated, Mapping):
+            raise ReportError(f"ビュー '{view_id}' に着色（colouring）がありません")
+        colouring = colouring_of(stated)
+        if isinstance(colouring, Result):
+            raise ReportError(colouring.reason or "着色を読めません")
+        camera = camera_of(view.get("camera"))
+        if isinstance(camera, Result):
+            raise ReportError(camera.reason or "カメラを読めません")
+        available, detail = session.offscreen()
+        if not available:
+            raise ReportError(f"図を描けません：{detail}")
+        try:
+            rendered = render_view(
+                loaded.datasets(), colouring, width=size[0], height=size[1], camera=camera,
+            )
+        except RenderError as error:
+            raise ReportError(f"ビュー '{view_id}' を描けません：{error}") from None
+        if loaded not in involved:
+            involved.append(loaded)
+        figures[key] = document_module.Figure(
+            png=rendered.png,
+            width=rendered.width,
+            height=rendered.height,
+            legend=document_module.Legend(
+                field_name=rendered.legend.field_name,
+                unit=rendered.legend.unit,
+                minimum=rendered.legend.minimum,
+                maximum=rendered.legend.maximum,
+                digits=rendered.legend.digits,
+                colour_map=rendered.legend.colour_map,
+                uniform=rendered.legend.uniform,
+            ),
+            description=str(item.get("name") or view_id),
+        )
+    return figures, involved
+
+
 def report_export(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
     workspace = session.open_workspace()
     if isinstance(workspace, Result):
@@ -813,18 +883,38 @@ def report_export(session: Session, parameters: Mapping[str, Any]) -> Effect | R
     except ItemError as error:
         return refused(str(error))
     definition = item["definition"]
-    try:
-        rows, involved = rows_for_report(session, definition)
-        document = build_document(definition, rows_for=rows, provenance=session.provenance_of(involved))
-    except ReportError as error:
-        return refused(str(error))
     # No font ships yet (OPEN-032): every Japanese label is unrepresentable and the document says so
     # itself, which is XC-254's rule and XC-257's stated state of the prototype.
     capability = html.Capability()
-    try:
-        export = html.write(document, path, capability=capability, accepted=True)
-    except ReportError as error:
-        return refused(str(error))
+    reductions: list[str] = []
+    export = None
+    for attempt, size in enumerate(FIGURE_SIZES):
+        try:
+            rows, involved = rows_for_report(session, definition)
+            figures, drawn = figures_for_report(session, definition, size)
+            for one in drawn:
+                if one not in involved:
+                    involved.append(one)
+            document = build_document(
+                definition, rows_for=rows, figures_for=figures,
+                provenance=session.provenance_of(involved),
+            )
+            export = html.write(document, path, capability=capability, accepted=True)
+        except ReportError as error:
+            # LIM-006's on_exceed: reduce the picture and say by how much, rather than writing a file
+            # a mail system will bounce or dropping the picture without a word. Only a size refusal
+            # is retried; anything else is the caller's answer.
+            if "LIM-006" in str(error) and attempt + 1 < len(FIGURE_SIZES):
+                nxt = FIGURE_SIZES[attempt + 1]
+                reductions.append(
+                    f"図を {size[0]}x{size[1]} から {nxt[0]}x{nxt[1]} に縮小しました"
+                    f"（成果物の上限 {html.MAX_REPORT_BYTES:,} バイト・LIM-006）"
+                )
+                continue
+            return refused(str(error))
+        break
+    if export is None:  # pragma: no cover - the loop returns or breaks
+        return refused("成果物を書き出せませんでした")
 
     def undo() -> None:
         if path.exists():
@@ -836,7 +926,7 @@ def report_export(session: Session, parameters: Mapping[str, Any]) -> Effect | R
         value={
             "path": str(export.path),
             "bytes": export.bytes,
-            "reductions": [],
+            "reductions": reductions,
             "omitted": list(export.stated),
         },
         undo=undo,

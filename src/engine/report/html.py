@@ -24,10 +24,21 @@ provenance and its caveats, so the document is readable with the 3D content brok
 readers and as "not applicable" to others, and it is neither.
 
 **What this build cannot do yet is named, not implied.** `Capability` holds what the writer can put in
-the file. Two things are absent from it today and both are stated rather than quietly skipped: the
-rotatable @View of AC-001, which needs the vtk.js bundle and so a JavaScript build; and the embedded
-font subset of AC-015, which needs a font whose licence permits it. Until each arrives, a document
-using it is refused unless the caller accepts a list that names it.
+the file, and a view block is named by **the form it asked for**: a still is written when a picture was
+drawn for it, while the rotatable @View of AC-001 still needs the vtk.js bundle and a video needs a
+camera path and a codec. Neither is quietly given a still instead - a reader who asked to rotate the
+model and got a photograph was answered with something else under the same name. The embedded font
+subset of AC-015 is absent for the same kind of reason, needing a font whose licence permits it. Until
+each arrives, a document using it is refused unless the caller accepts a list that names it.
+
+**A still carries its legend as text, not in the picture.** Measured: the toolkit's embedded faces
+draw a Japanese title as nothing at all - no glyph, no box, no warning (E-192) - and 単位未宣言 is the
+word a picture of an undeclared field must carry. So the image holds the colour ramp and its tick
+digits, and the field, the unit and the range are typeset here, in the document's own font.
+
+**A deliverable has a weight limit** (LIM-006). An embedded picture makes that a real question rather
+than a theoretical one, so the size is measured before the file exists and an oversized document is
+refused with the figure named rather than written and bounced by a mail system.
 
 **The font is required of every report, not only of reports containing Japanese.** Found by the check
 rather than assumed: a document whose content is entirely Latin still fails, because this product's own
@@ -41,26 +52,47 @@ INV-007, INV-013, XC-001, XC-003.
 
 from __future__ import annotations
 
+import base64
 import html as html_escape
 import unicodedata
 from dataclasses import dataclass, field as dataclass_field
 from pathlib import Path
 
+from domain_core.precision import format_value
 from domain_core.reported_value import CAVEAT_TEXT, UNDECLARED_MARKER, Caveat
 from engine.report.document import (
     EXTERNAL,
     Block,
     BlockKind,
     Document,
+    Figure,
     ReportError,
     ValueRow,
+    ViewForm,
 )
+from engine.report_limits import MAX_REPORT_BYTES
 
-#: Block kinds this writer can put into a static document. `VIEW` is absent: AC-001 asks for the view to
-#: be **rotatable**, which needs the vtk.js bundle of 09_technology.md and therefore a JavaScript build.
-#: A still picture in its place would satisfy the sentence and not the requirement, so the kind is
-#: declared unsupported and named to the caller rather than quietly downgraded.
-STATIC_KINDS = frozenset({BlockKind.VALUE_TABLE, BlockKind.TEXT, BlockKind.PAGE_BREAK, BlockKind.GRAPH})
+#: Block kinds this writer can put into a static document. `VIEW` is here from 2026-09-18 and is the
+#: **conditional** one: a view block is writable when it asked for a still and a picture was drawn for
+#: it, and not otherwise. AC-001's rotatable view still needs the vtk.js bundle of 09_technology.md and
+#: a video still needs a camera path and a codec; neither is written as a still in its place, because a
+#: reader who asked to rotate the model and got a photograph was answered with something else under the
+#: same name (XC-254). Which of the three a block asked for is `Block.form` (CT-006 2.1.0).
+STATIC_KINDS = frozenset({
+    BlockKind.VALUE_TABLE, BlockKind.TEXT, BlockKind.PAGE_BREAK, BlockKind.GRAPH, BlockKind.VIEW,
+})
+
+#: What a view block that cannot be written says, by the form it asked for. Written out per form
+#: because "this view cannot be included" is a message nobody can act on: one of these is fixed by
+#: rendering the view first, one by a build that bundles the viewer, and one by a build that encodes
+#: video.
+VIEW_FORM_REASONS: dict[ViewForm | None, str] = {
+    ViewForm.INTERACTIVE: "回転できる 3D 表示には vtk.js の同梱が要ります（AC-001）",
+    ViewForm.VIDEO: "動画にはカメラパスと動画コーデックが要ります（この版にはありません）",
+    ViewForm.STILL: "静止画が描かれていません：先にビューを描画してから書き出してください",
+    None: "どの形（still / video / interactive）か書かれていません。"
+    "書ける形を選んで入れることはしません（CT-006 2.1.0）",
+}
 
 #: Characters every font has. Anything outside it needs either an embedded font or a statement that the
 #: document depends on what the reader's machine has (AC-015, AC-016).
@@ -130,18 +162,15 @@ def unrepresentable(
     found: list[Unrepresentable] = []
 
     for index, block in enumerate(document.blocks):
+        where = block.title or f"{index + 1} 番目のブロック"
         if block.kind not in build.kinds:
-            where = block.title or f"{index + 1} 番目のブロック"
+            found.append(Unrepresentable(f"{block.kind.value} ブロック", where))
+            continue
+        if block.kind is BlockKind.VIEW and block.figure is None:
+            # The one conditional kind: writable as a still with a picture, and named by the form it
+            # asked for otherwise, so the reader is told which thing is missing.
             found.append(
-                Unrepresentable(
-                    f"{block.kind.value} ブロック"
-                    + (
-                        "：回転できる 3D 表示には vtk.js の同梱が要ります（AC-001）"
-                        if block.kind is BlockKind.VIEW
-                        else ""
-                    ),
-                    where,
-                )
+                Unrepresentable(f"view ブロック：{VIEW_FORM_REASONS[block.form]}", where)
             )
 
     found += _uncovered_characters(document, build.font)
@@ -200,6 +229,13 @@ def _elements(document: Document) -> list[tuple[str, str]]:
             found.append((f"{where}・見出し", block.title))
         if block.text:
             found.append((f"{where}・本文", block.text))
+        if block.figure is not None:
+            # The legend's words are in the document rather than in the picture (E-192), so they are
+            # the document's to render - and 単位未宣言 is exactly the string a build with no font
+            # would turn into empty boxes on the reader's machine. The **same** strings the writer
+            # emits, not a second phrasing of them: a coverage check against text the file does not
+            # contain reports characters nobody will see and misses the ones they will.
+            found.append((f"{where}・凡例", "".join(_legend_parts(block.figure))))
         for row in block.rows:
             found.append((f"{where}・{row.label}", row.label + (row.value.unit or "")))
     found.append(("来歴", document.provenance.as_text()))
@@ -260,6 +296,15 @@ def write(
     # differed from the same document written elsewhere. A deliverable's stated size is its size
     # (LIM-006), and the same document is the same bytes on every platform (XC-046).
     encoded = text.encode("utf-8")
+    if len(encoded) > MAX_REPORT_BYTES:
+        # LIM-006: a deliverable an engineer emails has to stay under what a mail system accepts.
+        # Refused **before the file exists** rather than written oversized, and the caller is told by
+        # how much, because what it does about it - a smaller picture, fewer views - is its choice.
+        raise ReportError(
+            f"この文書は {len(encoded):,} バイトで、上限 {MAX_REPORT_BYTES:,} バイトを超えます"
+            f"（LIM-006）。書き出しは行いません — 図を小さくするか、図の数を減らしてください。"
+            "黙って送れない大きさのファイルを作るより、ここで申し上げます"
+        )
     destination.write_bytes(encoded)
     return Export(
         destination,
@@ -307,6 +352,8 @@ def _block(block: Block, index: int) -> str:
         parts.append(f"<h2>{_text(block.title)}</h2>")
     if block.text:
         parts.append(f"<p>{_text(block.text)}</p>")
+    if block.figure is not None:
+        parts.append(_figure(block.figure))
     if block.reduced:
         # AC-003: the reduction is in the document, not only on the screen it happened on.
         parts.append(
@@ -318,6 +365,62 @@ def _block(block: Block, index: int) -> str:
     if block.rows:
         parts.append(_table(block.rows))
     parts.append("</section>")
+    return "\n".join(parts)
+
+
+#: What a still says about itself, beyond its legend. Held here so the coverage check and the writer
+#: read from one list: a note the file carries and the check does not know about is a note that
+#: becomes empty boxes on a machine without the font.
+STILL_NOTE = "この図は静止画です。回転はできません（report/AC-001）"
+NOT_UNIFORM_NOTE = (
+    "このカラーマップは知覚均等ではありません："
+    "色の変化の速さが値の変化の速さと一致しないため、勾配の見え方は当てになりません（XC-111）"
+)
+
+
+def _legend_parts(figure: Figure) -> tuple[str, ...]:
+    """Every string the figure puts in the document, in the order it puts them."""
+    legend = figure.legend
+    parts = [
+        figure.description or f"{legend.field_name} の表示",
+        legend.field_name,
+        legend.unit_text,
+        format_value(legend.minimum, legend.digits),
+        format_value(legend.maximum, legend.digits),
+        legend.colour_map,
+    ]
+    if not legend.uniform:
+        parts.append(NOT_UNIFORM_NOTE)
+    parts.append(STILL_NOTE)
+    return tuple(parts)
+
+
+def _figure(figure: Figure) -> str:
+    """The picture, embedded, with its legend as text beside it (E-192) and its form stated.
+
+    The bytes travel as a `data:` URI because the file is self-contained: a picture fetched from
+    somewhere is a picture the recipient may not get (AC-001, INV-007). The legend is typeset here
+    rather than drawn into the image, and the document says the view is a still - a reader who cannot
+    turn it should be told it does not turn, not left to discover it.
+    """
+    encoded = base64.b64encode(figure.png).decode("ascii")
+    legend = figure.legend
+    low = format_value(legend.minimum, legend.digits)
+    high = format_value(legend.maximum, legend.digits)
+    parts = [
+        '<figure class="view">',
+        f'<img src="data:image/png;base64,{encoded}" width="{figure.width}" height="{figure.height}"'
+        f' alt="{_text(figure.description or legend.field_name + " の表示")}">',
+        '<figcaption>',
+        f'<span class="legend-field">{_text(legend.field_name)}</span>'
+        f'<span class="legend-unit">{_text(legend.unit_text)}</span>'
+        f'<span class="legend-range">{_text(low)} – {_text(high)}</span>'
+        f'<span class="legend-map">{_text(legend.colour_map)}</span>',
+    ]
+    if not legend.uniform:
+        parts.append(f'<p class="note">{_text(NOT_UNIFORM_NOTE)}</p>')
+    parts.append(f'<p class="note">{_text(STILL_NOTE)}</p>')
+    parts += ["</figcaption>", "</figure>"]
     return "\n".join(parts)
 
 
@@ -432,6 +535,15 @@ def _stylesheet(font: EmbeddedFont | None) -> str:
         + "td.value{text-align:right;font-variant-numeric:tabular-nums}"
         + "td.undeclared,td.missing{font-style:italic}"
         + "p.note{font-size:.9rem;opacity:.85}"
+        # A still and its legend. The picture scales to the page and never past its own pixels, so a
+        # printed report does not enlarge it into softness; the legend reads as one line of facts.
+        + "figure.view{margin:1rem 0}"
+        + "figure.view img{max-width:100%;height:auto;display:block}"
+        + "figure.view figcaption{font-size:.9rem;margin-top:.4rem}"
+        + "figure.view figcaption span{margin-right:.9rem}"
+        + ".legend-field{font-weight:600}"
+        + ".legend-range{font-variant-numeric:tabular-nums}"
+        + ".legend-map{opacity:.85}"
         + "hr.page-break{border:0;border-top:1px solid currentColor;margin:2rem 0}"
         + "@media print{hr.page-break{break-after:page;border:0}}"
         + "section.limitations,section.provenance{margin-top:2.5rem;font-size:.95rem}"
