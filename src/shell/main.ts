@@ -19,12 +19,15 @@ import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import type { EngineProcessStatus } from "../ui/client/shell";
-import { startEngine, type Engine } from "./engine-process.js";
+import { developmentEngine, packagedEngine, startEngine, type Engine } from "./engine-process.js";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url)); // <package>/dist/shell/
 const PACKAGE = resolve(HERE, "..", "..");
 const ROOT = resolve(PACKAGE, "..", "..");
-const UI_DIST = join(ROOT, "src", "ui", "dist");
+// Packaged, the interface and the engine sit in the application's resources; in development they
+// are the repository's own build outputs (XC-261). Nothing else differs between the two.
+const PACKAGED = app.isPackaged;
+const UI_DIST = PACKAGED ? join(process.resourcesPath, "ui") : join(ROOT, "src", "ui", "dist");
 const SCHEME = "solvia";
 const ORIGIN = `${SCHEME}://app`;
 const PYTHON = process.env.SOLVIA_PYTHON ?? "python";
@@ -60,8 +63,7 @@ function broadcast(status: EngineProcessStatus): void {
 
 async function start(directory: string): Promise<Engine> {
   const started = await startEngine({
-    python: PYTHON,
-    root: ROOT,
+    ...(PACKAGED ? packagedEngine(process.resourcesPath) : developmentEngine(PYTHON, ROOT)),
     directory,
     allowOrigin: ORIGIN,
     onStatus: broadcast,
@@ -204,12 +206,22 @@ app.on("window-all-closed", () => {
 });
 
 async function smoke(): Promise<number> {
-  const summary: Record<string, unknown> = { python: PYTHON, root: ROOT };
+  const summary: Record<string, unknown> = {
+    packaged: PACKAGED,
+    engine: PACKAGED ? packagedEngine(process.resourcesPath).command : `${PYTHON} -m service.transport`,
+    version: app.getVersion(),
+  };
   const directory = engineDirectory();
   mkdirSync(directory, { recursive: true });
   try {
     const first = await start(directory);
-    summary.started = { pid: first.status().pid, protocol: first.connection?.protocol ?? null };
+    // From this process's own start to the engine answering /health: what a person waits for after
+    // the icon is clicked, less the window itself (#307).
+    summary.started = {
+      pid: first.status().pid,
+      protocol: first.connection?.protocol ?? null,
+      afterMs: Math.round(process.uptime() * 1000),
+    };
 
     // A crash, as a crash would arrive: the process is gone and 'exit' says so (E-200).
     const crashed = new Promise<EngineProcessStatus>((resolveStatus) => {

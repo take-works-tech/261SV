@@ -80,5 +80,48 @@
     ],
     "not_measured": "a packaged cold start on a machine that has never run the product (#307)",
     "settles": "XC-259: the connection file outlives a terminated engine, so it carries the writer's pid and is removed on a clean stop"
+  },
+  "packaged_start": {
+    "measured": "2026-09-19",
+    "script": "packaging/freeze_engine.py --check --thread; src/shell: npm run package -- --win dir; release/win-unpacked/SOLVIA.exe --smoke",
+    "machine": "Windows 11, Python 3.11.9, VTK 9.5.2, PyInstaller 6.22.3, Electron 44.4.3, electron-builder 26.15.3; file cache warm from the build",
+    "frozen_engine": {
+      "bytes": 297218704,
+      "files": 1600,
+      "freeze_seconds": 22.2,
+      "spawn_to_connection_file_s": 0.549,
+      "first_health_ms": 6.1,
+      "protocol": "2.5.0",
+      "operations": 16
+    },
+    "thread_over_http": {
+      "render_png_bytes": 70510,
+      "pick_value_K": 8.0,
+      "export_bytes": 229791,
+      "export_matches_disk": true
+    },
+    "unpacked_windows_application_mb": 655,
+    "packaged_smoke_no_python_on_path": [
+      {
+        "start_to_engine_running_ms": 483,
+        "crash_detected": "SIGKILL",
+        "restart_different_pid": true,
+        "connection_file_after_stop": false
+      },
+      {
+        "start_to_engine_running_ms": 391,
+        "crash_detected": "SIGKILL",
+        "restart_different_pid": true,
+        "connection_file_after_stop": false
+      },
+      {
+        "start_to_engine_running_ms": 412,
+        "crash_detected": "SIGKILL",
+        "restart_different_pid": true,
+        "connection_file_after_stop": false
+      }
+    ],
+    "not_measured": "a first launch on a machine that has never run the product (#307); the file cache here had seen every file during the build",
+    "settles": "XC-261: a PyInstaller one-directory freeze runs the whole prototype thread with no Python installed, and the packaged shell reaches a running engine in under half a second warm"
   }
 }

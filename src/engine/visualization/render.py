@@ -25,6 +25,7 @@ Specification: view/AC-007, AC-019, XC-087, XC-111, INV-001, INV-009, XC-001.
 
 from __future__ import annotations
 
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Sequence
 
@@ -401,16 +402,31 @@ def _refuse_an_empty_frame(frame: object, background: tuple[float, float, float]
 #: process because on a machine with no display the toolkit does not refuse - it **segfaults** in
 #: `Render()` (E-194, measured on a GitHub runner), and a segfault in the engine process takes the
 #: engine down with it (XC-045's reason for isolating the readers, now the renderer's too).
-_PROBE_SCRIPT = """
-import vtkmodules.vtkRenderingOpenGL2
-from vtkmodules.vtkRenderingCore import vtkRenderer, vtkRenderWindow
-window = vtkRenderWindow()
-window.SetOffScreenRendering(1)
-window.AddRenderer(vtkRenderer())
-window.SetSize(8, 8)
-window.Render()
-print(window.ReportCapabilities().splitlines()[0] if window.ReportCapabilities() else "rendered")
-"""
+def offscreen_probe_main() -> None:
+    """Render one frame offscreen and print the OpenGL vendor line, or die trying.
+
+    Run in a child process, never in the engine: a machine that cannot render offscreen may take the
+    process down rather than raise (E-194). Reached two ways that are the same code - `-c` on an
+    interpreter in development, and the `--offscreen-probe` argument on the frozen engine, whose
+    `sys.executable` is the engine itself and takes no `-c` (XC-261).
+    """
+    # The OpenGL backend is registered by this module's own import of vtkRenderingOpenGL2 (top).
+    from vtkmodules.vtkRenderingCore import vtkRenderer, vtkRenderWindow
+
+    window = vtkRenderWindow()
+    window.SetOffScreenRendering(1)
+    window.AddRenderer(vtkRenderer())
+    window.SetSize(8, 8)
+    window.Render()
+    print(window.ReportCapabilities().splitlines()[0] if window.ReportCapabilities() else "rendered")
+
+
+#: The `-c` form, for an interpreter: the same function, imported.
+_PROBE_SCRIPT = "from engine.visualization.render import offscreen_probe_main; offscreen_probe_main()"
+
+#: The argument a frozen engine recognises as "run the probe and exit" (packaging/engine_entry.py).
+OFFSCREEN_PROBE_ARGUMENT = "--offscreen-probe"
+
 
 PROBE_TIMEOUT_SECONDS = 30
 
@@ -422,13 +438,27 @@ def probe_offscreen(timeout_seconds: int = PROBE_TIMEOUT_SECONDS) -> tuple[bool,
     and a failed render may not return. So the attempt runs in a child process, and its exit status
     is the answer: (True, the OpenGL vendor line) or (False, what happened).
     """
+    import os
     import subprocess
     import sys
 
+    # A frozen engine's sys.executable is the engine: it runs the probe on a named argument rather
+    # than on `-c`, which it does not have (XC-261).
+    frozen = bool(getattr(sys, "frozen", False))
+    command = [sys.executable, OFFSCREEN_PROBE_ARGUMENT] if frozen else [sys.executable, "-c", _PROBE_SCRIPT]
+    # The `-c` form imports this module, so the child must find it where the parent did: the
+    # directory above the `engine` package goes first on its path. A frozen engine carries its own.
+    environment = dict(os.environ)
+    if not frozen:
+        source_root = str(Path(__file__).resolve().parents[2])
+        environment["PYTHONPATH"] = os.pathsep.join(
+            [source_root] + [one for one in environment.get("PYTHONPATH", "").split(os.pathsep) if one]
+        )
     try:
         completed = subprocess.run(
-            [sys.executable, "-c", _PROBE_SCRIPT],
+            command,
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout_seconds,
+            env=environment,
         )
     except subprocess.TimeoutExpired:
         return False, f"オフスクリーン描画の確認が {timeout_seconds} 秒で終わりませんでした"

@@ -9,6 +9,7 @@ __pycache__/
 dist/
 dist-preload/
 build/
+release/
 *.egg-info/
 .coverage
 coverage.xml

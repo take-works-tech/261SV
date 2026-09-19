@@ -5440,3 +5440,46 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a documented change in Electron's checklist or scheme privileges; or the
   interface needing an API the bridge cannot carry, which is a case for widening the bridge by one
   named function and not for loosening the isolation
+
+### XC-261 - The engine is frozen into one directory, and the package is the unpacked application
+- decided: 2026-09-19
+- status: active
+- decision: XC-040's "pinned Python environment for the engine" is a **PyInstaller one-directory
+  freeze** of `python -m service.transport` (`packaging/freeze_engine.py`, `solvia-engine`), collected
+  whole for `vtkmodules` and by submodule for the three source packages, with the runtime
+  distributions' metadata. **Never one file**: a one-file build unpacks itself into a temporary
+  directory on every start (E-203), which is the cold start #307 is about, paid on every launch.
+  The shell finds the engine at `resources/engine/` when packaged and runs the interpreter in
+  development; nothing else differs (MOD-018). electron-builder produces the **unpacked
+  application** (`dir` targets) - the thing an installer would install - and no installer, because
+  XC-051's signature does not exist yet and an unsigned installer is an installation failure. The
+  frozen engine recognises one argument of its own, `--offscreen-probe`: its `sys.executable` is
+  itself (E-203) and the offscreen probe (E-194) runs the same function through it that development
+  runs through `-c`
+- decided_by: engineering judgement inside XC-040 and XC-050, recorded with what was measured
+- rationale: **the engine is Python and the shell is not, and the person installing has neither.** A
+  frozen directory is the smallest thing that runs with nothing installed; a bundled interpreter
+  plus site-packages is the same bytes with the module search left to run time, which is where a
+  missing library is found by a customer. What PyInstaller's static analysis misses is what freezing
+  fails on, so the result is not trusted: the frozen engine is started and **walked through the
+  whole prototype thread over HTTP** - open, load, declare, render, pick, export - before it is
+  packaged, here and in CI. That walk found the one thing analysis could not: the offscreen probe
+  spawned `sys.executable -c`, and a frozen `sys.executable` takes no `-c`.
+  **Measured** (E-202, this machine, 2026-09-19): the frozen engine is 297 MB in 1600 files and
+  freezes in 22 s; the unpacked Windows application is 655 MB; started with **no Python on the
+  path**, the packaged shell has the engine answering `/health` **391-483 ms** after its own start,
+  across three launches - within the "several hundred megabytes" XC-050 expected and well under the
+  unresponsive seconds #307 feared. That is still not a cold start on a machine that has never run
+  it; the file cache on this machine had seen the files in the build. A true first launch stays
+  unmeasured until there is an installer to install
+- alternatives: **a bundled interpreter** (python-build-standalone or a venv copied whole) - no hidden
+  imports to chase, and the same size, with the module search happening on the customer's machine
+  instead of at build time. It is the fallback if a reader or a renderer ever fails to freeze that
+  cannot be fixed by collecting it. **One-file** - one executable, unpacked into a temporary
+  directory on every start (E-203). **An installer now** - unsigned (XC-051)
+- basis: E-202 (T1), E-203 (T1), E-204 (T1), E-194 (T1), E-021 (T1)
+- affects: XC-040, XC-050, XC-041, XC-025, MOD-018
+- decidedness: Bounded
+- reversal_trigger: a reader or renderer that cannot be made to freeze, which moves the engine to a
+  bundled interpreter; or a measured first launch on a clean machine that is slow enough to need a
+  splash, which is #307's question and not this one's

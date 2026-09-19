@@ -30,7 +30,12 @@ from check_specs import parse_spec_file  # noqa: E402
 
 # Highest first. A module may import from its own layer or any layer after it in this order.
 LAYERS = ("shell", "ui", "ui-logic", "state", "client", "service", "engine", "domain-core")
-SKIP_DIRS = {".git", "__pycache__", ".venv", ".venv-spike", "node_modules", "spike", "tests", "validate"}
+SKIP_DIRS = {
+    ".git", "__pycache__", ".venv", ".venv-spike", "node_modules", "spike", "tests", "validate",
+    # Build outputs, never sources: a packaged shell under src/shell/release carries VTK's Python
+    # files, which are nobody's module here.
+    "build", "dist", "dist-preload", "release",
+}
 
 
 @dataclass(frozen=True)
