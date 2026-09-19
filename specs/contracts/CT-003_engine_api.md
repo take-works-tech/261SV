@@ -10,7 +10,11 @@ updated: 2026-09-19
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 2.6.0
+- version: 2.7.0
+- correction: 2026-09-19, version 2.6.0 to 2.7.0. `dataset.inspect` is added: the home screen's import
+  review states a format's support level and the reader's gaps **before anything loads** (ingest/REQ-015,
+  XC-049), and nothing in the contract answered that without reading the file. It reads the path's
+  extension and the file's size and time, never its contents. Additive
 - correction: 2026-09-19, version 2.5.0 to 2.6.0. `workspace.open` answers the items the document
   holds. Found by the recovery path of #306: after an engine restart the interface reopened the
   saved document and then created its working view again under the same name, which the document
@@ -92,6 +96,7 @@ no identifier to report.
 | `case.delete` | write | case id | affected descendant ids |
 | `case.move` | write | case id, new parent id | - |
 | `case.tag` | write | case id, tags | - |
+| `dataset.inspect` | read | path | what can be said before the file is read: format, the support level this build promises for it, the reader's known gaps, size, modification time (ingest/AC-032) |
 | `dataset.load` | write | case id, file paths | dataset id, fields with association, support level, gaps |
 | `dataset.describe` | read | dataset id | point and cell counts, bounds in metres, time steps, partial flag |
 | `field.declareUnit` | write | dataset id, field name, unit symbol | - |

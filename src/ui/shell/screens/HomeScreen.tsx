@@ -207,13 +207,14 @@ function WorkspaceList() {
   const filtersActive = query.trim() !== "" || scope !== "すべて" || tags.length > 0;
 
   const openWorkspace = (id: string) => {
-    submit({ operation: "workspace.open", parameters: { workspace: id } });
+    submit({ operation: "workspace.open", parameters: { path: `${id}.svw` } });
     session.openWorkspace();
   };
-  /* CT-003 has no workspace.create operation yet; the design state dispatches the open
-   * operation with a create parameter so the action still goes through the one path (INV-006). */
+  /* CT-003 has no workspace.create operation yet; opening a path that does not exist is what a
+   * create will be, and the design state names that path so the action goes through the one
+   * operation the contract has (INV-006). */
   const createWorkspace = () => {
-    submit({ operation: "workspace.open", parameters: { create: true } });
+    submit({ operation: "workspace.open", parameters: { path: "新規ワークスペース.svw" } });
   };
 
   return (
@@ -364,11 +365,11 @@ function WorkspaceList() {
 
 function FirstRun() {
   const openSample = (id: string) => {
-    submit({ operation: "workspace.open", parameters: { workspace: id } });
+    submit({ operation: "workspace.open", parameters: { path: `${id}.svw` } });
     session.openWorkspace();
   };
   const pickFiles = () => {
-    submit({ operation: "dataset.describe", parameters: { source: "file-picker" } });
+    submit({ operation: "dataset.inspect", parameters: { path: "bracket_run12.cgns" } });
     session.navigate("home", "import-review");
   };
 
@@ -429,11 +430,7 @@ function ImportReviewDialog() {
   const load = () => {
     submit({
       operation: "dataset.load",
-      parameters: {
-        files: IMPORT_FILES.map((file) => file.name),
-        tags: acceptedTags,
-        grouping: groupingAccepted === true,
-      },
+      parameters: { caseId: "case:new", filePaths: IMPORT_FILES.map((file) => file.name) },
     });
     session.navigate("home", "importing");
   };
@@ -590,7 +587,7 @@ function ImportingState() {
   /* CT-003 has no dedicated cancel operation for a dataset load yet; the design state
    * dispatches the load operation with a cancel parameter through the one path (INV-006). */
   const cancelRead = () => {
-    submit({ operation: "dataset.load", parameters: { file: "bracket_run12.cgns", action: "cancel" } });
+    /* cancellation is the transport's abort (CT-003 has no cancel for this); nothing is submitted */ undefined;
     session.navigate("home", "default");
   };
 
@@ -631,7 +628,7 @@ function ImportingState() {
 
 function UnreadableFileState() {
   const pickAnother = () => {
-    submit({ operation: "dataset.describe", parameters: { source: "file-picker" } });
+    submit({ operation: "dataset.inspect", parameters: { path: "bracket_run12.cgns" } });
     session.navigate("home", "import-review");
   };
 

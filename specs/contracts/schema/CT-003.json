@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -25,6 +25,7 @@
         "case.delete",
         "case.move",
         "case.tag",
+        "dataset.inspect",
         "dataset.load",
         "dataset.describe",
         "field.declareUnit",
@@ -1518,6 +1519,19 @@
               "type": "integer",
               "minimum": 0,
               "description": "上からのピクセル"
+            }
+          }
+        },
+        "dataset.inspect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "読む前のファイル。中身は開かない"
             }
           }
         }
@@ -3878,6 +3892,45 @@
             "association": {
               "type": "string",
               "description": "節点の値か要素の値か（INV-003）"
+            }
+          }
+        },
+        "dataset.inspect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "format",
+            "supportLevel",
+            "gaps",
+            "sizeBytes",
+            "modifiedIso",
+            "exists"
+          ],
+          "properties": {
+            "format": {
+              "type": "string",
+              "description": "拡張子で決まる形式名（小文字）"
+            },
+            "supportLevel": {
+              "type": "string",
+              "description": "Verified / Limited / Absent など、この版がその形式に約束する水準（AC-032）"
+            },
+            "gaps": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "読み手の既知の欠け。読まなかった単位情報を含む（AC-034）"
+            },
+            "sizeBytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "modifiedIso": {
+              "type": "string"
+            },
+            "exists": {
+              "type": "boolean"
             }
           }
         }

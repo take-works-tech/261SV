@@ -266,7 +266,7 @@ export function FindScreen(props: { variant: string }) {
             onClick={() =>
               submit({
                 operation: "script.run",
-                parameters: { instruction: "find.run", mode, association, expression: expressionText },
+                parameters: { scriptText: `find ${mode} ${association} ${expressionText}`, authorisation: { allowDestructive: false } },
               })
             }
           >
@@ -376,7 +376,7 @@ export function FindScreen(props: { variant: string }) {
               onClick={() =>
                 submit({
                   operation: "script.run",
-                  parameters: { instruction: "find.keep", name: keepName, expression: expressionText },
+                  parameters: { scriptText: `keep ${keepName} = ${expressionText}`, authorisation: { allowDestructive: false } },
                 })
               }
             >
@@ -462,7 +462,7 @@ export function FindRail(props: { tab: string; variant: string }) {
             className="fi-sel"
             title={sel.name}
             onClick={() =>
-              submit({ operation: "script.run", parameters: { instruction: "find.open", name: sel.name } })
+              submit({ operation: "script.run", parameters: { scriptText: `open ${sel.name}`, authorisation: { allowDestructive: false } } })
             }
           >
             <span className="name">{sel.name}</span>

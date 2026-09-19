@@ -238,7 +238,7 @@ function refLine(unit: FlowUnit, variant: string) {
 function UnitControls(props: { title: string; running: boolean }) {
   const lock = props.running ? disabledBecause(EDIT_LOCK_REASON) : null;
   const act = (action: string) => () =>
-    submit({ operation: "pipeline.update", parameters: { pipeline: "pl-0001", unit: props.title, action } });
+    submit({ operation: "pipeline.update", parameters: { pipelineId: "pipeline:pl-0001", definition: { units: [{ name: props.title, action }] } } });
   return (
     <span className="pi-controls">
       <button type="button" aria-label={`${props.title}を上へ移動`} {...(lock ?? {})} title={lock?.title ?? "上へ移動"} onClick={act("move-up")}>▲</button>
@@ -340,7 +340,7 @@ function FlowHeader(props: { variant: string }) {
           {...(dryLock ?? {})}
           title={dryLock?.title ?? "実行せずに対象と生成物を確認します — 書込なし（AC-008）"}
           onClick={() => {
-            submit({ operation: "pipeline.dryRun", parameters: { pipeline: "pl-0001" } });
+            submit({ operation: "pipeline.dryRun", parameters: { pipelineId: "pipeline:pl-0001" } });
             session.navigate("pipeline", "dry-run");
           }}
         >
@@ -368,7 +368,7 @@ function Banner(props: { variant: string }) {
           label="パイプライン実行中"
           detail="run-2026-08-29_01 — ユニット5/9・ケース2/3（板厚変更）"
           fraction={0.5}
-          onCancel={() => submit({ operation: "pipeline.cancel", parameters: { run: "run-2026-08-29_01" } })}
+          onCancel={() => submit({ operation: "pipeline.cancel", parameters: { runId: "run-2026-08-29_01" } })}
           cancelNote="中止はユニット境界で反映されます — 処理中のユニットは完了まで実行されます"
         />
         <p className="notice warn pi-note" role="status">
@@ -519,7 +519,7 @@ function EmptyPipeline() {
       <div className="actions">
         <button
           className="btn primary"
-          onClick={() => submit({ operation: "pipeline.update", parameters: { pipeline: "pl-0001", add: "case" } })}
+          onClick={() => submit({ operation: "pipeline.update", parameters: { pipelineId: "pipeline:pl-0001", definition: { units: [{ kind: "case" }] } } })}
         >
           ＋ ケースユニットを追加
         </button>
@@ -565,7 +565,7 @@ export function PipelineScreen(props: { variant: string }) {
             type="button"
             {...(insertLock ?? {})}
             title={insertLock?.title ?? "右のパレットで種類を選び、ここに追加します"}
-            onClick={() => submit({ operation: "pipeline.update", parameters: { pipeline: "pl-0001", insert: "end" } })}
+            onClick={() => submit({ operation: "pipeline.update", parameters: { pipelineId: "pipeline:pl-0001", definition: { units: [] } } })}
           >
             ＋ ユニットをここに追加（右のパレットから選択）
           </button>
@@ -582,7 +582,7 @@ export function PipelineScreen(props: { variant: string }) {
             `${row.kase} — 読み込み済み結果データ ${formatBytes(CLEAR_BYTES[index] ?? 0)} を解放（書込済みファイルは削除しません）`,
           )}
           onAccept={() => {
-            submit({ operation: "pipeline.run", parameters: { pipeline: "pl-0001", authorised: ["u-clear"] } });
+            submit({ operation: "pipeline.run", parameters: { pipelineId: "pipeline:pl-0001", destructiveAuthorisation: ["u-clear"] } });
             session.navigate("pipeline", "running");
           }}
           onCancel={() => session.navigate("pipeline", "default")}
@@ -620,7 +620,7 @@ function RailUnitPalette(props: { variant: string }) {
               role="listitem"
               {...(lock ?? {})}
               title={lock?.title ?? `${meta.label}ユニットを末尾に追加（Undo可能）`}
-              onClick={() => submit({ operation: "pipeline.update", parameters: { pipeline: "pl-0001", add: kind } })}
+              onClick={() => submit({ operation: "pipeline.update", parameters: { pipelineId: "pipeline:pl-0001", definition: { units: [{ kind }] } } })}
             >
               <span className="pi-glyph" aria-hidden>{meta.glyph}</span>
               <span className="pi-main"><b>{meta.label}</b><small title={meta.detail}>{meta.detail}</small></span>
@@ -668,7 +668,7 @@ function RailSettings(props: { variant: string }) {
   const ref = unit.reference;
   const refUnselected = variant === "unit-reference" && unit.id === "u-report";
   const update = (field: string) => () =>
-    submit({ operation: "pipeline.update", parameters: { pipeline: "pl-0001", unit: unit.id, field } });
+    submit({ operation: "pipeline.update", parameters: { pipelineId: "pipeline:pl-0001", definition: { units: [{ id: unit.id, field }] } } });
 
   return (
     <>
@@ -870,7 +870,7 @@ function RailHistory(props: { variant: string }) {
             label="run-2026-08-29_01"
             detail="ユニット5/9・ケース2/3（板厚変更）"
             fraction={0.5}
-            onCancel={() => submit({ operation: "pipeline.cancel", parameters: { run: "run-2026-08-29_01" } })}
+            onCancel={() => submit({ operation: "pipeline.cancel", parameters: { runId: "run-2026-08-29_01" } })}
             cancelNote="中止はユニット境界で反映されます"
           />
           <p className="prop-note">中止した場合、どのユニットの前で停止したかを実行記録に残します。</p>

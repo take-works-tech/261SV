@@ -462,7 +462,7 @@ function AuditCanvas({ variant }: { variant: string }) {
               className="btn"
               title="監査記録をファイルとして書き出します。書き出しは端末内で完結します。"
               onClick={() =>
-                submit({ operation: "system.audit", parameters: { scope: "workspace", format: "jsonl" } })
+                submit({ operation: "system.audit", parameters: { since: "2026-08-29T00:00:00+09:00" } })
               }
             >
               監査記録を書き出し

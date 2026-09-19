@@ -219,7 +219,7 @@ function UnitsPanel({ invalid }: { invalid: boolean }) {
               {...(valid ? { disabled: false } : disabledBecause("認識できる単位のみ保存できます"))}
               onClick={() => {
                 setApplied(trimmed);
-                submit({ operation: "field.setDisplayUnit", parameters: { field: "stress", unit: trimmed } });
+                submit({ operation: "field.setDisplayUnit", parameters: { workspaceId: "ws:1", quantity: "stress", unitSymbol: trimmed } });
               }}
             >
               保存
@@ -262,7 +262,7 @@ function FramesPanel() {
             id="se-frame"
             className="field-input"
             defaultValue="global"
-            onChange={(event) => submit({ operation: "frame.declare", parameters: { frame: event.target.value } })}
+            onChange={(event) => submit({ operation: "frame.declare", parameters: { workspaceId: "ws:1", name: event.target.value, kind: "cartesian", origin: [0, 0, 0], axis: [[1, 0, 0], [0, 1, 0], [0, 0, 1]] } })}
           >
             <option value="global">グローバル直交（X・Y・Z）</option>
             <option value="bearing">軸受中心 R-θ-Z（円筒）</option>
@@ -910,7 +910,7 @@ function DiagnosticsPanel({ openBundle }: { openBundle: boolean }) {
                 onClick={() => {
                   submit({
                     operation: "system.supportBundle",
-                    parameters: { caseNames: includeCaseNames, inputPaths: includeInputPaths },
+                    parameters: { consent: { caseNames: includeCaseNames, inputPaths: includeInputPaths }, path: "C:\\Users\\eng-04\\Documents\\solvia-support-2026-08-29.zip" },
                   });
                   setCreatedTo("C:\\Users\\eng-04\\Documents\\solvia-support-2026-08-29.zip");
                   setBundleOpen(false);

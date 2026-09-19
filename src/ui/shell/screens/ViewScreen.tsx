@@ -361,7 +361,7 @@ function ViewCanvas({ variant }: { variant: string }) {
           unit="MPa"
           origin="dataset"
           location="GlobalNodeId 20481・未変形座標・時刻 12.0 s・節点値（平均なし）"
-          onHold={() => submit({ operation: "variable.declare", parameters: { name: "プローブ応力", source: "probe" } })}
+          onHold={() => submit({ operation: "variable.declare", parameters: { workspaceId: "ws:1", caseId: "case-012", name: "プローブ応力", value: 241.7, unit: "MPa" } })}
         />
       ) : null}
 
@@ -610,7 +610,7 @@ function PlaybackOverlay(props: {
       <button
         className="icon-button"
         aria-label="再生"
-        onClick={() => submit({ operation: "view.update", parameters: { playback: "start", axis: props.axisId } })}
+        onClick={() => submit({ operation: "view.update", parameters: { viewId: "view:current", definition: { resultPosition: { timeStep: 0 } } } })}
       >
         ▶
       </button>
@@ -748,7 +748,7 @@ function AssistantDrawer() {
       draft={draft}
       onDraft={setDraft}
       onSend={() => {
-        submit({ operation: "script.run", parameters: { instruction: draft.trim() } });
+        submit({ operation: "script.run", parameters: { scriptText: draft.trim(), authorisation: { allowDestructive: false } } });
         setDraft("");
       }}
       onClose={() => session.navigate("view", "default")}
@@ -795,9 +795,9 @@ function EmptyCanvas() {
         <h2>表示するケースがありません</h2>
         <p>開始プリセットを選ぶか、ワークスペースへ結果ファイルをドロップします。プリセットは絵の構成だけを持ち、数値には触れません。</p>
         <div className="actions">
-          <button className="btn primary" onClick={() => submit({ operation: "view.create", parameters: { preset: "overview" } })}>全体外観</button>
-          <button className="btn" onClick={() => submit({ operation: "view.create", parameters: { preset: "section-contour" } })}>断面＋コンター</button>
-          <button className="btn" onClick={() => submit({ operation: "view.create", parameters: { preset: "deformation" } })}>変形の拡大表示</button>
+          <button className="btn primary" onClick={() => submit({ operation: "view.create", parameters: { workspaceId: "ws:1", definition: { name: "全体外観", datasetId: "dataset:current", representation: "surface" }, sourceTemplateId: "template:overview" } })}>全体外観</button>
+          <button className="btn" onClick={() => submit({ operation: "view.create", parameters: { workspaceId: "ws:1", definition: { name: "断面＋コンター", datasetId: "dataset:current", representation: "slice" }, sourceTemplateId: "template:section-contour" } })}>断面＋コンター</button>
+          <button className="btn" onClick={() => submit({ operation: "view.create", parameters: { workspaceId: "ws:1", definition: { name: "変形の拡大表示", datasetId: "dataset:current", representation: "surface" }, sourceTemplateId: "template:deformation" } })}>変形の拡大表示</button>
         </div>
       </div>
       <div style={{ width: "min(520px, 100%)", margin: "0 auto", padding: "0 16px 16px" }}>
@@ -810,7 +810,7 @@ function EmptyCanvas() {
           ]}
           openId={null}
           onOpen={() => session.navigate("view", "default")}
-          onCreate={() => submit({ operation: "view.create", parameters: {} })}
+          onCreate={() => submit({ operation: "view.create", parameters: { workspaceId: "ws:1", definition: { name: "新しいビュー", datasetId: "dataset:current", representation: "surface" } } })}
         />
       </div>
     </div>
@@ -827,7 +827,7 @@ function RendererErrorCanvas() {
           どちらの経路で描いたかは出力の来歴に記録されます。
         </p>
         <div className="actions">
-          <button className="btn primary" onClick={() => submit({ operation: "view.render", parameters: { renderer: "vtk" } })}>
+          <button className="btn primary" onClick={() => submit({ operation: "view.update", parameters: { viewId: "view:current", definition: { rendererBackend: "native" } } })}>
             VTK 経路で続ける
           </button>
           <button className="btn ghost" onClick={() => submit({ operation: "system.capabilities", parameters: {} })}>接続を再確認</button>
@@ -925,7 +925,7 @@ function OverallTab({ variant }: { variant: string }) {
           roots={outlinerRoots(variant)}
           selectedId={selectedNode}
           onSelect={setSelectedNode}
-          onToggleVisible={(id) => submit({ operation: "view.update", parameters: { toggleVisible: id } })}
+          onToggleVisible={(id) => submit({ operation: "view.update", parameters: { viewId: "view:current", definition: { partVisibility: { [id]: false } } } })}
           emptyText="データセット未読込です。読み込むと元ファイルの構成をここに表示します。サンプル構造は作りません"
         />
       </section>
@@ -1063,9 +1063,9 @@ function CameraTab({ variant }: { variant: string }) {
           ))}
         </div>
         <div className="vi-row-actions" style={{ marginTop: 6 }}>
-          <button className="btn ghost" onClick={() => submit({ operation: "view.update", parameters: { camera: "add" } })}>追加</button>
-          <button className="btn ghost" onClick={() => submit({ operation: "view.duplicate", parameters: { camera: selected } })}>複製</button>
-          <button className="btn ghost" onClick={() => submit({ operation: "view.update", parameters: { camera: "remove", id: selected } })}>削除</button>
+          <button className="btn ghost" onClick={() => submit({ operation: "view.update", parameters: { viewId: "view:current", definition: { camera: { projection: "perspective" } } } })}>追加</button>
+          <button className="btn ghost" onClick={() => submit({ operation: "view.duplicate", parameters: { viewId: "view:current", newName: `${selected} のコピー` } })}>複製</button>
+          <button className="btn ghost" onClick={() => submit({ operation: "view.update", parameters: { viewId: "view:current", definition: { camera: {} } } })}>削除</button>
         </div>
         <p className="prop-note">規則で位置を決めるカメラは座標を保存しません。ケースごとに解決し、解決できないときは名指しして拒否します。各画面は覗くカメラを名指しします。</p>
       </section>
@@ -1493,7 +1493,7 @@ function OutputTab({ variant }: { variant: string }) {
         <div className="prop-row"><label>既存出力</label><span>上書きしない</span></div>
       </section>
       <section className="prop-section">
-        <button className="btn primary" onClick={() => submit({ operation: "view.render", parameters: { mode: effectiveMode } })}>
+        <button className="btn primary" onClick={() => submit({ operation: "view.render", parameters: { viewId: "view:current", width: 1920, height: 1080, format: "png" } })}>
           出力前チェックへ
         </button>
         <p className="prop-note">レンダラー・保存先・動画のカメラパス・時間対応を検査してから出力します。不足があれば開始しません。</p>
@@ -1636,7 +1636,7 @@ function ObjectProperties({ kind }: { kind: ObjectKind }) {
                 { name: "ひずみエネルギー密度", association: "integrationPoint", unit: null },
               ]}
               value="ミーゼス応力"
-              onChange={(name) => submit({ operation: "view.update", parameters: { field: name } })}
+              onChange={(name) => submit({ operation: "view.update", parameters: { viewId: "view:current", definition: { colouring: { fieldName: name, association: "point", colourMap: "viridis" } } } })}
             />
           </div>
           <div className="prop-row"><label>位置</label><span>節点（ソースに従う）</span></div>
