@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-006 report definition",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "type": "object",
   "additionalProperties": true,
   "required": [
@@ -186,8 +186,9 @@
             }
           }
         },
-        "producedIso": {
-          "type": "string"
+        "produced": {
+          "$ref": "CT-001.json#/$defs/recordedTime",
+          "description": "書き出した時刻"
         }
       }
     }

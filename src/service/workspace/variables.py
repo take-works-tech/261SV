@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+from domain_core.recorded_time import RecordedTime
 from service.workspace.hierarchy import require, walk
 
 Case = dict[str, Any]
@@ -195,7 +196,7 @@ def set_value(document: dict[str, Any], case_id: str, variable_id: str, value: A
 
 
 def detach(
-    document: dict[str, Any], case_id: str, variable_id: str, *, when: str
+    document: dict[str, Any], case_id: str, variable_id: str, *, when: RecordedTime
 ) -> Resolution:
     """Stop following the parent, starting from the value it currently shows (AC-044).
 
@@ -213,7 +214,7 @@ def detach(
     _states(case)[variable_id] = {
         "state": VariableState.INDEPENDENT.value,
         "value": resolution.value,
-        "detachedIso": when,
+        "detached": when.as_stored(),
     }
     return resolve(document, case_id, variable_id)
 

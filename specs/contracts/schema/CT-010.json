@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-010 failure report",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "type": "object",
   "additionalProperties": true,
   "required": ["reason", "summary", "changed"],
@@ -79,6 +79,6 @@
     },
     "remedy": { "type": "string", "description": "what the user can do, where there is something" },
     "detail": { "type": "string", "description": "technical text for a support bundle; never required to understand the summary" },
-    "occurredIso": { "type": "string" }
+    "occurred": { "$ref": "CT-001.json#/$defs/recordedTime" }
   }
 }

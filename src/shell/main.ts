@@ -65,6 +65,14 @@ let window: BrowserWindow | null = null;
 let stopping = false;
 const log: string[] = [];
 
+/** The zone the shell stands in, named beside every UTC stamp it writes (XC-142): `UTC+09:00`. */
+function zoneOfNow(): string {
+  const east = -new Date().getTimezoneOffset();
+  const sign = east >= 0 ? "+" : "-";
+  const absolute = Math.abs(east);
+  return `UTC${sign}${String(Math.floor(absolute / 60)).padStart(2, "0")}:${String(absolute % 60).padStart(2, "0")}`;
+}
+
 const SHELL_LOG_MAX_BYTES = 1_000_000;
 
 function note(line: string): void {
@@ -77,7 +85,7 @@ function note(line: string): void {
     mkdirSync(directory, { recursive: true });
     const file = join(directory, "shell.log");
     if (existsSync(file) && statSync(file).size > SHELL_LOG_MAX_BYTES) renameSync(file, join(directory, "shell.log.1"));
-    appendFileSync(file, `${new Date().toISOString()} ${line}\n`);
+    appendFileSync(file, `${new Date().toISOString()} ${zoneOfNow()} ${line}\n`);
   } catch {
     /* a note that cannot be written is not a reason to stop */
   }

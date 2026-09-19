@@ -321,7 +321,7 @@ class TestTheTrustContentIsInTheFile:
         """AC-007. The workspace, the cases, the sources with their times, the units, the version."""
         text = render(a_document())
 
-        for expected in ("workspace:001", "Run 12", "run12.vtu", "2026-08-26T00:00:00Z", "0.1.0"):
+        for expected in ("workspace:001", "Run 12", "run12.vtu", "2026-08-26 09:00（UTC+09:00）", "0.1.0"):
             assert expected in text
 
     def test_a_limitations_section_is_always_present(self) -> None:

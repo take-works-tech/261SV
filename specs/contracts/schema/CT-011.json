@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-011 Material Asset definition",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "object",
   "additionalProperties": true,
   "required": [
@@ -15,7 +15,7 @@
   ],
   "properties": {
     "contract": { "const": "CT-011" },
-    "version": { "const": "1.0.0" },
+    "version": { "const": "2.0.0" },
     "materialX": {
       "type": "object",
       "additionalProperties": true,
@@ -146,7 +146,7 @@
         "colorConfigurationSha256": { "$ref": "#/$defs/sha256" },
         "sampleData": { "type": "boolean" },
         "sampleFixtureSha256": { "$ref": "#/$defs/sha256" },
-        "generatedIso": { "type": "string", "format": "date-time" }
+        "generated": { "$ref": "CT-001.json#/$defs/recordedTime" }
       }
     },
     "licence": {
@@ -163,15 +163,15 @@
     "provenance": {
       "type": "object",
       "additionalProperties": true,
-      "required": ["createdBy", "createdIso"],
+      "required": ["createdBy", "created"],
       "properties": {
         "createdBy": { "type": "string", "minLength": 1 },
-        "createdIso": { "type": "string", "format": "date-time" },
+        "created": { "$ref": "CT-001.json#/$defs/recordedTime" },
         "sourceUri": { "type": "string" },
         "sourceSha256": { "$ref": "#/$defs/sha256" },
         "importer": { "type": "string" },
         "importerVersion": { "type": "string" },
-        "importedIso": { "type": "string", "format": "date-time" },
+        "imported": { "$ref": "CT-001.json#/$defs/recordedTime" },
         "author": { "type": "string" },
         "authoringTool": { "type": "string" },
         "authoringToolVersion": { "type": "string" }

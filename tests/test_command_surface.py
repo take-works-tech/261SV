@@ -72,7 +72,7 @@ class Store:
             value={
                 "entries": [
                     {"operation": "view.rename", "origin": "interface",
-                     "atUtc": "2026-08-25T00:00:00Z", "outcome": name}
+                     "at": {"utc": "2026-08-25T00:00:00Z", "offsetMinutes": 0}, "outcome": name}
                     for name in self.names.values()
                 ]
             },

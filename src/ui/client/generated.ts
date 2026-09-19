@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "2.9.0";
+export const PROTOCOL_VERSION = "3.0.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -671,7 +671,7 @@ export interface Results {
     entries: readonly ({
       operation: string;
       origin: "interface" | "assistant" | "script" | "pipeline";
-      atUtc: string;
+      at: RecordedTime;
       outcome: string;
       undoId?: string;
       undoable?: boolean;
@@ -800,8 +800,8 @@ export interface Results {
     written: readonly (string)[];
     failedCases: readonly (string)[];
     stoppedAt?: string | null;
-    startedUtc?: string;
-    finishedUtc?: string;
+    started?: RecordedTime;
+    finished?: RecordedTime;
   };
   "pipeline.cancel": {
     stoppedAt: string;
@@ -816,14 +816,15 @@ export interface Results {
     caseIds: readonly (string)[];
     sources: readonly ({
       path: string;
-      modifiedUtc: string;
+      modified: RecordedTime;
     })[];
     declaredUnits: Record<string, unknown>;
     productVersion: string;
+    produced: RecordedTime;
   };
   "system.audit": {
     entries: readonly ({
-      atUtc: string;
+      at: RecordedTime;
       purpose: string;
       host: string;
       outcome: "sent" | "refused" | "awaitingConfirmation";
@@ -864,7 +865,7 @@ export interface Results {
     supportLevel: string;
     gaps: readonly (string)[];
     sizeBytes: number;
-    modifiedIso: string;
+    modified?: RecordedTime;
     exists: boolean;
   };
 }
@@ -881,4 +882,12 @@ export type ReportedValue = {
   caveats?: readonly (string)[];
   missingBecause?: string;
   location?: string;
+};
+
+/** A time this product recorded: the UTC instant, and the offset of the zone it was recorded
+  * in - or null where a record written before the offset was kept has none (XC-142, XC-266).
+  * Defined once, in CT-001's $defs.recordedTime, and referenced by every contract. */
+export type RecordedTime = {
+  utc: string;
+  offsetMinutes: number | null;
 };

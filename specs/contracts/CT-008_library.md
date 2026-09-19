@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-22
+updated: 2026-09-20
 ---
 
 # Contract: template and asset library
@@ -10,7 +10,10 @@ updated: 2026-08-22
   The same envelope for a material, a font, a background, a camera path, an Object asset, a view, a
   graph and a report
 - schema: schema/CT-008.json
-- version: 2.2.0
+- version: 3.0.0
+- correction: 2026-09-20, version 2.2.0 to 3.0.0. `origin.copiedIso` becomes `origin.copied`,
+  `imported.importedIso` becomes `imported.at`, and `updatedIso` becomes `updated` - each the one
+  wire form of a recorded time (CT-001 `$defs.recordedTime`, XC-266). Breaking
 - strictness: unknown fields are **preserved** - an entry authored by a newer build must survive being
   opened, moved between scopes and saved by an older one (CT-001)
 - compatibility: an entry states the contract version of the definition it carries, so a view saved

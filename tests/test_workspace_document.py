@@ -103,7 +103,8 @@ class TestUnknownFieldsSurvive:
     def test_a_newer_document_opens_and_may_not_be_written_back(self, tmp_path: Path) -> None:
         """CT-001 compatibility: keep every field it does not understand, and refuse to write it back
         under the older version - writing it would claim to understand a shape that changed."""
-        source = write(tmp_path / "w.svw", dict(MINIMAL, formatVersion="5.0.0", newSection={"a": 1}))
+        newer = f"{int(FORMAT_VERSION.split('.')[0]) + 1}.0.0"
+        source = write(tmp_path / "w.svw", dict(MINIMAL, formatVersion=newer, newSection={"a": 1}))
 
         document = load(source)
 
@@ -111,7 +112,7 @@ class TestUnknownFieldsSurvive:
         assert document.raw["newSection"] == {"a": 1}
         with pytest.raises(WorkspaceVersionError) as refusal:
             save(document, source)
-        assert "5.0.0" in str(refusal.value)
+        assert newer in str(refusal.value)
 
 
 class TestADamagedFileIsNeverWrittenTo:

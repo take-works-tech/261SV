@@ -143,7 +143,7 @@ class TestTheTrustContentIsMandatory:
         text = a_document().as_text()
 
         assert "runs/run12.vtu" in text
-        assert "2026-08-25T00:00:00Z" in text
+        assert "更新 2026-08-25 09:00（UTC+09:00）" in text, "the recorded moment with its zone named (XC-266)"
 
     def test_it_records_the_declared_units(self) -> None:
         assert "stress：MPa" in a_document().as_text()

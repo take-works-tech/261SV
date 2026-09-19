@@ -38,3 +38,5 @@ features are storing data is a migration rather than an edit.
 - a document written by a newer version keeps its unknown fields when an older version saves it (CT-001)
 - the document has a measured ceiling on items: creation past it is refused by name, and a file past
   it opens whole and says so (LIM-016, XC-265)
+- every time the document records is UTC with the offset beside it, in the one form every contract
+  shares, and a time recorded before the offset was kept says so (XC-142, XC-266)

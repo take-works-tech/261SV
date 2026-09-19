@@ -32,7 +32,13 @@ from typing import Any
 #: What this build writes. A document declaring a **newer major** may be opened - every field it holds
 #: is kept - and may not be written back under this version, because writing it would mean claiming to
 #: understand a shape that changed (CT-001 compatibility).
-FORMAT_VERSION = "4.0.0"
+FORMAT_VERSION = "5.0.0"
+
+#: The major this build lifts to its own on open. Version 4 wrote a source's modification time and a
+#: variable's detachment time as bare UTC strings (`modifiedIso`, `detachedIso`); version 5 writes
+#: every recorded time as `{utc, offsetMinutes}` (XC-266), and a time version 4 wrote gets a null
+#: offset - unknown, not zero (XC-001). Version 3 is not lifted by this build, as before.
+LIFTED_MAJOR = 4
 
 #: The fields CT-001 requires. Their absence is a damaged document rather than an old one: a file
 #: without `cases` is not a workspace missing a feature, it is not a workspace.
@@ -71,6 +77,9 @@ class WorkspaceDocument:
     raw: dict[str, Any] = dataclass_field(default_factory=dict)
     #: Where it was read from, where one exists. A document built in memory has none.
     origin: Path | None = None
+    #: The version the file declared where this build lifted it to its own on open, so the open can
+    #: say so; None where the file was already this build's shape.
+    migrated_from: str | None = None
 
     @property
     def format_version(self) -> str:
@@ -137,7 +146,39 @@ def load(path: str | Path) -> WorkspaceDocument:
             "機能の欠けたワークスペースではなく、ワークスペースではないものとして扱います"
         )
 
-    return WorkspaceDocument(raw=parsed, origin=location)
+    return WorkspaceDocument(raw=parsed, origin=location, migrated_from=lift_in_place(parsed))
+
+
+def lift_in_place(parsed: dict[str, Any]) -> str | None:
+    """Lift a version-4 document to this build's shape, field by field, and say which version it was.
+
+    Two known fields move - a source's `modifiedIso` and a variable state's `detachedIso`, each into
+    the `{utc, offsetMinutes}` a recorded time has everywhere (XC-266) with the offset **null**,
+    because the file never kept it and zero would be a claim (XC-001). Everything else, known or not,
+    stays where it is. The document is then what this build would have written, so a save writes
+    it as this version - and the open's answer says so, because a file that changes version on the
+    next save is a thing a person shares with somebody on the version before.
+    """
+    declared = str(parsed.get("formatVersion", ""))
+    if _major(declared) != LIFTED_MAJOR:
+        return None
+
+    def lift(holder: dict[str, Any], old: str, new: str) -> None:
+        if old in holder and new not in holder:
+            holder[new] = {"utc": str(holder.pop(old)), "offsetMinutes": None}
+
+    remaining = [one for one in (parsed.get("cases") or []) if isinstance(one, dict)]
+    while remaining:
+        case = remaining.pop()
+        for source in case.get("sources") or []:
+            if isinstance(source, dict):
+                lift(source, "modifiedIso", "modified")
+        for state in (case.get("variableStates") or {}).values():
+            if isinstance(state, dict):
+                lift(state, "detachedIso", "detached")
+        remaining += [one for one in (case.get("children") or []) if isinstance(one, dict)]
+    parsed["formatVersion"] = FORMAT_VERSION
+    return declared
 
 
 def save(document: WorkspaceDocument, path: str | Path) -> Path:

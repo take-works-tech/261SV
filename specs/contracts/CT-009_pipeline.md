@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-21
+updated: 2026-09-20
 ---
 
 # Contract: pipeline
@@ -10,7 +10,10 @@ updated: 2026-08-21
   view, this graph and this report" into "do that for every result, including the ones that do not
   exist yet"
 - schema: schema/CT-009.json
-- version: 3.0.0
+- version: 4.0.0
+- correction: 2026-09-20, version 3.0.0 to 4.0.0. A run record's `startedIso` becomes `started`, the
+  one wire form of a recorded time (CT-001 `$defs.recordedTime`, XC-266) - which is what XC-142's
+  "run records" had asked for and the string had not carried. Breaking
 - strictness: unknown fields are **rejected** - a pipeline carrying a unit this build does not
   understand would silently skip work the user believes was done
 - compatibility: a unit kind added later is additive; a unit kind never changes meaning

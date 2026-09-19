@@ -20,6 +20,7 @@ from typing import Any
 
 import pytest
 from conftest import FIXED_INSTANT
+from domain_core.recorded_time import RecordedTime
 
 from service.workspace.hierarchy import (
     HierarchyError,
@@ -42,7 +43,7 @@ from service.workspace.variables import (
     set_value,
 )
 
-WHEN = FIXED_INSTANT
+WHEN = RecordedTime(FIXED_INSTANT, 540)
 
 
 def workspace() -> dict[str, Any]:
@@ -213,7 +214,7 @@ class TestDetachingIsDeliberate:
         declare(document, "mesh", "メッシュ寸法", 5.0)
         detach(document, "a", "mesh", when=WHEN)
 
-        assert find(document["cases"], "a")[0]["variableStates"]["mesh"]["detachedIso"] == WHEN
+        assert find(document["cases"], "a")[0]["variableStates"]["mesh"]["detached"] == WHEN.as_stored()
 
     def test_detaching_twice_is_refused_rather_than_silently_repeated(self) -> None:
         document = workspace()

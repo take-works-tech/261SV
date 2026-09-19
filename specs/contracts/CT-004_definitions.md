@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-26
+updated: 2026-09-20
 ---
 
 # Contracts: view, graph and report definitions
@@ -126,7 +126,10 @@ was in the same unit.
 ### CT-006 - Report definition
 - purpose: the reproducible description of a deliverable - what goes in it, in what order, in what style
 - schema: schema/CT-006.json
-- version: 2.1.0
+- version: 3.0.0
+- correction: 2026-09-20, version 2.1.0 to 3.0.0. `producedFrom.producedIso` becomes
+  `producedFrom.produced`, the one wire form of a recorded time (CT-001 `$defs.recordedTime`,
+  XC-266): the export stamp carried the instant and not the zone it was made in. Breaking
 - correction: 2026-09-18, version 2.0.0 to 2.1.0. A view block named a view and nothing else, so
   "put this view in the report" could only mean the rotatable form, and a build without the viewer
   bundle had to refuse every view block whatever the author wanted. `form` is added -

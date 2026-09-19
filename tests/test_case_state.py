@@ -27,6 +27,7 @@ from service.workspace.case_state import (
     summary_of,
 )
 from service.workspace.hierarchy import add, new_case
+from conftest import FIXED_MOMENT
 from service.workspace.sources import record, resolve_case
 
 
@@ -104,7 +105,7 @@ class TestUnresolvedIsReachableFromAnywhere:
         path = tmp_path / "run.vtu"
         path.write_text("result", encoding="utf-8")
         case = a_case(CaseState.LOADED)
-        case["sources"] = [record(path, relative_to=tmp_path)]
+        case["sources"] = [record(path, relative_to=tmp_path, where=FIXED_MOMENT)]
         case["views"] = [{"id": "view:001"}]
         path.unlink()
 
@@ -117,7 +118,7 @@ class TestUnresolvedIsReachableFromAnywhere:
         path = tmp_path / "run.vtu"
         path.write_text("result", encoding="utf-8")
         case = a_case(CaseState.LOADED)
-        case["sources"] = [record(path, relative_to=tmp_path)]
+        case["sources"] = [record(path, relative_to=tmp_path, where=FIXED_MOMENT)]
         path.unlink()
 
         mark_unresolved(case, resolve_case(case, relative_to=tmp_path))

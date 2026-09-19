@@ -670,3 +670,15 @@ updated: 2026-09-20
   fraction of a second. The ceiling is counted across the four lists because that is what the costs
   are counted across; the walk every creation makes stays a walk because the ceiling bounds it
   (XC-265). What the interface makes of the warning and the refusal is the next frontend piece
+
+### TASK-069 - One wire form for every recorded time
+- satisfies: AC-054
+- depends_on: TASK-001
+- done_when: every contract carries a recorded time as `{utc, offsetMinutes}` and none as a bare
+  string; every exit the engine has for a time writes that form with the session's offset; a
+  version-4 document lifts with the offset unknown and says so
+- done: 2026-09-20. Found by reading every contract against XC-142 (#318): eighteen string fields in
+  seven schemas, the engine dropping the offset at every wire. CT-001 `$defs.recordedTime` is the one
+  definition; CT-001, CT-003, CT-006, CT-008, CT-009, CT-010 and CT-011 each took a major version
+  (XC-266). What the interface shows - the reader's zone, with the recording zone named when it
+  differs - is the next frontend piece; the engine's `describe` already says it that way

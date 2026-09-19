@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-25
+updated: 2026-09-20
 ---
 
 # Contract: workspace document
@@ -10,7 +10,16 @@ updated: 2026-08-25
   inheritance, @Simulation, @View, @Graph and @Report definitions, tags, and references to the result files it
   reads. Exchanged between the product and the user's disk, and between product versions over years
 - schema: schema/CT-001.json
-- version: 4.0.0
+- version: 5.0.0
+- correction: 2026-09-20, version 4.0.0 to 5.0.0. A recorded time has one wire form, `{utc,
+  offsetMinutes}` - `$defs.recordedTime`, defined here and referenced by every contract that carries
+  a time (XC-266). `sources[].modifiedIso` becomes `sources[].modified` and
+  `variableStates.*.detachedIso` becomes `detached`. Version 4 wrote both as bare UTC strings,
+  which dropped the offset XC-142 requires - the second of a recorded time's two facts, the one
+  that lets two offices' records be laid side by side. Breaking: a version-4 document is lifted on
+  open, field by field, and a time it wrote gets a **null** offset - unknown, never zero (XC-001);
+  the open's answer says it was lifted and that the next save writes 5.0.0. A version-3 document
+  is not lifted by this build, as before
 - strictness: unknown fields are **preserved**, not rejected and not dropped
 - compatibility: a reader of an older version opens a newer document, keeps every field it does not
   understand, and refuses to write it back under the older version

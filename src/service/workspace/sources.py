@@ -29,6 +29,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from domain_core.recorded_time import record_instant
+
 
 class SourceState(str, Enum):
     """What became of one file a @Case was built from."""
@@ -66,8 +68,8 @@ class SourceStatus:
         )
 
 
-def _modified_iso(path: Path) -> str:
-    """The file's modification time, to the second and in UTC.
+def _modified_utc(path: Path) -> str:
+    """The file's modification time, to the second and in UTC - the instant half of a recorded time.
 
     To the second because that is the resolution a recorded ISO string carries across the filesystems
     this product meets; comparing finer would report a change every time a file is copied.
@@ -76,12 +78,16 @@ def _modified_iso(path: Path) -> str:
     return stamp.replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def record(path: Path, *, relative_to: Path) -> dict[str, Any]:
-    """The reference CT-001 stores for a file: where it is, how big, and when it changed."""
+def record(path: Path, *, relative_to: Path, where: datetime) -> dict[str, Any]:
+    """The reference CT-001 stores for a file: where it is, how big, and when it changed - the time
+    as `{utc, offsetMinutes}`, the offset being that of whoever is recording (`where`, an aware
+    moment from the recorder's clock; XC-266)."""
     return {
         "pathRelative": path.relative_to(relative_to).as_posix(),
         "sizeBytes": path.stat().st_size,
-        "modifiedIso": _modified_iso(path),
+        "modified": record_instant(
+            datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc), where=where,
+        ).as_stored(),
     }
 
 
@@ -89,14 +95,15 @@ def status_of(source: dict[str, Any], *, relative_to: Path) -> SourceStatus:
     """What is true now of one recorded source. Reads the file's metadata and never its contents."""
     relative = str(source.get("pathRelative", ""))
     recorded_size = int(source.get("sizeBytes", -1))
-    recorded_modified = str(source.get("modifiedIso", ""))
+    recorded = source.get("modified")
+    recorded_modified = str(recorded.get("utc", "")) if isinstance(recorded, dict) else ""
     location = relative_to / relative
 
     if not location.exists():
         return SourceStatus(relative, SourceState.MISSING, recorded_size, recorded_modified)
 
     current_size = location.stat().st_size
-    current_modified = _modified_iso(location)
+    current_modified = _modified_utc(location)
     if current_size == recorded_size and current_modified == recorded_modified:
         return SourceStatus(
             relative, SourceState.PRESENT, recorded_size, recorded_modified,
@@ -170,7 +177,9 @@ def find_source(case: dict[str, Any], path: Path, *, relative_to: Path) -> dict[
     return None
 
 
-def ensure_source(case: dict[str, Any], path: Path, *, relative_to: Path) -> tuple[dict[str, Any], bool]:
+def ensure_source(
+    case: dict[str, Any], path: Path, *, relative_to: Path, where: datetime,
+) -> tuple[dict[str, Any], bool]:
     """The case's entry for this file, created from the file itself when the case had none.
 
     Returns the entry and whether it was created. A file outside the workspace's directory gets the
@@ -183,9 +192,9 @@ def ensure_source(case: dict[str, Any], path: Path, *, relative_to: Path) -> tup
         found.setdefault("declaredUnits", {})
         return found, False
     try:
-        source = record(path, relative_to=relative_to)
+        source = record(path, relative_to=relative_to, where=where)
     except ValueError:
-        source = record(path, relative_to=path.parent)
+        source = record(path, relative_to=path.parent, where=where)
         try:
             source["pathRelative"] = Path(os.path.relpath(path.resolve(), relative_to.resolve())).as_posix()
         except ValueError:

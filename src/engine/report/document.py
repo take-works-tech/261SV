@@ -138,7 +138,7 @@ class SourceFile:
     modified: RecordedTime
 
     def describe(self) -> str:
-        return f"{self.path}（更新 {self.modified.utc}）"
+        return f"{self.path}（更新 {self.modified.describe_where_recorded()}）"
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,7 +174,7 @@ class Provenance:
             f"製品の版：{self.product_version}",
         ]
         if self.produced:
-            lines.append(f"作成：{self.produced.utc}")
+            lines.append(f"作成：{self.produced.describe_where_recorded()}")
         if self.sources:
             lines.append("元ファイル：")
             lines += [f"  - {one.describe()}" for one in self.sources]

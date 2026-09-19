@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "2.9.0",
+  "version": "3.0.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -2932,7 +2932,7 @@
                 "type": "object",
                 "additionalProperties": false,
                 "required": [
-                  "atUtc",
+                  "at",
                   "operation",
                   "origin",
                   "outcome"
@@ -2951,9 +2951,9 @@
                       "pipeline"
                     ]
                   },
-                  "atUtc": {
-                    "type": "string",
-                    "description": "時刻。UTC"
+                  "at": {
+                    "$ref": "CT-001.json#/$defs/recordedTime",
+                    "description": "いつ。記録された時刻（XC-142）"
                   },
                   "outcome": {
                     "type": "string",
@@ -3643,13 +3643,13 @@
                 "null"
               ]
             },
-            "startedUtc": {
-              "type": "string",
-              "description": "開始。UTC"
+            "started": {
+              "$ref": "CT-001.json#/$defs/recordedTime",
+              "description": "始まった時刻"
             },
-            "finishedUtc": {
-              "type": "string",
-              "description": "終了。UTC"
+            "finished": {
+              "$ref": "CT-001.json#/$defs/recordedTime",
+              "description": "終わった時刻"
             }
           }
         },
@@ -3701,7 +3701,8 @@
             "declaredUnits",
             "productVersion",
             "sources",
-            "workspaceId"
+            "workspaceId",
+            "produced"
           ],
           "properties": {
             "workspaceId": {
@@ -3721,7 +3722,7 @@
                 "type": "object",
                 "additionalProperties": false,
                 "required": [
-                  "modifiedUtc",
+                  "modified",
                   "path"
                 ],
                 "properties": {
@@ -3729,9 +3730,9 @@
                     "type": "string",
                     "description": "元ファイル"
                   },
-                  "modifiedUtc": {
-                    "type": "string",
-                    "description": "更新時刻。UTC"
+                  "modified": {
+                    "$ref": "CT-001.json#/$defs/recordedTime",
+                    "description": "元ファイルの更新時刻。文書が読み込み時に記録したもの"
                   }
                 }
               },
@@ -3747,6 +3748,10 @@
             "productVersion": {
               "type": "string",
               "description": "作った版"
+            },
+            "produced": {
+              "$ref": "CT-001.json#/$defs/recordedTime",
+              "description": "この来歴を作った時刻"
             }
           }
         },
@@ -3763,15 +3768,15 @@
                 "type": "object",
                 "additionalProperties": false,
                 "required": [
-                  "atUtc",
+                  "at",
                   "host",
                   "outcome",
                   "purpose"
                 ],
                 "properties": {
-                  "atUtc": {
-                    "type": "string",
-                    "description": "時刻"
+                  "at": {
+                    "$ref": "CT-001.json#/$defs/recordedTime",
+                    "description": "いつ"
                   },
                   "purpose": {
                     "type": "string",
@@ -3970,7 +3975,6 @@
             "supportLevel",
             "gaps",
             "sizeBytes",
-            "modifiedIso",
             "exists"
           ],
           "properties": {
@@ -3993,8 +3997,9 @@
               "type": "integer",
               "minimum": 0
             },
-            "modifiedIso": {
-              "type": "string"
+            "modified": {
+              "$ref": "CT-001.json#/$defs/recordedTime",
+              "description": "ファイルの更新時刻。ファイルがあるときだけ答える"
             },
             "exists": {
               "type": "boolean"

@@ -32,7 +32,7 @@ import numpy as np
 from domain_core.association import Association
 from domain_core.dataset import Dataset, Field
 from domain_core.parts import LoadedCase, Part
-from domain_core.recorded_time import RecordedTime, record as record_time
+from domain_core.recorded_time import RecordedTime, from_stored, record as record_time, record_instant
 from domain_core.reported_value import Caveat, Provenance, ReportedValue
 from domain_core.units import UndeclaredUnitError, unit as known_unit
 from engine import reader
@@ -55,7 +55,7 @@ from service.command.catalogue import PROTOCOL_VERSION
 from service.command.surface import Effect, Handler, LogEntry, Result, Status, Surface
 from service.egress import diagnostics
 from service.workspace import items, sources
-from service.workspace.document import WorkspaceDocument, WorkspaceFileError, load as load_workspace
+from service.workspace.document import FORMAT_VERSION, WorkspaceDocument, WorkspaceFileError, load as load_workspace
 from service.workspace.document import WorkspaceVersionError, save as save_document
 from service.workspace.hierarchy import find as find_case, walk as walk_cases
 from service.workspace.items import ItemError
@@ -259,6 +259,18 @@ class Session:
             )
         return self.workspace
 
+    def recorded_modified(self, one: Loaded) -> RecordedTime:
+        """When a source changed, as the document recorded it when the file was read - the file the
+        numbers came from, with the offset of whoever recorded it (XC-266). From the file itself,
+        with this session's offset, only where the document holds no record of it."""
+        if self.workspace is not None:
+            found = find_case(self.workspace.cases, one.case_id)
+            base = self.workspace_path.parent if self.workspace_path else one.path.parent
+            entry = sources.find_source(found[0], one.path, relative_to=base) if found else None
+            if entry is not None and isinstance(entry.get("modified"), Mapping):
+                return from_stored(entry["modified"])
+        return modified_time(one.path, self.clock())
+
     def provenance_of(self, involved: list[Loaded]) -> ReportProvenance:
         """The trust content of a deliverable, from what this session knows first-hand."""
         workspace = self.workspace
@@ -266,7 +278,7 @@ class Session:
             workspace_id=workspace.identifier if workspace is not None else "",
             case_ids=tuple(dict.fromkeys(one.case_id for one in involved)),
             sources=tuple(
-                SourceFile(path=str(one.path), modified=modified_time(one.path)) for one in involved
+                SourceFile(path=str(one.path), modified=self.recorded_modified(one)) for one in involved
             ),
             declared_units={
                 name: symbol for one in involved for name, symbol in one.declared_units.items()
@@ -276,8 +288,10 @@ class Session:
         )
 
 
-def modified_time(path: Path) -> RecordedTime:
-    return record_time(datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc))
+def modified_time(path: Path, where: datetime) -> RecordedTime:
+    """A file's modification time, recorded with the offset of whoever records it (XC-266): the
+    file's own zone no filesystem keeps."""
+    return record_instant(datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc), where=where)
 
 
 # -- the handlers -------------------------------------------------------------------------------
@@ -322,7 +336,7 @@ def handlers(session: Session) -> tuple[Handler, ...]:
     return (
         Handler("workspace.open", lambda p, t: workspace_open(session, p)),
         Handler("workspace.save", lambda p, t: workspace_save(session, p)),
-        Handler("dataset.inspect", lambda p, t: dataset_inspect(p)),
+        Handler("dataset.inspect", lambda p, t: dataset_inspect(session, p)),
         Handler("dataset.load", lambda p, t: dataset_load(session, p)),
         Handler("dataset.describe", lambda p, t: dataset_describe(session, p)),
         Handler("dataset.parts", lambda p, t: dataset_parts(session, p)),
@@ -364,6 +378,16 @@ def workspace_open(session: Session, parameters: Mapping[str, Any]) -> Effect | 
     over = items.capacity_warning(loaded.raw)
     if over is not None:
         warnings += (over,)
+
+    # A version-4 document was lifted to this build's shape on the way in (CT-001 5.0.0, XC-266).
+    # Said, because the next save writes it as 5.0.0, and a file that changes version is a thing a
+    # person shares with somebody on the version before.
+    if loaded.migrated_from:
+        warnings += (
+            f"{location.name} は版 {loaded.migrated_from} の文書です。この版の形 {FORMAT_VERSION} に読み替えました："
+            "記録時のゾーンを持たない時刻は不明として保持し、次に保存すると "
+            f"{FORMAT_VERSION} で書かれます（CT-001）",
+        )
 
     # A dataset belongs to a case of a workspace; the one that was open is no longer, so neither are
     # they. They are **not** kept for undo: an undo closure holding every dataset of every workspace
@@ -436,7 +460,7 @@ def history_list(session: Session, surface: Surface, parameters: Mapping[str, An
         one: dict[str, Any] = {
             "operation": entry.operation,
             "origin": entry.origin.value,
-            "atUtc": entry.at.utc,
+            "at": entry.at.as_stored(),
             "outcome": entry.status.value,
             "undoable": bool(entry.undo_id and entry.undo_id in report["undoable"]),
         }
@@ -505,7 +529,7 @@ def workspace_save(session: Session, parameters: Mapping[str, Any]) -> Effect | 
     )
 
 
-def dataset_inspect(parameters: Mapping[str, Any]) -> Effect | Result:
+def dataset_inspect(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
     """What can be said about a file before it is read (ingest/AC-032, XC-049).
 
     The support level is a promise this build makes about a format, and a promise is stated before
@@ -516,17 +540,18 @@ def dataset_inspect(parameters: Mapping[str, Any]) -> Effect | Result:
     level, gaps = reader.support_level(path)
     exists = path.exists()
     stat = path.stat() if exists else None
-    return Effect(
-        f"{path.name}：{level}",
-        value={
-            "format": path.suffix.lower().lstrip("."),
-            "supportLevel": level,
-            "gaps": [gap for gap in gaps.split("; ") if gap],
-            "sizeBytes": int(stat.st_size) if stat else 0,
-            "modifiedIso": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(timespec="seconds") if stat else "",
-            "exists": exists,
-        },
-    )
+    value: dict[str, Any] = {
+        "format": path.suffix.lower().lstrip("."),
+        "supportLevel": level,
+        "gaps": [gap for gap in gaps.split("; ") if gap],
+        "sizeBytes": int(stat.st_size) if stat else 0,
+        "exists": exists,
+    }
+    if stat is not None:
+        # The file's time with this session's offset beside it (XC-266); absent rather than empty
+        # where there is no file, because "" is not a time (XC-001).
+        value["modified"] = modified_time(path, session.clock()).as_stored()
+    return Effect(f"{path.name}：{level}", value=value)
 
 
 def dataset_load(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
@@ -563,7 +588,9 @@ def dataset_load(session: Session, parameters: Mapping[str, Any]) -> Effect | Re
     # session. A unit declared before and saved is a unit found now (XC-003, XC-259); one never
     # saved is not here, and the field is as undeclared as the file left it.
     workspace_directory = (session.workspace_path.parent if session.workspace_path else path.parent)
-    source_entry, source_created = sources.ensure_source(case_entry, path, relative_to=workspace_directory)
+    source_entry, source_created = sources.ensure_source(
+        case_entry, path, relative_to=workspace_directory, where=session.clock(),
+    )
     applied_units: dict[str, str] = {}
     for name, symbol in sources.declared_units(source_entry).items():
         for part in loaded.holders(name):
@@ -681,7 +708,9 @@ def field_declare_unit(session: Session, parameters: Mapping[str, Any]) -> Effec
         found_case = find_case(workspace.cases, loaded.case_id)
         if found_case is not None:
             workspace_directory = (session.workspace_path.parent if session.workspace_path else loaded.path.parent)
-            source_entry, _ = sources.ensure_source(found_case[0], loaded.path, relative_to=workspace_directory)
+            source_entry, _ = sources.ensure_source(
+                found_case[0], loaded.path, relative_to=workspace_directory, where=session.clock(),
+            )
             recorded_previous = sources.record_unit(source_entry, name, symbol)
 
     def undo() -> None:
@@ -1277,10 +1306,11 @@ def report_provenance(session: Session, parameters: Mapping[str, Any]) -> Effect
             "workspaceId": provenance.workspace_id,
             "caseIds": list(provenance.case_ids),
             "sources": [
-                {"path": source.path, "modifiedUtc": source.modified.utc} for source in provenance.sources
+                {"path": source.path, "modified": source.modified.as_stored()} for source in provenance.sources
             ],
             "declaredUnits": dict(provenance.declared_units),
             "productVersion": provenance.product_version,
+            "produced": provenance.produced.as_stored() if provenance.produced else None,
         },
     )
 
