@@ -177,8 +177,14 @@ def render_view(
     camera: Camera | None = None,
     background: tuple[float, float, float] = (1.0, 1.0, 1.0),
     budget: int = MAX_INTERACTIVE_TRIANGLES,
+    legend: bool = True,
 ) -> Rendered:
-    """Draw the datasets coloured by one field, and say what the picture leaves out."""
+    """Draw the datasets coloured by one field, and say what the picture leaves out.
+
+    `legend` is whether the colour bar is drawn **inside** the picture. A document needs it there,
+    because a document has nowhere else (XC-254). A screen has a legend beside the picture that can
+    carry the unit, which the bar cannot (E-192), and drawing both is two scales for one image.
+    """
     if not datasets:
         raise RenderError("描くデータセットがありません")
     for edge, name in ((width, "width"), (height, "height")):
@@ -196,7 +202,8 @@ def render_view(
         geometry = display_geometry(dataset, budget=budget)
         geometries.append(geometry)
         renderer.AddActor(_actor(geometry, field, table, low, high))
-    renderer.AddViewProp(_scalar_bar(table, background))
+    if legend:
+        renderer.AddViewProp(_scalar_bar(table, background))
 
     renderer.ResetCamera()
     _aim(renderer, camera)

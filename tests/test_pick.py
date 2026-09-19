@@ -20,7 +20,7 @@ import numpy as np  # noqa: E402
 
 from domain_core.association import Association  # noqa: E402
 from domain_core.dataset import Dataset, Field  # noqa: E402
-from domain_core.identifiers import NO_IDENTIFIER, SourceIdentifiers  # noqa: E402
+from domain_core.identifiers import NO_IDENTIFIER, SourceIdentifiers, no_identifier  # noqa: E402
 from domain_core.reported_value import Caveat, Provenance  # noqa: E402
 from engine import reader  # noqa: E402
 from engine.visualization.pick import PickError, probe  # noqa: E402
@@ -76,7 +76,8 @@ class TestAPointValueIsThePointsOwn:
 
     def test_the_location_is_in_the_source_s_words_or_says_the_source_had_none(self, tmp_path: Path) -> None:
         dataset = a_dataset(tmp_path)
-        assert probe(dataset, "stress", (0.0, 0.0, 0.0)).value.location == NO_IDENTIFIER
+        assert probe(dataset, "stress", (0.0, 0.0, 0.0)).value.location == no_identifier(Association.POINT)
+        assert "節点" in no_identifier(Association.POINT), "a node value names the node numbers it lacks"
 
         dataset.identifiers[Association.POINT] = SourceIdentifiers(
             global_ids=np.array([101, 102, 103, 104], dtype=np.int64), global_name="GlobalNodeId",

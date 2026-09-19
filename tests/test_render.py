@@ -167,6 +167,41 @@ class TestAPictureIsProduced:
             native.draw("not a scene", 10, 10)
 
 
+class TestTheLegendIsDrawnOnlyWhereAsked:
+    """A document needs the colour bar inside its picture, because a document has nowhere else
+    (XC-254). A screen has a legend beside the picture that carries the unit, which the bar cannot
+    (E-192), and drawing both showed two scales for one image. `legend=False` leaves the bar out and
+    changes nothing else about the frame."""
+
+    @staticmethod
+    def _column_is_bare(frame: np.ndarray, background: tuple[float, float, float]) -> bool:
+        """Whether the right-hand strip, where the bar is laid out, holds only the background."""
+        strip = frame[:, int(frame.shape[1] * 0.82) :, :3].astype(np.int32)
+        ground = np.array([round(one * 255) for one in background], dtype=np.int32)
+        return bool(np.all(np.abs(strip - ground) <= 2))
+
+    def test_without_a_legend_the_bar_s_column_holds_only_background(self, tmp_path: Path) -> None:
+        dataset = a_dataset(tmp_path)
+        ground = (0.04, 0.05, 0.05)
+
+        with_bar = render_view([dataset], stress(), width=400, height=300, background=ground)
+        without = render_view([dataset], stress(), width=400, height=300, background=ground, legend=False)
+
+        assert not self._column_is_bare(decode(with_bar.png), ground), "the bar is drawn by default"
+        assert self._column_is_bare(decode(without.png), ground), "and left out when asked"
+
+    def test_leaving_the_legend_out_does_not_move_the_model(self, tmp_path: Path) -> None:
+        """The bar is an overlay. Without it the model must sit exactly where it did, or a pick made
+        against the screen's frame would land on a different pixel than the document's."""
+        dataset = a_dataset(tmp_path)
+
+        with_bar = decode(render_view([dataset], stress(), width=400, height=300).png)
+        without = decode(render_view([dataset], stress(), width=400, height=300, legend=False).png)
+
+        left_half = slice(0, 200)
+        assert np.array_equal(with_bar[:, left_half], without[:, left_half])
+
+
 class TestTheLegendFactsComeFromTheFullField:
     def test_the_range_is_the_field_s_extremes_at_storage_digits_with_the_declared_unit(self, tmp_path: Path) -> None:
         dataset = a_dataset(tmp_path)

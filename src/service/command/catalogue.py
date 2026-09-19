@@ -171,7 +171,7 @@ PARAMETERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "view.duplicate": (frozenset(['newName', 'viewId']), frozenset(['newName', 'viewId'])),
     "view.rename": (frozenset(['newName', 'viewId']), frozenset(['newName', 'viewId'])),
     "view.delete": (frozenset(['viewId']), frozenset(['viewId'])),
-    "view.render": (frozenset(['format', 'height', 'viewId', 'width']), frozenset(['format', 'height', 'viewId', 'width'])),
+    "view.render": (frozenset(['format', 'height', 'legend', 'viewId', 'width']), frozenset(['format', 'height', 'viewId', 'width'])),
     "view.pick": (frozenset(['height', 'viewId', 'width', 'x', 'y']), frozenset(['height', 'viewId', 'width', 'x', 'y'])),
     "graph.create": (frozenset(['definition', 'sourceTemplateId', 'sourceTemplateRevision', 'workspaceId']), frozenset(['definition', 'workspaceId'])),
     "graph.update": (frozenset(['definition', 'graphId']), frozenset(['definition', 'graphId'])),
@@ -357,7 +357,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
 
 #: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below
 #: the engine's floor is refused politely rather than answered in a shape it cannot read.
-PROTOCOL_VERSION = "2.3.0"
+PROTOCOL_VERSION = "2.4.0"
 
 #: The wire's own names, from CT-003's `$defs.transport` (XC-258). The interface generates
 #: the same values from the same place; neither side is derived from the other (XC-252).

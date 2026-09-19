@@ -321,7 +321,7 @@ class Dataset:
         location: str | None = None
         if aggregate is Aggregate.EXTREMUM:
             position = int(np.argmax(field.values if mask is None else np.where(mask, field.values, -np.inf)))
-            location = location_of(self.identifiers.get(field.association), position)
+            location = location_of(self.identifiers.get(field.association), position, field.association)
 
         # Accumulated in double whatever the field is stored in (INV-031, XC-246). The extremum and
         # the count are exact in any type; the sum and the mean are not, and summing a float32 field

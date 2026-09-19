@@ -752,7 +752,7 @@ def view_render(session: Session, parameters: Mapping[str, Any]) -> Effect | Res
         rendered = render_view(
             loaded.datasets(), colouring,
             width=int(parameters["width"]), height=int(parameters["height"]), camera=camera,
-            background=ground,
+            background=ground, legend=bool(parameters.get("legend", True)),
         )
     except RenderError as error:
         return refused(str(error))
