@@ -40,7 +40,7 @@ we thought of**, which is why the manual rows exist rather than being quietly dr
 | workspace/AC-008 | unit (planned) | - | in-test hierarchy | authored in the test | exact | reported unresolved, no value substituted |
 | workspace/AC-009 | integration (planned) | - | `fixtures/ws_inherit` | as above | exact | later variable change reaches the bound input |
 | workspace/AC-010 | unit (planned) | - | in-test variables | authored in the test | exact | binding refused, both units named |
-| workspace/AC-011 | end-to-end (planned) | - | `fixtures/ws_full` + `fixtures/case_small` | authored workspace over the small dataset | exact | exported artefacts identical before and after reopen |
+| workspace/AC-011 | integration | tests/test_handlers.py::test_a_declaration_saved_is_the_declaration_the_next_session_finds | `fixtures/ws_full` + `fixtures/case_small` | authored workspace over the small dataset | exact | exported artefacts identical before and after reopen |
 | workspace/AC-012 | integration (planned) | - | `fixtures/ws_full` with one input removed | as above, file deleted by the test | exact | case marked unresolved, workspace file unmodified on disk |
 | workspace/AC-013 | integration (planned) | - | `fixtures/ws_corrupt` | valid workspace truncated at a byte boundary | exact | original file byte-identical after the failed open |
 | workspace/AC-014 | integration (planned) | - | `fixtures/ws_tags` | authored, 5 tagged cases | exact | hidden count matches the filtered-out set |

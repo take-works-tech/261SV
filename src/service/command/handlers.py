@@ -19,6 +19,7 @@ module comes back as a failure, because that is the difference the two words mar
 
 from __future__ import annotations
 
+import os
 import secrets
 from dataclasses import dataclass, field as dataclass_field, replace
 from datetime import datetime, timezone
@@ -54,6 +55,7 @@ from service.command.catalogue import PROTOCOL_VERSION
 from service.command.surface import Effect, Handler, Result, Status, Surface
 from service.workspace import items, sources
 from service.workspace.document import WorkspaceDocument, WorkspaceFileError, load as load_workspace
+from service.workspace.document import WorkspaceVersionError, save as save_document
 from service.workspace.hierarchy import find as find_case, walk as walk_cases
 from service.workspace.items import ItemError
 
@@ -293,6 +295,7 @@ def build_surface(session: Session, *, clock: Callable[[], datetime] | None = No
 def handlers(session: Session) -> tuple[Handler, ...]:
     return (
         Handler("workspace.open", lambda p, t: workspace_open(session, p)),
+        Handler("workspace.save", lambda p, t: workspace_save(session, p)),
         Handler("dataset.load", lambda p, t: dataset_load(session, p)),
         Handler("dataset.describe", lambda p, t: dataset_describe(session, p)),
         Handler("dataset.parts", lambda p, t: dataset_parts(session, p)),
@@ -347,13 +350,54 @@ def workspace_open(session: Session, parameters: Mapping[str, Any]) -> Effect | 
     )
 
 
+def workspace_save(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
+    """Write the open document back, keeping the previous version beside it (CT-003, XC-055).
+
+    What this makes true is the sentence XC-259 rests on: what was saved is intact after a crash.
+    Until this existed nothing was ever saved after `workspace.open`, so every declaration, view and
+    report of a session was lost when the process ended - by a crash or by quitting.
+    """
+    workspace = session.open_workspace(str(parameters["workspaceId"]))
+    if isinstance(workspace, Result):
+        return workspace
+    target = Path(str(parameters["path"])) if parameters.get("path") else session.workspace_path
+    if target is None:
+        return refused("保存先がありません：path を指定してください")
+    previous = target.with_name(target.name + ".previous")
+    had_previous = previous.exists()
+    kept_before = previous.read_bytes() if had_previous else None
+    try:
+        kept = save_document(workspace, target)
+    except (OSError, WorkspaceVersionError) as error:
+        return refused(f"保存できません：{error}")
+    session.workspace_path = target
+
+    def undo() -> None:
+        # The document as it was on disk before this save comes back; what this save wrote goes.
+        if kept != target and kept.exists():
+            os.replace(kept, target)
+            if kept_before is not None:
+                previous.write_bytes(kept_before)
+        elif target.exists():
+            target.unlink()
+
+    return Effect(
+        f"{target.name} を保存しました" + ("（直前の版を残しました）" if kept != target else ""),
+        changed=(workspace.identifier,),
+        value={"path": str(target), "previousKept": str(kept) if kept != target else None},
+        undo=undo,
+    )
+
+
 def dataset_load(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
     workspace = session.open_workspace()
     if isinstance(workspace, Result):
         return workspace
     case_id = str(parameters["caseId"])
-    if find_case(workspace.cases, case_id) is None:
+    found_case = find_case(workspace.cases, case_id)
+    if found_case is None:
         return refused(f"ケース '{case_id}' はこのワークスペースにありません")
+    case_entry = found_case[0]
     paths = [Path(str(one)) for one in parameters["filePaths"]]
     if len(paths) != 1:
         # Stated rather than silently taking the first: a case of several files is a real thing
@@ -375,6 +419,20 @@ def dataset_load(session: Session, parameters: Mapping[str, Any]) -> Effect | Re
     )
     session.datasets[dataset_id] = loaded
 
+    # The document's own record of this file, and what a person declared about it in an earlier
+    # session. A unit declared before and saved is a unit found now (XC-003, XC-259); one never
+    # saved is not here, and the field is as undeclared as the file left it.
+    workspace_directory = (session.workspace_path.parent if session.workspace_path else path.parent)
+    source_entry, source_created = sources.ensure_source(case_entry, path, relative_to=workspace_directory)
+    applied_units: dict[str, str] = {}
+    for name, symbol in sources.declared_units(source_entry).items():
+        for part in loaded.holders(name):
+            assert part.dataset is not None
+            part.dataset.fields[name] = part.dataset.fields[name].declared(symbol)
+        if loaded.holders(name):
+            loaded.declared_units[name] = symbol
+            applied_units[name] = symbol
+
     seen: dict[str, Field] = {}
     for dataset in loaded.datasets():
         for name, field in dataset.fields.items():
@@ -386,13 +444,19 @@ def dataset_load(session: Session, parameters: Mapping[str, Any]) -> Effect | Re
 
     def undo() -> None:
         session.datasets.pop(dataset_id, None)
+        if source_created:
+            case_entry.get("sources", []).remove(source_entry)
 
     warnings: tuple[str, ...] = ()
     if case.is_partial:
         warnings = (f"ケースは不完全です：{case.describe()}",)
+    if applied_units:
+        warnings += (
+            "保存済みの宣言を適用しました：" + "、".join(f"{name} = {symbol}" for name, symbol in applied_units.items()),
+        )
     return Effect(
         f"{path.name} を読み込みました（{len(case.present)} パート）",
-        changed=(dataset_id,),
+        changed=(dataset_id, workspace.identifier) if source_created else (dataset_id,),
         value={
             "datasetId": dataset_id,
             "fields": fields,
@@ -468,6 +532,18 @@ def field_declare_unit(session: Session, parameters: Mapping[str, Any]) -> Effec
         part.dataset.fields[name] = part.dataset.fields[name].declared(symbol)
     loaded.declared_units[name] = symbol
 
+    # Into the document, so that the declaration survives the session once the document is saved
+    # (CT-001 `declaredUnits`, #306). In memory alone it was lost on every exit.
+    workspace = session.open_workspace()
+    recorded_previous: str | None = None
+    source_entry = None
+    if not isinstance(workspace, Result):
+        found_case = find_case(workspace.cases, loaded.case_id)
+        if found_case is not None:
+            workspace_directory = (session.workspace_path.parent if session.workspace_path else loaded.path.parent)
+            source_entry, _ = sources.ensure_source(found_case[0], loaded.path, relative_to=workspace_directory)
+            recorded_previous = sources.record_unit(source_entry, name, symbol)
+
     def undo() -> None:
         for part in holders:
             assert part.dataset is not None
@@ -476,9 +552,12 @@ def field_declare_unit(session: Session, parameters: Mapping[str, Any]) -> Effec
             loaded.declared_units.pop(name, None)
         else:
             loaded.declared_units[name] = previous
+        if source_entry is not None:
+            sources.forget_unit(source_entry, name, recorded_previous)
 
+    changed = (dataset_id, workspace.identifier) if not isinstance(workspace, Result) else (dataset_id,)
     return Effect(
-        f"'{name}' の単位を {symbol} と宣言しました", changed=(dataset_id,), value={}, undo=undo,
+        f"'{name}' の単位を {symbol} と宣言しました", changed=changed, value={}, undo=undo,
     )
 
 

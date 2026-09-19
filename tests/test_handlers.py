@@ -104,9 +104,10 @@ class TestWhatThisBuildRegisters:
             "workspace.open", "dataset.load", "dataset.describe", "dataset.parts",
             "field.declareUnit", "field.statistics", "view.create", "view.update", "view.render",
             "dataset.probe", "view.pick", "report.create", "report.export", "report.provenance",
+            "workspace.save",
             "system.capabilities", "system.protocols",
         }
-        assert len(surface.unimplemented()) == len(OPERATIONS) - 16
+        assert len(surface.unimplemented()) == len(OPERATIONS) - 17
 
     def test_an_unimplemented_operation_is_refused_and_named_as_such(self) -> None:
         surface, _ = a_surface()
@@ -880,3 +881,83 @@ class TestRenderingAView:
 
         assert result.status is Status.REFUSED
         assert "jet" in (result.reason or "")
+
+
+class TestWhatWasSavedIsIntact:
+    """XC-259's sentence, made true: a declaration saved into the document is found by the next
+    session; one never saved is not, and nothing pretends otherwise (#306, CT-001 `declaredUnits`)."""
+
+    @staticmethod
+    def _second_session(tmp_path: Path, workspace: Path, source: Path) -> tuple[Surface, dict]:
+        surface, _ = a_surface()
+        assert surface.submit(Command("workspace.open", {"path": str(workspace)})).status is Status.APPLIED
+        loaded = surface.submit(Command("dataset.load", {"caseId": "case:1", "filePaths": [str(source)]}))
+        assert loaded.status is Status.APPLIED, loaded.reason
+        return surface, loaded.value
+
+    def test_a_declaration_saved_is_the_declaration_the_next_session_finds(self, tmp_path: Path) -> None:
+        surface, session, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        workspace = session.workspace_path
+        assert workspace is not None
+        assert surface.submit(Command("field.declareUnit", {
+            "datasetId": dataset_id, "fieldName": "temperature", "unitSymbol": "K",
+        })).status is Status.APPLIED
+
+        saved = surface.submit(Command("workspace.save", {"workspaceId": "ws:1"}))
+
+        assert saved.status is Status.APPLIED, saved.reason
+        assert saved.value["path"] == str(workspace)
+        written = json.loads(workspace.read_text(encoding="utf-8"))
+        entry = written["cases"][0]["sources"][0]
+        assert entry["declaredUnits"] == {"temperature": "K"}
+        assert entry["pathRelative"] == "cube.vtu"
+        _, reloaded = self._second_session(tmp_path, workspace, workspace.parent / "cube.vtu")
+        assert reloaded["fields"] == [{"name": "temperature", "association": "point", "unit": "K"}]
+
+    def test_a_declaration_never_saved_is_not_found_and_the_field_is_undeclared_again(self, tmp_path: Path) -> None:
+        """The other half of the sentence. Nothing rebuilds it: the next session sees what the file
+        carries, which is no unit (XC-003)."""
+        surface, session, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        workspace = session.workspace_path
+        assert workspace is not None
+        assert surface.submit(Command("field.declareUnit", {
+            "datasetId": dataset_id, "fieldName": "temperature", "unitSymbol": "K",
+        })).status is Status.APPLIED
+
+        _, reloaded = self._second_session(tmp_path, workspace, workspace.parent / "cube.vtu")
+
+        assert reloaded["fields"] == [{"name": "temperature", "association": "point", "unit": None}]
+
+    def test_saving_keeps_the_previous_version_beside_the_file(self, tmp_path: Path) -> None:
+        surface, session, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        workspace = session.workspace_path
+        assert workspace is not None
+        before = workspace.read_bytes()
+
+        first = surface.submit(Command("workspace.save", {"workspaceId": "ws:1"}))
+        assert first.status is Status.APPLIED, first.reason
+
+        previous = workspace.with_name(workspace.name + ".previous")
+        assert previous.exists() and previous.read_bytes() == before, "the version before the save is beside it"
+        assert first.value["previousKept"] == str(previous)
+
+    def test_saving_a_workspace_that_is_not_open_is_refused(self, tmp_path: Path) -> None:
+        surface, _ = a_surface()
+
+        result = surface.submit(Command("workspace.save", {"workspaceId": "ws:1"}))
+
+        assert result.status is Status.REFUSED
+
+    def test_undoing_a_save_puts_the_previous_file_back(self, tmp_path: Path) -> None:
+        surface, session, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        workspace = session.workspace_path
+        assert workspace is not None
+        before = workspace.read_bytes()
+        surface.submit(Command("field.declareUnit", {"datasetId": dataset_id, "fieldName": "temperature", "unitSymbol": "K"}))
+        saved = surface.submit(Command("workspace.save", {"workspaceId": "ws:1"}))
+        assert saved.status is Status.APPLIED and workspace.read_bytes() != before
+
+        undone = surface.undo(saved.undo_id or "")
+
+        assert undone.status is Status.APPLIED, undone.reason
+        assert workspace.read_bytes() == before
