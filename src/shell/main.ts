@@ -14,7 +14,7 @@
  * writes what it shows, so a picture of the shell exists that a person can look at.
  */
 import { app, BrowserWindow, dialog, ipcMain, net, protocol } from "electron";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -36,6 +36,8 @@ const argv = process.argv.slice(1);
 const SMOKE = argv.includes("--smoke");
 const captureIndex = argv.indexOf("--capture");
 const CAPTURE = captureIndex >= 0 ? argv[captureIndex + 1] ?? null : null;
+const routeIndex = argv.indexOf("--route");
+const ROUTE = routeIndex >= 0 ? argv[routeIndex + 1] ?? "" : "";
 
 // ---- one instance, one engine (E-195) ---------------------------------------------------------
 
@@ -124,7 +126,7 @@ function createWindow(): BrowserWindow {
       nodeIntegration: false,
     },
   });
-  void created.loadURL(`${ORIGIN}/index.html`);
+  void created.loadURL(`${ORIGIN}/index.html${ROUTE ? `#${ROUTE.replace(/^#/, "")}` : ""}`);
   created.on("closed", () => {
     window = null;
   });
@@ -133,7 +135,21 @@ function createWindow(): BrowserWindow {
 
 // ---- the bridge's other side --------------------------------------------------------------------
 
+/** The notices generated for this build (XC-025): beside the other resources when packaged, in
+ *  build/notices in development if the generator has run, otherwise nothing - never a substitute. */
+function readNotices(): unknown {
+  const file = PACKAGED ? join(process.resourcesPath, "notices.json") : join(ROOT, "build", "notices", "notices.json");
+  if (!existsSync(file)) return null;
+  try {
+    return JSON.parse(readFileSync(file, "utf-8"));
+  } catch (error) {
+    note(`shell: notices.json could not be read: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+}
+
 function registerBridge(): void {
+  ipcMain.handle("notices", () => readNotices());
   ipcMain.handle("engine:connection", () => engine?.connection ?? null);
   ipcMain.handle("engine:status", (): EngineProcessStatus => {
     return (
@@ -208,6 +224,7 @@ app.on("window-all-closed", () => {
 async function smoke(): Promise<number> {
   const summary: Record<string, unknown> = {
     packaged: PACKAGED,
+    route: ROUTE || null,
     engine: PACKAGED ? packagedEngine(process.resourcesPath).command : `${PYTHON} -m service.transport`,
     version: app.getVersion(),
   };

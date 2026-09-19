@@ -14,6 +14,7 @@ import type { EngineProcessStatus, ShellApi } from "../ui/client/shell.js" with 
 
 const api: ShellApi = {
   kind: "electron",
+  notices: () => ipcRenderer.invoke("notices"),
   engine: {
     connection: () => ipcRenderer.invoke("engine:connection"),
     status: () => ipcRenderer.invoke("engine:status"),

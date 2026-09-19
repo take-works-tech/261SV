@@ -101,6 +101,10 @@ unknown, so the glyphs have to travel with the document.
   the Microsoft runtime, the OpenXR loader and VTK's own declarations. The "viewable in the
   application" half of the statement is not built yet - the data ships as `resources/notices.json`
   and the file as `THIRD-PARTY-NOTICES.txt` next to the executable; a screen that shows it is owed
+- correction: 2026-09-19, later the same day. The screen exists: Settings > ライセンス reads
+  `resources/notices.json` through the shell's bridge and lists every component with its terms and
+  files; in a browser build, which has no closure, it says there is no list rather than showing an
+  example of one (XC-001). Both halves of the statement now hold
 
 ### XC-026 - Security and data protection
 - statement: no @Dataset, @Workspace or @Reference material content leaves the machine unless the user

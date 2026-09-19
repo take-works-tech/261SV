@@ -33,8 +33,29 @@ export interface EngineProcessStatus {
   readonly reason: string | null;
 }
 
+/** One entry of the notices file, as packaging/notices.py writes it (`Component.as_json`): the
+ *  Python side is the definition and tests/test_notices.py holds its keys to this shape. */
+export interface NoticeComponent {
+  readonly name: string;
+  readonly version: string;
+  readonly licence: string;
+  readonly files: readonly string[];
+  readonly texts: readonly { readonly source: string; readonly text: string }[];
+  readonly note: string;
+}
+
+export interface Notices {
+  readonly components: readonly NoticeComponent[];
+  /** Files the generator could not attribute. Empty in a build that shipped, because the generator
+   *  refuses to finish otherwise; shown if ever non-empty, because a list that hides its own gaps
+   *  is the failure XC-025 exists to prevent. */
+  readonly unattributed: readonly string[];
+}
+
 export interface ShellApi {
   readonly kind: "electron";
+  /** The notices generated for this build (XC-025), or null when the build carries none. */
+  notices(): Promise<Notices | null>;
   readonly engine: {
     /** The connection the running engine wrote, or null while starting or after it exited. */
     connection(): Promise<Connection | null>;

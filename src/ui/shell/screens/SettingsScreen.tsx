@@ -6,7 +6,9 @@
  * - default:        単位・座標系・描画・アシスタント・ライブラリの各カテゴリ。表示単位は宣言単位を書き換えない。
  * - invalid:        無効値は入力された欄で拒否され、直前の値が維持される（11_ui.md settings.invalid）。
  * - shortcuts:      コマンドとキーの編集。破壊的コマンドは キーなし + 確認経路で、割り当てを拒否する（XC-193）。衝突は列挙され、順序では解決しない。
- * - support-bundle: バンドルの内容を作成前に列挙する - 含める / 確認が必要 / 含めない顧客データ（XC-055b）。 */
+ * - support-bundle: バンドルの内容を作成前に列挙する - 含める / 確認が必要 / 含めない顧客データ（XC-055b）。
+ * - licences:       同梱する構成要素とその条件。一覧はビルド閉包から生成した notices.json で、シェルが渡す。
+ *                   ブラウザでは一覧がないと言い、例示は出さない（XC-025, XC-001）。 */
 import { useState } from "react";
 import type { KeyboardEvent } from "react";
 import { QuantityChip } from "../../shared/QuantityChip";
@@ -17,9 +19,10 @@ import { ScopeConfirmation } from "../../shared/ScopeConfirmation";
 import { formatBytes, disabledBecause } from "../../logic/format";
 import { submit } from "../../client/operations";
 import { session } from "../../state/session";
+import { NoticesPanel } from "./NoticesPanel";
 import "./settings.css";
 
-type Category = "単位" | "座標系" | "描画" | "アシスタント" | "ライブラリ" | "ショートカット" | "診断";
+type Category = "単位" | "座標系" | "描画" | "アシスタント" | "ライブラリ" | "ショートカット" | "診断" | "ライセンス";
 
 const NAV_GROUPS: { scope: string; items: { id: Category; note: string }[] }[] = [
   {
@@ -29,6 +32,7 @@ const NAV_GROUPS: { scope: string; items: { id: Category; note: string }[] }[] =
       { id: "アシスタント", note: "モデル提供元と鍵の保管" },
       { id: "ショートカット", note: "コマンドとキーの一覧" },
       { id: "診断", note: "ローカルログとサポートバンドル" },
+      { id: "ライセンス", note: "同梱物とその条件（XC-025）" },
     ],
   },
   {
@@ -51,6 +55,7 @@ function scopeOf(category: Category): string {
 function initialCategory(variant: string): Category {
   if (variant === "shortcuts") return "ショートカット";
   if (variant === "support-bundle") return "診断";
+  if (variant === "licences") return "ライセンス";
   return "単位"; // default と invalid は単位カテゴリから始まる
 }
 
@@ -98,6 +103,7 @@ export function SettingsScreen(props: { variant: string }) {
           {category === "ライブラリ" ? <LibraryPanel /> : null}
           {category === "ショートカット" ? <ShortcutsPanel /> : null}
           {category === "診断" ? <DiagnosticsPanel openBundle={variant === "support-bundle"} /> : null}
+          {category === "ライセンス" ? <NoticesPanel /> : null}
         </div>
       </div>
     </div>
