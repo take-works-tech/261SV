@@ -1935,3 +1935,37 @@ Recorded so that nothing silently depends on them:
   rather than skipping when the probe says no under `SIM_VIEWER_REQUIRE_VTK=1`. E-191's closing
   sentence - that a machine without a discrete GPU or a CI runner was not measured - is now measured,
   and the answer was worse than a slow frame
+
+### E-195 - Electron's `app` module: single-instance lock, userData, quit events
+- tier: T1
+- url: https://www.electronjs.org/docs/latest/api/app
+- verified: 2026-09-19
+- says: `app.requestSingleInstanceLock()` returns whether this instance obtained the lock - "If it
+  failed to obtain the lock, you can assume that another instance of your application is already
+  running with the lock" - and `second-instance` "will be emitted inside the primary instance of
+  your application when a second instance has been executed"; `app.getPath('userData')` is "the
+  directory for storing your app's configuration files"; `before-quit` and `will-quit` are emitted
+  before the application terminates and `event.preventDefault()` holds it
+- justifies: XC-259
+
+### E-196 - Electron's `utilityProcess` runs Node.js scripts, not arbitrary executables
+- tier: T1
+- url: https://www.electronjs.org/docs/latest/api/utility-process
+- verified: 2026-09-19
+- says: `utilityProcess.fork(modulePath)` takes the "path to the script that should run as
+  entrypoint in the child process" and "provides the equivalent of `child_process.fork` API from
+  Node.js"; its `exit` event carries "the exit code for the process obtained from waitpid on POSIX,
+  or GetExitCodeProcess on Windows". A Python engine executable is therefore started with
+  `child_process.spawn`, not with this
+- justifies: XC-259
+
+### E-197 - The engine's warm start and what termination leaves behind, measured here
+- tier: T1
+- url: spike/measure_engine_startup.py
+- verified: 2026-09-19
+- says: three runs on Windows 11 (reported by the platform module as "Windows 10"), Python 3.11.9,
+  VTK 9.5.2, warm cache: spawn to `connection.json` 0.357-0.365 s; first `/health` 2.2-28.9 ms;
+  `terminate()` ends the process with exit code 1 and the connection file survives it in every
+  run. Before the pid was added the file was indistinguishable from a live engine's. A packaged
+  cold start on a machine that has never run the product was not measured
+- justifies: XC-259
