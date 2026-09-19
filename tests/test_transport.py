@@ -242,6 +242,30 @@ class TestHandlesAreFetchedSeparately:
         assert status == 410
         assert json.loads(body)["reason"]["id"] == "handle.expired"
 
+    def test_the_connection_file_names_the_process_that_wrote_it(self, tmp_path: Path) -> None:
+        """XC-259: a file is a hint, not proof. A crash leaves it behind (E-197), so a shell reading
+        one needs to know which process it belonged to before deciding what it means."""
+        session = Session()
+        listener = serve(Engine(session, build_surface(session)), connection_directory=tmp_path / "run")
+        try:
+            written = json.loads((tmp_path / "run" / CONNECTION_FILE).read_text(encoding="utf-8"))
+            assert written["pid"] == os.getpid()
+        finally:
+            listener.stop()
+
+    def test_a_clean_stop_removes_the_connection_file(self, tmp_path: Path) -> None:
+        """Left behind, it sends the next shell to a port nothing answers on. Measured before this
+        existed: terminate() left the file every time (E-197) - a crash still will, and the pid
+        above is how that case is told apart."""
+        session = Session()
+        listener = serve(Engine(session, build_surface(session)), connection_directory=tmp_path / "run")
+        path = tmp_path / "run" / CONNECTION_FILE
+        assert path.exists()
+
+        listener.stop()
+
+        assert not path.exists()
+
     def test_a_percent_encoded_identifier_finds_its_bytes(self, engine) -> None:
         """A handle's identifier holds a colon, which a correct client percent-encodes in a path
         segment. Reading the raw segment looked up `handle%3Aab12`, found nothing, and answered

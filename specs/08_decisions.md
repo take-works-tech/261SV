@@ -5361,3 +5361,47 @@ model or the prompt, never in a description that quietly went stale.
   changing - which is a WebSocket beside this one rather than a replacement for it. Or a measured
   cost: if fetching geometry through `GET` is slower than the same bytes over a socket by enough to
   matter at LIM-002's budget, the payload path moves and the command path stays
+
+### XC-259 - The shell owns the engine process, and the connection file is a hint the shell verifies
+- decided: 2026-09-19
+- status: active
+- decision: the shell's main process **starts the engine as a child process** with Node's
+  `child_process.spawn` - the packaged engine executable, or `python -m service.transport` in
+  development - passing `--connection-directory` under `app.getPath('userData')`, and reads
+  `connection.json` there. **The file is a hint, not proof.** The shell calls `/health` before it
+  says "connected", and the file carries its writer's `pid` so that a file left behind by a process
+  that died is recognisable as one: the engine removes the file on a clean stop and cannot on a
+  crash, and the pid is how the shell tells the two apart. **One engine per application instance**:
+  `app.requestSingleInstanceLock()`, and a second launch is handed to the first through
+  `second-instance`. **On the child's `exit`** - crash, kill, or anything else - the shell tells the
+  renderer in the same moment; the interface marks the engine absent with the exit code as the
+  reason, keeps what is on screen labelled as from an engine that is gone, and offers a restart.
+  What was saved to the workspace document is intact; what was not is **reported lost**, never
+  silently rebuilt. On `before-quit` the shell stops the engine and waits for it, bounded
+- decided_by: engineering judgement inside XC-040's frame - Electron over a local Python process is
+  Fixed there - recorded with the measurements #305 asked for rather than before them
+- rationale: **process ownership decides what a crash is.** A child the shell spawned is one the
+  shell receives an `exit` event for, so an engine dying is an event with an exit code, not a
+  timeout noticed later by a request that hangs; a separately started daemon would need polling and
+  a stale-file protocol on every launch. **The process boundary is what makes a VTK crash
+  recoverable**: the toolkit takes its process down rather than raising (E-194), and an engine
+  embedded in the shell's process would take the window with it - #306's premise, "VTK は落ちる", is
+  answered by the boundary, not by catching anything. Electron's own `utilityProcess` is the
+  equivalent of `child_process.fork` for a **Node.js script** (E-196), so a Python executable goes
+  through `child_process.spawn`. The control channel is XC-258's: stdio is not it.
+  **Measured** (E-197): on this machine a warm start reaches the connection file in 0.36 s and the
+  first `/health` answers in 2-29 ms, so the unresponsive seconds #307 fears are not the engine's
+  own warm start; a packaged cold start is **unmeasured and stays open** (#307). `terminate()` ends
+  the process with exit code 1 and **leaves the connection file every time** - the fact that put the
+  pid in the file and the removal in `Listener.stop()`
+- alternatives: **a detached daemon** the shell finds or starts - survives a shell restart, and every
+  launch begins by deciding whether a file it finds is live, which is the work this decision does
+  once with a pid and `/health`. **Embedding** the engine in the shell's process - one process, one
+  crash (E-194). **`utilityProcess`** - Node scripts only (E-196)
+- basis: E-195 (T1), E-196 (T1), E-197 (T1), E-194 (T1), E-024 (T1)
+- affects: XC-040, XC-258, MOD-017
+- decidedness: Bounded
+- reversal_trigger: a measured packaged cold start of more than a few seconds moves the question to
+  what is shown while waiting (#307) and not to this model. A crash rate that makes restart routine
+  moves the workspace document to a save on every applied command, so that "what was not saved" is
+  never more than the last one

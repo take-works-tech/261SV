@@ -53,5 +53,32 @@
     "points": 113106,
     "gzip_bytes": 1579984,
     "seconds": 22.34
+  },
+  "engine_startup": {
+    "measured": "2026-09-19",
+    "script": "spike/measure_engine_startup.py",
+    "machine": "Windows 11 (platform reports 'Windows 10'), Python 3.11.9, VTK 9.5.2, warm cache",
+    "runs": [
+      {
+        "spawn_to_connection_file_s": 0.365,
+        "first_health_ms": 28.9,
+        "exit_code_after_terminate": 1,
+        "connection_file_survives_terminate": true
+      },
+      {
+        "spawn_to_connection_file_s": 0.359,
+        "first_health_ms": 2.2,
+        "exit_code_after_terminate": 1,
+        "connection_file_survives_terminate": true
+      },
+      {
+        "spawn_to_connection_file_s": 0.357,
+        "first_health_ms": 2.3,
+        "exit_code_after_terminate": 1,
+        "connection_file_survives_terminate": true
+      }
+    ],
+    "not_measured": "a packaged cold start on a machine that has never run the product (#307)",
+    "settles": "XC-259: the connection file outlives a terminated engine, so it carries the writer's pid and is removed on a clean stop"
   }
 }

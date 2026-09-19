@@ -26,6 +26,7 @@ Specification: CT-003, XC-258, XC-045, INV-007.
 from __future__ import annotations
 
 import json
+import os
 import secrets
 import threading
 from dataclasses import dataclass
@@ -98,10 +99,20 @@ class Connection:
     port: int
     token: str
     protocol: str
+    #: The process that wrote the file. A file is a hint and not proof that an engine is listening:
+    #: a crash leaves it behind (measured, E-197), and the shell tells a live engine from a dead one
+    #: by `/health` - the pid is what lets it say *which* dead one, and clean up after it (XC-259).
+    pid: int = 0
 
     def as_json(self) -> str:
         return json.dumps(
-            {"host": self.host, "port": self.port, "token": self.token, "protocol": self.protocol},
+            {
+                "host": self.host,
+                "port": self.port,
+                "token": self.token,
+                "protocol": self.protocol,
+                "pid": self.pid,
+            },
             ensure_ascii=False,
         )
 
@@ -320,6 +331,9 @@ class Listener:
     engine: Engine
     server: ThreadingHTTPServer
     thread: threading.Thread
+    #: The connection file this listener wrote, if any, so that stopping removes it. A file that
+    #: outlives its engine sends the next shell to a port nothing answers on.
+    connection_path: Path | None = None
 
     @property
     def port(self) -> int:
@@ -327,12 +341,21 @@ class Listener:
 
     @property
     def connection(self) -> Connection:
-        return Connection(host=LOOPBACK_HOST, port=self.port, token=self.engine.token, protocol=PROTOCOL_VERSION)
+        return Connection(host=LOOPBACK_HOST, port=self.port, token=self.engine.token, protocol=PROTOCOL_VERSION,
+            pid=os.getpid(),
+        )
 
     def stop(self) -> None:
         self.server.shutdown()
         self.server.server_close()
         self.thread.join(timeout=10)
+        # A clean stop leaves no connection file. A crash cannot do this, which is what the pid in
+        # the file is for (XC-259).
+        if self.connection_path is not None:
+            try:
+                self.connection_path.unlink()
+            except FileNotFoundError:
+                pass
 
 
 def serve(
@@ -352,7 +375,7 @@ def serve(
     thread.start()
     listener = Listener(engine=engine, server=server, thread=thread)
     if connection_directory is not None:
-        write_connection(listener.connection, connection_directory)
+        listener.connection_path = write_connection(listener.connection, connection_directory)
     if ready is not None:
         ready(listener.connection)
     return listener
