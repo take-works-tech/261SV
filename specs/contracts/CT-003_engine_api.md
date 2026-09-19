@@ -10,7 +10,11 @@ updated: 2026-09-20
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 2.8.0
+- version: 2.9.0
+- correction: 2026-09-20, version 2.8.0 to 2.9.0. `history.list` says what memory no longer holds:
+  each entry carries `undoable`, and the answer carries the undo cap and how many groups it dropped
+  (LIM-014), the history cap and how many entries fell out (LIM-015). #315's condition is that a
+  person can tell what was lost when the cap is exceeded; this is where they are told. Additive
 - correction: 2026-09-20, version 2.7.0 to 2.8.0. `system.capabilities` answers `diagnostics`: where
   the log is written, at what level, the size it rotates at, how many files are kept and for how
   long, and what is there now. #312 asks that the location be reachable from the interface, and

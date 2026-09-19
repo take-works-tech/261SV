@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "2.8.0";
+export const PROTOCOL_VERSION = "2.9.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -674,7 +674,12 @@ export interface Results {
       atUtc: string;
       outcome: string;
       undoId?: string;
+      undoable?: boolean;
     })[];
+    undoLimit?: number;
+    undoDropped?: number;
+    historyLimit?: number;
+    omitted?: number;
   };
   "dataset.probe": {
     value: {

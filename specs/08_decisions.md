@@ -5557,3 +5557,35 @@ model or the prompt, never in a description that quietly went stale.
   which point the two numbers become settings on the 診断 page rather than constants; or a measured
   cost of the synchronous write on a command's latency, at which point the write moves to a thread
   and the line order is preserved by a queue
+
+### XC-264 - Undo is bounded by count, holds nothing it can reread, and says what it dropped
+- decided: 2026-09-20
+- status: active
+- decision: the command surface keeps at most LIM-014 undo groups and LIM-015 history entries in
+  memory. Past the first, the oldest undo group is dropped and its id is remembered, so asking to
+  undo it is refused with the limit's name and not with a denial that it ever existed. Past the
+  second, the oldest entry leaves `history.list` and the answer says how many did. **No undo closure
+  holds what it can reread**: the undo of `workspace.open` no longer keeps the previous workspace's
+  datasets - it reopens the document and the open's answer warns that the datasets will need
+  reading again - and the undo of `workspace.save` puts the previous file back from disk rather
+  than from bytes held in memory. `history.list` carries `undoable` per entry and `undoDropped`,
+  `undoLimit`, `omitted`, `historyLimit`, which is where a person is told what the caps took
+- decided_by: engineering judgement, from reading what the closures held
+- rationale: **the count was never the problem; the closures were.** Fifty closures over a view
+  definition are kilobytes. One closure over a workspace's datasets is LIM-001 - eight gigabytes on
+  the workstation class - and the undo of `workspace.open` held exactly that, for every workspace a
+  session had opened, for as long as the session ran. A cap by count would have bounded that at
+  fifty workspaces' worth, which is not a bound. So the heavy closures were changed to hold
+  references to what is on disk, and then a count is an honest limit. **Saying what was dropped**
+  is #315's condition and the difference between a limit and a leak: an undo that silently stops
+  working is a defect report; one that says "the limit dropped it" is a decision the person can act on
+- alternatives: **a cap by measured bytes** - closures cannot be measured without walking what they
+  reference, and the walk would cost more than the memory. **Unbounded, with the heavy closures
+  fixed** - the leak is gone but the growth is not, and #315 is about growth. **Serialising undo
+  state to disk** - a second document format for the sake of an undo depth nobody asked for
+- basis: E-001 (T1), LIM-001
+- affects: MOD-012, CT-003, LIM-014, LIM-015
+- decidedness: Bounded
+- reversal_trigger: a real case that needs more than fifty undo steps, at which point the number
+  moves and the reason is written here; or a closure found holding a dataset again, at which point
+  the surface gains a check that an undo is registered with a stated weight

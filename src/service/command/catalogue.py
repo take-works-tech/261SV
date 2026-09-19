@@ -262,7 +262,7 @@ RESULT_FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "system.capabilities": (frozenset(['diagnostics', 'formats', 'machineClass', 'renderers']), frozenset(['formats', 'machineClass', 'renderers'])),
     "system.protocols": (frozenset(['versions']), frozenset(['versions'])),
     "history.undo": (frozenset(['restoredIds']), frozenset(['restoredIds'])),
-    "history.list": (frozenset(['entries']), frozenset(['entries'])),
+    "history.list": (frozenset(['entries', 'historyLimit', 'omitted', 'undoDropped', 'undoLimit']), frozenset(['entries'])),
     "dataset.probe": (frozenset(['association', 'value']), frozenset(['value'])),
     "dataset.parts": (frozenset(['parts']), frozenset(['parts'])),
     "field.derive": (frozenset(['conventions', 'fieldName', 'formula', 'frameId']), frozenset(['conventions', 'fieldName', 'formula'])),
@@ -362,7 +362,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
 
 #: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below
 #: the engine's floor is refused politely rather than answered in a shape it cannot read.
-PROTOCOL_VERSION = "2.8.0"
+PROTOCOL_VERSION = "2.9.0"
 
 #: The wire's own names, from CT-003's `$defs.transport` (XC-258). The interface generates
 #: the same values from the same place; neither side is derived from the other (XC-252).
