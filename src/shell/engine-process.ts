@@ -25,10 +25,14 @@ import type { EngineProcessStatus } from "../ui/client/shell";
 export { CONNECTION_FILE };
 
 export interface EngineOptions {
-  /** What runs `-m service.transport`: an interpreter in development, the packaged engine later. */
-  readonly python: string;
-  /** The repository root in development: `src/` goes on PYTHONPATH and is the working directory. */
-  readonly root: string;
+  /** The engine executable: an interpreter in development, the frozen `solvia-engine` when packaged
+   *  (XC-261). What follows it is `args`; the connection directory is appended here. */
+  readonly command: string;
+  readonly args?: readonly string[];
+  /** The working directory the engine starts in. */
+  readonly cwd: string;
+  /** Environment added to the shell's own: PYTHONPATH in development, nothing when packaged. */
+  readonly environment?: Readonly<Record<string, string>>;
   /** Where the engine writes its connection file - the shell's own directory, never a shared one. */
   readonly directory: string;
   /** The renderer's origin, for the engine's CORS header (XC-260). */
@@ -98,6 +102,27 @@ async function health(connection: Connection, timeoutMs: number): Promise<string
   }
 }
 
+/** The engine as development runs it: an interpreter, `-m service.transport`, `src/` on its path. */
+export function developmentEngine(python: string, root: string): Pick<EngineOptions, "command" | "args" | "cwd" | "environment"> {
+  return {
+    command: python,
+    args: ["-m", "service.transport"],
+    cwd: root,
+    environment: { PYTHONPATH: join(root, "src") },
+  };
+}
+
+/** The engine as a package carries it: the frozen executable in its own directory (XC-261). */
+export function packagedEngine(resources: string): Pick<EngineOptions, "command" | "args" | "cwd" | "environment"> {
+  const directory = join(resources, "engine");
+  return {
+    command: join(directory, process.platform === "win32" ? "solvia-engine.exe" : "solvia-engine"),
+    args: [],
+    cwd: directory,
+    environment: {},
+  };
+}
+
 /** What a connection file left by a previous life is, and what was done about it. */
 export async function clearStale(directory: string): Promise<string | null> {
   const file = join(directory, CONNECTION_FILE);
@@ -159,13 +184,13 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
     for (const listener of listeners) listener(next);
   };
 
-  const args = ["-m", "service.transport", "--connection-directory", directory];
+  const args = [...(options.args ?? []), "--connection-directory", directory];
   if (options.allowOrigin) args.push("--allow-origin", options.allowOrigin);
-  const child = spawn(options.python, args, {
-    cwd: options.root,
+  const child = spawn(options.command, args, {
+    cwd: options.cwd,
     env: {
       ...process.env,
-      PYTHONPATH: join(options.root, "src"),
+      ...(options.environment ?? {}),
       PYTHONIOENCODING: "utf-8",
     },
     stdio: ["ignore", "pipe", "pipe"],

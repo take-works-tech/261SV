@@ -27,6 +27,15 @@ dev = [
     # A development requirement, not in the distribution closure, so no notice obligation attaches
     # (XC-025). Nothing under src/ imports it.
     "h5py==3.16.0",
+    # Freezes the engine into a directory that runs with no Python installed (XC-261,
+    # packaging/freeze_engine.py). Its bootloader starts every frozen executable, so it is in the
+    # distribution closure - and PyInstaller's own licence page says what that obliges: the bundle
+    # "can be shipped with whatever license you want", and "you do not need to include PyInstaller's
+    # license file with your application, nor do you have to provide any form of acknowledgements"
+    # (E-204). So nothing for the notices file (XC-025) from this pin; the closure's other members
+    # - VTK, NumPy, Electron, Chromium - are where the obligations are.
+    "pyinstaller==6.22.3",
+    "pyinstaller-hooks-contrib==2026.7",
 ]
 
 [build-system]

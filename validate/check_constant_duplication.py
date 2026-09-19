@@ -34,6 +34,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 SOURCE_SUFFIXES = (".py", ".ts", ".tsx", ".js", ".jsx")
 SKIP_DIRS = {
     ".git", ".venv", "venv", "node_modules", ".next", "archive", "__pycache__", "dist", "build",
+    # Build outputs on disk but never in the tree: the packaged shell (electron-builder writes
+    # `release/`, with VTK's own sources inside) and the preload's CommonJS build.
+    "release", "dist-preload",
     ".mypy_cache", ".pytest_cache", ".ruff_cache", "site-packages",
 }
 

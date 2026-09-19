@@ -10,11 +10,13 @@
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.preload.json && node -e \"require('fs').copyFileSync('dist-preload/shell/preload.cjs','dist/shell/preload.cjs')\"",
     "test": "vitest run",
     "start": "npm run build && electron .",
-    "smoke": "npm run build && electron . --smoke"
+    "smoke": "npm run build && electron . --smoke",
+    "package": "npm run build && electron-builder --config electron-builder.yml"
   },
   "devDependencies": {
     "@types/node": "26.6.2",
     "electron": "44.4.3",
+    "electron-builder": "^26.15.3",
     "typescript": "7.0.2",
     "vitest": "5.0.1"
   }

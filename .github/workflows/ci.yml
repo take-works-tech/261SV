@@ -260,3 +260,44 @@ jobs:
         working-directory: src/shell
         env:
           SIM_VIEWER_REQUIRE_VTK: "1"
+
+  package:
+    name: the package runs with nothing installed
+    # XC-261: the engine frozen with PyInstaller, the interface built, the shell packaged by
+    # electron-builder as an unpacked directory, and the result started with no Python on its path -
+    # the frozen engine walked through the whole prototype thread over HTTP, then the packaged shell
+    # in --smoke mode. What this does not prove: an installer, a signature, a notices file (XC-050,
+    # XC-051, XC-025 stay open), or a cold start on a machine that has never run it.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgl1 libglx-mesa0 libegl1 libnss3 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libasound2t64
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e ".[dev]"
+      - name: Freeze the engine, start it, walk the prototype thread against it
+        run: xvfb-run -a python packaging/freeze_engine.py --check --thread
+      - run: npm ci
+        working-directory: src/ui
+      - run: npm run build
+        working-directory: src/ui
+      - run: npm ci
+        working-directory: src/shell
+      - run: npm run package -- --linux dir
+        working-directory: src/shell
+      - name: Start the packaged shell with no Python on the path
+        run: |
+          set -e
+          ls -la release/linux-unpacked | head -20
+          out=$(xvfb-run -a ./release/linux-unpacked/solvia --smoke --no-sandbox)
+          echo "$out"
+          # Chromium writes its D-Bus complaints before the summary; the object is what is read.
+          echo "$out" | python3 -c 'import json,sys; raw=sys.stdin.read(); s=json.loads(raw[raw.find("{"):raw.rfind("}")+1]); assert s["ok"] and s["packaged"], s; print("packaged start to running:", s["started"]["afterMs"], "ms")'
+        working-directory: src/shell
+        env:
+          PATH: /usr/bin:/bin

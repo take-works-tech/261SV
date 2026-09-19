@@ -261,7 +261,10 @@ class TestNothingStoredExecutesItself:
         offenders = [
             path.name
             for path in sorted(root.rglob("*.py"))
-            if "__pycache__" not in path.parts
+            # Build outputs live under src/ on disk and never in the tree: the packaged shell
+            # (src/shell/release) carries VTK's own Python, which is nobody's code here. The same
+            # names the two filesystem gates skip (check_boundaries, check_constant_duplication).
+            if not any(part in {"__pycache__", "build", "dist", "dist-preload", "release", "node_modules"} for part in path.parts)
             and doors.findall(path.read_text(encoding="utf-8"))
         ]
 

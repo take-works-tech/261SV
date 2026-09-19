@@ -1,0 +1,40 @@
+# The packaged desktop build (XC-050, XC-261): the shell, the interface's built files and the frozen
+# engine in one directory that runs with nothing installed.
+#
+# `dir` targets only, on purpose. XC-050 asks for a signed installer per platform and XC-051 for the
+# signature; neither exists yet (no certificate), and an installer that is not signed is an
+# installation failure for the customers who matter (XC-051's own words). What this produces is the
+# unpacked application - the thing an installer would install - so that it can be started, measured
+# and walked end to end before there is anything to sign.
+appId: tech.take-works.solvia
+productName: SOLVIA
+# The executable's name on every platform, stated rather than derived: electron-builder derives
+# it from the product name in a platform-dependent way, and CI's first run of the Linux package
+# failed with 127 - command not found - on the name I had assumed.
+executableName: solvia
+copyright: FSL-1.1-MIT (LICENSE.md)
+directories:
+  output: release
+files:
+  - dist/**
+  - package.json
+extraResources:
+  # The interface, served by the main process from solvia://app/ (XC-260).
+  - from: ../ui/dist
+    to: ui
+  # The frozen engine, one directory (packaging/freeze_engine.py). Started as a child process and
+  # verified through /health before anything is called "connected" (XC-259).
+  - from: ../../build/engine/solvia-engine
+    to: engine
+asar: true
+npmRebuild: false
+win:
+  target:
+    - dir
+linux:
+  target:
+    - dir
+  category: Science
+mac:
+  target:
+    - dir
