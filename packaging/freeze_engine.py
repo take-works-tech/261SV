@@ -51,6 +51,9 @@ RUNTIME_DISTRIBUTIONS = ("vtk", "numpy")
 EXCLUDED_MODULES = (
     "tkinter", "_tkinter", "PIL",
     "vtkmodules.tk", "vtkmodules.qt", "vtkmodules.gtk", "vtkmodules.wx",
+    # readline is GPL-3.0 and pulls libreadline and libtinfo into a Linux freeze; nothing in the
+    # engine reads a terminal. Found by the notices generator on the first Linux run.
+    "readline",
 )
 
 

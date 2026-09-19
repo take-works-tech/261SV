@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "packaging"))
 
-from notices import REQUIRED_STATEMENTS, _field, library_matches  # noqa: E402
+from notices import REQUIRED_STATEMENTS, _field, library_matches, soname  # noqa: E402
 
 
 class TestALibraryFileBelongsToItsModule:
@@ -71,3 +71,11 @@ class TestTheStatementsSomeLicencesRequire:
         assert "Independent JPEG Group" in REQUIRED_STATEMENTS["jpeg"]
         assert "MPL-2.0" in REQUIRED_STATEMENTS["eigen"] and "https://" in REQUIRED_STATEMENTS["eigen"]
         assert "modified" in REQUIRED_STATEMENTS["gl2ps"] and "https://" in REQUIRED_STATEMENTS["gl2ps"]
+
+
+class TestASystemLibraryIsNamedAsItsPackageNamesIt:
+    def test_the_hash_pyinstaller_or_auditwheel_added_is_removed_and_the_version_kept_to_the_major(self) -> None:
+        assert soname("libXcursor-1a09904e.so.1.0.2") == "libXcursor.so.1"
+        assert soname("libgfortran-040039e1-0352e75f.so.5.0.0") == "libgfortran.so.5"
+        assert soname("libX11.so.6") == "libX11.so.6"
+        assert soname("libreadline.so.8") == "libreadline.so.8"

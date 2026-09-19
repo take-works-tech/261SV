@@ -243,7 +243,7 @@ def attribute_vtk(
 ) -> list[Component]:
     """VTK's own copyright, its licence variants among the modules present, and each third party
     the present modules depend on - with the files each one accounts for."""
-    library_files = [f for f in files if "/vtk.libs/" in f or f.startswith("vtk.libs/") or "/vtkmodules/" in f]
+    library_files = [f for f in files if f.startswith(("vtk.libs/", "vtkmodules/")) or "/vtk.libs/" in f or "/vtkmodules/" in f]
     present: dict[str, list[str]] = {}
     for module in modules.values():
         mine = [f for f in library_files if library_matches(module.library, f)]
@@ -268,7 +268,8 @@ def attribute_vtk(
     components: list[Component] = []
 
     # 1. VTK itself: the wheel's own copyright file, and the python modules and bindings.
-    dist_info = next((f for f in files if re.match(r"^vtk-[^/]+\.dist-info/LICENSE$", f)), None)
+    # Newer wheel metadata keeps licence files under dist-info/licenses/; older ones beside METADATA.
+    dist_info = next((f for f in files if re.match(r"^vtk-[^/]+\.dist-info/(licenses/)?LICENSE[^/]*$", f)), None)
     own_files = [f for f in files if f.startswith("vtkmodules/") or f.startswith("vtk-") and ".dist-info/" in f]
     own_files += [f for name in present if not modules[name].third_party for f in present[name]]
     vtk = Component(
@@ -401,6 +402,7 @@ def attribute_python(files: list[str], engine: Path, claimed: dict[str, str]) ->
         "/" not in f and (f == library or f.endswith(".pyd") or f.endswith(".so") or f == "base_library.zip")
         or f.startswith("lib-dynload/")
         or f.startswith("lib/")
+        or re.match(r"^python3\.\d+/", f) is not None
         or re.match(r"^(libffi|libcrypto|libssl|sqlite3|libsqlite3|libz|zlib1|libbz2|liblzma|libexpat|libmpdec|libgcc|libstdc)", f.rsplit("/", 1)[-1]) is not None and "/" not in f
     )]
     component = Component(
@@ -473,6 +475,24 @@ def attribute_bundled_runtime(files: list[str], claimed: dict[str, str]) -> list
         components.append(component)
         for f in microsoft:
             claimed.setdefault(f, component.name)
+    gcc = [
+        f for f in files
+        if re.match(r"^(libgcc_s|libstdc\+\+|libgomp|libgfortran|libquadmath)", f.rsplit("/", 1)[-1])
+        and not f.startswith("numpy.libs/")
+    ]
+    if gcc:
+        text = (VENDORED / "gcc-runtime.txt").read_text(encoding="utf-8")
+        component = Component(
+            name="GCC runtime libraries",
+            version="as bundled by the wheel that carries them",
+            licence="GPL-3.0-or-later WITH GCC-exception-3.1",
+            files=gcc,
+            texts=[(str(VENDORED / "gcc-runtime.txt"), text)],
+            note="Bundled into a Linux wheel by auditwheel; the exception text is vendored with its provenance",
+        )
+        components.append(component)
+        for f in gcc:
+            claimed.setdefault(f, component.name)
     openxr = [f for f in files if f.rsplit("/", 1)[-1].startswith("openxr_loader")]
     if openxr:
         text = (VENDORED / "openxr-loader.txt").read_text(encoding="utf-8")
@@ -486,6 +506,56 @@ def attribute_bundled_runtime(files: list[str], claimed: dict[str, str]) -> list
         )
         components.append(component)
         for f in openxr:
+            claimed.setdefault(f, component.name)
+    return components
+
+
+def soname(filename: str) -> str:
+    """`libXcursor-1a09904e.so.1.0.2` -> `libXcursor.so.1`: the name a package's file list carries."""
+    base = filename.rsplit("/", 1)[-1]
+    base = re.sub(r"-[0-9a-f]{8}(-[0-9a-f]{8})?(?=\.so)", "", base)
+    match = re.match(r"^(.*\.so(?:\.\d+)?)", base)
+    return match.group(1) if match else base
+
+
+def attribute_system_libraries(files: list[str], claimed: dict[str, str]) -> list[Component]:
+    """Shared libraries at the top of the closure that belong to no wheel and no runtime named above:
+    on Linux, PyInstaller copies what the engine's libraries link to (X11, libbsd, ncurses) from the
+    machine that built it. Their terms are those of the packages they came from, so the package is
+    found with dpkg and its copyright file is the text. On a machine without dpkg this is an error
+    naming the files, not a guess."""
+    import shutil
+    import subprocess
+
+    loose = [f for f in files if "/" not in f and re.match(r"^lib[^/]*\.so(\.|$)", f) and f not in claimed]
+    if not loose:
+        return []
+    if shutil.which("dpkg") is None:
+        raise NoticesError("system libraries in the closure and no dpkg to say which packages they came from: " + ", ".join(loose))
+    by_package: dict[str, list[str]] = {}
+    for f in loose:
+        name = soname(f)
+        found = subprocess.run(["dpkg", "-S", name], capture_output=True, text=True)
+        packages = sorted({line.split(":")[0] for line in found.stdout.splitlines() if line.strip()})
+        if found.returncode != 0 or not packages:
+            raise NoticesError(f"{f} ({name}) belongs to no installed package: dpkg -S found nothing")
+        by_package.setdefault(packages[0], []).append(f)
+    components: list[Component] = []
+    for package, mine in sorted(by_package.items()):
+        copyright_file = Path("/usr/share/doc") / package / "copyright"
+        if not copyright_file.exists():
+            raise NoticesError(f"{package} owns {mine} and has no copyright file at {copyright_file}")
+        version = subprocess.run(["dpkg-query", "-W", "-f=${Version}", package], capture_output=True, text=True).stdout.strip()
+        component = Component(
+            name=f"{package} (system library copied into the closure by PyInstaller)",
+            version=version or "?",
+            licence="see the package's copyright file",
+            files=mine,
+            texts=[(str(copyright_file), copyright_file.read_text(encoding="utf-8", errors="replace"))],
+            note="Linked by the engine's libraries on the build machine; a Windows build carries none of these",
+        )
+        components.append(component)
+        for f in mine:
             claimed.setdefault(f, component.name)
     return components
 
@@ -638,6 +708,7 @@ def main(argv: list[str]) -> int:
     components.append(attribute_dist_info(files, engine, claimed, "numpy", ("numpy/", "numpy.libs/")))
     components += attribute_bundled_runtime(files, claimed)
     components.append(attribute_python(files, engine, claimed))
+    components += attribute_system_libraries(files, claimed)
     components.append(attribute_product(files, claimed))
     product = next(c for c in components if c.name == "SOLVIA (this product)")
     for name in executable:
