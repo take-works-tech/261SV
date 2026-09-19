@@ -961,3 +961,27 @@ class TestWhatWasSavedIsIntact:
 
         assert undone.status is Status.APPLIED, undone.reason
         assert workspace.read_bytes() == before
+
+
+class TestOpeningSaysWhatTheDocumentHolds:
+    def test_a_saved_view_is_named_by_the_next_open_so_it_can_be_updated_not_recreated(self, tmp_path: Path) -> None:
+        """CT-003 2.6.0. The recovery path created its view again under the same name and was refused,
+        correctly (AC-030); the next open now says what is there."""
+        surface, session, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        workspace = session.workspace_path
+        assert workspace is not None
+        created = surface.submit(Command("view.create", {"workspaceId": "ws:1", "definition": {
+            "name": "temperature", "datasetId": dataset_id, "representation": "surface",
+            "colouring": {"fieldName": "temperature", "association": "point", "colourMap": "viridis"},
+        }}))
+        assert created.status is Status.APPLIED, created.reason
+        assert surface.submit(Command("workspace.save", {"workspaceId": "ws:1"})).status is Status.APPLIED
+
+        again, _ = a_surface()
+        opened = again.submit(Command("workspace.open", {"path": str(workspace)}))
+
+        assert opened.status is Status.APPLIED, opened.reason
+        assert opened.value["items"]["views"] == [
+            {"id": created.value["id"], "name": "temperature", "datasetId": dataset_id},
+        ]
+        assert opened.value["items"]["reports"] == []

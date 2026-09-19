@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -1611,6 +1611,82 @@
                 "type": "string"
               },
               "description": "ファイルが見つからない、または変わったケース"
+            },
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "開いた文書が持つ項目。名前は文書の中で一意なので（AC-030）、同じ名前で作り直さず更新するために要る",
+              "properties": {
+                "views": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "datasetId": {
+                        "type": "string",
+                        "description": "ビューが指すデータセット。前のセッションの識別子であり、読み直した後は別の識別子になる"
+                      }
+                    }
+                  }
+                },
+                "graphs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "datasetId": {
+                        "type": "string",
+                        "description": "ビューが指すデータセット。前のセッションの識別子であり、読み直した後は別の識別子になる"
+                      }
+                    }
+                  }
+                },
+                "reports": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "datasetId": {
+                        "type": "string",
+                        "description": "ビューが指すデータセット。前のセッションの識別子であり、読み直した後は別の識別子になる"
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         },

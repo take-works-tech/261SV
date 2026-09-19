@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "2.5.0";
+export const PROTOCOL_VERSION = "2.6.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -426,6 +426,23 @@ export interface Results {
     workspaceId: string;
     formatVersion: string;
     unresolvedCases: readonly (string)[];
+    items?: {
+      views?: readonly ({
+        id: string;
+        name: string;
+        datasetId?: string;
+      })[];
+      graphs?: readonly ({
+        id: string;
+        name: string;
+        datasetId?: string;
+      })[];
+      reports?: readonly ({
+        id: string;
+        name: string;
+        datasetId?: string;
+      })[];
+    };
   };
   "workspace.save": {
     path: string;

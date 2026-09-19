@@ -8,7 +8,7 @@ import { useEffect, type ReactNode } from "react";
 import { session, useSession, type ScreenId } from "../state/session";
 import { connectionFromEnvironment, engineState, useEngine } from "../state/engine";
 import { shellApi } from "../client/shell";
-import { EngineRefusal } from "../shared/EngineStatus";
+import { EngineLost, EngineRefusal } from "../shared/EngineStatus";
 import { InstructionBar } from "../shared/InstructionBar";
 import { MaterialLibraryShelf, type ShelfAsset, type ShelfState } from "../shared/MaterialLibraryShelf";
 import { Topbar } from "./Topbar";
@@ -91,18 +91,30 @@ export function App() {
       else engineState.disconnect();
       return;
     }
+    let hadExited = false;
     const apply = (status: { state: string; reason: string | null; exitCode: number | null; signal: string | null }) => {
       if (status.state === "running") {
         void shell.engine.connection().then((connection) => {
-          if (connection) void engineState.connect(connection);
+          if (!connection) return;
+          // After an exit, what was saved is opened again; the first time, there is nothing to reopen.
+          if (hadExited) void engineState.recover(connection);
+          else void engineState.connect(connection);
         });
       } else if (status.state === "exited") {
+        hadExited = true;
         engineState.engineExited(status);
       }
     };
     const unsubscribe = shell.engine.onStatus(apply);
     void shell.engine.status().then(apply);
-    return unsubscribe;
+    // Quitting saves first (XC-259). The shell waits, bounded, for the answer.
+    const unsubscribeQuit = shell.app.onWillQuit(() => {
+      void engineState.save().finally(() => shell.app.quitReady());
+    });
+    return () => {
+      unsubscribe();
+      unsubscribeQuit();
+    };
   }, []);
 
   const canvas = ((): ReactNode => {
@@ -146,6 +158,7 @@ export function App() {
         </header>
         <div className="centre-column" style={{ flex: 1, minHeight: 0 }}>
           <EngineRefusal refusal={e.refusal} onDismiss={() => engineState.clearRefusal()} />
+        <EngineLost lost={e.lost} onDismiss={() => engineState.dismissLost()} />
           {canvas}
         </div>
         <CatalogDrawer />
@@ -210,6 +223,7 @@ export function App() {
 
           <div className="canvas-wrap">
             <EngineRefusal refusal={e.refusal} onDismiss={() => engineState.clearRefusal()} />
+            <EngineLost lost={e.lost} onDismiss={() => engineState.dismissLost()} />
             {canvas}
           </div>
 

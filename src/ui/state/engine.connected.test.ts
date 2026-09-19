@@ -177,6 +177,19 @@ describe("the prototype thread from the interface's side", () => {
     expect(s.turntable.azimuthDegrees).toBe(30 + 35);
   });
 
+  test("a write the engine applied is unsaved work until the document is saved", async () => {
+    // K was declared above and never saved: it is in the journal - beside the view writes that
+    // orbiting and colouring made, which are document writes too.
+    const operations = snapshot().journal.map((one) => one.operation);
+    expect(operations).toContain("field.declareUnit");
+    expect(operations).toContain("view.update");
+
+    expect(await engineState.save()).toBe(true);
+
+    expect(snapshot().journal).toEqual([]);
+    expect(snapshot().savedAt).not.toBeNull();
+  });
+
   test("export: a self-contained document with the picture, the unit and the maximum, of the size it says", async () => {
     const target = join(directory, "from-the-interface.html");
 
@@ -193,5 +206,53 @@ describe("the prototype thread from the interface's side", () => {
     expect(html).toContain("K");
     const withoutData = html.replace(/data:image[^"]+/g, "");
     expect(withoutData).not.toMatch(/https?:\/\//);
+  });
+});
+
+describe("when the engine ends", () => {
+  test("what was saved is opened again, and what was not is listed as lost - not rebuilt", async () => {
+    // A second declaration, applied and not saved. MPa on a temperature is a person's choice the
+    // engine does not judge; it is here so that saved (K) and lost (MPa) are told apart.
+    expect(await engineState.declareUnit("temperature", "MPa")).toBe(true);
+    expect(snapshot().journal.map((one) => one.operation)).toContain("field.declareUnit");
+    expect(snapshot().fields[0]?.unit).toBe("MPa");
+
+    // The engine dies. Without a shell, the test says so the way the shell would.
+    engine?.kill("SIGKILL");
+    await new Promise((r) => setTimeout(r, 500));
+    engineState.engineExited({ reason: "エンジンが停止されました（SIGKILL）", exitCode: null, signal: "SIGKILL" });
+
+    let s = snapshot();
+    expect(s.reachability.kind).toBe("exited");
+    expect(s.lost?.map((one) => one.operation)).toContain("field.declareUnit");
+    expect(s.lost?.find((one) => one.operation === "field.declareUnit")?.summary).toContain("MPa");
+    expect(s.journal).toEqual([]);
+    // The picture and the numbers stay on screen, labelled by the topbar as from an engine that is gone.
+    expect(s.imageUrl).toMatch(/^blob:/);
+
+    // A new engine, as the shell would start one.
+    const runDirectory = join(directory, "run2");
+    engine = spawn(PYTHON, ["-m", "service.transport", "--connection-directory", runDirectory], {
+      cwd: ROOT,
+      env: { ...process.env, PYTHONPATH: join(ROOT, "src"), PYTHONIOENCODING: "utf-8" },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const connectionFile = join(runDirectory, "connection.json");
+    await until(() => existsSync(connectionFile), 90_000, "the second connection file");
+    connection = JSON.parse(readFileSync(connectionFile, "utf-8")) as Connection;
+
+    const reachability = await engineState.recover(connection);
+
+    expect(reachability.kind).toBe("reachable");
+    s = snapshot();
+    expect(s.sourceName).toBe("cube.vtu");
+    // The saved declaration came back from the document; the unsaved one did not.
+    expect(s.fields[0]?.unit).toBe("K");
+    expect(s.lost?.map((one) => one.operation)).toContain("field.declareUnit");
+    expect(s.refusal).toBeNull();
+    expect(s.imageUrl).toMatch(/^blob:/);
+
+    engineState.dismissLost();
+    expect(snapshot().lost).toBeNull();
   });
 });

@@ -8,7 +8,7 @@
  * looking live is the failure this product exists to refuse (XC-001). So the state is named in the
  * topbar, in words, always - not by a coloured dot, which says "something" and not "what".
  */
-import type { Reachability } from "../state/engine";
+import type { AppliedWrite, Reachability } from "../state/engine";
 
 export function EngineStatus(props: {
   reachability: Reachability;
@@ -16,6 +16,9 @@ export function EngineStatus(props: {
   refusal?: string | null;
   /** Offered only where a shell can do it (XC-259); a browser build has nothing to restart. */
   onRestart?: () => void;
+  /** Applied writes not yet in the saved document, and the way to save them. */
+  unsaved?: number;
+  onSave?: () => void;
 }) {
   const { reachability } = props;
   const label =
@@ -38,7 +41,42 @@ export function EngineStatus(props: {
           再起動
         </button>
       ) : null}
+      {reachability.kind === "reachable" && (props.unsaved ?? 0) > 0 && props.onSave ? (
+        <button type="button" className="btn ghost" onClick={props.onSave} title="文書に書き戻します。直前の版は隣に残ります">
+          未保存 {props.unsaved} 件 - 保存
+        </button>
+      ) : null}
     </span>
+  );
+}
+
+/** What the last exit lost: the writes the engine had applied and the document had not yet been
+ *  saved with. Listed in the engine's own words, never re-applied (XC-259). */
+export function EngineLost(props: { lost: readonly AppliedWrite[] | null; onDismiss?: () => void }) {
+  if (!props.lost || props.lost.length === 0) return null;
+  return (
+    <div className="notice error" role="status">
+      <div>
+        <b>エンジンの終了で失われた変更：{props.lost.length} 件</b>
+        <span className="why">保存済みの文書とファイルは開き直しました。次は保存前のものです - 作り直してはいません。</span>
+        <ul className="lost-list">
+          {grouped(props.lost).map((group) => (
+            <li key={group.operation}>
+              {group.lastSummary}
+              <small>
+                （{group.operation}
+                {group.count > 1 ? ` ×${group.count}` : ""}、最後は {group.lastAt.slice(11, 19)}）
+              </small>
+            </li>
+          ))}
+        </ul>
+      </div>
+      {props.onDismiss ? (
+        <button type="button" className="btn ghost" onClick={props.onDismiss}>
+          閉じる
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -56,4 +94,21 @@ export function EngineRefusal(props: { refusal: string | null; onDismiss?: () =>
       ) : null}
     </div>
   );
+}
+
+/** The loss, one line per operation: a drag is many `view.update`s, and a list that repeats them
+ *  hides the one declaration among them. The count is kept; the last summary stands for the group. */
+function grouped(lost: readonly AppliedWrite[]): { operation: string; count: number; lastSummary: string; lastAt: string }[] {
+  const groups = new Map<string, { operation: string; count: number; lastSummary: string; lastAt: string }>();
+  for (const one of lost) {
+    const group = groups.get(one.operation);
+    if (group) {
+      group.count += 1;
+      group.lastSummary = one.summary;
+      group.lastAt = one.at;
+    } else {
+      groups.set(one.operation, { operation: one.operation, count: 1, lastSummary: one.summary, lastAt: one.at });
+    }
+  }
+  return [...groups.values()];
 }

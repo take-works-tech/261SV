@@ -4,6 +4,7 @@
 import { useEngine } from "../state/engine";
 import { EngineStatus } from "../shared/EngineStatus";
 import { shellApi } from "../client/shell";
+import { engineState } from "../state/engine";
 import { useEffect, useRef, useState } from "react";
 import { session, useSession } from "../state/session";
 import { NotificationHistory, type Notice } from "../shared/NotificationHistory";
@@ -181,6 +182,8 @@ export function Topbar() {
           reachability={e.reachability}
           busy={e.busy}
           onRestart={shellApi() ? () => void shellApi()?.engine.restart() : undefined}
+          unsaved={e.journal.length}
+          onSave={() => void engineState.save()}
         />
         <button className="icon-button" aria-label="設定" title="設定" onClick={() => session.navigate("settings")}>
           ⚙
