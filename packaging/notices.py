@@ -527,7 +527,16 @@ def attribute_system_libraries(files: list[str], claimed: dict[str, str]) -> lis
     import shutil
     import subprocess
 
-    loose = [f for f in files if "/" not in f and re.match(r"^lib[^/]*\.so(\.|$)", f) and f not in claimed]
+    # At the top of the closure: copied from the build machine by PyInstaller. Inside vtk.libs/ with
+    # a hash in the name: grafted into the wheel by auditwheel at Kitware's build (libXcursor,
+    # libXfixes) - the same libraries under the same terms, and the machine that packages this
+    # product carries the package of each, so that package's copyright file is the text either way.
+    loose = [
+        f for f in files
+        if f not in claimed
+        and re.match(r"^lib[^/]*\.so(\.|$)", f.rsplit("/", 1)[-1])
+        and ("/" not in f or f.startswith("vtk.libs/"))
+    ]
     if not loose:
         return []
     if shutil.which("dpkg") is None:
@@ -552,7 +561,11 @@ def attribute_system_libraries(files: list[str], claimed: dict[str, str]) -> lis
             licence="see the package's copyright file",
             files=mine,
             texts=[(str(copyright_file), copyright_file.read_text(encoding="utf-8", errors="replace"))],
-            note="Linked by the engine's libraries on the build machine; a Windows build carries none of these",
+            note=(
+                "Linked by the engine's libraries; "
+                + ("copied from the build machine by PyInstaller" if all("/" not in f for f in mine) else "grafted into the VTK wheel by auditwheel, named with a hash")
+                + ". A Windows build carries none of these"
+            ),
         )
         components.append(component)
         for f in mine:
