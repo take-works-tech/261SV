@@ -205,6 +205,7 @@ def read_vtk_modules(tarball: Path) -> tuple[dict[str, VtkModule], dict[str, str
                             base = candidate[len(prefix):]
                             if base.count("/") <= 1 and base.rsplit("/", 1)[-1] in (f"{short}.h", f"{short}3.h", f"{short}.hpp"):
                                 wanted_texts.add(candidate)
+        wanted_texts.add(f"VTK-{VTK_VERSION}/Copyright.txt")
         for name in sorted(wanted_texts):
             member = members.get(name)
             if member is None:
@@ -282,8 +283,13 @@ def attribute_vtk(
     )
     if dist_info:
         vtk.texts.append((f"{engine.name}/_internal/{dist_info}", (engine / "_internal" / dist_info).read_text(encoding="utf-8", errors="replace")))
+    elif f"VTK-{VTK_VERSION}/Copyright.txt" in texts:
+        # The Linux wheel's metadata carries no licence file (only `License: BSD` in METADATA); the
+        # text is the release's own Copyright.txt, which is what the Windows wheel's LICENSE is a copy of.
+        metadata_files = sorted(f for f in files if re.match(r"^vtk-[^/]+\.dist-info/", f))
+        vtk.texts.append((f"VTK-{VTK_VERSION} source: Copyright.txt (the wheel's dist-info holds {', '.join(f.rsplit('/', 1)[-1] for f in metadata_files) or 'nothing'})", texts[f"VTK-{VTK_VERSION}/Copyright.txt"]))
     else:
-        raise NoticesError("the VTK wheel's LICENSE is not in the closure (was --copy-metadata vtk given?)")
+        raise NoticesError("VTK's copyright text is in neither the wheel's dist-info nor the source release")
     components.append(vtk)
     for f in vtk.files:
         claimed.setdefault(f, vtk.name)
