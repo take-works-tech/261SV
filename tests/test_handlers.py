@@ -31,17 +31,13 @@ needs_offscreen = pytest.mark.skipif(
     not OFFSCREEN_AVAILABLE and not REQUIRE_VTK, reason=f"no offscreen rendering here: {OFFSCREEN_DETAIL}"
 )
 
-import numpy as np  # noqa: E402
-from vtkmodules.util.numpy_support import numpy_to_vtk  # noqa: E402
-from vtkmodules.vtkCommonCore import vtkFloatArray, vtkPoints  # noqa: E402
-from vtkmodules.vtkCommonDataModel import VTK_HEXAHEDRON, vtkCellArray, vtkUnstructuredGrid  # noqa: E402
-from vtkmodules.vtkIOXML import vtkXMLUnstructuredGridWriter  # noqa: E402
 
 from service.command.catalogue import OPERATIONS, PROTOCOL_VERSION  # noqa: E402
 from service.command.handlers import HandleExpired, HandleStore, Session, build_surface  # noqa: E402
 from service.command.surface import Command, Status, Surface  # noqa: E402
 from service.workspace.document import FORMAT_VERSION  # noqa: E402
 from test_reader import write_grid  # noqa: E402
+from demo_case import write_cube  # noqa: E402, F401 - re-exported for the tests that import it from here
 
 ROOT = Path(__file__).resolve().parents[1]
 ZONE = timezone(timedelta(hours=9))
@@ -74,31 +70,6 @@ def a_workspace(tmp_path: Path, *, cases: list[dict] | None = None) -> Path:
     path = tmp_path / "beam.svw"
     path.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
     return path
-
-
-def write_cube(path: Path) -> None:
-    """One hexahedron, a float32 point field 1..8 - a mesh with volume, so dual weights exist."""
-    coordinates = np.array(
-        [[x, y, z] for z in (0.0, 1.0) for y in (0.0, 1.0) for x in (0.0, 1.0)], dtype=np.float64
-    )
-    points = vtkPoints()
-    points.SetData(numpy_to_vtk(coordinates, deep=True))
-    cells = vtkCellArray()
-    cells.InsertNextCell(8)
-    for index in (0, 1, 3, 2, 4, 5, 7, 6):
-        cells.InsertCellPoint(index)
-    grid = vtkUnstructuredGrid()
-    grid.SetPoints(points)
-    grid.SetCells(VTK_HEXAHEDRON, cells)
-    field = vtkFloatArray()
-    field.SetName("temperature")
-    for value in range(1, 9):
-        field.InsertNextValue(float(value))
-    grid.GetPointData().AddArray(field)
-    writer = vtkXMLUnstructuredGridWriter()
-    writer.SetFileName(str(path))
-    writer.SetInputData(grid)
-    writer.Write()
 
 
 def a_surface() -> tuple[Surface, Session]:
