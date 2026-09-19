@@ -31,6 +31,8 @@ from conftest import REQUIRE_VTK, offscreen_rendering_available, requires_vtk
 
 requires_vtk()
 
+ROOT = Path(__file__).resolve().parents[1]
+
 OFFSCREEN_AVAILABLE, OFFSCREEN_DETAIL = offscreen_rendering_available()
 needs_offscreen = pytest.mark.skipif(
     not OFFSCREEN_AVAILABLE and not REQUIRE_VTK, reason=f"no offscreen rendering here: {OFFSCREEN_DETAIL}"
@@ -296,3 +298,118 @@ class TestTheDocumentTheRecipientOpens:
 def self_named(path: Path) -> str:
     """The file name as the provenance writes it."""
     return path.name
+
+# -- the other two formats XC-257 names ---------------------------------------------------------
+
+
+class TestTheThreadRunsOnEveryFormatTheDecisionNames:
+    """XC-257's prototype says "one of the three formats read end-to-end today (.vtu, .ex2, .cgns)".
+    That sentence is a claim about three formats and was walked on one. Each is opened, reduced,
+    probed and exported here - a format the readers accept and the thread cannot carry is a format
+    the decision names and the product does not have.
+
+    The fixtures differ on purpose: Exodus is written by the toolkit's own writer and returns **no
+    results unless every array is switched on by name** (E-136), and CGNS has no writer in the
+    toolkit at all, so its fixture is built straight into the HDF5 node layout (E-137).
+    """
+
+    @staticmethod
+    def _open(tmp_path: Path, source: Path, field: str):
+        session = Session(clock=lambda: datetime(2026, 9, 19, 10, tzinfo=timezone(timedelta(hours=9))))
+        surface = build_surface(session)
+        applied(surface.submit(Command("workspace.open", {"path": str(a_workspace(tmp_path / "w.svw"))})))
+        loaded = applied(surface.submit(
+            Command("dataset.load", {"caseId": "case:1", "filePaths": [str(source)]})
+        ))
+        names = {one["name"] for one in loaded["fields"]}
+        assert field in names, f"{source.suffix} carried {sorted(names)}"
+        return surface, session, loaded["datasetId"]
+
+    def test_exodus_carries_a_value_from_the_file_to_a_document(self, tmp_path: Path) -> None:
+        from test_reader import write_exodus
+
+        source = tmp_path / "case.ex2"
+        write_exodus(source)
+        surface, _, dataset_id = self._open(tmp_path, source, "stress")
+        applied(surface.submit(Command("field.declareUnit", {
+            "datasetId": dataset_id, "fieldName": "stress", "unitSymbol": "MPa",
+        })))
+
+        statistics = applied(surface.submit(Command("field.statistics", {
+            "datasetId": dataset_id, "fieldName": "stress",
+        })))
+        probed = applied(surface.submit(Command("dataset.probe", {
+            "datasetId": dataset_id, "fieldName": "stress",
+            "pointM": [0.0, 1.0, 0.0], "resultPosition": 0,
+        })))
+
+        assert statistics["maximum"]["value"] == 90.0, "the file's own largest value"
+        assert statistics["maximum"]["unit"] == "MPa"
+        assert probed["value"]["value"] in {10.0, 20.0, 90.0, 40.0}
+        assert probed["value"]["unit"] == "MPa"
+        assert probed["value"]["location"], "Exodus numbers its own nodes, so the location is named"
+
+        report_id = applied(surface.submit(Command("report.create", {
+            "workspaceId": "ws:1",
+            "definition": {
+                "name": "Exodus の最大応力", "targets": ["html"],
+                "blocks": [{"kind": "valueTable", "fields": ["stress"]}],
+            },
+        })))["id"]
+        target = tmp_path / "exodus.html"
+        applied(surface.submit(Command("report.export", {"reportId": report_id, "path": str(target)})))
+        document = target.read_text(encoding="utf-8")
+
+        assert "90" in document and "MPa" in document, "the maximum and its unit reach the page"
+        assert "case.ex2" in document, "the document names the file it was read from"
+
+    def test_cgns_carries_a_value_and_keeps_its_unit_undeclared(self, tmp_path: Path) -> None:
+        """CGNS is the one format whose standard can declare a unit, and the toolkit's reader exposes
+        no way to read it (E-130, E-137). So the unit stays undeclared through the whole thread, and
+        the document says so rather than inventing one (XC-003)."""
+        from conftest import requires_h5py
+
+        requires_h5py()
+        from cgns_fixture import write_minimal_cgns
+
+        source = write_minimal_cgns(tmp_path / "case.cgns")
+        surface, _, dataset_id = self._open(tmp_path, source, "stress")
+
+        statistics = applied(surface.submit(Command("field.statistics", {
+            "datasetId": dataset_id, "fieldName": "stress",
+        })))
+
+        assert statistics["maximum"]["value"] == 90.0
+        assert statistics["maximum"]["unit"] is None
+        assert "undeclared-unit" in statistics["maximum"]["caveats"]
+
+        report_id = applied(surface.submit(Command("report.create", {
+            "workspaceId": "ws:1",
+            "definition": {
+                "name": "CGNS の最大値", "targets": ["html"],
+                "blocks": [{"kind": "valueTable", "fields": ["stress"]}],
+            },
+        })))["id"]
+        target = tmp_path / "cgns.html"
+        applied(surface.submit(Command("report.export", {"reportId": report_id, "path": str(target)})))
+        document = target.read_text(encoding="utf-8")
+
+        assert "90" in document
+        assert "単位未宣言" in document, "the page says the unit was never declared, in those words"
+
+
+class TestOneWordForAnUndeclaredUnit:
+    """The engine and the interface both show a value whose unit nobody declared. They live on opposite
+    sides of a wire, each with its own constant, and for a while they said it differently: the page
+    wrote 単位が宣言されていません and the screen wrote 単位未宣言 - the same absence, and a person
+    reading both would rightly wonder whether they were the same state. XC-257 names the word; this
+    holds both sides to it."""
+
+    def test_the_interface_uses_the_engine_s_word(self) -> None:
+        from domain_core.reported_value import UNDECLARED_MARKER
+
+        source = (ROOT / "src" / "ui" / "shared" / "primitives.tsx").read_text(encoding="utf-8")
+        match = re.search(r'export const UNDECLARED = "([^"]+)";', source)
+
+        assert match, "the interface's constant is where the engine's comment says it is"
+        assert match.group(1) == UNDECLARED_MARKER

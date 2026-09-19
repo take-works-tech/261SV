@@ -131,7 +131,7 @@ class TestEveryNumberIsText:
 
         text = render(document)
 
-        assert "単位が宣言されていません" in text
+        assert "単位未宣言" in text
 
     def test_a_missing_value_says_why_rather_than_leaving_a_blank(self) -> None:
         """XC-001. A blank reads as zero to some readers and as "not applicable" to others."""

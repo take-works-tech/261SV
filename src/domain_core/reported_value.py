@@ -53,7 +53,11 @@ DIMENSIONLESS = "1"
 
 #: What a value with no declared unit reads as, everywhere it is written. One spelling, in one place,
 #: so an axis label, a table cell and a report line cannot disagree about the same absence (XC-003).
-UNDECLARED_MARKER = "単位が宣言されていません"
+#: The interface shows the same absence and must use the same word: `UNDECLARED` in
+#: src/ui/shared/primitives.tsx is held equal to this by tests/test_prototype_thread.py, because the
+#: two live on opposite sides of a wire and nothing else would notice them drifting apart. The word
+#: is XC-257's: the one a legend carries, short enough to fit where a unit symbol would go.
+UNDECLARED_MARKER = "単位未宣言"
 
 CAVEAT_TEXT: dict[Caveat, str] = {
     Caveat.PARTIAL_DATASET: "データセットの一部が欠落しています",
