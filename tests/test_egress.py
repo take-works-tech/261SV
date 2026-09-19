@@ -340,7 +340,9 @@ class TestNothingElseOpensAConnection:
         offenders = [
             path.relative_to(root).as_posix()
             for path in sorted((root / "src").rglob("*.py"))
-            if "__pycache__" not in path.parts
+            # Build outputs under src/ on disk, never in the tree (the packaged shell carries VTK's
+            # own Python): the same names the filesystem gates and the scripting sweep skip.
+            if not any(part in {"__pycache__", "build", "dist", "dist-preload", "release", "node_modules"} for part in path.parts)
             and "egress" not in path.parts
             and any(client in path.read_text(encoding="utf-8") for client in clients)
         ]
