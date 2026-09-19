@@ -186,9 +186,17 @@ class LogEntry:
 class Surface:
     """The command surface: a registry, a dispatcher, an undo history and a log."""
 
-    def __init__(self, *, clock: Callable[[], datetime] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        clock: Callable[[], datetime] | None = None,
+        on_entry: Callable[[LogEntry], None] | None = None,
+    ) -> None:
         self._handlers: dict[str, Handler] = {}
         self._log: list[LogEntry] = []
+        #: Where each entry also goes as it is made - the diagnostic log on disk (XC-263). One
+        #: place, every origin, so the file and `history.list` cannot tell different stories.
+        self._on_entry = on_entry
         #: undo id -> the undo callables of that group, in the order they were applied.
         self._undo: dict[str, list[Callable[[], None]]] = {}
         self._next = 0
@@ -450,18 +458,19 @@ class Surface:
         return f"undo:{self._next:04d}"
 
     def _record(self, command: Command, result: Result) -> Result:
-        self._log.append(
-            LogEntry(
-                operation=command.operation,
-                origin=command.origin,
-                at=record_time(self._clock()),
-                status=result.status,
-                reason=result.reason,
-                undo_id=result.undo_id,
-                group_id=command.group_id,
-                dry_run=command.dry_run,
-            )
+        entry = LogEntry(
+            operation=command.operation,
+            origin=command.origin,
+            at=record_time(self._clock()),
+            status=result.status,
+            reason=result.reason,
+            undo_id=result.undo_id,
+            group_id=command.group_id,
+            dry_run=command.dry_run,
         )
+        self._log.append(entry)
+        if self._on_entry is not None:
+            self._on_entry(entry)
         return result
 
     # -- undo and log ------------------------------------------------------------------------

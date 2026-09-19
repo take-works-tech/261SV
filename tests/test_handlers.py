@@ -1041,3 +1041,36 @@ class TestNothingHalfWrittenIsLeftBehind:
         assert exported.status is Status.APPLIED, exported.reason
         assert target.exists() and target.stat().st_size == exported.value["bytes"]
         assert not target.with_name(target.name + ".writing").exists()
+
+
+class TestEveryCommandReachesTheDiagnosticLog:
+    def test_a_refusal_is_a_warning_line_with_the_operation_and_the_reason(self, tmp_path: Path) -> None:
+        """XC-263: the surface hands every entry to the session's log, so the file and history.list
+        cannot tell different stories. A refusal is a warning; a read that answered is info."""
+        from service.egress.diagnostics import Level, Log
+
+        session = Session(log=Log(directory=tmp_path / "logs"))
+        surface = build_surface(session)
+
+        surface.submit(Command("system.protocols", {}))
+        surface.submit(Command("dataset.describe", {"datasetId": "dataset:none"}))
+
+        lines = session.log.lines()
+        assert [one.level for one in lines] == [Level.INFO, Level.WARNING]
+        assert lines[1].context["operation"] == "dataset.describe"
+        assert lines[1].context["status"] == "refused"
+        assert lines[1].context["reason"]
+        written = (tmp_path / "logs" / "solvia.log").read_text(encoding="utf-8").splitlines()
+        assert len(written) == 2 and json.loads(written[1])["status"] == "refused"
+
+    def test_capabilities_say_where_the_log_is(self, tmp_path: Path) -> None:
+        from service.egress.diagnostics import Log
+
+        session = Session(log=Log(directory=tmp_path / "logs"))
+        surface = build_surface(session)
+
+        result = surface.submit(Command("system.capabilities", {}))
+
+        assert result.status is Status.ANSWERED, result.reason
+        assert result.value["diagnostics"]["logDirectory"] == str(tmp_path / "logs")
+        assert result.value["diagnostics"]["level"] == "info"

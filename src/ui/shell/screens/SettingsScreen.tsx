@@ -19,6 +19,9 @@ import { ScopeConfirmation } from "../../shared/ScopeConfirmation";
 import { formatBytes, disabledBecause } from "../../logic/format";
 import { submit } from "../../client/operations";
 import { session } from "../../state/session";
+import { engineState, useEngine } from "../../state/engine";
+import type { Results } from "../../client/engine";
+import { useEffect } from "react";
 import { NoticesPanel } from "./NoticesPanel";
 import "./settings.css";
 
@@ -802,6 +805,14 @@ const LOG_DIR = "%LOCALAPPDATA%\\SOLVIA\\logs";
 
 function DiagnosticsPanel({ openBundle }: { openBundle: boolean }) {
   const [bundleOpen, setBundleOpen] = useState(openBundle);
+  // With an engine: where its log actually is, from `system.capabilities` (XC-263). Without one, the
+  // design state's path, labelled as design.
+  const [live, setLive] = useState<Results["system.capabilities"]["diagnostics"] | null>(null);
+  const reachable = useEngine().reachability.kind === "reachable";
+  useEffect(() => {
+    if (!reachable) return;
+    void engineState.capabilities().then((answer) => setLive(answer?.diagnostics ?? null));
+  }, [reachable]);
   const [includeCaseNames, setIncludeCaseNames] = useState(false);
   const [includeInputPaths, setIncludeInputPaths] = useState(false);
   const [createdTo, setCreatedTo] = useState<string | null>(null);
@@ -826,9 +837,15 @@ function DiagnosticsPanel({ openBundle }: { openBundle: boolean }) {
         <h3>ローカルログ</h3>
         <div className="se-field-grid">
           <span className="se-field-label">場所</span>
-          <span className="se-path" title={LOG_DIR}>{LOG_DIR}</span>
+          <span className="se-path" title={live?.logDirectory ?? LOG_DIR}>
+            {live ? live.logDirectory ?? "メモリのみ（開発実行：--log-directory なし）" : `${LOG_DIR}（設計状態）`}
+          </span>
           <span className="se-field-label">容量</span>
-          <span>{formatBytes(2516582)}（7日で入れ替え）</span>
+          <span>
+            {live
+              ? `${formatBytes(live.bytes)}・${live.files} ファイル（${formatBytes(live.maxBytes)} で回転、${live.keepFiles} 世代、${live.retainDays} 日で削除、水準 ${live.level}）`
+              : `${formatBytes(2516582)}（7日で入れ替え・設計状態）`}
+          </span>
           <span className="se-field-label">収録内容</span>
           <span>操作・失敗理由コード - フィールド値なし</span>
         </div>

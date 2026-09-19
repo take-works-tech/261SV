@@ -15,7 +15,11 @@ import signal
 import sys
 from pathlib import Path
 
+import os
+
+from service.command.catalogue import PROTOCOL_VERSION
 from service.command.handlers import Session, build_surface
+from service.egress.diagnostics import Level, Log
 from service.transport.local import Connection, Engine, serve
 
 
@@ -41,9 +45,18 @@ def main(argv: list[str] | None = None) -> int:
         "--allow-origin", default=None,
         help="a browser origin permitted to call this engine, for a development build served by vite",
     )
+    parser.add_argument(
+        "--log-directory", type=Path, default=None,
+        help="where the diagnostic log is written, rotated and retained (XC-263); omit for memory only",
+    )
+    parser.add_argument(
+        "--log-level", choices=[one.value for one in Level], default=Level.INFO.value,
+        help="the least level written; warning is the list of what was refused or failed",
+    )
     arguments = parser.parse_args(argv if argv is not None else sys.argv[1:])
 
-    session = Session()
+    session = Session(log=Log(directory=arguments.log_directory, level=Level(arguments.log_level)))
+    session.log.record(Level.INFO, "engine.start", pid=os.getpid(), protocol=PROTOCOL_VERSION)
     engine = Engine(session, build_surface(session), allowed_origin=arguments.allow_origin)
     listener = serve(engine, port=arguments.port, connection_directory=arguments.connection_directory)
     where = (arguments.connection_directory / "connection.json") if arguments.connection_directory else None
@@ -60,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
         print("stopping", flush=True)
     finally:
         listener.stop()
+        session.log.record(Level.INFO, "engine.stop", pid=os.getpid())
     return 0
 
 

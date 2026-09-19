@@ -14,7 +14,7 @@
  * writes what it shows, so a picture of the shell exists that a person can look at.
  */
 import { app, BrowserWindow, dialog, ipcMain, net, protocol } from "electron";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -47,6 +47,8 @@ const captureIndex = argv.indexOf("--capture");
 const CAPTURE = captureIndex >= 0 ? argv[captureIndex + 1] ?? null : null;
 const routeIndex = argv.indexOf("--route");
 const ROUTE = routeIndex >= 0 ? argv[routeIndex + 1] ?? "" : "";
+const levelIndex = argv.indexOf("--log-level");
+const LOG_LEVEL = (levelIndex >= 0 ? argv[levelIndex + 1] : undefined) as "debug" | "info" | "warning" | "error" | undefined;
 
 // ---- one instance, one engine (E-195) ---------------------------------------------------------
 
@@ -63,19 +65,40 @@ let window: BrowserWindow | null = null;
 let stopping = false;
 const log: string[] = [];
 
+const SHELL_LOG_MAX_BYTES = 1_000_000;
+
 function note(line: string): void {
   log.push(line);
   if (log.length > 500) log.shift();
+  // The shell's own notes, to disk beside the engine's log, capped the simple way: past the cap the
+  // file is moved to `.1` and a new one begun. The engine's log is the one with levels and retention.
+  try {
+    const directory = logDirectory();
+    mkdirSync(directory, { recursive: true });
+    const file = join(directory, "shell.log");
+    if (existsSync(file) && statSync(file).size > SHELL_LOG_MAX_BYTES) renameSync(file, join(directory, "shell.log.1"));
+    appendFileSync(file, `${new Date().toISOString()} ${line}\n`);
+  } catch {
+    /* a note that cannot be written is not a reason to stop */
+  }
 }
 
 function broadcast(status: EngineProcessStatus): void {
   for (const each of BrowserWindow.getAllWindows()) each.webContents.send("engine:status", status);
 }
 
+/** Where logs go: the engine's diagnostic log and the shell's own notes, beside each other, in a
+ *  directory a person can open (XC-263). The smoke keeps them under its own root. */
+function logDirectory(): string {
+  return SMOKE ? join(transientRoot(), "logs") : join(app.getPath("userData"), "logs");
+}
+
 async function start(directory: string): Promise<Engine> {
   const started = await startEngine({
     ...(PACKAGED ? packagedEngine(process.resourcesPath) : developmentEngine(PYTHON, ROOT)),
     directory,
+    logDirectory: logDirectory(),
+    logLevel: LOG_LEVEL,
     allowOrigin: ORIGIN,
     onStatus: broadcast,
     output: note,
@@ -340,6 +363,15 @@ async function smoke(): Promise<number> {
     summary.ok = false;
   }
   summary.tokenInLog = log.some((line) => engine?.connection?.token && line.includes(engine.connection.token));
+  // The engine's diagnostic log exists where the shell said, and never holds the token either.
+  const engineLog = join(logDirectory(), "solvia.log");
+  const logText = existsSync(engineLog) ? readFileSync(engineLog, "utf-8") : "";
+  summary.diagnosticLog = {
+    exists: existsSync(engineLog),
+    lines: logText ? logText.trim().split("\n").length : 0,
+    startsAndStops: (logText.match(/"engine\.(start|stop)"/g) ?? []).length,
+    tokenInLog: Boolean(engine?.connection?.token && logText.includes(engine.connection.token)),
+  };
   // The smoke's own transient root goes with it: the leftovers it used to keep were the first
   // orphans this product measured (E-208).
   rmSync(transientRoot(), { recursive: true, force: true });

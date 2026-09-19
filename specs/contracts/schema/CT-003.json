@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -2837,6 +2837,53 @@
                 }
               },
               "description": "読める形式と、その保証の段（XC-049）"
+            },
+            "diagnostics": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "診断ログの所在と保ち方（XC-263, #312）。利用者が場所を辿れるように答える",
+              "required": [
+                "logDirectory",
+                "level",
+                "maxBytes",
+                "keepFiles",
+                "retainDays",
+                "files",
+                "bytes"
+              ],
+              "properties": {
+                "logDirectory": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "null ならメモリのみ（開発実行）"
+                },
+                "level": {
+                  "type": "string",
+                  "enum": [
+                    "debug",
+                    "info",
+                    "warning",
+                    "error"
+                  ]
+                },
+                "maxBytes": {
+                  "type": "integer"
+                },
+                "keepFiles": {
+                  "type": "integer"
+                },
+                "retainDays": {
+                  "type": "integer"
+                },
+                "files": {
+                  "type": "integer"
+                },
+                "bytes": {
+                  "type": "integer"
+                }
+              }
             }
           }
         },

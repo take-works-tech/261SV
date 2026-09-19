@@ -29,6 +29,10 @@ export interface EngineOptions {
    *  (XC-261). What follows it is `args`; the connection directory is appended here. */
   readonly command: string;
   readonly args?: readonly string[];
+  /** Where the engine writes its diagnostic log, rotated and retained (XC-263). Omitted, the log
+   *  stays in the engine's memory. */
+  readonly logDirectory?: string;
+  readonly logLevel?: "debug" | "info" | "warning" | "error";
   /** The working directory the engine starts in. */
   readonly cwd: string;
   /** Environment added to the shell's own: PYTHONPATH in development, nothing when packaged. */
@@ -264,6 +268,8 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
 
   const args = [...(options.args ?? []), "--connection-directory", directory];
   if (options.allowOrigin) args.push("--allow-origin", options.allowOrigin);
+  if (options.logDirectory) args.push("--log-directory", options.logDirectory);
+  if (options.logLevel) args.push("--log-level", options.logLevel);
   const child = spawn(options.command, args, {
     cwd: options.cwd,
     env: {

@@ -14,11 +14,16 @@ Verifies: operations/AC-007, AC-008, operations/TASK-011, TASK-012, XC-126, INV-
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from service.egress.diagnostics import (
+    MAX_LOG_BYTES,
+    RETAIN_DAYS,
     ALLOWED_CONTEXT,
     DiagnosticsError,
     Item,
@@ -206,3 +211,76 @@ class TestTheItemsAreReadable:
 
     def test_an_empty_manifest_says_so_rather_than_being_blank(self) -> None:
         assert "何も含まれません" in Manifest(()).describe()
+
+
+class TestTheLogOnDisk:
+    """#312, XC-263: a level, a cap with rotation, a retention period, and a location that can be
+    said. Every line is one JSON object, and the file never holds what a line may not."""
+
+    def test_lines_are_written_as_json_with_when_and_where(self, tmp_path: Path) -> None:
+        log = Log(directory=tmp_path / "logs")
+
+        log.record(Level.INFO, "command", operation="view.render", status="answered")
+
+        written = (tmp_path / "logs" / "solvia.log").read_text(encoding="utf-8").splitlines()
+        assert len(written) == 1
+        line = json.loads(written[0])
+        assert line["event"] == "command" and line["operation"] == "view.render"
+        assert line["level"] == "info" and line["at"] and isinstance(line["offsetMinutes"], int)
+
+    def test_below_the_level_nothing_is_written_anywhere(self, tmp_path: Path) -> None:
+        log = Log(directory=tmp_path / "logs", level=Level.WARNING)
+
+        assert log.record(Level.INFO, "command", operation="x") is None
+        assert log.record(Level.WARNING, "command", operation="y", status="refused") is not None
+
+        assert log.lines()[0].context["operation"] == "y"
+        assert (tmp_path / "logs" / "solvia.log").read_text(encoding="utf-8").count("\n") == 1
+
+    def test_the_file_rotates_at_the_cap_and_keeps_the_stated_number(self, tmp_path: Path, monkeypatch) -> None:
+        import service.egress.diagnostics as module
+
+        monkeypatch.setattr(module, "MAX_LOG_BYTES", 400)
+        monkeypatch.setattr(module, "KEEP_ROTATED", 2)
+        log = Log(directory=tmp_path / "logs")
+        for index in range(40):
+            log.record(Level.INFO, "command", operation=f"op-{index:02d}", status="answered")
+
+        files = sorted(one.name for one in (tmp_path / "logs").iterdir())
+        assert files == ["solvia.log", "solvia.log.1", "solvia.log.2"], files
+        assert (tmp_path / "logs" / "solvia.log").stat().st_size <= 400
+        assert "op-39" in (tmp_path / "logs" / "solvia.log").read_text(encoding="utf-8")
+
+    def test_rotated_files_past_the_retention_period_are_removed_at_open(self, tmp_path: Path) -> None:
+        import os
+        import time
+
+        directory = tmp_path / "logs"
+        directory.mkdir()
+        old = directory / "solvia.log.1"
+        old.write_text("{}\n", encoding="utf-8")
+        ancient = time.time() - (RETAIN_DAYS + 1) * 86_400
+        os.utime(old, (ancient, ancient))
+        live = directory / "solvia.log"
+        live.write_text("{}\n", encoding="utf-8")
+        os.utime(live, (ancient, ancient))
+
+        Log(directory=directory)
+
+        assert not old.exists(), "a rotated file older than the retention period goes"
+        assert live.exists(), "the live file stays whatever its age"
+
+    def test_the_location_is_describable(self, tmp_path: Path) -> None:
+        log = Log(directory=tmp_path / "logs", level=Level.DEBUG)
+        log.record(Level.DEBUG, "x")
+
+        where = log.describe_location()
+
+        assert where["logDirectory"] == str(tmp_path / "logs")
+        assert where["level"] == "debug" and where["files"] == 1 and where["bytes"] > 0
+        assert where["maxBytes"] == MAX_LOG_BYTES and where["retainDays"] == RETAIN_DAYS
+
+    def test_memory_only_without_a_directory(self) -> None:
+        where = Log().describe_location()
+
+        assert where["logDirectory"] is None and where["files"] == 0
