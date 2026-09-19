@@ -63,9 +63,14 @@ export interface SavedView {
   readonly datasetId?: string;
 }
 
+/** What `dataset.inspect` said about a file that is not loaded yet (ingest/AC-032). */
+export type Inspection = Results["dataset.inspect"] & { readonly path: string };
+
 export interface EngineState {
   readonly reachability: Reachability;
   readonly opened: Opened | null;
+  /** The file under review before loading, or null. Cleared by loading it or by cancelling. */
+  readonly inspection: Inspection | null;
   /** What the document held when it was opened. A working view is updated when one of these has
    *  its name, because the document refuses a second view under a name it holds (AC-030). */
   readonly savedViews: readonly SavedView[];
@@ -142,6 +147,7 @@ function cameraFrom(turntable: Turntable, bounds: readonly [number[], number[]] 
 const EMPTY: EngineState = {
   reachability: { kind: "unknown" },
   opened: null,
+  inspection: null,
   savedViews: [],
   journal: [],
   lost: null,
@@ -345,6 +351,24 @@ export const engineState = {
     return true;
   },
 
+  /** Before reading a file: the support level this build promises for its format, and what the
+   *  reader is known not to read (ingest/REQ-015, XC-049). Nothing is opened; nothing is loaded. */
+  async inspect(path: string): Promise<Inspection | null> {
+    setState({ refusal: null });
+    const inspected = await ask("dataset.inspect", { path });
+    if (!inspected) {
+      setState({ inspection: null });
+      return null;
+    }
+    const inspection: Inspection = { ...inspected, path };
+    setState({ inspection });
+    return inspection;
+  },
+
+  cancelInspection() {
+    setState({ inspection: null });
+  },
+
   /** Class 3: read a result file into a case. The fields arrive with no unit, as the file had none. */
   async loadDataset(caseId: string, filePath: string): Promise<boolean> {
     setState({ refusal: null });
@@ -354,6 +378,7 @@ export const engineState = {
     setImage(null, null);
     setState({
       opened: state.opened ? { ...state.opened, caseId, filePath } : null,
+      inspection: null,
       caseId,
       datasetId: loaded.datasetId,
       sourceName: filePath.split(/[\\/]/).pop() ?? filePath,

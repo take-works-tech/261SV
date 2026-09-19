@@ -94,6 +94,22 @@ describe("the prototype thread from the interface's side", () => {
     expect(snapshot().refusal).toBeTruthy();
   });
 
+  test("inspect: the support level and the gaps are stated before the file is read", async () => {
+    const inspection = await engineState.inspect(cubePath);
+
+    expect(inspection).not.toBeNull();
+    expect(inspection?.format).toBe("vtu");
+    expect(inspection?.exists).toBe(true);
+    expect(["Verified", "Limited", "Offered"]).toContain(inspection?.supportLevel);
+    expect(snapshot().inspection?.path).toBe(cubePath);
+    // Nothing was loaded by looking.
+    expect(snapshot().datasetId).toBeNull();
+
+    const absent = await engineState.inspect(join(directory, "thing.unknownformat"));
+    expect(absent?.supportLevel).toBe("Absent");
+    expect(absent?.exists).toBe(false);
+  });
+
   test("open: the file is read and its field arrives with no unit, because none was declared", async () => {
     const loaded = await engineState.loadDataset("case:1", cubePath);
 
