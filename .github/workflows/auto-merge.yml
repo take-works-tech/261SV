@@ -99,7 +99,27 @@ jobs:
 
           # 3. Git-level state. DIRTY is a conflict, BLOCKED is a rule refusing it, UNKNOWN is GitHub
           #    still deciding - and an undecided answer is not a green one.
+          #
+          #    But UNKNOWN is not a verdict either. GitHub computes mergeability in a background job
+          #    that the first request starts, and its REST reference for "Get a pull request" says
+          #    so in as many words: "If the value is null, then GitHub has started a background job to
+          #    compute the mergeability. After giving the job time to complete, resubmit the request."
+          #    (docs.github.com/en/rest/pulls/pulls, read 2026-09-19). This job is that first request
+          #    more often than not, because it runs the moment the checks finish. Read once and
+          #    stopped, an UNKNOWN was final: nothing re-runs this job for a pull request whose
+          #    branch does not move, so a green pull request sat unmerged until someone noticed. That
+          #    happened to #341 (2026-09-10, "auto-merge stopped: PR #341 is UNKNOWN"; found 2026-09-19).
+          #    So the answer is re-read, a bounded number of times, and UNKNOWN still stops the job
+          #    if it is what GitHub keeps saying - an answer this job cannot read is still a reason
+          #    to leave.
           state=$(echo "$pr_json" | jq -r .mergeStateStatus)
+          attempts=0
+          while [ "$state" = "UNKNOWN" ] && [ "$attempts" -lt 6 ]; do
+            attempts=$((attempts + 1))
+            echo "PR #$pr is UNKNOWN: GitHub is still computing mergeability, re-reading in 5s ($attempts/6)"
+            sleep 5
+            state=$(gh pr view "$pr" --repo "$REPO" --json mergeStateStatus --jq .mergeStateStatus)
+          done
           case "$state" in
             DIRTY|BLOCKED|UNKNOWN) stop "PR #$pr is $state" ;;
           esac
