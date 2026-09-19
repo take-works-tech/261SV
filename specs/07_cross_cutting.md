@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-20
+updated: 2026-09-19
 ---
 
 # Cross-cutting requirements
@@ -94,7 +94,13 @@ unknown, so the glyphs have to travel with the document.
   upstream-provided one can be incomplete: VTK's install tree omits the MPL-2.0 text for a library it
   vendors, and its published wheel carries no third-party notices at all
 - decidedness: Fixed
-- basis: E-001 (T1), E-046 (T1), E-047 (T1)
+- basis: E-001 (T1), E-046 (T1), E-047 (T1), E-205 (T1), E-206 (T1), E-207 (T1)
+- correction: 2026-09-19. E-205, E-206 and E-207 added to the basis: the list is now generated
+  (`packaging/notices.py`) from the frozen engine and the unpacked application, refusing to finish
+  while a shipped file is attributed to nothing; the three entries are what the generator cites for
+  the Microsoft runtime, the OpenXR loader and VTK's own declarations. The "viewable in the
+  application" half of the statement is not built yet - the data ships as `resources/notices.json`
+  and the file as `THIRD-PARTY-NOTICES.txt` next to the executable; a screen that shows it is owed
 
 ### XC-026 - Security and data protection
 - statement: no @Dataset, @Workspace or @Reference material content leaves the machine unless the user

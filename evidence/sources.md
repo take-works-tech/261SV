@@ -2059,3 +2059,46 @@ Recorded so that nothing silently depends on them:
   Read after a comment in pyproject.toml had claimed the bootloader's notice belonged in the notices
   file - it does not, and the comment was corrected the same hour
 - justifies: XC-261
+
+### E-205 - Microsoft on redistributing the Visual C++ runtime files
+- tier: T1
+- url: https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files
+- verified: 2026-09-19
+- says: "distribution of the Visual C++ Runtime Redistributable package, merge modules, and individual
+  binaries is limited to licensed Visual Studio users and is subject to Microsoft Software License
+  Terms"; the REDIST list is referenced from the Visual Studio licence terms; "it's also possible to
+  directly install the Redistributable DLLs in the application local folder", which "for servicing
+  reasons, we don't recommend". The runtime files in this product's closure (VCRUNTIME140,
+  VCRUNTIME140_1, msvcp140, the api-ms-win forwarders) arrive inside the VTK wheel, placed there by
+  delvewheel at Kitware's build
+- justifies: XC-025
+
+### E-206 - The OpenXR loader's licence, from Khronos's own copying statement
+- tier: T1
+- url: https://github.com/KhronosGroup/OpenXR-SDK/blob/main/COPYING.adoc
+- verified: 2026-09-19
+- says: "the main OpenXR headers, XML registry, and loader source are licensed under a dual license
+  with the SPDX license identifier `Apache-2.0 OR MIT`"; the repository's LICENSES/MIT.txt and the
+  copyright lines of src/loader/loader_core.cpp (Khronos Group 2017-2026, Valve 2017-2019) are
+  vendored in packaging/notices/openxr-loader.txt with this provenance. The loader DLL is in the
+  closure because delvewheel bundled it into the VTK wheel; it is not in VTK's ThirdParty tree
+- justifies: XC-025
+
+### E-207 - What VTK 9.5.2's module descriptions declare, read from the source release
+- tier: T1
+- url: https://vtk.org/files/release/9.5/VTK-9.5.2.tar.gz (SHA-256 cee64b98d270ff7302daf1ef13458dff5d5ac1ecb45d47723835f7f7d562c989)
+- verified: 2026-09-19
+- says: the release carries 271 `vtk.module` files, 233 with an `SPDX_LICENSE_IDENTIFIER`: 178
+  BSD-3-Clause, 42 `LicenseRef-BSD-3-Clause-Sandia-USGov`, and one or two each of seven other
+  variants (LANL, Triad, California, NVIDIA, BSD-4-Clause, BSD-3-Clause-Clear), each variant naming
+  its text through `SPDX_CUSTOM_LICENSE_FILE`; 45 third parties under ThirdParty/, 41 of them
+  reached by the modules whose libraries the wheel ships, 71 licence-named files among them plus
+  three under other names (exodusII and ioss `COPYRIGHT`, viskores/LICENSE.txt) and one with none
+  (sqlite, whose sqlite3.h disclaims copyright). **`VTK::scn` is a `TEST_DEPENDS` of CommonCore in
+  this release**, not a `DEPENDS` or `PRIVATE_DEPENDS`, so no scnlib file ships and no Apache-2.0
+  text is owed for it - which corrects E-046's reading, taken from the master branch on 2026-08-19,
+  that scnlib was on CommonCore's mandatory path. The reading was true of what it read and is not
+  true of 9.5.2; E-046 stands as the record of that reading. The freeze also pulled Tk, Tcl's 830
+  data files and Pillow through VTK's GUI bindings until they were excluded, which the generator
+  found by refusing to attribute them
+- justifies: XC-025, XC-041
