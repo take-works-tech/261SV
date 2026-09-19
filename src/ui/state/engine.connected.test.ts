@@ -206,6 +206,29 @@ describe("the prototype thread from the interface's side", () => {
     expect(snapshot().savedAt).not.toBeNull();
   });
 
+  test("history: the engine's record lists what was asked, each time as the pair, nothing dropped yet", async () => {
+    const history = await engineState.history();
+
+    expect(history).not.toBeNull();
+    const s = snapshot();
+    expect(s.history?.entries.length).toBeGreaterThan(0);
+    for (const entry of s.history?.entries ?? []) {
+      expect(entry.at.utc).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+      expect(typeof entry.at.offsetMinutes).toBe("number");
+    }
+    expect(s.history?.entries.map((one) => one.operation)).toContain("field.declareUnit");
+    expect(s.history?.undoDropped ?? 0).toBe(0);
+    expect(s.history?.omitted ?? 0).toBe(0);
+    // What the interface itself recorded is the same two facts (XC-266): the save the step before
+    // made, and any write since it.
+    const own = [...(s.savedAt ? [s.savedAt] : []), ...s.journal.map((one) => one.at)];
+    expect(own.length).toBeGreaterThan(0);
+    for (const at of own) {
+      expect(at.utc).toMatch(/Z$/);
+      expect(typeof at.offsetMinutes).toBe("number");
+    }
+  });
+
   test("export: a self-contained document with the picture, the unit and the maximum, of the size it says", async () => {
     const target = join(directory, "from-the-interface.html");
 
