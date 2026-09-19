@@ -8,7 +8,7 @@ import { useEffect, type ReactNode } from "react";
 import { session, useSession, type ScreenId } from "../state/session";
 import { connectionFromEnvironment, engineState, useEngine } from "../state/engine";
 import { shellApi } from "../client/shell";
-import { EngineLost, EngineRefusal } from "../shared/EngineStatus";
+import { EngineLost, EngineRefusal, OrphanNotice } from "../shared/EngineStatus";
 import { InstructionBar } from "../shared/InstructionBar";
 import { MaterialLibraryShelf, type ShelfAsset, type ShelfState } from "../shared/MaterialLibraryShelf";
 import { Topbar } from "./Topbar";
@@ -159,6 +159,7 @@ export function App() {
         <div className="centre-column" style={{ flex: 1, minHeight: 0 }}>
           <EngineRefusal refusal={e.refusal} onDismiss={() => engineState.clearRefusal()} />
         <EngineLost lost={e.lost} onDismiss={() => engineState.dismissLost()} />
+        <OrphanNotice />
           {canvas}
         </div>
         <CatalogDrawer />

@@ -47,6 +47,10 @@ def one_run() -> dict[str, object]:
     health_ms = (time.perf_counter() - asked) * 1000
     process.terminate()
     process.wait(timeout=30)
+    # Its own directory goes with the run: six of these were among the orphans first measured (E-208).
+    import shutil
+
+    shutil.rmtree(directory, ignore_errors=True)
     return {
         "spawn_to_connection_file_s": round(ready_s, 3),
         "first_health_ms": round(health_ms, 1),

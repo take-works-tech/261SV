@@ -53,6 +53,7 @@ INV-007, INV-013, XC-001, XC-003.
 from __future__ import annotations
 
 import base64
+import os
 import html as html_escape
 import unicodedata
 from dataclasses import dataclass, field as dataclass_field
@@ -305,7 +306,15 @@ def write(
             f"（LIM-006）。書き出しは行いません — 図を小さくするか、図の数を減らしてください。"
             "黙って送れない大きさのファイルを作るより、ここで申し上げます"
         )
-    destination.write_bytes(encoded)
+    # Whole or absent: written beside the target and moved into place, so a process that dies
+    # mid-write leaves a `.writing` file and never a deliverable that opens and is short (#313,
+    # XC-262). A `.writing` left by an earlier death is overwritten, not kept.
+    temporary = destination.with_name(destination.name + ".writing")
+    with temporary.open("wb") as handle:
+        handle.write(encoded)
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temporary, destination)
     return Export(
         destination,
         len(encoded),

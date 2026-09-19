@@ -15,7 +15,7 @@
  *     nowhere else; the engine itself never writes the token to stdout (tested on the Python side).
  */
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import type { Connection } from "../ui/client/engine";
@@ -121,6 +121,84 @@ export function packagedEngine(resources: string): Pick<EngineOptions, "command"
     cwd: directory,
     environment: {},
   };
+}
+
+// ---- where transient files live, and what is left of sessions that died (XC-262, #313) -------
+
+/** One engine session's directory: everything transient the engine writes for that session, under
+ *  the root the shell owns, named by the shell's own pid. Nothing transient goes anywhere else. */
+export function sessionDirectory(root: string, pid: number = process.pid): string {
+  return join(root, "sessions", String(pid));
+}
+
+export interface Orphan {
+  readonly id: string;
+  readonly path: string;
+  readonly pid: number | null;
+  readonly bytes: number;
+  readonly files: number;
+  readonly modified: string;
+}
+
+function walkSize(directory: string): { bytes: number; files: number; newest: number } {
+  let bytes = 0;
+  let files = 0;
+  let newest = 0;
+  const stack = [directory];
+  while (stack.length > 0) {
+    const current = stack.pop() as string;
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const full = join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(full);
+      } else {
+        const stat = statSync(full);
+        bytes += stat.size;
+        files += 1;
+        newest = Math.max(newest, stat.mtimeMs);
+      }
+    }
+  }
+  return { bytes, files, newest };
+}
+
+/** Session directories whose shell no longer runs. Detected, never removed here: what to do with
+ *  them is a person's choice, and the default is to keep (#313). The current session and any
+ *  session whose pid is alive are not orphans, whatever they hold. */
+export function findOrphans(root: string): Orphan[] {
+  const sessions = join(root, "sessions");
+  if (!existsSync(sessions)) return [];
+  const orphans: Orphan[] = [];
+  for (const entry of readdirSync(sessions, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const pid = /^\d+$/.test(entry.name) ? Number(entry.name) : null;
+    if (pid !== null && (pid === process.pid || processAlive(pid))) continue;
+    const path = join(sessions, entry.name);
+    const size = walkSize(path);
+    orphans.push({
+      id: entry.name,
+      path,
+      pid,
+      bytes: size.bytes,
+      files: size.files,
+      modified: size.newest ? new Date(size.newest).toISOString() : "",
+    });
+  }
+  return orphans;
+}
+
+/** Remove the named orphans - only ones `findOrphans` would still name, so a session that came
+ *  alive in between is not removed from under it. Returns what was removed. */
+export function removeOrphans(root: string, ids: readonly string[]): Orphan[] {
+  const current = new Map(findOrphans(root).map((one) => [one.id, one]));
+  const removed: Orphan[] = [];
+  for (const id of ids) {
+    const orphan = current.get(id);
+    if (!orphan) continue;
+    rmSync(orphan.path, { recursive: true, force: true });
+    removed.push(orphan);
+  }
+  return removed;
 }
 
 /** What a connection file left by a previous life is, and what was done about it. */

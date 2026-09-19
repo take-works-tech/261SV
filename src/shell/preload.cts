@@ -38,6 +38,8 @@ const api: ShellApi = {
     quitReady: () => {
       ipcRenderer.send("app:quit-ready");
     },
+    orphans: () => ipcRenderer.invoke("app:orphans"),
+    removeOrphans: (ids: readonly string[]) => ipcRenderer.invoke("app:removeOrphans", [...ids]),
   },
   dialog: {
     openWorkspace: () => ipcRenderer.invoke("dialog:openWorkspace"),

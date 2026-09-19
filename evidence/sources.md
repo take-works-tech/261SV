@@ -2102,3 +2102,14 @@ Recorded so that nothing silently depends on them:
   data files and Pillow through VTK's GUI bindings until they were excluded, which the generator
   found by refusing to attribute them
 - justifies: XC-025, XC-041
+
+### E-208 - This product's own leftovers in the temporary folder, measured here
+- tier: T1
+- url: spike/results.json `transient_leftovers` (the listing was taken with `ls -d %TEMP%/solvia-*`)
+- verified: 2026-09-19
+- says: on the development machine, before #313 was addressed, the temporary folder held eighteen
+  `solvia-*` directories totalling 6 MB: twelve `solvia-smoke-<pid>` from the shell's `--smoke` runs
+  and six `solvia-start-*` from `spike/measure_engine_startup.py`, none removed by what created it.
+  The shell's session directories under `userData/engine` were not among them because the shell had
+  been started only through the smoke. A crash leaves the connection file too (E-197)
+- justifies: XC-262

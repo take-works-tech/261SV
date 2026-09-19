@@ -8,7 +8,10 @@
  * looking live is the failure this product exists to refuse (XC-001). So the state is named in the
  * topbar, in words, always - not by a coloured dot, which says "something" and not "what".
  */
+import { useEffect, useState } from "react";
 import type { AppliedWrite, Reachability } from "../state/engine";
+import { shellApi, type Orphan } from "../client/shell";
+import { formatBytes } from "../logic/format";
 
 export function EngineStatus(props: {
   reachability: Reachability;
@@ -111,4 +114,45 @@ function grouped(lost: readonly AppliedWrite[]): { operation: string; count: num
     }
   }
   return [...groups.values()];
+}
+
+/** Transient directories a dead session left behind, and the choice (#313, XC-262). Shown only
+ *  inside the shell, which is the only thing that can know; removed only when a person says so,
+ *  and kept otherwise - "残す" is the default, because a file nobody chose to delete is not this
+ *  product's to delete. */
+export function OrphanNotice() {
+  const [orphans, setOrphans] = useState<readonly Orphan[]>([]);
+  const [decided, setDecided] = useState<"kept" | "removed" | null>(null);
+  useEffect(() => {
+    const shell = shellApi();
+    if (!shell) return;
+    void shell.app.orphans().then(setOrphans);
+  }, []);
+  if (orphans.length === 0 || decided !== null) return null;
+  const bytes = orphans.reduce((sum, one) => sum + one.bytes, 0);
+  const files = orphans.reduce((sum, one) => sum + one.files, 0);
+  return (
+    <div className="notice" role="status">
+      <div>
+        <b>前回までの異常終了が残した一時ファイル：{orphans.length} セッション</b>
+        <span className="why">
+          {files} ファイル・{formatBytes(bytes)}。エンジンが落ちるか、シェルが待たずに終わったときの作業領域です。ワークスペースの文書とは別で、消しても何も失われません。
+        </span>
+      </div>
+      <button
+        type="button"
+        className="btn"
+        onClick={() => {
+          const shell = shellApi();
+          if (!shell) return;
+          void shell.app.removeOrphans(orphans.map((one) => one.id)).then(() => setDecided("removed"));
+        }}
+      >
+        消す
+      </button>
+      <button type="button" className="btn ghost" onClick={() => setDecided("kept")}>
+        残す
+      </button>
+    </div>
+  );
 }

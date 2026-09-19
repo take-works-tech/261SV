@@ -1011,3 +1011,33 @@ class TestAFileIsInspectedBeforeItIsRead:
         assert result.status is Status.ANSWERED
         assert result.value["supportLevel"] == "Absent"
         assert result.value["exists"] is False
+
+
+class TestNothingHalfWrittenIsLeftBehind:
+    """#313, XC-262: a save that did not finish is removed and said on the next open; a deliverable
+    is written beside its target and moved into place, so it is whole or absent."""
+
+    def test_an_interrupted_save_is_removed_on_open_and_said(self, tmp_path: Path) -> None:
+        surface, session = a_surface()
+        workspace = a_workspace(tmp_path)
+        interrupted = workspace.with_name(workspace.name + ".writing")
+        interrupted.write_text("{ this save never finished", encoding="utf-8")
+
+        result = surface.submit(Command("workspace.open", {"path": str(workspace)}))
+
+        assert result.status is Status.APPLIED, result.reason
+        assert not interrupted.exists()
+        assert any("途中で終わって" in one for one in result.warnings)
+
+    def test_an_export_leaves_no_writing_file_beside_the_deliverable(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        report_id = surface.submit(Command("report.create", {"workspaceId": "ws:1", "definition": {
+            "name": "whole", "targets": ["html"], "blocks": [{"kind": "valueTable", "fields": ["temperature"]}],
+        }})).value["id"]
+        target = tmp_path / "whole.html"
+
+        exported = surface.submit(Command("report.export", {"reportId": report_id, "path": str(target)}))
+
+        assert exported.status is Status.APPLIED, exported.reason
+        assert target.exists() and target.stat().st_size == exported.value["bytes"]
+        assert not target.with_name(target.name + ".writing").exists()
