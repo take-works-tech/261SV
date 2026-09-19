@@ -63,7 +63,7 @@ class TestADimensionIsWhatDecides:
 
     def test_a_product_of_two_bare_numbers_is_still_undeclared(self) -> None:
         """Giving it `1` would be this product declaring a unit on somebody's behalf (XC-003)."""
-        assert "宣言されていません" in evaluate("2 * 3").describe()
+        assert "単位未宣言" in evaluate("2 * 3").describe()
 
     def test_an_odd_exponent_has_no_square_root_this_product_can_write(self) -> None:
         assert dimension_of("m").root() is None
