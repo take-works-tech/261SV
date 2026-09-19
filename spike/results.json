@@ -119,9 +119,21 @@
         "crash_detected": "SIGKILL",
         "restart_different_pid": true,
         "connection_file_after_stop": false
+      },
+      {
+        "start_to_engine_running_ms": 724,
+        "note": "fourth launch on this machine, right after a rebuild"
       }
     ],
     "not_measured": "a first launch on a machine that has never run the product (#307); the file cache here had seen every file during the build",
-    "settles": "XC-261: a PyInstaller one-directory freeze runs the whole prototype thread with no Python installed, and the packaged shell reaches a running engine in under half a second warm"
+    "settles": "XC-261: a PyInstaller one-directory freeze runs the whole prototype thread with no Python installed, and the packaged shell reaches a running engine in under half a second warm",
+    "linux_runner_first_launch": {
+      "machine": "GitHub ubuntu-latest runner, CI run 35423145900, PATH=/usr/bin:/bin, xvfb",
+      "start_to_engine_running_ms": 1165,
+      "crash_detected": "SIGKILL",
+      "restart_different_pid": true,
+      "connection_file_after_stop": false,
+      "token_in_log": false
+    }
   }
 }

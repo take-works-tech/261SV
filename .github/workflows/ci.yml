@@ -296,7 +296,8 @@ jobs:
           ls -la release/linux-unpacked | head -20
           out=$(xvfb-run -a ./release/linux-unpacked/solvia --smoke --no-sandbox)
           echo "$out"
-          echo "$out" | python3 -c 'import json,sys; s=json.load(sys.stdin); assert s["ok"] and s["packaged"], s; print("packaged start to running:", s["started"]["afterMs"], "ms")'
+          # Chromium writes its D-Bus complaints before the summary; the object is what is read.
+          echo "$out" | python3 -c 'import json,sys; raw=sys.stdin.read(); s=json.loads(raw[raw.find("{"):raw.rfind("}")+1]); assert s["ok"] and s["packaged"], s; print("packaged start to running:", s["started"]["afterMs"], "ms")'
         working-directory: src/shell
         env:
           PATH: /usr/bin:/bin

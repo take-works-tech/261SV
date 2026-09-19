@@ -2028,7 +2028,10 @@ Recorded so that nothing silently depends on them:
   only the system directories - no Python - its `--smoke` reports the engine running 483, 391 and
   412 ms after the shell's own start across three launches, detects a SIGKILL as an event, restarts
   with a different pid, and leaves no connection file. Not a cold start: the machine's file cache
-  had seen every file during the build
+  had seen every file during the build. A fourth launch after a rebuild took 724 ms. On a GitHub
+  `ubuntu-latest` runner (CI run 35423145900, the same day) the packaged Linux application, started
+  with `PATH=/usr/bin:/bin` under xvfb right after being built, reported the engine running after
+  1,165 ms - a second machine, a first launch of that build, and still a warm file cache
 - justifies: XC-261
 
 ### E-203 - PyInstaller's run-time information: frozen state, `sys.executable`, one-file extraction
