@@ -135,5 +135,16 @@
       "connection_file_after_stop": false,
       "token_in_log": false
     }
+  },
+  "transient_leftovers": {
+    "measured": "2026-09-19",
+    "machine": "development machine, Windows 11, %TEMP%",
+    "directories": 18,
+    "by_origin": {
+      "solvia-smoke (shell --smoke)": 12,
+      "solvia-start (spike/measure_engine_startup.py)": 6
+    },
+    "megabytes": 6,
+    "settles": "XC-262: one transient root, pid-named sessions, orphans detected at start and removed only on a person's word; the smoke and the measurement remove their own"
   }
 }

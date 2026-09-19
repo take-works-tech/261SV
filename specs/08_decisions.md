@@ -5483,3 +5483,39 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a reader or renderer that cannot be made to freeze, which moves the engine to a
   bundled interpreter; or a measured first launch on a clean machine that is slow enough to need a
   splash, which is #307's question and not this one's
+
+### XC-262 - Transient files live in one directory the shell owns, and orphans are a person's choice
+- decided: 2026-09-19
+- status: active
+- decision: everything transient - the connection file, and whatever working files the engine
+  comes to write - lives under **one root the shell owns** (`userData/engine/` in the product, a
+  root under temp for the smoke), in a **session directory named by the shell's pid**
+  (`sessions/<pid>/`). Nothing transient is written anywhere else. **At start the shell scans the
+  sessions and names the orphans**: directories of pids that no longer run, with their file count
+  and bytes. They are shown to the person with two choices, 消す and 残す, and **残す is the default**:
+  a file nobody chose to delete is not this product's to delete. The engine's own outputs are
+  **whole or absent**: a document is written beside its target and moved into place (XC-055, already),
+  and now so is a deliverable; a `.writing` file found beside a document on open is an interrupted
+  save, removed and said. The smoke and the measurement scripts remove what they create
+- decided_by: engineering judgement, from a measurement of this product's own leftovers
+- rationale: **the first orphans this product produced were its own.** Measured on 2026-09-19 on the
+  development machine (E-208): eighteen `solvia-*` directories in the temporary folder, six megabytes,
+  all from the shell's `--smoke` runs and the startup measurement, neither of which removed what it
+  created. Small today, and #313's premise is right that a working area for a large dataset will be
+  gigabytes; a product that cannot clean up after six megabytes will not clean up after six
+  gigabytes. One root makes the scan possible and the rule stateable; a pid-named session makes
+  "orphan" a fact the shell can check (`kill(pid, 0)`) rather than an age it guesses at. **A
+  deliverable written straight into its target** was the other finding: a process dying mid-write
+  would leave a file that opens and is short, and a short deliverable that looks whole is exactly the
+  wrong kind of wrong (the product's claim is trustworthy numbers, not trustworthy-looking ones)
+- alternatives: **delete orphans silently at start** - simplest, and it deletes the working area of
+  a session a person may be recovering by hand, which is the one time the files matter. **Age-based
+  cleanup** (older than a day) - deletes a live session's files on a machine that slept, and keeps a
+  dead session's for a day. **No scan** - #313's premise, measured
+- basis: E-208 (T1), E-197 (T1), E-200 (T1)
+- affects: XC-259, MOD-018, MOD-006
+- decidedness: Bounded
+- reversal_trigger: an engine working area measured in gigabytes, at which point the notice gains a
+  per-session listing and the choice becomes per session rather than all-or-nothing; or a platform
+  where `kill(pid, 0)` cannot answer, at which point the session directory carries a heartbeat file
+  instead of relying on the pid

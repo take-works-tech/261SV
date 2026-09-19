@@ -52,6 +52,16 @@ export interface Notices {
   readonly unattributed: readonly string[];
 }
 
+/** A transient directory a dead session left behind, as the shell measured it. */
+export interface Orphan {
+  readonly id: string;
+  readonly path: string;
+  readonly pid: number | null;
+  readonly bytes: number;
+  readonly files: number;
+  readonly modified: string;
+}
+
 export interface ShellApi {
   readonly kind: "electron";
   /** The notices generated for this build (XC-025), or null when the build carries none. */
@@ -70,6 +80,10 @@ export interface ShellApi {
      *  saves the document in between, so quitting does not lose what a crash would have. */
     onWillQuit(listener: () => void): () => void;
     quitReady(): void;
+    /** Session directories left by shells that are gone (XC-262, #313): found at start, removed
+     *  only through `removeOrphans`, which a person triggers. */
+    orphans(): Promise<readonly Orphan[]>;
+    removeOrphans(ids: readonly string[]): Promise<readonly Orphan[]>;
   };
   readonly dialog: {
     /** A path the person chose, or null if they cancelled. The path is the shell's to obtain: a page

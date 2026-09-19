@@ -14,12 +14,21 @@
  * writes what it shows, so a picture of the shell exists that a person can look at.
  */
 import { app, BrowserWindow, dialog, ipcMain, net, protocol } from "electron";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import type { EngineProcessStatus } from "../ui/client/shell";
-import { developmentEngine, packagedEngine, startEngine, type Engine } from "./engine-process.js";
+import {
+  developmentEngine,
+  findOrphans,
+  packagedEngine,
+  removeOrphans,
+  sessionDirectory,
+  startEngine,
+  type Engine,
+  type Orphan,
+} from "./engine-process.js";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url)); // <package>/dist/shell/
 const PACKAGE = resolve(HERE, "..", "..");
@@ -75,9 +84,20 @@ async function start(directory: string): Promise<Engine> {
   return started;
 }
 
-function engineDirectory(): string {
+/** The root of everything transient (XC-262): the engine's session directories live under it, and
+ *  nothing transient lives anywhere else. The smoke uses a root of its own under temp and removes
+ *  it when it is done - the smoke's own leftovers were the first orphans measured (E-208). */
+function transientRoot(): string {
   return SMOKE ? join(app.getPath("temp"), `solvia-smoke-${process.pid}`) : join(app.getPath("userData"), "engine");
 }
+
+function engineDirectory(): string {
+  return sessionDirectory(transientRoot());
+}
+
+/** Orphans found at start: sessions of shells that are gone. Reported to the interface, removed
+ *  only when a person says so, and never touched otherwise (#313). */
+let orphans: Orphan[] = [];
 
 // ---- the renderer's origin (E-198) -------------------------------------------------------------
 
@@ -150,6 +170,13 @@ function readNotices(): unknown {
 
 function registerBridge(): void {
   ipcMain.handle("notices", () => readNotices());
+  ipcMain.handle("app:orphans", () => orphans);
+  ipcMain.handle("app:removeOrphans", (_event, ids: unknown) => {
+    const wanted = Array.isArray(ids) ? ids.filter((one): one is string => typeof one === "string") : [];
+    const removed = removeOrphans(transientRoot(), wanted);
+    orphans = findOrphans(transientRoot());
+    return removed;
+  });
   ipcMain.handle("engine:connection", () => engine?.connection ?? null);
   ipcMain.handle("engine:status", (): EngineProcessStatus => {
     return (
@@ -242,12 +269,27 @@ async function smoke(): Promise<number> {
   const summary: Record<string, unknown> = {
     packaged: PACKAGED,
     route: ROUTE || null,
+    transientRoot: transientRoot(),
     engine: PACKAGED ? packagedEngine(process.resourcesPath).command : `${PYTHON} -m service.transport`,
     version: app.getVersion(),
   };
   const directory = engineDirectory();
   mkdirSync(directory, { recursive: true });
   try {
+    // A session left by a shell that is gone: planted with a pid nothing runs under, found at
+    // start, removed on the word this smoke stands in for (#313).
+    const planted = sessionDirectory(transientRoot(), 2147483646);
+    mkdirSync(planted, { recursive: true });
+    writeFileSync(join(planted, "connection.json"), "{}");
+    orphans = findOrphans(transientRoot());
+    const removed = removeOrphans(transientRoot(), orphans.map((one) => one.id));
+    summary.orphans = {
+      found: orphans.map((one) => ({ id: one.id, files: one.files })),
+      removed: removed.map((one) => one.id),
+      remaining: findOrphans(transientRoot()).length,
+      currentSessionKept: existsSync(directory),
+    };
+
     const first = await start(directory);
     // From this process's own start to the engine answering /health: what a person waits for after
     // the icon is clicked, less the window itself (#307).
@@ -273,6 +315,12 @@ async function smoke(): Promise<number> {
     summary.restarted = { pid: second.status().pid, differentPid: second.status().pid !== first.status().pid };
 
     if (CAPTURE) {
+      // So the picture shows the choice: one more dead session, planted after the check above and
+      // left for the window to report. The smoke's root is removed at the end either way.
+      const shown = sessionDirectory(transientRoot(), 2147483645);
+      mkdirSync(shown, { recursive: true });
+      writeFileSync(join(shown, "scratch.bin"), Buffer.alloc(4096));
+      orphans = findOrphans(transientRoot());
       serveInterface();
       registerBridge();
       window = createWindow();
@@ -292,6 +340,13 @@ async function smoke(): Promise<number> {
     summary.ok = false;
   }
   summary.tokenInLog = log.some((line) => engine?.connection?.token && line.includes(engine.connection.token));
+  // The smoke's own transient root goes with it: the leftovers it used to keep were the first
+  // orphans this product measured (E-208).
+  rmSync(transientRoot(), { recursive: true, force: true });
+  summary.transientRootRemoved = !existsSync(transientRoot());
+  summary.ok = summary.ok === true && summary.transientRootRemoved === true
+    && (summary.orphans as { removed: string[]; remaining: number }).removed.length === 1
+    && (summary.orphans as { remaining: number }).remaining === 0;
   process.stdout.write(JSON.stringify(summary, null, 2) + "\n");
   return summary.ok === true ? 0 : 1;
 }
@@ -304,6 +359,7 @@ void app.whenReady().then(async () => {
   }
   serveInterface();
   registerBridge();
+  orphans = findOrphans(transientRoot());
   window = createWindow();
   try {
     await start(engineDirectory());

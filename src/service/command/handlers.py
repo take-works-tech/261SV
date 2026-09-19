@@ -321,6 +321,17 @@ def workspace_open(session: Session, parameters: Mapping[str, Any]) -> Effect | 
         loaded = load_workspace(location)
     except WorkspaceFileError as error:
         return refused(str(error))
+    # A `.writing` beside the document is a save that did not finish (XC-055 writes there and moves
+    # into place). It is never a document, so it is removed - and said, because an interrupted save
+    # is a thing the person may want to know happened (#313).
+    interrupted = location.with_name(location.name + ".writing")
+    warnings: tuple[str, ...] = ()
+    if interrupted.exists():
+        try:
+            interrupted.unlink()
+            warnings = (f"{interrupted.name} がありました：前回の保存は途中で終わっています。開いたのは最後に完了した保存です",)
+        except OSError as error:
+            warnings = (f"{interrupted.name} を消せませんでした：{error}",)
 
     before = (session.workspace, session.workspace_path, dict(session.datasets), dict(session.revisions))
     session.workspace, session.workspace_path = loaded, location
@@ -348,6 +359,7 @@ def workspace_open(session: Session, parameters: Mapping[str, Any]) -> Effect | 
             "unresolvedCases": unresolved,
             "items": items_of(loaded),
         },
+        warnings=warnings,
         undo=undo,
     )
 
