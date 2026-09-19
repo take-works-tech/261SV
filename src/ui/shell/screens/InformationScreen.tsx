@@ -305,7 +305,7 @@ function FileSection({ info }: { info: DatasetInfo }) {
         <button
           className="btn ghost"
           title="取込時の値と現在のファイルを照合します — 元ファイルは変更しません"
-          onClick={() => submit({ operation: "dataset.describe", parameters: { dataset: info.id, verify: "sha-256" } })}
+          onClick={() => submit({ operation: "dataset.describe", parameters: { datasetId: info.id } })}
         >
           チェックサムを照合
         </button>

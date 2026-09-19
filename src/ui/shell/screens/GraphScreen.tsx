@@ -164,7 +164,7 @@ const GRAPH_ID = "graph-cross-thickness";
 
 function update(field: string, value: unknown): void {
   // Every action dispatches through the one command path (INV-006); design states log only.
-  submit({ operation: "graph.update", parameters: { graph: GRAPH_ID, [field]: value } });
+  submit({ operation: "graph.update", parameters: { graphId: GRAPH_ID, definition: { [field]: value } } });
 }
 
 /* ---- chart geometry (an SVG placeholder drawn with tokens - the chart is chrome) ------------ */
@@ -546,7 +546,7 @@ function GraphEmpty(): ReactNode {
         <button
           type="button"
           className="gr-entry-card"
-          onClick={() => submit({ operation: "graph.create", parameters: { start: "manual" } })}
+          onClick={() => submit({ operation: "graph.create", parameters: { workspaceId: "ws:1", definition: { name: "新しいグラフ", start: "manual" } } })}
         >
           <b>手動</b>
           <p>物理量とケースを明示的に選んで、空の定義から組み立てます。</p>
@@ -555,7 +555,7 @@ function GraphEmpty(): ReactNode {
         <button
           type="button"
           className="gr-entry-card"
-          onClick={() => submit({ operation: "graph.create", parameters: { start: "recommended" } })}
+          onClick={() => submit({ operation: "graph.create", parameters: { workspaceId: "ws:1", definition: { name: "新しいグラフ", start: "recommended" } } })}
         >
           <b>推奨</b>
           <p>開いているデータから候補を提示します。プレビューのみ・自動適用しません。</p>
@@ -916,7 +916,7 @@ function SeriesTab(props: {
           <button
             type="button"
             className="btn ghost"
-            onClick={() => submit({ operation: "graph.update", parameters: { graph: GRAPH_ID, addSeries: true } })}
+            onClick={() => submit({ operation: "graph.update", parameters: { graphId: GRAPH_ID, definition: { series: [] } } })}
           >
             系列を追加
           </button>
@@ -1546,7 +1546,7 @@ function OutputTab(props: { variant: string; series: SeriesDef[] }): ReactNode {
         <button
           type="button"
           className="btn ghost"
-          onClick={() => submit({ operation: "graph.data", parameters: { graph: GRAPH_ID, preflight: true } })}
+          onClick={() => submit({ operation: "graph.data", parameters: { graphId: GRAPH_ID } })}
         >
           出力前チェック
         </button>
@@ -1558,7 +1558,7 @@ function OutputTab(props: { variant: string; series: SeriesDef[] }): ReactNode {
           <button
             type="button"
             className="btn primary"
-            onClick={() => submit({ operation: "graph.data", parameters: { graph: GRAPH_ID, artefact: kind } })}
+            onClick={() => submit({ operation: "graph.data", parameters: { graphId: GRAPH_ID } })}
           >
             出力を開始
           </button>

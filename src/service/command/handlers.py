@@ -296,6 +296,7 @@ def handlers(session: Session) -> tuple[Handler, ...]:
     return (
         Handler("workspace.open", lambda p, t: workspace_open(session, p)),
         Handler("workspace.save", lambda p, t: workspace_save(session, p)),
+        Handler("dataset.inspect", lambda p, t: dataset_inspect(p)),
         Handler("dataset.load", lambda p, t: dataset_load(session, p)),
         Handler("dataset.describe", lambda p, t: dataset_describe(session, p)),
         Handler("dataset.parts", lambda p, t: dataset_parts(session, p)),
@@ -406,6 +407,30 @@ def workspace_save(session: Session, parameters: Mapping[str, Any]) -> Effect | 
         changed=(workspace.identifier,),
         value={"path": str(target), "previousKept": str(kept) if kept != target else None},
         undo=undo,
+    )
+
+
+def dataset_inspect(parameters: Mapping[str, Any]) -> Effect | Result:
+    """What can be said about a file before it is read (ingest/AC-032, XC-049).
+
+    The support level is a promise this build makes about a format, and a promise is stated before
+    it is relied on; so is the reader's list of what it does not read. Neither needs the file open,
+    and this does not open it - a file that turns out unreadable says so at `dataset.load`.
+    """
+    path = Path(str(parameters["path"]))
+    level, gaps = reader.support_level(path)
+    exists = path.exists()
+    stat = path.stat() if exists else None
+    return Effect(
+        f"{path.name}：{level}",
+        value={
+            "format": path.suffix.lower().lstrip("."),
+            "supportLevel": level,
+            "gaps": [gap for gap in gaps.split("; ") if gap],
+            "sizeBytes": int(stat.st_size) if stat else 0,
+            "modifiedIso": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(timespec="seconds") if stat else "",
+            "exists": exists,
+        },
     )
 
 

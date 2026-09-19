@@ -87,7 +87,7 @@ function FlowCanvas({ unresolved }: { unresolved: boolean }) {
           <span className="si-flow-actions">
             <button
               className="btn"
-              onClick={() => submit({ operation: "workspace.save", parameters: { item: "simulation", name: "基準シミュレーション", revision: 3 } })}
+              onClick={() => submit({ operation: "workspace.save", parameters: { workspaceId: "ws:1" } })}
             >
               定義を保存
             </button>
@@ -218,7 +218,7 @@ export function SimulationScreen(props: { variant: string }) {
             into five different words for "create" across five areas (MOD-010). */}
         <NewItemButtons
           onCreate={(kind) =>
-            submit({ operation: "workspace.save", parameters: { item: kind, action: "create" } })
+            submit({ operation: "view.create", parameters: { workspaceId: "ws:1", definition: { name: `新しい${kind}`, datasetId: "dataset:current", representation: "surface" } } })
           }
           disabled={{
             view: "ケースが読み込まれていません",
@@ -253,8 +253,8 @@ export function SimulationScreen(props: { variant: string }) {
               },
             ]}
             selectedId="tpl-thermal"
-            onSelect={(id) => submit({ operation: "library.list", parameters: { select: id } })}
-            onCreate={(id) => submit({ operation: "template.apply", parameters: { templateId: id } })}
+            onSelect={(id) => submit({ operation: "library.list", parameters: { kind: "template", scope: "workspace" } })}
+            onCreate={(id) => submit({ operation: "template.apply", parameters: { workspaceId: "ws:1", templateId: id, templateRevision: 1, targetSelection: { caseIds: ["case-012"] } } })}
           />
           <SaveAsTemplate
             itemName="標準強度確認"
@@ -268,7 +268,7 @@ export function SimulationScreen(props: { variant: string }) {
             ]}
             name=""
             onName={() => undefined}
-            onSave={() => submit({ operation: "template.createFromItem", parameters: {} })}
+            onSave={() => submit({ operation: "template.createFromItem", parameters: { name: "標準強度確認", targetScope: "workspace", workspaceItemId: "simulation:current", workspaceItemRevision: 1 } })}
           />
         </div>
       </div>
@@ -338,7 +338,7 @@ export function SimulationRail(props: { tab: string; variant: string }) {
 
   const unresolved = props.variant === "unresolved";
   const declare = (field: string) =>
-    submit({ operation: "workspace.save", parameters: { item: "simulation", field } });
+    submit({ operation: "workspace.save", parameters: { workspaceId: "ws:1" } });
   // The badge travels with a value (INV-013): an undeclared field carries no origin to show.
   const declaredBadge = unresolved ? null : <ProvenanceBadge origin="declared" />;
 

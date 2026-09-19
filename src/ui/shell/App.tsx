@@ -242,14 +242,14 @@ export function App() {
               }
               selectedId={(SHELF_ASSETS[s.screen] ?? [])[0]?.id ?? null}
               query={s.variant === "library-searching" ? "鋼" : ""}
-              onSelect={(id) => submit({ operation: "library.list", parameters: { select: id } })}
+              onSelect={(id) => submit({ operation: "library.list", parameters: { kind: "template", scope: "workspace" } })}
             />
           ) : null}
 
           {!isChat ? (
             <InstructionBar
               onSubmit={(text) =>
-                submit({ operation: "script.run", parameters: { instruction: text } })
+                submit({ operation: "script.run", parameters: { scriptText: text, authorisation: { allowDestructive: false } } })
               }
             />
           ) : null}

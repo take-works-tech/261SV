@@ -52,6 +52,7 @@ coverage:
 | `validate/check_mockup_states.py` | every catalogue state renders, not only typechecks - needs `MOCKUP_BASE_URL` and refuses to report success without it |
 | `validate/check_interface_states.py` | every design state of the production interface renders - needs `INTERFACE_BASE_URL` and refuses to report success without it |
 | `validate/check_client_types.py` | `src/ui/client/generated.ts` against CT-003: the interface's types are generated from the contract and regenerated here, so a hand edit or a contract change that did not reach them fails the build (XC-252) |
+| `validate/check_interface_commands.py` | every command literal the screens dispatch names an operation CT-003 has, with parameters it takes - the design states' half of what the compiler checks for the typed client |
 | `ci` job `the wiring the merge depends on` | the review's `pull_request` trigger and `CLAUDE_CODE_OAUTH_TOKEN` are both present or both absent (XC-219), and every label the automation names exists (XC-218's `no-auto-merge` brake among them) - both read repository state a validator on disk cannot see |
 
 ## Format

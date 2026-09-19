@@ -325,7 +325,7 @@ function TemplateChoices() {
             type="button"
             className="re-choice"
             onClick={() => {
-              submit({ operation: "report.create", parameters: { template: one.id } });
+              submit({ operation: "report.create", parameters: { workspaceId: "ws:1", definition: { name: one.name, targets: ["html"], blocks: [] }, sourceTemplateId: one.id } });
               session.navigate("report", "default");
             }}
           >
@@ -394,7 +394,7 @@ function DraftingCanvas() {
                 type="button"
                 className="btn primary"
                 onClick={() => {
-                  submit({ operation: "report.update", parameters: { action: "draft.create", method } });
+                  submit({ operation: "report.update", parameters: { reportId: "report:current", definition: { commentary: { draft: "create", method } } } });
                   setStage("review");
                 }}
               >
@@ -428,7 +428,7 @@ function DraftingCanvas() {
               type="button"
               className="btn primary"
               onClick={() => {
-                submit({ operation: "report.update", parameters: { action: "draft.accept", statements: DRAFT_STATEMENTS.length } });
+                submit({ operation: "report.update", parameters: { reportId: "report:current", definition: { commentary: { draft: "accept", statements: DRAFT_STATEMENTS.length } } } });
                 setStage("applied");
               }}
             >
@@ -492,7 +492,7 @@ function CommentaryReviewCanvas() {
             type="button"
             className="btn primary"
             onClick={() => {
-              submit({ operation: "report.update", parameters: { action: "commentary.generate" } });
+              submit({ operation: "report.update", parameters: { reportId: "report:current", definition: { commentary: { generate: true } } } });
               session.navigate("report", "drafting");
             }}
           >
@@ -534,7 +534,7 @@ function ThemeCanvas() {
             aria-pressed={themeId === one.id}
             onClick={() => {
               setThemeId(one.id);
-              submit({ operation: "report.update", parameters: { theme: one.id } });
+              submit({ operation: "report.update", parameters: { reportId: "report:current", definition: { theme: one.id } } });
             }}
           >
             <b style={{ fontFamily: one.faceStack }}>{one.name}</b>
@@ -581,7 +581,7 @@ function ExportingCanvas() {
                 type="button"
                 className="btn primary"
                 onClick={() => {
-                  submit({ operation: "report.export", parameters: { format: "html", target: EXPORT_TARGET } });
+                  submit({ operation: "report.export", parameters: { reportId: "report:current", path: EXPORT_TARGET } });
                   setCancelled(false);
                 }}
               >
@@ -596,7 +596,7 @@ function ExportingCanvas() {
               detail={`${EXPORT_TARGET}design-review.html・ページ 3/5`}
               fraction={0.62}
               onCancel={() => {
-                submit({ operation: "report.export", parameters: { action: "cancel", target: EXPORT_TARGET } });
+                /* cancellation is the transport's abort (CT-003 has no cancel for this); nothing is submitted */ undefined;
                 setCancelled(true);
               }}
               cancelNote="中断はページ境界で反映されます"
@@ -630,8 +630,8 @@ function ExportErrorCanvas() {
           <span className="why">design-review.pptx（2026-08-27 14:02・{PPTX_SIZE}）はそのまま残っています。出力は一時ファイルに書き、完了時にのみ置き換えます。</span>
         </div>
         <div className="re-actions">
-          <button type="button" className="btn" onClick={() => submit({ operation: "report.update", parameters: { action: "output.retarget" } })}>保存先を変更</button>
-          <button type="button" className="btn primary" onClick={() => submit({ operation: "report.export", parameters: { format: "pptx", target: EXPORT_TARGET } })}>再試行</button>
+          <button type="button" className="btn" onClick={() => submit({ operation: "report.update", parameters: { reportId: "report:current", definition: { targets: ["html"] } } })}>保存先を変更</button>
+          <button type="button" className="btn primary" onClick={() => submit({ operation: "report.export", parameters: { reportId: "report:current", path: EXPORT_TARGET } })}>再試行</button>
         </div>
       </div>
       <DocumentPages />
@@ -956,10 +956,10 @@ function RailDrafting(props: { variant: string }) {
           {createBlocked ? (
             <button type="button" className="btn primary" {...disabledBecause("モデルが未設定のため生成できません")}>下書きを作る</button>
           ) : (
-            <button type="button" className="btn primary" onClick={() => submit({ operation: "report.update", parameters: { action: "draft.create", method } })}>下書きを作る</button>
+            <button type="button" className="btn primary" onClick={() => submit({ operation: "report.update", parameters: { reportId: "report:current", definition: { commentary: { draft: "create" } } } })}>下書きを作る</button>
           )}
           {props.variant === "drafting" ? (
-            <button type="button" className="btn ghost" onClick={() => submit({ operation: "report.update", parameters: { action: "draft.discard" } })}>破棄</button>
+            <button type="button" className="btn ghost" onClick={() => submit({ operation: "report.update", parameters: { reportId: "report:current", definition: { commentary: { draft: "discard" } } } })}>破棄</button>
           ) : (
             <button type="button" className="btn ghost" {...disabledBecause("破棄する下書きがありません")}>破棄</button>
           )}
@@ -1133,7 +1133,7 @@ function RailOutput(props: { variant: string }) {
             label="HTMLを出力中"
             detail="ページ 3/5"
             fraction={0.62}
-            onCancel={() => submit({ operation: "report.export", parameters: { action: "cancel", target: EXPORT_TARGET } })}
+            onCancel={() => /* cancellation is the transport's abort (CT-003 has no cancel for this); nothing is submitted */ undefined}
             cancelNote="中断はページ境界で反映されます"
           />
           <p className="prop-note">同じ対象への再出力は、完了または中断まで開始できません（XC-060）。</p>

@@ -52,6 +52,7 @@ jobs:
       - run: python validate/check_automerge_policy.py
         if: '!cancelled()'
       - run: python validate/check_client_types.py
+      - run: python validate/check_interface_commands.py
         if: '!cancelled()'
 
   # XC-219: the review becomes a merge gate on the day the secret exists, and this is what stops that

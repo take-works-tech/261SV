@@ -104,10 +104,10 @@ class TestWhatThisBuildRegisters:
             "workspace.open", "dataset.load", "dataset.describe", "dataset.parts",
             "field.declareUnit", "field.statistics", "view.create", "view.update", "view.render",
             "dataset.probe", "view.pick", "report.create", "report.export", "report.provenance",
-            "workspace.save",
+            "workspace.save", "dataset.inspect",
             "system.capabilities", "system.protocols",
         }
-        assert len(surface.unimplemented()) == len(OPERATIONS) - 17
+        assert len(surface.unimplemented()) == len(OPERATIONS) - 18
 
     def test_an_unimplemented_operation_is_refused_and_named_as_such(self) -> None:
         surface, _ = a_surface()
@@ -985,3 +985,29 @@ class TestOpeningSaysWhatTheDocumentHolds:
             {"id": created.value["id"], "name": "temperature", "datasetId": dataset_id},
         ]
         assert opened.value["items"]["reports"] == []
+
+
+class TestAFileIsInspectedBeforeItIsRead:
+    def test_the_support_level_and_the_gaps_are_stated_without_opening_the_file(self, tmp_path: Path) -> None:
+        """ingest/AC-032 before anything loads: the level is a promise about a format, made from the
+        extension, and the reader's gaps come with it (AC-034)."""
+        surface, _ = a_surface()
+        source = tmp_path / "case.vtu"
+        write_cube(source)
+
+        result = surface.submit(Command("dataset.inspect", {"path": str(source)}))
+
+        assert result.status is Status.ANSWERED, result.reason
+        assert result.value["format"] == "vtu"
+        assert result.value["supportLevel"] in {"Verified", "Limited", "Offered"}
+        assert result.value["exists"] is True
+        assert result.value["sizeBytes"] == source.stat().st_size
+
+    def test_a_format_this_build_does_not_read_is_named_as_absent(self, tmp_path: Path) -> None:
+        surface, _ = a_surface()
+
+        result = surface.submit(Command("dataset.inspect", {"path": str(tmp_path / "thing.unknownformat")}))
+
+        assert result.status is Status.ANSWERED
+        assert result.value["supportLevel"] == "Absent"
+        assert result.value["exists"] is False

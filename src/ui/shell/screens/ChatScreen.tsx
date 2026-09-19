@@ -88,7 +88,7 @@ function DefaultThread() {
             onHold={() =>
               submit({
                 operation: "variable.declare",
-                parameters: { name: "σmax_case012", value: 241.7, unit: "MPa", origin: "computed" },
+                parameters: { workspaceId: "ws:1", name: "σmax_case012", value: 241.7, unit: "MPa" },
               })
             }
           />
@@ -186,7 +186,7 @@ function DefaultThread() {
           label="pipeline.dryRun を実行中"
           detail="ユニット 2／4・ケース 3／6"
           fraction={0.42}
-          onCancel={() => submit({ operation: "pipeline.cancel", parameters: { at: "unit-boundary" } })}
+          onCancel={() => submit({ operation: "pipeline.cancel", parameters: { runId: "run-2026-08-29_01" } })}
           cancelNote="中断はユニット境界で有効になります。途中の成果物は作られません"
         />
       </Turn>
@@ -224,7 +224,7 @@ function ErrorThread() {
             type="button"
             className="btn"
             title="同じ指示をもう一度対応付けから実行します"
-            onClick={() => submit({ operation: "script.run", parameters: { instruction: FIRST_QUESTION, retry: true } })}
+            onClick={() => submit({ operation: "script.run", parameters: { scriptText: FIRST_QUESTION, authorisation: { allowDestructive: false } } })}
           >
             再試行
           </button>
@@ -276,7 +276,7 @@ function OutboundRequestCard() {
   const decide = (next: Exclude<OutboundDecision, "pending">) => {
     setDecision(next);
     // The decision itself is a workspace event: host, time and verdict go to the local audit.
-    submit({ operation: "system.audit", parameters: { event: "outbound-decision", host, decision: next } });
+    /* the engine records an outbound decision itself when the request is made (XC-106); nothing is submitted */ undefined;
   };
 
   if (decision !== "pending") {
@@ -437,7 +437,7 @@ function Composer(props: { draft: string; onDraft: (draft: string) => void }) {
       onSubmit={(event) => {
         event.preventDefault();
         if (!canSend) return;
-        submit({ operation: "script.run", parameters: { instruction: props.draft.trim() } });
+        submit({ operation: "script.run", parameters: { scriptText: props.draft.trim(), authorisation: { allowDestructive: false } } });
         props.onDraft("");
       }}
     >

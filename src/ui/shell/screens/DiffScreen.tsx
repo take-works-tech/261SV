@@ -515,14 +515,7 @@ function MethodForm(props: MethodFormProps) {
             onClick={() =>
               submit({
                 operation: "diff.create",
-                parameters: {
-                  a: "run-12",
-                  b: "run-11",
-                  quantity: "von_mises",
-                  method: props.method,
-                  target: props.target,
-                  basis: props.basis,
-                },
+                parameters: { caseIdA: "run-12", caseIdB: "run-11", basisCaseId: "run-12" },
               })
             }
           >
