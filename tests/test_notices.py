@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "packaging"))
 
-from notices import REQUIRED_STATEMENTS, _field, library_matches, soname  # noqa: E402
+from notices import REQUIRED_STATEMENTS, Component, _field, library_matches, soname  # noqa: E402
 
 
 class TestALibraryFileBelongsToItsModule:
@@ -79,3 +79,13 @@ class TestASystemLibraryIsNamedAsItsPackageNamesIt:
         assert soname("libgfortran-040039e1-0352e75f.so.5.0.0") == "libgfortran.so.5"
         assert soname("libX11.so.6") == "libX11.so.6"
         assert soname("libreadline.so.8") == "libreadline.so.8"
+
+
+class TestTheShapeTheScreenReadsIsTheShapeTheGeneratorWrites:
+    def test_a_component_serialises_to_exactly_the_keys_the_interface_declares(self) -> None:
+        """`NoticeComponent` in src/ui/client/shell.ts is the other half of this; the two sides cannot
+        import from each other, so the keys are pinned here and named there."""
+        one = Component(name="x", version="1", licence="MIT", files=["a"], texts=[("s", "t")], note="n")
+
+        assert set(one.as_json()) == {"name", "version", "licence", "files", "texts", "note"}
+        assert one.as_json()["texts"] == [{"source": "s", "text": "t"}]

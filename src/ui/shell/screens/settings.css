@@ -89,6 +89,16 @@
   text-align: left; border: 1px solid var(--line-strong); border-radius: var(--radius-m);
   background: var(--surface-panel); padding: 8px 12px;
 }
+/* Settings > ライセンス: a long list read one entry at a time. */
+.se-notices { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.se-notice { border: 1px solid var(--line); border-radius: 6px; background: var(--surface-raised); }
+.se-notice-head { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; padding: 8px 10px; background: none; border: 0; color: inherit; cursor: pointer; font: inherit; }
+.se-notice-head:hover { background: var(--sel-bg); }
+.se-notice-meta { color: var(--ink-muted); font-size: var(--text-caption); }
+.se-notice-body { padding: 0 10px 10px; display: flex; flex-direction: column; gap: 6px; }
+.se-notice-note { margin: 0; color: var(--ink-muted); font-size: var(--text-caption); }
+.se-notice-files { margin: 4px 0 0; padding-left: 18px; color: var(--ink-muted); font-size: var(--text-caption); max-height: 180px; overflow: auto; }
+.se-notice-text { margin: 4px 0 0; padding: 8px; max-height: 320px; overflow: auto; white-space: pre-wrap; font-size: var(--text-caption); background: var(--surface-well); border-radius: 4px; }
 .se-action:hover:not(:disabled) { background: var(--surface-raise); }
 .se-action > b { color: var(--ink-strong); font-size: var(--text-body); font-weight: var(--weight-medium); }
 .se-action > small { color: var(--ink-muted); font-size: var(--text-caption); }
