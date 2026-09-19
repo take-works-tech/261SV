@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "2.4.0";
+export const PROTOCOL_VERSION = "2.5.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -15,6 +15,7 @@ export const TOKEN_HEADER: string = "X-Solvia-Token";
 export const COMMAND_PATH: string = "/command";
 export const HANDLE_PATH: string = "/handle/";
 export const HEALTH_PATH: string = "/health";
+export const CONNECTION_FILE: string = "connection.json";
 
 export type Operation =
   | "workspace.open"

@@ -105,7 +105,8 @@ def render() -> str:
             f'export const {name}: string = {json.dumps(node.get("const", ""), ensure_ascii=False)};'
             for name, node in ((document.get("$defs", {}).get("transport", {}).get("properties")) or {}).items()
             for name in [({"tokenHeader": "TOKEN_HEADER", "commandPath": "COMMAND_PATH",
-                           "handlePath": "HANDLE_PATH", "healthPath": "HEALTH_PATH"}).get(name, name.upper())]
+                           "handlePath": "HANDLE_PATH", "healthPath": "HEALTH_PATH",
+                           "connectionFile": "CONNECTION_FILE"}).get(name, name.upper())]
         ],
         "",
         "export type Operation =",

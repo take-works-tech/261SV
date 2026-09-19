@@ -5398,10 +5398,45 @@ model or the prompt, never in a description that quietly went stale.
   launch begins by deciding whether a file it finds is live, which is the work this decision does
   once with a pid and `/health`. **Embedding** the engine in the shell's process - one process, one
   crash (E-194). **`utilityProcess`** - Node scripts only (E-196)
-- basis: E-195 (T1), E-196 (T1), E-197 (T1), E-194 (T1), E-024 (T1)
-- affects: XC-040, XC-258, MOD-017
+- basis: E-195 (T1), E-196 (T1), E-197 (T1), E-194 (T1), E-024 (T1), E-200 (T1)
+- correction: 2026-09-19, the same day. E-200 (Node's `child_process`: 'exit' carries a code or a signal and
+  one is always set) added to the basis - the decision's "a crash is an event with an exit code" leaned on
+  it, and it was cited in the code and not here
+- affects: XC-040, XC-258, MOD-017, MOD-018
 - decidedness: Bounded
 - reversal_trigger: a measured packaged cold start of more than a few seconds moves the question to
   what is shown while waiting (#307) and not to this model. A crash rate that makes restart routine
   moves the workspace document to a save on every applied command, so that "what was not saved" is
   never more than the last one
+
+### XC-260 - The renderer is served from a privileged app scheme and isolated from Node
+- decided: 2026-09-19
+- status: active
+- decision: the interface's built files are served to the window from **`solvia://app/`**, a scheme
+  registered as standard, secure, fetch-capable and CORS-enabled before the application is ready
+  and handled by the main process from `src/ui/dist` - **not from `file://`**. The engine is told
+  that one origin and no other. The renderer runs with **context isolation, the sandbox and no Node
+  integration**, and reaches the shell only through `window.solvia`, whose shape `src/ui/client/
+  shell.ts` declares and the preload implements with `contextBridge` - no raw `ipcRenderer`, no
+  channel a page could name. The preload is CommonJS, because a sandboxed preload is a plain script
+- decided_by: Electron's own security checklist and its ESM notes, followed rather than re-derived
+- rationale: the checklist is explicit on each point (E-199): enable context isolation (3), enable
+  the sandbox (4), no Node integration for content (2), do not disable web security (6), prefer a
+  custom protocol over `file://` (18), filter what the bridge exposes (20). **A custom scheme also
+  gives the engine a real origin to allow**: a `file://` page sends `Origin: null`, and allowing
+  `null` is allowing every local file. The privileges the scheme needs are the documented ones
+  (E-198): standard, so relative URLs resolve; secure, so the page is a secure context; fetch and
+  CORS, so the interface's calls to loopback are ordinary `fetch` with the token header. The
+  preload is CommonJS because "sandboxed preload scripts are run as plain JavaScript without an
+  ESM context" and preloads ignore a package's `"type": "module"` (E-201) - an ESM preload would be
+  the sandbox off, which is the wrong trade
+- alternatives: **`file://`** - works, sends a null origin, and is the thing the checklist says to
+  avoid. **An unsandboxed renderer** with an ESM preload - one flag, and every renderer bug is a
+  process on the machine. **Node integration in the renderer** - the interface could read files
+  itself, and the engine would no longer be the only thing that reads a case
+- basis: E-198 (T1), E-199 (T1), E-201 (T1)
+- affects: XC-259, XC-258, MOD-018, MOD-017
+- decidedness: Fixed
+- reversal_trigger: a documented change in Electron's checklist or scheme privileges; or the
+  interface needing an API the bridge cannot carry, which is a case for widening the bridge by one
+  named function and not for loosening the isolation

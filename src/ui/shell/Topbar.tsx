@@ -3,6 +3,7 @@
  * path rather than gaining a single key (XC-193). */
 import { useEngine } from "../state/engine";
 import { EngineStatus } from "../shared/EngineStatus";
+import { shellApi } from "../client/shell";
 import { useEffect, useRef, useState } from "react";
 import { session, useSession } from "../state/session";
 import { NotificationHistory, type Notice } from "../shared/NotificationHistory";
@@ -176,7 +177,11 @@ export function Topbar() {
             </div>
           ) : null}
         </span>
-        <EngineStatus reachability={e.reachability} busy={e.busy} />
+        <EngineStatus
+          reachability={e.reachability}
+          busy={e.busy}
+          onRestart={shellApi() ? () => void shellApi()?.engine.restart() : undefined}
+        />
         <button className="icon-button" aria-label="設定" title="設定" onClick={() => session.navigate("settings")}>
           ⚙
         </button>

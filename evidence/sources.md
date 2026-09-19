@@ -1969,3 +1969,48 @@ Recorded so that nothing silently depends on them:
   run. Before the pid was added the file was indistinguishable from a live engine's. A packaged
   cold start on a machine that has never run the product was not measured
 - justifies: XC-259
+
+### E-198 - Electron's `protocol` module: privileged schemes and `protocol.handle`
+- tier: T1
+- url: https://www.electronjs.org/docs/latest/api/protocol
+- verified: 2026-09-19
+- says: `registerSchemesAsPrivileged` "can only be used before the `ready` event of the `app`
+  module gets emitted and can be called only once", and registers a scheme "as standard, secure,
+  bypasses content security policy for resources, allows registering ServiceWorker, supports fetch
+  API, streaming video/audio, and V8 code cache" according to the privileges given; `standard`
+  makes the scheme "adhere to what RFC 3986 calls generic URI syntax" so relative resources
+  resolve; `protocol.handle(scheme, handler)` delegates "requests made to URLs with this scheme"
+  to a handler returning "either a `Response` or a `Promise<Response>`"
+- justifies: XC-260
+
+### E-199 - Electron's security checklist
+- tier: T1
+- url: https://www.electronjs.org/docs/latest/tutorial/security
+- verified: 2026-09-19
+- says: item 2 "Do not enable Node.js integration for remote content"; item 3 "Enable context
+  isolation in all renderers" (default since 12.0.0); item 4 "Enable process sandboxing" (default
+  since 20.0.0); item 6 "Do not disable `webSecurity`"; item 18 "Avoid usage of the `file://`
+  protocol and prefer usage of custom protocols"; item 20 shows `contextBridge.exposeInMainWorld`
+  filtering what reaches the page rather than exposing `ipcRenderer.on` directly
+- justifies: XC-260, MOD-018
+
+### E-200 - Node's `child_process`: what 'exit' carries and what `kill()` sends
+- tier: T1
+- url: https://nodejs.org/api/child_process.html
+- verified: 2026-09-19
+- says: on 'exit', `code` is "the exit code if the child process exited on its own, or `null` if
+  the child process terminated due to a signal" and `signal` is "the signal by which the child
+  process was terminated, or `null`"; "one of the two will always be non-`null`"; 'close' is
+  emitted "after a process has ended _and_ the stdio streams of a child process have been closed";
+  `subprocess.kill()` with no argument sends `'SIGTERM'`
+- justifies: XC-259
+
+### E-201 - Electron's ESM notes: main process yes, sandboxed preload no
+- tier: T1
+- url: https://www.electronjs.org/docs/latest/tutorial/esm
+- verified: 2026-09-19
+- says: ESM in the main process "was added in `electron@28.0.0`" and is enabled when "the nearest
+  parent package.json has `"type": "module"` set"; "preload scripts will ignore `"type": "module"`
+  fields, so you _must_ use the `.mjs` file extension in your ESM preload scripts"; "sandboxed
+  preload scripts are run as plain JavaScript without an ESM context"
+- justifies: XC-260

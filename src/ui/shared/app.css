@@ -456,5 +456,9 @@ button:disabled { cursor: not-allowed; color: var(--ink-faint); }
   background: var(--ink-faint);
 }
 .engine-dot.reachable { background: var(--state-good); }
+.engine-dot.exited { background: var(--state-error); }
+/* A path and the dialog button that fills it are one control: side by side, the field taking the room. */
+.field-with-action { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.field-with-action .field-input { flex: 1; min-width: 0; }
 .engine-dot.absent { background: var(--ink-faint); }
 .engine-busy { color: var(--ink-faint); }

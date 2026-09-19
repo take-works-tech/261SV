@@ -7,6 +7,7 @@
 import { useEffect, type ReactNode } from "react";
 import { session, useSession, type ScreenId } from "../state/session";
 import { connectionFromEnvironment, engineState, useEngine } from "../state/engine";
+import { shellApi } from "../client/shell";
 import { EngineRefusal } from "../shared/EngineStatus";
 import { InstructionBar } from "../shared/InstructionBar";
 import { MaterialLibraryShelf, type ShelfAsset, type ShelfState } from "../shared/MaterialLibraryShelf";
@@ -77,13 +78,31 @@ export function App() {
   const s = useSession();
   const e = useEngine();
 
-  // Connect once, to whatever the shell was told about. There is no retry loop and no polling: a
-  // reconnection is a thing a person asks for, and a loop that quietly reattaches hides an engine
-  // that keeps dying (#306 carries the recovery this build does not have).
+  // Inside the desktop shell, the engine's state is the shell's to report (XC-259): every change
+  // arrives as a status, and "running" carries the connection the engine wrote. Outside it, a
+  // development build may name a connection in its environment. There is no retry loop and no
+  // polling in either case: a restart is a thing a person asks for, and a loop that quietly
+  // reattaches hides an engine that keeps dying.
   useEffect(() => {
-    const connection = connectionFromEnvironment();
-    if (connection) void engineState.connect(connection);
-    else engineState.disconnect();
+    const shell = shellApi();
+    if (!shell) {
+      const connection = connectionFromEnvironment();
+      if (connection) void engineState.connect(connection);
+      else engineState.disconnect();
+      return;
+    }
+    const apply = (status: { state: string; reason: string | null; exitCode: number | null; signal: string | null }) => {
+      if (status.state === "running") {
+        void shell.engine.connection().then((connection) => {
+          if (connection) void engineState.connect(connection);
+        });
+      } else if (status.state === "exited") {
+        engineState.engineExited(status);
+      }
+    };
+    const unsubscribe = shell.engine.onStatus(apply);
+    void shell.engine.status().then(apply);
+    return unsubscribe;
   }, []);
 
   const canvas = ((): ReactNode => {

@@ -224,3 +224,39 @@ jobs:
         working-directory: src/ui
         env:
           SIM_VIEWER_REQUIRE_VTK: "1"
+
+  shell:
+    name: the desktop shell owns a real engine
+    # MOD-018 against a real engine process: the pure-Node process module under vitest (start,
+    # verify, crash as an event, orphan cleanup, stop), then Electron itself in `--smoke` mode - the
+    # same wiring the window uses, with no person present. `--no-sandbox` is for the runner only:
+    # its kernel forbids the unprivileged user namespaces Chromium's sandbox needs, and what this
+    # job proves is the process model, not the sandbox (XC-260 keeps it on in the product).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/shell/package-lock.json
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgl1 libglx-mesa0 libegl1 libnss3 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libasound2t64
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e ".[dev]"
+      - run: npm ci
+        working-directory: src/shell
+      - run: npm run typecheck
+        working-directory: src/shell
+      - run: npm run build
+        working-directory: src/shell
+      - run: xvfb-run -a npm test
+        working-directory: src/shell
+        env:
+          SIM_VIEWER_REQUIRE_VTK: "1"
+      - run: xvfb-run -a npx electron . --smoke --no-sandbox
+        working-directory: src/shell
+        env:
+          SIM_VIEWER_REQUIRE_VTK: "1"

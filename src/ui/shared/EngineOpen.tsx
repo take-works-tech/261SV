@@ -9,6 +9,7 @@
  */
 import { useState } from "react";
 import { engineState, useEngine } from "../state/engine";
+import { shellApi } from "../client/shell";
 
 export function EngineOpen() {
   const e = useEngine();
@@ -17,6 +18,7 @@ export function EngineOpen() {
   const [caseId, setCaseId] = useState("case:1");
 
   if (e.reachability.kind !== "reachable") return null;
+  const shell = shellApi();
 
   const open = async () => {
     if (workspace && !(await engineState.openWorkspace(workspace))) return;
@@ -27,17 +29,30 @@ export function EngineOpen() {
   return (
     <section className="prop-section" aria-label="エンジンで開く">
       <header className="prop-note">
-        エンジンで開く（開発用：製品版はシェルのファイルダイアログが経路を渡します）
+        {shell
+          ? "エンジンで開く（経路はシェルのファイルダイアログから）"
+          : "エンジンで開く（開発用：製品版はシェルのファイルダイアログが経路を渡します）"}
       </header>
       <div className="prop-row">
         <label htmlFor="engine-workspace">ワークスペース</label>
-        <input
-          id="engine-workspace"
-          className="field-input"
-          value={workspace}
-          placeholder="…/beam.svw"
-          onChange={(event) => setWorkspace(event.target.value)}
-        />
+        <div className="field-with-action">
+          <input
+            id="engine-workspace"
+            className="field-input"
+            value={workspace}
+            placeholder="…/beam.svw"
+            onChange={(event) => setWorkspace(event.target.value)}
+          />
+          {shell ? (
+            <button
+                type="button"
+                className="btn"
+                onClick={() => void shell.dialog.openWorkspace().then((path) => path && setWorkspace(path))}
+            >
+                選ぶ…
+            </button>
+          ) : null}
+        </div>
       </div>
       <div className="prop-row">
         <label htmlFor="engine-case">ケース</label>
@@ -50,13 +65,24 @@ export function EngineOpen() {
       </div>
       <div className="prop-row">
         <label htmlFor="engine-result">結果ファイル</label>
-        <input
-          id="engine-result"
-          className="field-input"
-          value={result}
-          placeholder="…/cube.vtu"
-          onChange={(event) => setResult(event.target.value)}
-        />
+        <div className="field-with-action">
+          <input
+            id="engine-result"
+            className="field-input"
+            value={result}
+            placeholder="…/cube.vtu"
+            onChange={(event) => setResult(event.target.value)}
+          />
+          {shell ? (
+            <button
+                type="button"
+                className="btn"
+                onClick={() => void shell.dialog.openResult().then((path) => path && setResult(path))}
+            >
+                選ぶ…
+            </button>
+          ) : null}
+        </div>
       </div>
       <div className="prop-row">
         <button type="button" className="btn primary" onClick={() => void open()} disabled={e.busy}>

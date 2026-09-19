@@ -19,6 +19,7 @@ Dependencies point downward only. A dependency pointing upward is a defect, not 
 
 | Layer | May depend on | What lives here |
 |---|---|---|
+| `shell` | client (the bridge's type), domain-core | the desktop host: the engine process, the window, the operating system's dialogs, the bridge. Computes nothing and shows nothing of its own (XC-259, XC-260) |
 | `ui` | ui-logic, state, shared-ui, domain-core | React components, canvas hosts, panels |
 | `ui-logic` | state, client, domain-core | view models, formatting, interaction rules |
 | `state` | client, domain-core | workspace document state, selection, undo |
@@ -217,6 +218,19 @@ module; a surface owned by one of its callers is a dependency waiting to be inve
 - depends_on: domain-core
 - decidedness: Fixed
 - basis: E-001 (T1)
+
+### MOD-018 - desktop-shell
+- layer: shell
+- paths: src/shell
+- owns: the Electron main process and its preload - **the engine as a process** (started, verified
+  through `/health`, its exit received as an event, stopped without leaving a connection file), the
+  window, the operating system's file dialogs, and the bridge `window.solvia` whose shape MOD-017
+  declares. It holds no data and no rule about data: a path it obtains goes to the engine unchanged,
+  and every number a screen shows still comes from the engine's answer. The renderer it hosts is
+  served from a privileged app scheme, isolated from Node and sandboxed (XC-260)
+- depends_on: client, domain-core
+- decidedness: Bounded
+- basis: E-195 (T1), E-199 (T1)
 
 ### MOD-014 - egress
 - layer: service

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -3827,6 +3827,10 @@
         "healthPath": {
           "const": "/health",
           "description": "the one endpoint that needs no token"
+        },
+        "connectionFile": {
+          "const": "connection.json",
+          "description": "the file the engine writes its host, port, token, protocol and pid to, in the directory the shell names (XC-258, XC-259)"
         }
       }
     }
