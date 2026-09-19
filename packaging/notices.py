@@ -573,6 +573,38 @@ def attribute_system_libraries(files: list[str], claimed: dict[str, str]) -> lis
     return components
 
 
+def attribute_vendored_data() -> list[Component]:
+    """Data vendored into the product's own source, declared where it is vendored.
+
+    The colour maps are tables copied from their authors' publication, not files in the closure: a
+    scan of shipped files cannot see them. What it can read is the declaration each map carries in
+    `engine.visualization.colour_maps` - its source and its licence - which is the record #275
+    asked for and is what this reproduces. A map this project generated itself is not third party
+    and is not listed.
+    """
+    sys.path.insert(0, str(ROOT / "src"))
+    from engine.visualization.colour_maps import COLOUR_MAPS  # noqa: PLC0415 - the product's own declaration
+
+    components: list[Component] = []
+    for key, colour_map in COLOUR_MAPS.items():
+        if colour_map.licence == "this project":
+            continue
+        components.append(Component(
+            name=f"colour map '{key}'",
+            version="256-entry table as published",
+            licence=colour_map.licence,
+            files=[],
+            texts=[(
+                "src/engine/visualization/colour_maps.py (the table's own declaration)",
+                "Source: " + colour_map.source + chr(10) + "Licence: " + colour_map.licence + chr(10)
+                + "The authors' file releases the tables under the CC0 license / public domain dedication "
+                "(evidence E-193, read 2026-09-18). Compiled into the engine; no separate file ships.",
+            )],
+            note="Vendored data in the product's own code, listed because the list is of everything shipped, not only of files",
+        ))
+    return components
+
+
 def attribute_product(files: list[str], claimed: dict[str, str]) -> Component:
     mine = [f for f in files if f not in claimed]
     # What is left at this point is the product's own frozen code and PyInstaller's bookkeeping.
@@ -722,6 +754,7 @@ def main(argv: list[str]) -> int:
     components += attribute_bundled_runtime(files, claimed)
     components.append(attribute_python(files, engine, claimed))
     components += attribute_system_libraries(files, claimed)
+    components += attribute_vendored_data()
     components.append(attribute_product(files, claimed))
     product = next(c for c in components if c.name == "SOLVIA (this product)")
     for name in executable:
