@@ -410,6 +410,13 @@ const rendered = await ask("view.render", { viewId, ...FRAME, format: "png", leg
   },
 };
 
+/** The store as it stands, for a caller that is not a component: a test that drives the thread
+ *  and reads what a screen would have been given. Read-only - the object is frozen by convention
+ *  (every field is `readonly`) and every change goes through `engineState`. */
+export function snapshot(): EngineState {
+  return state;
+}
+
 export function useEngine(): EngineState {
   const subscribe = useCallback((listener: () => void) => {
     listeners.add(listener);
