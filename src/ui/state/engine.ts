@@ -551,6 +551,11 @@ const rendered = await ask("view.render", { viewId, ...FRAME, format: "png", leg
     return ask("report.export", { reportId: report.id, path });
   },
 
+  /** What this build can do and where it keeps its log (system.capabilities). A read. */
+  async capabilities(): Promise<Results["system.capabilities"] | null> {
+    return ask("system.capabilities", {});
+  },
+
   clearRefusal() {
     setState({ refusal: null });
   },

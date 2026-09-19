@@ -52,7 +52,8 @@ from engine.visualization import render as render_module
 from engine.visualization.backends import REQUIRES, Backend, probe
 from engine.visualization.render import Camera, Colouring, RenderError, probe_offscreen, render_view
 from service.command.catalogue import PROTOCOL_VERSION
-from service.command.surface import Effect, Handler, Result, Status, Surface
+from service.command.surface import Effect, Handler, LogEntry, Result, Status, Surface
+from service.egress import diagnostics
 from service.workspace import items, sources
 from service.workspace.document import WorkspaceDocument, WorkspaceFileError, load as load_workspace
 from service.workspace.document import WorkspaceVersionError, save as save_document
@@ -223,6 +224,8 @@ class Session:
     #: allows (XC-086), while the reverse merely renders less than it could.
     machine_class: MachineClass = MachineClass.INTEGRATED
     native_offscreen: Callable[[], tuple[bool, str]] = native_offscreen_available
+    #: The diagnostic log (XC-126, XC-263). Memory-only unless the transport was given a directory.
+    log: diagnostics.Log = dataclass_field(default_factory=diagnostics.Log)
     workspace: WorkspaceDocument | None = None
     workspace_path: Path | None = None
     datasets: dict[str, Loaded] = dataclass_field(default_factory=dict)
@@ -280,13 +283,34 @@ def modified_time(path: Path) -> RecordedTime:
 # -- the handlers -------------------------------------------------------------------------------
 
 
+def log_entry(session: Session, entry: LogEntry) -> None:
+    """One command's outcome into the diagnostic log: the operation, who asked, how it went, and the
+    reason if it was refused - names and outcomes, never a value (XC-126). A refusal is a warning and
+    a failure an error, so a log read at WARNING is the list of what went wrong."""
+    level = (
+        diagnostics.Level.ERROR if entry.status is Status.FAILED
+        else diagnostics.Level.WARNING if entry.status is Status.REFUSED
+        else diagnostics.Level.INFO
+    )
+    session.log.record(
+        level,
+        "command",
+        operation=entry.operation,
+        origin=entry.origin.value,
+        status=entry.status.value,
+        reason=(entry.reason[:200] if entry.reason else None),
+        undoId=entry.undo_id,
+        dryRun=entry.dry_run,
+    )
+
+
 def build_surface(session: Session, *, clock: Callable[[], datetime] | None = None) -> Surface:
     """A surface with every handler this build can honestly provide.
 
     Read it as the list of what works: an operation absent here is one `Surface.unimplemented()`
     reports, and the report is the truth rather than a placeholder.
     """
-    surface = Surface(clock=clock or session.clock)
+    surface = Surface(clock=clock or session.clock, on_entry=lambda entry: log_entry(session, entry))
     for handler in handlers(session):
         surface.register(handler)
     return surface
@@ -1225,6 +1249,7 @@ def system_capabilities(session: Session) -> Effect:
     return Effect(
         "この機械でできることです",
         value={
+            "diagnostics": session.log.describe_location(),
             "machineClass": session.machine_class.value,
             "renderers": [
                 {"backend": one.backend.value, "available": one.available, "requires": REQUIRES[one.backend]}

@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-19
+updated: 2026-09-20
 ---
 
 # Modules and dependency direction
@@ -150,7 +150,8 @@ touches a file, a device or a clock.
   loopback listener, its token, and the handle endpoint the bytes of a large answer are fetched
   through. The wire is here rather than in a module of its own because it adds no rule: it carries the
   surface's own envelope, and a second module would be a second place a request could be interpreted
-- depends_on: domain-core, dataset-io, visualization, analysis, graph, report, workspace
+- depends_on: domain-core, dataset-io, visualization, analysis, graph, report, workspace, egress
+  (egress since 2026-09-20: the surface hands every history entry to the diagnostic log egress owns, XC-263)
 - decidedness: Fixed
 - basis: E-001 (T1)
 

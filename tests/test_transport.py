@@ -286,3 +286,36 @@ class TestHandlesAreFetchedSeparately:
 
         assert status == 200
         assert body == b"\x89PNG\r\n\x1a\nnot really a picture"
+
+
+class TestTheEngineProcessWritesItsLogWhereItIsTold:
+    def test_start_is_the_first_line_and_the_token_is_in_none(self, tmp_path: Path) -> None:
+        """`python -m service.transport --log-directory` writes engine.start and every command, and
+        never the token (XC-126, XC-258)."""
+        import subprocess
+        import sys
+        import time
+
+        run = tmp_path / "run"
+        logs = tmp_path / "logs"
+        env = {**os.environ, "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src"), "PYTHONIOENCODING": "utf-8"}
+        process = subprocess.Popen(
+            [sys.executable, "-m", "service.transport", "--connection-directory", str(run), "--log-directory", str(logs), "--log-level", "debug"],
+            env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        )
+        try:
+            deadline = time.time() + 60
+            while not (run / CONNECTION_FILE).exists():
+                assert process.poll() is None, "the engine exited before writing its connection file"
+                assert time.time() < deadline
+                time.sleep(0.05)
+            connection = json.loads((run / CONNECTION_FILE).read_text(encoding="utf-8"))
+            with urllib.request.urlopen(f"http://{connection['host']}:{connection['port']}/health", timeout=10) as answer:
+                answer.read()
+        finally:
+            process.terminate()
+            process.wait(timeout=20)
+        text = (logs / "solvia.log").read_text(encoding="utf-8")
+        lines = [json.loads(one) for one in text.splitlines()]
+        assert lines[0]["event"] == "engine.start" and lines[0]["pid"] == connection["pid"]
+        assert connection["token"] not in text

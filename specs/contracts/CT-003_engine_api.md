@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-19
+updated: 2026-09-20
 ---
 
 # Contract: engine API
@@ -10,7 +10,11 @@ updated: 2026-09-19
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 2.7.0
+- version: 2.8.0
+- correction: 2026-09-20, version 2.7.0 to 2.8.0. `system.capabilities` answers `diagnostics`: where
+  the log is written, at what level, the size it rotates at, how many files are kept and for how
+  long, and what is there now. #312 asks that the location be reachable from the interface, and
+  the capabilities answer is where a build says what it is. Additive
 - correction: 2026-09-19, version 2.6.0 to 2.7.0. `dataset.inspect` is added: the home screen's import
   review states a format's support level and the reader's gaps **before anything loads** (ingest/REQ-015,
   XC-049), and nothing in the contract answered that without reading the file. It reads the path's

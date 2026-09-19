@@ -5519,3 +5519,41 @@ model or the prompt, never in a description that quietly went stale.
   per-session listing and the choice becomes per session rather than all-or-nothing; or a platform
   where `kill(pid, 0)` cannot answer, at which point the session directory carries a heartbeat file
   instead of relying on the pid
+
+### XC-263 - The diagnostic log is a capped, rotated, retained file whose place a build can name
+- decided: 2026-09-20
+- status: active
+- decision: the local log XC-126 describes is **written to disk** by the engine, one JSON object per
+  line, in the directory the shell names (`userData/logs/`, beside the shell's own notes). It has
+  **a level** - debug, info, warning, error - below which nothing is written, set when the engine is
+  started and defaulting to info; **a cap** of 5,000,000 bytes at which the file rotates, with five
+  rotated files kept; and **a retention** of seven days, after which rotated files are removed when
+  the log is opened. Every command's outcome reaches it from one place - the command surface hands
+  each history entry to the log as it is made - as the operation, who asked, how it went and the
+  reason if refused: names and outcomes, never a value (XC-126). A refusal is written at warning and
+  a failure at error, so a log read at warning is the list of what went wrong. **Where the log is,
+  and how it is kept, is answered by `system.capabilities`** and shown on the settings page's 診断
+  category, so the location is reachable from the interface rather than known from documentation
+- decided_by: engineering judgement inside XC-126, from the promise the settings page had already
+  made (直近7日、操作と失敗理由コードのみ) and the disk the issue is about
+- rationale: **an unbounded log fills a disk, and the disk it fills is the customer's** (#312's
+  words). A cap with rotation bounds it; retention bounds the rotated files; a level bounds what is
+  written at all. The numbers are stated in one place in the code and quoted here: five megabytes is
+  a week of a busy session at a few hundred bytes a line, five of them is what a support bundle can
+  carry without the log becoming the largest thing in it, and seven days is what the page promised.
+  **One feed** for the file and for `history.list` - the surface's own record - so that what a
+  person reads on screen and what a support engineer reads in the file cannot differ. The token is
+  never in it: the engine never logs a request's headers, and the smoke and a test read the file to
+  say so
+- alternatives: **the platform's logging module with a rotating handler** - does the same rotation
+  and would have been fine, and it formats floats without asking; this product's `Line` refuses a
+  float at construction (operations/AC-007), which is the rule the whole log exists to keep.
+  **A log per day** - retention by name, and a busy day is unbounded. **No file** - the log the
+  settings page described did not exist until this; that is what was found
+- basis: E-001 (T1)
+- affects: XC-126, MOD-014, MOD-018, CT-003
+- decidedness: Bounded
+- reversal_trigger: a support case where seven days or twenty-five megabytes was not enough, at
+  which point the two numbers become settings on the 診断 page rather than constants; or a measured
+  cost of the synchronous write on a command's latency, at which point the write moves to a thread
+  and the line order is preserved by a queue

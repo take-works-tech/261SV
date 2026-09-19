@@ -22,8 +22,11 @@ Specification: XC-126, XC-106, operations/AC-007, AC-008, INV-015.
 
 from __future__ import annotations
 
+import json
+import os
 from dataclasses import dataclass, field as dataclass_field
 from datetime import datetime
+from pathlib import Path
 from enum import Enum
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
@@ -78,17 +81,109 @@ class Line:
             line += "｜" + "、".join(f"{k}={v}" for k, v in sorted(self.context.items()))
         return line
 
+    def as_json(self) -> dict[str, Any]:
+        """The line as it is written to the file: when (UTC and the offset it was recorded in), the
+        level, the event, and the context - which the constructor already refused a value into."""
+        return {
+            "at": self.at.utc,
+            "offsetMinutes": self.at.offset_minutes,
+            "level": self.level.value,
+            "event": self.event,
+            **self.context,
+        }
+
+
+#: The file the log is written to, in the directory the shell names (XC-263).
+LOG_FILE = "solvia.log"
+
+#: One file at most this size before it is rotated; this many rotated files kept; rotated files
+#: older than this many days removed at open. Five megabytes is a week of a busy session at a few
+#: hundred bytes a line; five of them is what a support bundle can carry (XC-126) without becoming
+#: the largest thing in it. "Seven days" is what the settings page has promised since the design
+#: (直近7日); the code now keeps the promise.
+MAX_LOG_BYTES = 5_000_000
+KEEP_ROTATED = 5
+RETAIN_DAYS = 7
+
+#: In memory, whatever the file says: what a screen may read back without opening files.
+KEEP_IN_MEMORY = 1_000
+
+LEVEL_ORDER = (Level.DEBUG, Level.INFO, Level.WARNING, Level.ERROR)
+
 
 class Log:
-    """The local log. Written here, read here, and sent by nothing (XC-126)."""
+    """The local log. Written here, read here, and sent by nothing (XC-126).
 
-    def __init__(self, *, clock: Callable[[], datetime] | None = None) -> None:
+    With a `directory` it is also a file: one JSON object per line, rotated at `MAX_LOG_BYTES`, at
+    most `KEEP_ROTATED` rotated files kept, rotated files older than `RETAIN_DAYS` removed when the
+    log is opened (#312, XC-263). Lines below `level` are not written anywhere. Without a directory
+    it is memory only, which is what a test wants and what a development run gets unless it asks.
+    """
+
+    def __init__(
+        self,
+        *,
+        clock: Callable[[], datetime] | None = None,
+        directory: Path | str | None = None,
+        level: Level = Level.INFO,
+    ) -> None:
         self._lines: list[Line] = []
         self._clock = clock or (lambda: datetime.now().astimezone())
+        self.level = level
+        self.directory = Path(directory) if directory is not None else None
+        self.written_bytes = 0
+        if self.directory is not None:
+            self.directory.mkdir(parents=True, exist_ok=True)
+            self._sweep()
+            self.written_bytes = self.path.stat().st_size if self.path.exists() else 0
 
-    def record(self, level: Level, event: str, **context: Any) -> Line:
+    @property
+    def path(self) -> Path:
+        assert self.directory is not None
+        return self.directory / LOG_FILE
+
+    def _sweep(self) -> None:
+        """Rotated files past the retention period go; the live file stays whatever its age."""
+        assert self.directory is not None
+        cutoff = self._clock().timestamp() - RETAIN_DAYS * 86_400
+        for old in self.directory.glob(LOG_FILE + ".*"):
+            try:
+                if old.stat().st_mtime < cutoff:
+                    old.unlink()
+            except OSError:
+                continue
+
+    def _rotate(self) -> None:
+        assert self.directory is not None
+        oldest = self.directory / f"{LOG_FILE}.{KEEP_ROTATED}"
+        if oldest.exists():
+            oldest.unlink()
+        for index in range(KEEP_ROTATED - 1, 0, -1):
+            source = self.directory / f"{LOG_FILE}.{index}"
+            if source.exists():
+                os.replace(source, self.directory / f"{LOG_FILE}.{index + 1}")
+        if self.path.exists():
+            os.replace(self.path, self.directory / f"{LOG_FILE}.1")
+        self.written_bytes = 0
+
+    def enabled(self, level: Level) -> bool:
+        return LEVEL_ORDER.index(level) >= LEVEL_ORDER.index(self.level)
+
+    def record(self, level: Level, event: str, **context: Any) -> Line | None:
+        """One line, if the level allows it. The context is checked before anything is written."""
+        if not self.enabled(level):
+            return None
         line = Line(record_time(self._clock()), level, event, dict(context))
         self._lines.append(line)
+        if len(self._lines) > KEEP_IN_MEMORY:
+            del self._lines[: len(self._lines) - KEEP_IN_MEMORY]
+        if self.directory is not None:
+            encoded = (json.dumps(line.as_json(), ensure_ascii=False) + "\n").encode("utf-8")
+            if self.written_bytes + len(encoded) > MAX_LOG_BYTES:
+                self._rotate()
+            with self.path.open("ab") as handle:
+                handle.write(encoded)
+            self.written_bytes += len(encoded)
         return line
 
     def lines(self) -> tuple[Line, ...]:
@@ -96,6 +191,19 @@ class Log:
 
     def as_text(self) -> str:
         return "\n".join(one.describe() for one in self._lines)
+
+    def describe_location(self) -> dict[str, Any]:
+        """Where the log is and how it is kept - what a settings page shows (#312: reachable)."""
+        files = sorted(self.directory.glob(LOG_FILE + "*")) if self.directory is not None else []
+        return {
+            "logDirectory": str(self.directory) if self.directory is not None else None,
+            "level": self.level.value,
+            "maxBytes": MAX_LOG_BYTES,
+            "keepFiles": KEEP_ROTATED,
+            "retainDays": RETAIN_DAYS,
+            "files": len(files),
+            "bytes": sum(one.stat().st_size for one in files if one.exists()),
+        }
 
 
 @dataclass(frozen=True, slots=True)
