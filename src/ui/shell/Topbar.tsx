@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { session, useSession } from "../state/session";
 import { NotificationHistory, type Notice } from "../shared/NotificationHistory";
 import { ScriptView, type ScriptLine } from "../shared/ScriptView";
+import { EngineHistory } from "../shared/EngineHistory";
 
 type MenuItem = { label: string; key?: string; noKeyBecause?: string; disabled?: string };
 
@@ -43,9 +44,9 @@ const MENUS: { name: string; items: MenuItem[] }[] = [
 ];
 
 const NOTICES: Notice[] = [
-  { id: "n1", at: "10:24", severity: "refusal", title: "ネットワーク要求を拒否", detail: "host: api.example.test — 許可がないため送信していません（XC-106）" },
-  { id: "n2", at: "10:12", severity: "warning", title: "単位が未宣言", detail: "フィールド stress — 変換は行っていません（XC-003）" },
-  { id: "n3", at: "09:58", severity: "info", title: "読み込み完了", detail: "Run 12 — 1,127,844 点" },
+  { id: "n1", at: { utc: "2026-08-29T01:24:00Z", offsetMinutes: 540 }, severity: "refusal", title: "ネットワーク要求を拒否", detail: "host: api.example.test — 許可がないため送信していません（XC-106）" },
+  { id: "n2", at: { utc: "2026-08-29T01:12:00Z", offsetMinutes: 540 }, severity: "warning", title: "単位が未宣言", detail: "フィールド stress — 変換は行っていません（XC-003）" },
+  { id: "n3", at: { utc: "2026-08-29T00:58:00Z", offsetMinutes: 540 }, severity: "info", title: "読み込み完了", detail: "Run 12 — 1,127,844 点" },
 ];
 
 /* XC-046: every interface action has a written form, and it is the same command surface a script
@@ -70,6 +71,11 @@ export function Topbar() {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [showNotices, setShowNotices] = useState(false);
   const [showScript, setShowScript] = useState(false);
+  // The engine's record is read when the popover opens: it is the engine's, bounded there, and a
+  // copy kept here would be a second history to keep in step (#315).
+  useEffect(() => {
+    if (showScript && engineState.isConnected()) void engineState.history();
+  }, [showScript]);
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -170,10 +176,14 @@ export function Topbar() {
             <div className="popover" style={{ right: 0, top: "calc(100% + 6px)" }}>
               <header>操作の記録</header>
               <div className="body">
-                <ScriptView
-                  lines={RECENT}
-                  onCopy={(text) => void navigator.clipboard?.writeText(text)}
-                />
+                {e.reachability.kind === "reachable" ? (
+                  <EngineHistory history={e.history} workspaceOpen={e.workspaceId !== null} onRefresh={() => void engineState.history()} />
+                ) : (
+                  <ScriptView
+                    lines={RECENT}
+                    onCopy={(text) => void navigator.clipboard?.writeText(text)}
+                  />
+                )}
               </div>
             </div>
           ) : null}
@@ -184,6 +194,7 @@ export function Topbar() {
           onRestart={shellApi() ? () => void shellApi()?.engine.restart() : undefined}
           unsaved={e.journal.length}
           onSave={() => void engineState.save()}
+          savedAt={e.savedAt}
         />
         <button className="icon-button" aria-label="設定" title="設定" onClick={() => session.navigate("settings")}>
           ⚙

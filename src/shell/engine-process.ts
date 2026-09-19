@@ -19,8 +19,12 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } fr
 import { join } from "node:path";
 
 import type { Connection } from "../ui/client/engine";
-import { CONNECTION_FILE } from "../ui/client/generated.js";
-import type { EngineProcessStatus } from "../ui/client/shell";
+import { CONNECTION_FILE, type RecordedTime } from "../ui/client/generated.js";
+import { recordInstant, recordNow } from "../ui/client/time.js";
+// The bridge's types are the one definition of what crosses it (XC-015); the shell fills them.
+import type { EngineProcessStatus, Orphan } from "../ui/client/shell";
+
+export type { Orphan };
 
 export { CONNECTION_FILE };
 
@@ -70,17 +74,8 @@ export class EngineStartError extends Error {
   }
 }
 
-const now = (): string => {
-  const date = new Date();
-  const offset = -date.getTimezoneOffset();
-  const sign = offset >= 0 ? "+" : "-";
-  const pad = (value: number) => String(Math.abs(value)).padStart(2, "0");
-  return (
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-    `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}` +
-    `${sign}${pad(Math.floor(offset / 60))}:${pad(offset % 60)}`
-  );
-};
+/** Now, as the shell records it: the same two facts the engine writes (XC-142, XC-266). */
+const now = (): RecordedTime => recordNow();
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -135,15 +130,6 @@ export function sessionDirectory(root: string, pid: number = process.pid): strin
   return join(root, "sessions", String(pid));
 }
 
-export interface Orphan {
-  readonly id: string;
-  readonly path: string;
-  readonly pid: number | null;
-  readonly bytes: number;
-  readonly files: number;
-  readonly modified: string;
-}
-
 function walkSize(directory: string): { bytes: number; files: number; newest: number } {
   let bytes = 0;
   let files = 0;
@@ -185,7 +171,7 @@ export function findOrphans(root: string): Orphan[] {
       pid,
       bytes: size.bytes,
       files: size.files,
-      modified: size.newest ? new Date(size.newest).toISOString() : "",
+      modified: size.newest ? recordInstant(new Date(size.newest)) : null,
     });
   }
   return orphans;

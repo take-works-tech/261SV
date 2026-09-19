@@ -2,9 +2,12 @@
  * happened AND here; dismissal hides, it never deletes - a dismissed refusal is still the answer to
  * "why did nothing happen" (16_application_model §12). */
 
+import type { RecordedTime } from "../client/generated";
+import { describeRecorded } from "../logic/time";
+
 export type Notice = {
   id: string;
-  at: string;
+  at: RecordedTime;
   severity: "info" | "warning" | "error" | "refusal";
   title: string;
   detail: string;
@@ -33,7 +36,7 @@ export function NotificationHistory(props: { notices: Notice[] }) {
             [{SEVERITY_LABEL[notice.severity]}] {notice.title}
           </b>
           <span className="why">
-            {notice.at} — {notice.detail}
+            {describeRecorded(notice.at)} — {notice.detail}
           </span>
         </div>
       ))}

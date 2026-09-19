@@ -11,7 +11,9 @@
 import { useEffect, useState } from "react";
 import type { AppliedWrite, Reachability } from "../state/engine";
 import { shellApi, type Orphan } from "../client/shell";
+import type { RecordedTime } from "../client/generated";
 import { formatBytes } from "../logic/format";
+import { describeRecorded } from "../logic/time";
 
 export function EngineStatus(props: {
   reachability: Reachability;
@@ -22,6 +24,8 @@ export function EngineStatus(props: {
   /** Applied writes not yet in the saved document, and the way to save them. */
   unsaved?: number;
   onSave?: () => void;
+  /** When the document was last written back, or null; shown once nothing is unsaved. */
+  savedAt?: RecordedTime | null;
 }) {
   const { reachability } = props;
   const label =
@@ -49,6 +53,11 @@ export function EngineStatus(props: {
           未保存 {props.unsaved} 件 - 保存
         </button>
       ) : null}
+      {reachability.kind === "reachable" && (props.unsaved ?? 0) === 0 && props.savedAt ? (
+        <span className="type-caption" style={{ color: "var(--ink-faint)" }} title="この文書を最後に書き戻した時刻。読み手のゾーンで表示し、記録時のゾーンが違えば添えます（XC-142）">
+          保存済み {describeRecorded(props.savedAt)}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -68,7 +77,7 @@ export function EngineLost(props: { lost: readonly AppliedWrite[] | null; onDism
               {group.lastSummary}
               <small>
                 （{group.operation}
-                {group.count > 1 ? ` ×${group.count}` : ""}、最後は {group.lastAt.slice(11, 19)}）
+                {group.count > 1 ? ` ×${group.count}` : ""}、最後は {describeRecorded(group.lastAt)}）
               </small>
             </li>
           ))}
@@ -101,8 +110,8 @@ export function EngineRefusal(props: { refusal: string | null; onDismiss?: () =>
 
 /** The loss, one line per operation: a drag is many `view.update`s, and a list that repeats them
  *  hides the one declaration among them. The count is kept; the last summary stands for the group. */
-function grouped(lost: readonly AppliedWrite[]): { operation: string; count: number; lastSummary: string; lastAt: string }[] {
-  const groups = new Map<string, { operation: string; count: number; lastSummary: string; lastAt: string }>();
+function grouped(lost: readonly AppliedWrite[]): { operation: string; count: number; lastSummary: string; lastAt: RecordedTime }[] {
+  const groups = new Map<string, { operation: string; count: number; lastSummary: string; lastAt: RecordedTime }>();
   for (const one of lost) {
     const group = groups.get(one.operation);
     if (group) {
@@ -131,12 +140,17 @@ export function OrphanNotice() {
   if (orphans.length === 0 || decided !== null) return null;
   const bytes = orphans.reduce((sum, one) => sum + one.bytes, 0);
   const files = orphans.reduce((sum, one) => sum + one.files, 0);
+  // The most recent file among them, so a person can tell last night's crash from last month's.
+  const newest = orphans
+    .map((one) => one.modified)
+    .filter((one): one is RecordedTime => one !== null)
+    .sort((a, b) => (a.utc < b.utc ? 1 : a.utc > b.utc ? -1 : 0))[0] ?? null;
   return (
     <div className="notice" role="status">
       <div>
         <b>前回までの異常終了が残した一時ファイル：{orphans.length} セッション</b>
         <span className="why">
-          {files} ファイル・{formatBytes(bytes)}。エンジンが落ちるか、シェルが待たずに終わったときの作業領域です。ワークスペースの文書とは別で、消しても何も失われません。
+          {files} ファイル・{formatBytes(bytes)}{newest ? `・最終更新 ${describeRecorded(newest)}` : ""}。エンジンが落ちるか、シェルが待たずに終わったときの作業領域です。ワークスペースの文書とは別で、消しても何も失われません。
         </span>
       </div>
       <button

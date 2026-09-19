@@ -17,14 +17,16 @@ export interface Connection {
   readonly protocol: string;
 }
 
+import type { RecordedTime } from "./generated.js";
+
 export type EngineProcessState = "starting" | "running" | "exited";
 
 /** What the shell knows about the engine process, pushed whenever it changes (XC-259). */
 export interface EngineProcessStatus {
   readonly state: EngineProcessState;
   readonly pid: number | null;
-  /** When this state began, ISO 8601 with offset. */
-  readonly since: string;
+  /** When this state began: UTC with the shell's offset beside it (XC-142, XC-266). */
+  readonly since: RecordedTime;
   /** The exit code when the process ended on its own; null otherwise. */
   readonly exitCode: number | null;
   /** The signal that ended it; null otherwise. One of exitCode and signal is set once exited. */
@@ -59,7 +61,7 @@ export interface Orphan {
   readonly pid: number | null;
   readonly bytes: number;
   readonly files: number;
-  readonly modified: string;
+  readonly modified: RecordedTime | null;
 }
 
 export interface ShellApi {

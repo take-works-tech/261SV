@@ -680,5 +680,7 @@ updated: 2026-09-20
 - done: 2026-09-20. Found by reading every contract against XC-142 (#318): eighteen string fields in
   seven schemas, the engine dropping the offset at every wire. CT-001 `$defs.recordedTime` is the one
   definition; CT-001, CT-003, CT-006, CT-008, CT-009, CT-010 and CT-011 each took a major version
-  (XC-266). What the interface shows - the reader's zone, with the recording zone named when it
-  differs - is the next frontend piece; the engine's `describe` already says it that way
+  (XC-266). The interface shows every time in the reader's zone with the recording zone named when
+  it differs (`src/ui/logic/time.ts`, held to the same cases as the Python side), and the engine's
+  own record with what the caps dropped (`EngineHistory`, #315); the shell records its status and
+  orphan times the same way

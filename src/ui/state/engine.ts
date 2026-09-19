@@ -16,6 +16,8 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { Engine, TransportFailure, reasonText } from "../client/engine";
 import type { Connection, Operation, Parameters, Response, Results } from "../client/engine";
+import type { RecordedTime } from "../client/generated";
+import { recordNow } from "../client/time";
 
 /** Whether an engine is reachable, and what it said if it is not. */
 export type Reachability =
@@ -46,7 +48,7 @@ export type Reported = Results["dataset.probe"]["value"];
 export interface AppliedWrite {
   readonly operation: string;
   readonly summary: string;
-  readonly at: string;
+  readonly at: RecordedTime;
 }
 
 /** What was opened, so that what was saved can be opened again after the engine is restarted. */
@@ -80,7 +82,10 @@ export interface EngineState {
   /** What the last exit lost, until a person dismisses it. Null when nothing was lost or nothing
    *  ended. */
   readonly lost: readonly AppliedWrite[] | null;
-  readonly savedAt: string | null;
+  readonly savedAt: RecordedTime | null;
+  /** The engine's own record of what was asked, as `history.list` last answered it, with what
+   *  the caps dropped said in numbers (LIM-014, LIM-015). Null until asked. */
+  readonly history: Results["history.list"] | null;
   readonly workspaceId: string | null;
   readonly unresolvedCases: readonly string[];
   readonly caseId: string | null;
@@ -152,6 +157,7 @@ const EMPTY: EngineState = {
   journal: [],
   lost: null,
   savedAt: null,
+  history: null,
   workspaceId: null,
   unresolvedCases: [],
   caseId: null,
@@ -233,7 +239,7 @@ async function ask<O extends Operation>(
     setState({
       journal: [
         ...state.journal,
-        { operation, summary: answer.effectSummary ?? operation, at: new Date().toISOString() },
+        { operation, summary: answer.effectSummary ?? operation, at: recordNow() },
       ],
     });
   }
@@ -309,7 +315,7 @@ export const engineState = {
     setState({ refusal: null });
     const saved = await ask("workspace.save", { workspaceId: state.workspaceId });
     if (!saved) return false;
-    setState({ journal: [], savedAt: new Date().toISOString() });
+    setState({ journal: [], savedAt: recordNow() });
     return true;
   },
 
@@ -554,6 +560,15 @@ const rendered = await ask("view.render", { viewId, ...FRAME, format: "png", leg
   /** What this build can do and where it keeps its log (system.capabilities). A read. */
   async capabilities(): Promise<Results["system.capabilities"] | null> {
     return ask("system.capabilities", {});
+  },
+
+  /** The engine's record of what was asked (XC-023), read rather than kept here: the engine holds
+   *  it, bounds it, and says what the bounds dropped (LIM-014, LIM-015, #315). */
+  async history(): Promise<Results["history.list"] | null> {
+    if (!state.workspaceId) return null;
+    const listed = await ask("history.list", { workspaceId: state.workspaceId });
+    if (listed) setState({ history: listed });
+    return listed;
   },
 
   clearRefusal() {

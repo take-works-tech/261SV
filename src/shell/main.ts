@@ -19,6 +19,7 @@ import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import type { EngineProcessStatus } from "../ui/client/shell";
+import { offsetMinutesAt, offsetText, recordNow } from "../ui/client/time.js";
 import {
   developmentEngine,
   findOrphans,
@@ -67,10 +68,7 @@ const log: string[] = [];
 
 /** The zone the shell stands in, named beside every UTC stamp it writes (XC-142): `UTC+09:00`. */
 function zoneOfNow(): string {
-  const east = -new Date().getTimezoneOffset();
-  const sign = east >= 0 ? "+" : "-";
-  const absolute = Math.abs(east);
-  return `UTC${sign}${String(Math.floor(absolute / 60)).padStart(2, "0")}:${String(absolute % 60).padStart(2, "0")}`;
+  return offsetText(offsetMinutesAt());
 }
 
 const SHELL_LOG_MAX_BYTES = 1_000_000;
@@ -214,7 +212,7 @@ function registerBridge(): void {
       engine?.status() ?? {
         state: "starting",
         pid: null,
-        since: new Date().toISOString(),
+        since: recordNow(),
         exitCode: null,
         signal: null,
         reason: null,
