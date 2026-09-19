@@ -313,6 +313,8 @@ def build_surface(session: Session, *, clock: Callable[[], datetime] | None = No
     surface = Surface(clock=clock or session.clock, on_entry=lambda entry: log_entry(session, entry))
     for handler in handlers(session):
         surface.register(handler)
+    # The one handler that reads the surface itself: what it recorded and what its caps dropped.
+    surface.register(Handler("history.list", lambda p, t: history_list(session, surface, p)))
     return surface
 
 
@@ -357,10 +359,13 @@ def workspace_open(session: Session, parameters: Mapping[str, Any]) -> Effect | 
         except OSError as error:
             warnings = (f"{interrupted.name} を消せませんでした：{error}",)
 
-    before = (session.workspace, session.workspace_path, dict(session.datasets), dict(session.revisions))
-    session.workspace, session.workspace_path = loaded, location
     # A dataset belongs to a case of a workspace; the one that was open is no longer, so neither are
-    # they. Kept for undo, which puts the previous workspace and its datasets back together.
+    # they. They are **not** kept for undo: an undo closure holding every dataset of every workspace
+    # a session has opened is the memory #315 is about (LIM-001 per case, times the history). The
+    # undo puts the previous document back and says that its datasets need reading again.
+    before = (session.workspace, session.workspace_path, dict(session.revisions))
+    dropped_datasets = len(session.datasets)
+    session.workspace, session.workspace_path = loaded, location
     session.datasets = {}
     session.revisions = {}
 
@@ -372,8 +377,13 @@ def workspace_open(session: Session, parameters: Mapping[str, Any]) -> Effect | 
     ]
 
     def undo() -> None:
-        session.workspace, session.workspace_path, session.datasets, session.revisions = before
+        session.workspace, session.workspace_path, session.revisions = before
+        session.datasets = {}
 
+    if dropped_datasets:
+        warnings += (
+            f"読み込んでいた {dropped_datasets} 件のデータセットは閉じました。取り消しても文書が戻るだけで、データセットは読み直しが要ります（LIM-014）",
+        )
     return Effect(
         f"{location.name} を開きました",
         changed=(loaded.identifier,),
@@ -407,6 +417,38 @@ def items_of(workspace: WorkspaceDocument) -> dict[str, list[dict[str, str]]]:
     return answer
 
 
+def history_list(session: Session, surface: Surface, parameters: Mapping[str, Any]) -> Effect | Result:
+    """The command history (XC-023), with what memory no longer holds said in numbers (LIM-014,
+    LIM-015, #315): each entry says whether it can still be undone, and the answer says how many undo
+    groups the cap dropped and how many entries fell out of the list."""
+    workspace = session.open_workspace(str(parameters["workspaceId"]))
+    if isinstance(workspace, Result):
+        return workspace
+    report = surface.history_report()
+    entries = []
+    for entry in report["entries"]:
+        one: dict[str, Any] = {
+            "operation": entry.operation,
+            "origin": entry.origin.value,
+            "atUtc": entry.at.utc,
+            "outcome": entry.status.value,
+            "undoable": bool(entry.undo_id and entry.undo_id in report["undoable"]),
+        }
+        if entry.undo_id:
+            one["undoId"] = entry.undo_id
+        entries.append(one)
+    return Effect(
+        f"履歴 {len(entries)} 件",
+        value={
+            "entries": entries,
+            "undoLimit": report["undoLimit"],
+            "undoDropped": report["undoDropped"],
+            "historyLimit": report["historyLimit"],
+            "omitted": report["omitted"],
+        },
+    )
+
+
 def workspace_save(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
     """Write the open document back, keeping the previous version beside it (CT-003, XC-055).
 
@@ -421,11 +463,17 @@ def workspace_save(session: Session, parameters: Mapping[str, Any]) -> Effect | 
     if target is None:
         return refused("保存先がありません：path を指定してください")
     previous = target.with_name(target.name + ".previous")
-    had_previous = previous.exists()
-    kept_before = previous.read_bytes() if had_previous else None
+    # The version before the last one is kept as a file beside the target during this save, so the
+    # undo can put it back from disk rather than from bytes held in memory for as long as the undo
+    # lives (#315): a document is small, and fifty of them held for nothing is the habit to avoid.
+    older = target.with_name(target.name + ".previous.older")
+    if previous.exists():
+        os.replace(previous, older)
     try:
         kept = save_document(workspace, target)
     except (OSError, WorkspaceVersionError) as error:
+        if older.exists():
+            os.replace(older, previous)
         return refused(f"保存できません：{error}")
     session.workspace_path = target
 
@@ -433,11 +481,16 @@ def workspace_save(session: Session, parameters: Mapping[str, Any]) -> Effect | 
         # The document as it was on disk before this save comes back; what this save wrote goes.
         if kept != target and kept.exists():
             os.replace(kept, target)
-            if kept_before is not None:
-                previous.write_bytes(kept_before)
+            if older.exists():
+                os.replace(older, previous)
         elif target.exists():
             target.unlink()
 
+    if older.exists() and kept != target:
+        # Two versions back is more than XC-055 promises; once the undo of this save is no longer
+        # the newest possible one, the older file is not needed. It is removed on the next save
+        # rather than tracked, because a file is what it is and a tracker is a second truth.
+        pass
     return Effect(
         f"{target.name} を保存しました" + ("（直前の版を残しました）" if kept != target else ""),
         changed=(workspace.identifier,),

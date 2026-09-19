@@ -709,3 +709,53 @@ class TestAHandlerMayRefuse:
 
         assert result.status is Status.FAILED
         assert "壊れています" in (result.reason or "")
+
+
+class TestTheUndoHistoryIsBounded:
+    """LIM-014, XC-264, #315: past the cap the oldest undo is dropped, asking for it says why, and
+    history.list says how many the cap took."""
+
+    @staticmethod
+    def _surface_with(count: int) -> tuple[Surface, list[str]]:
+        # A real write of the contract with a stub behind it: the surface accepts only operations
+        # CT-003 lists (CT-002), so the cap is exercised through view.rename.
+        surface = Surface()
+        undone: list[str] = []
+        surface.register(Handler("view.rename", lambda p, t: Effect(
+            "renamed", changed=(p["viewId"],), value={"id": p["viewId"], "revision": 1}, undo=lambda: undone.append(p["newName"]),
+        )))
+        ids = []
+        for index in range(count):
+            result = surface.submit(Command("view.rename", {"viewId": "view:1", "newName": str(index)}))
+            assert result.status is Status.APPLIED, result.reason
+            ids.append(result.undo_id or "")
+        return surface, ids
+
+    def test_the_oldest_group_is_dropped_past_the_cap_and_refused_by_name(self) -> None:
+        from engine.limits import MAX_UNDO_GROUPS
+
+        surface, ids = self._surface_with(MAX_UNDO_GROUPS + 3)
+
+        assert len(surface.undoable()) == MAX_UNDO_GROUPS
+        refused = surface.undo(ids[0])
+        assert refused.status is Status.REFUSED
+        assert "LIM-014" in (refused.reason or "") and ids[0] in (refused.reason or "")
+        assert surface.undo(ids[-1]).status is Status.APPLIED
+        assert surface.history_report()["undoDropped"] == 3
+
+    def test_an_id_that_never_existed_is_still_told_apart_from_one_the_cap_dropped(self) -> None:
+        surface, _ = self._surface_with(1)
+
+        refused = surface.undo("undo:9999")
+
+        assert "履歴にありません" in (refused.reason or "")
+
+    def test_the_history_list_is_bounded_and_says_how_many_it_omits(self, monkeypatch) -> None:
+        import service.command.surface as module
+
+        monkeypatch.setattr(module, "MAX_HISTORY_ENTRIES", 5)
+        surface, _ = self._surface_with(8)
+
+        report = surface.history_report()
+
+        assert len(report["entries"]) == 5 and report["omitted"] == 3

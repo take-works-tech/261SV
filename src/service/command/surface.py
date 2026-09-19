@@ -37,6 +37,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
+from engine.limits import MAX_HISTORY_ENTRIES, MAX_UNDO_GROUPS
 from domain_core.recorded_time import RecordedTime, record as record_time
 from service.command.catalogue import OPERATIONS, PARAMETERS, REPORTED_VALUES, RESULT_FIELDS, writes
 
@@ -194,6 +195,11 @@ class Surface:
     ) -> None:
         self._handlers: dict[str, Handler] = {}
         self._log: list[LogEntry] = []
+        #: History entries dropped from memory past LIM-015; the answer to history.list says so.
+        self._omitted = 0
+        #: Undo ids the cap dropped (LIM-014): asked for, they are refused with that reason and not
+        #: with "never existed", which would send a person looking for a typo.
+        self._dropped_undo: dict[str, str] = {}
         #: Where each entry also goes as it is made - the diagnostic log on disk (XC-263). One
         #: place, every origin, so the file and `history.list` cannot tell different stories.
         self._on_entry = on_entry
@@ -451,6 +457,14 @@ class Surface:
         undo_id = command.group_id or self._identifier()
         if effect.undo is not None:
             self._undo.setdefault(undo_id, []).append(effect.undo)
+            # The cap (LIM-014). Insertion order is age; the oldest goes, and its id is remembered
+            # so that asking for it gets the reason rather than a denial that it ever existed.
+            while len(self._undo) > MAX_UNDO_GROUPS:
+                oldest = next(iter(self._undo))
+                del self._undo[oldest]
+                self._dropped_undo[oldest] = f"取り消しの上限 {MAX_UNDO_GROUPS} 件を超えたため、'{oldest}' は取り消せなくなりました（LIM-014）"
+                if len(self._dropped_undo) > MAX_UNDO_GROUPS:
+                    self._dropped_undo.pop(next(iter(self._dropped_undo)))
         return undo_id
 
     def _identifier(self) -> str:
@@ -469,6 +483,9 @@ class Surface:
             dry_run=command.dry_run,
         )
         self._log.append(entry)
+        if len(self._log) > MAX_HISTORY_ENTRIES:
+            del self._log[0]
+            self._omitted += 1
         if self._on_entry is not None:
             self._on_entry(entry)
         return result
@@ -483,7 +500,8 @@ class Surface:
         """
         steps = self._undo.pop(undo_id, None)
         if steps is None:
-            return Result(Status.REFUSED, reason=f"取り消し '{undo_id}' は履歴にありません")
+            dropped = self._dropped_undo.get(undo_id)
+            return Result(Status.REFUSED, reason=dropped or f"取り消し '{undo_id}' は履歴にありません")
         for step in reversed(steps):
             step()
         return Result(
@@ -498,6 +516,18 @@ class Surface:
 
     def undoable(self) -> tuple[str, ...]:
         return tuple(self._undo)
+
+    def history_report(self) -> dict[str, Any]:
+        """What `history.list` answers: the entries in memory, each saying whether it can still be
+        undone, and the two numbers that say what memory no longer holds (LIM-014, LIM-015)."""
+        return {
+            "entries": tuple(self._log),
+            "undoable": frozenset(self._undo),
+            "undoLimit": MAX_UNDO_GROUPS,
+            "undoDropped": len(self._dropped_undo),
+            "historyLimit": MAX_HISTORY_ENTRIES,
+            "omitted": self._omitted,
+        }
 
 
 def only_reads(commands: Iterable[Command]) -> bool:

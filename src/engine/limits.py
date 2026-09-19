@@ -60,6 +60,16 @@ MAX_CASES_PER_WORKSPACE = 500
 # specs/05_limits.md LIM-007: how deep a pipeline may nest before it stops being readable
 MAX_PIPELINE_DEPTH = 3
 
+#: LIM-014. Undo groups kept in memory; past this the oldest is dropped and `history.undo` refuses it
+#: by name, saying the limit dropped it. Fifty is #315's "forty cases of history" with room: an undo
+#: is a closure over what it puts back, and fifty closures that hold definitions are small, which is
+#: why the closures that could hold a dataset or a file's bytes were made not to (XC-264).
+MAX_UNDO_GROUPS = 50
+
+#: LIM-015. History entries kept in memory for `history.list`; older ones drop from the answer and
+#: the answer says how many. The diagnostic log on disk is the durable record (XC-263).
+MAX_HISTORY_ENTRIES = 1000
+
 # specs/05_limits.md LIM-008: iterations one loop unit may run. The count is resolved before the loop
 # starts (XC-100), so this catches a formula that yields a million iterations at edit time rather than
 # after a night of running.

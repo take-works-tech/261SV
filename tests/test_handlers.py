@@ -104,10 +104,10 @@ class TestWhatThisBuildRegisters:
             "workspace.open", "dataset.load", "dataset.describe", "dataset.parts",
             "field.declareUnit", "field.statistics", "view.create", "view.update", "view.render",
             "dataset.probe", "view.pick", "report.create", "report.export", "report.provenance",
-            "workspace.save", "dataset.inspect",
+            "workspace.save", "dataset.inspect", "history.list",
             "system.capabilities", "system.protocols",
         }
-        assert len(surface.unimplemented()) == len(OPERATIONS) - 18
+        assert len(surface.unimplemented()) == len(OPERATIONS) - 19
 
     def test_an_unimplemented_operation_is_refused_and_named_as_such(self) -> None:
         surface, _ = a_surface()
@@ -1074,3 +1074,54 @@ class TestEveryCommandReachesTheDiagnosticLog:
         assert result.status is Status.ANSWERED, result.reason
         assert result.value["diagnostics"]["logDirectory"] == str(tmp_path / "logs")
         assert result.value["diagnostics"]["level"] == "info"
+
+
+class TestUndoHoldsNothingItCanReread:
+    """XC-264: the undo of workspace.open no longer keeps the previous workspace's datasets, and says
+    so; the undo of workspace.save puts the previous file back from disk."""
+
+    def test_opening_another_workspace_warns_that_the_datasets_will_need_reading_again(self, tmp_path: Path) -> None:
+        surface, session, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        other = tmp_path / "other"
+        other.mkdir()
+        second = a_workspace(other)
+
+        opened = surface.submit(Command("workspace.open", {"path": str(second)}))
+
+        assert opened.status is Status.APPLIED, opened.reason
+        assert any("読み直し" in one for one in opened.warnings)
+        assert session.datasets == {}
+        undone = surface.undo(opened.undo_id or "")
+        assert undone.status is Status.APPLIED
+        assert session.workspace is not None and session.workspace_path == tmp_path / "beam.svw"
+        assert session.datasets == {}, "the previous datasets are not held by the undo"
+
+    def test_undoing_a_save_restores_the_previous_file_from_disk(self, tmp_path: Path) -> None:
+        surface, session, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        workspace = session.workspace_path
+        assert workspace is not None
+        original = workspace.read_bytes()
+        assert surface.submit(Command("workspace.save", {"workspaceId": "ws:1"})).status is Status.APPLIED
+        surface.submit(Command("field.declareUnit", {"datasetId": dataset_id, "fieldName": "temperature", "unitSymbol": "K"}))
+        second = surface.submit(Command("workspace.save", {"workspaceId": "ws:1"}))
+        assert second.status is Status.APPLIED and workspace.read_bytes() != original
+
+        undone = surface.undo(second.undo_id or "")
+
+        assert undone.status is Status.APPLIED, undone.reason
+        assert json.loads(workspace.read_text(encoding="utf-8"))["cases"][0]["sources"][0].get("declaredUnits", {}) == {}
+        previous = workspace.with_name(workspace.name + ".previous")
+        assert previous.exists() and previous.read_bytes() == original
+
+    def test_history_list_says_what_is_undoable_and_what_the_cap_took(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        declared = surface.submit(Command("field.declareUnit", {"datasetId": dataset_id, "fieldName": "temperature", "unitSymbol": "K"}))
+
+        listed = surface.submit(Command("history.list", {"workspaceId": "ws:1"}))
+
+        assert listed.status is Status.ANSWERED, listed.reason
+        assert listed.value["undoDropped"] == 0 and listed.value["omitted"] == 0
+        # The answer is what was recorded before this read; the read itself is recorded after.
+        last = listed.value["entries"][-1]
+        assert last["operation"] == "field.declareUnit" and last["undoId"] == declared.undo_id and last["undoable"] is True
+        assert all(one["undoable"] is False for one in listed.value["entries"] if one["operation"] == "dataset.describe")

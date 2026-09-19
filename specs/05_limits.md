@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-25
+updated: 2026-09-20
 ---
 
 # Capacity limits
@@ -17,7 +17,7 @@ Three labels are in use here and they mean different things to an implementer:
 | Label | What it means for this limit | Which |
 |---|---|---|
 | Fixed | measured, cited, and held in one place the linter compares against the code | LIM-001, LIM-002, LIM-003, LIM-004, LIM-006, LIM-007 |
-| Bounded | a working value is in force and enforced, but the number itself is a judgement nobody has yet had to defend against a real case | LIM-008, LIM-009, LIM-012 |
+| Bounded | a working value is in force and enforced, but the number itself is a judgement nobody has yet had to defend against a real case | LIM-008, LIM-009, LIM-012, LIM-014, LIM-015 |
 | Open | no number exists, or the one written is a placeholder; the tracking ID says what would settle it | LIM-005, LIM-010, LIM-011, LIM-013 |
 
 A Bounded limit still has a value in the code, because a guard with no number guards nothing. The
@@ -230,3 +230,31 @@ applies the matching row; the class it chose is visible in settings, and can be 
   `limitExceeded` with the dimension and observed count, and make no network or out-of-package request
 - decidedness: Open
 - open: OPEN-018
+
+### LIM-014 - Undo groups kept in memory
+- value: 50
+- unit: undo groups
+- source_of_truth: src/engine/limits.py:MAX_UNDO_GROUPS
+- rationale: an undo is a closure over what it puts back, and #315's forty cases of history is the
+  case it is sized for with room. The number is bearable because the closures that could have held
+  a dataset (the undo of `workspace.open`) or a file's bytes (the undo of `workspace.save`) were
+  changed to hold neither: the one reopens the document and says the datasets need reading again,
+  the other puts the previous file back from disk (XC-264). What remains in a closure is a
+  definition or a name
+- on_exceed: the oldest group is dropped; `history.undo` for it is refused with a reason that names
+  this limit rather than denying the id existed; `history.list` carries `undoDropped`, and the
+  interface shows it when it is not zero
+- decidedness: Bounded
+- basis: E-001 (T1)
+
+### LIM-015 - History entries kept in memory
+- value: 1000
+- unit: entries
+- source_of_truth: src/engine/limits.py:MAX_HISTORY_ENTRIES
+- rationale: `history.list` reads memory; the durable record is the diagnostic log on disk
+  (XC-263), which is capped and rotated on its own terms. A thousand entries is a long session at
+  a glance and a few hundred kilobytes
+- on_exceed: the oldest entry leaves the list and `history.list` carries `omitted`, so a list that
+  starts in the middle says so
+- decidedness: Bounded
+- basis: E-001 (T1)
