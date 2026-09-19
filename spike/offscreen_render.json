@@ -1,0 +1,19 @@
+{
+  "measured": "2026-09-18",
+  "vtk_version": "9.5.2",
+  "python": "3.11.9",
+  "platform": "Windows-10-10.0.26200-SP0",
+  "opengl": "OpenGL vendor string:  NVIDIA Corporation",
+  "size": [
+    800,
+    600
+  ],
+  "points": 39602,
+  "polygons": 79200,
+  "frame_bytes": [
+    81338,
+    76222
+  ],
+  "frames_differ": true,
+  "seconds_total": 0.263
+}

@@ -126,7 +126,13 @@ was in the same unit.
 ### CT-006 - Report definition
 - purpose: the reproducible description of a deliverable - what goes in it, in what order, in what style
 - schema: schema/CT-006.json
-- version: 2.0.0
+- version: 2.1.0
+- correction: 2026-09-18, version 2.0.0 to 2.1.0. A view block named a view and nothing else, so
+  "put this view in the report" could only mean the rotatable form, and a build without the viewer
+  bundle had to refuse every view block whatever the author wanted. `form` is added -
+  **still | video | interactive**, the three 16_application_model.md already names - so a still with
+  its legend as text is a thing a definition can ask for and a build can write. Additive; a block
+  without `form` is still a definition this build reads, and it says which form it could not carry
 - strictness: unknown fields are preserved
 - compatibility: as CT-004
 - migration: as CT-004

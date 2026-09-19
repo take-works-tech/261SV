@@ -33,6 +33,7 @@ from dataclasses import dataclass, field as dataclass_field
 from enum import Enum
 from typing import Any, Iterable, Sequence
 
+from domain_core.precision import format_value
 from domain_core.recorded_time import RecordedTime
 from domain_core.reported_value import CAVEAT_TEXT, UNDECLARED_MARKER, Caveat, ReportedValue
 
@@ -48,6 +49,77 @@ class BlockKind(str, Enum):
     VALUE_TABLE = "valueTable"
     TEXT = "text"
     PAGE_BREAK = "pageBreak"
+
+
+class ViewForm(str, Enum):
+    """Which form of a view a block asks for (CT-006 2.1.0).
+
+    A still is a picture and its legend as text; interactive needs the viewer bundle and video a
+    camera path and a codec. A build that has neither says which one it could not carry rather than
+    writing a still in its place - a reader who asked to rotate the model and got a photograph has
+    been answered with something else under the same name (XC-254).
+    """
+
+    STILL = "still"
+    VIDEO = "video"
+    INTERACTIVE = "interactive"
+
+
+@dataclass(frozen=True, slots=True)
+class Legend:
+    """What a picture's colours mean, as numbers the document typesets into words itself.
+
+    Not drawn into the image: the toolkit's embedded faces render this product's own language as
+    nothing at all - no glyph and no warning (E-192) - and 単位未宣言 is the very word a picture of
+    an undeclared field has to carry. So the ramp and its tick digits are in the image, and the
+    field, the unit and the range are here, in a face the document embeds.
+    """
+
+    field_name: str
+    unit: str | None
+    minimum: float
+    maximum: float
+    digits: int
+    colour_map: str
+    uniform: bool
+
+    def __post_init__(self) -> None:
+        if self.digits < 1:
+            raise ReportError("凡例の値は少なくとも 1 桁を持ちます（INV-014）")
+        if self.minimum > self.maximum:
+            raise ReportError(f"凡例の下端 {self.minimum} が上端 {self.maximum} より大きい")
+
+    @property
+    def unit_text(self) -> str:
+        return self.unit or UNDECLARED_MARKER
+
+    def as_text(self) -> str:
+        low = format_value(self.minimum, self.digits)
+        high = format_value(self.maximum, self.digits)
+        line = f"色は {self.field_name}（{self.unit_text}）：{low} から {high}、{self.colour_map}"
+        if not self.uniform:
+            # XC-111: a map that is not perceptually uniform puts steps in the picture that are not in
+            # the data, and the note travels with every report that uses one.
+            line += "。このカラーマップは知覚均等ではありません — 色の変化の速さは値の変化の速さと一致しません"
+        return line
+
+
+@dataclass(frozen=True, slots=True)
+class Figure:
+    """A still picture of a view, with the bytes, what they mean, and what they left out."""
+
+    png: bytes
+    width: int
+    height: int
+    legend: Legend
+    #: What the picture is of, for a reader who cannot see it - and for a printer that drops it.
+    description: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.png:
+            raise ReportError("図に中身がありません。空の画像を文書に入れることはしません")
+        if self.width < 1 or self.height < 1:
+            raise ReportError("図の大きさは 1 ピクセル以上です")
 
 
 class ReportError(Exception):
@@ -179,6 +251,23 @@ class Block:
     text: str = ""
     reduced: str | None = None
     coverage: str | None = None
+    #: Which form of view this block asks for, where it is a view block (CT-006 2.1.0). `None` is a
+    #: block that did not say, and the writer names that as the thing it could not carry rather than
+    #: choosing the form that happens to be writable.
+    form: ViewForm | None = None
+    #: The picture, where one was produced for this block. Supplied rather than made here: this
+    #: module arranges what MOD-003 drew, and a report layer that rendered would be a second place a
+    #: picture comes from.
+    figure: Figure | None = None
+
+    def __post_init__(self) -> None:
+        if self.form is not None and self.kind is not BlockKind.VIEW:
+            raise ReportError(f"{self.kind.value} ブロックに view の形（form）はありません")
+        if self.figure is not None and self.form is not ViewForm.STILL:
+            raise ReportError(
+                "図を持てるのは form が still の view ブロックだけです。"
+                "回転できる表示や動画の代わりに静止画を置くことはしません（XC-254）"
+            )
 
     def as_text(self) -> str:
         if self.kind is BlockKind.PAGE_BREAK:
@@ -188,6 +277,12 @@ class Block:
             lines.append(f"## {self.title}")
         if self.text:
             lines.append(self.text)
+        if self.figure is not None:
+            # The picture as words: what it shows and what its colours mean. A document read without
+            # its images - printed, piped to text, listened to - still says what the figure said.
+            if self.figure.description:
+                lines.append(f"［図：{self.figure.description}］")
+            lines.append(self.figure.legend.as_text())
         if self.reduced:
             # AC-003: a reduced representation says so in the document, not only on screen.
             lines.append(f"※ 表示は簡略化されています：{self.reduced}。数値は完全なデータで計算しています")
@@ -224,19 +319,23 @@ def build(
     definition: dict[str, Any],
     *,
     rows_for: dict[str, Sequence[ValueRow]] | None = None,
+    figures_for: dict[str, Figure] | None = None,
     provenance: Provenance,
 ) -> Document:
     """Turn a CT-006 definition into a document (AC-002).
 
-    `rows_for` maps a block's identifier to the values it shows. Supplied rather than computed here:
-    MOD-004 produces numbers and this module arranges them, and a report layer that computed would be a
-    second place where a value comes from (INV-001).
+    `rows_for` maps a block's identifier to the values it shows, and `figures_for` to the picture
+    that was drawn for it. Both supplied rather than computed here: MOD-004 produces numbers and
+    MOD-003 pictures, this module arranges them, and a report layer that computed either would be a
+    second place the same thing comes from (INV-001).
     """
     supplied = rows_for or {}
+    drawn = figures_for or {}
     blocks: list[Block] = []
     for index, stated in enumerate(definition.get("blocks", []) or []):
         kind = _kind_of(stated)
         key = str(stated.get("viewId") or stated.get("graphId") or index)
+        form = _form_of(stated) if kind is BlockKind.VIEW else None
         blocks.append(
             Block(
                 kind,
@@ -245,6 +344,8 @@ def build(
                 text=str(stated.get("text", "")),
                 reduced=stated.get("reduced"),
                 coverage=stated.get("coverage"),
+                form=form,
+                figure=drawn.get(key) if form is ViewForm.STILL else None,
             )
         )
     return Document(
@@ -253,6 +354,20 @@ def build(
         provenance=provenance,
         language=str(definition.get("locale", "ja")),
     )
+
+
+def _form_of(block: dict[str, Any]) -> ViewForm | None:
+    """Which form of view the block asked for, or None where it did not say."""
+    stated = block.get("form")
+    if stated is None:
+        return None
+    try:
+        return ViewForm(str(stated))
+    except ValueError:
+        raise ReportError(
+            f"view ブロックの形 '{stated}' は CT-006 の一覧にありません"
+            f"（{[one.value for one in ViewForm]}）"
+        ) from None
 
 
 def _kind_of(block: dict[str, Any]) -> BlockKind:

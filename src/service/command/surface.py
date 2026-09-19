@@ -38,7 +38,7 @@ from enum import Enum
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from domain_core.recorded_time import RecordedTime, record as record_time
-from service.command.catalogue import OPERATIONS, PARAMETERS, RESULT_FIELDS, writes
+from service.command.catalogue import OPERATIONS, PARAMETERS, REPORTED_VALUES, RESULT_FIELDS, writes
 
 
 class Origin(str, Enum):
@@ -131,7 +131,10 @@ class Handler:
     """
 
     operation: str
-    perform: Callable[[Mapping[str, Any], tuple[str, ...]], Effect]
+    #: What the handler does. An `Effect` is what happened or would happen; a `Result` is a refusal
+    #: with its reason - the caller's mistake, returned rather than raised, because raising is how a
+    #: caller's mistake gets reported as the build's failure.
+    perform: Callable[[Mapping[str, Any], tuple[str, ...]], "Effect | Result"]
     needs: frozenset[Permission] = frozenset()
 
     @property
@@ -151,6 +154,11 @@ class Handler:
     def answers_required(self) -> frozenset[str]:
         """The fields it must carry. Where a number is among them, so is its unit (XC-003)."""
         return RESULT_FIELDS[self.operation][1]
+
+    @property
+    def reported(self) -> Mapping[str, frozenset[str]]:
+        """The answer fields that are reported values, and the keys each must hold (XC-253)."""
+        return REPORTED_VALUES[self.operation]
 
 
 @dataclass(frozen=True, slots=True)
@@ -341,6 +349,14 @@ class Surface:
             effect = handler.perform(command.parameters, command.targets)
         except Exception as error:  # noqa: BLE001 - a handler may fail in any way it likes
             return Result(Status.FAILED, reason=str(error)[:400])
+        if isinstance(effect, Result):
+            # A handler's refusal: the caller named a case that is not there, a file that cannot be
+            # read, a unit this product does not know. Returned as it is, before the undo check - a
+            # refusal applied nothing and has nothing to put back (`Result` itself refuses to be a
+            # refusal that changed something). Until 2026-09-18 this branch was missing, so a handler
+            # had no way to refuse: raising became FAILED, which blames the build for the caller's
+            # mistake, and CT-002 keeps the two words apart for a reason.
+            return effect
         if writes(command.operation) and not command.dry_run and effect.undo is None:
             return Result(
                 Status.FAILED,
@@ -398,6 +414,29 @@ class Surface:
                 f"'{handler.operation}' の結果に {absent} がありません（CT-003）。"
                 "単位や来歴が必須なのは、それが無い数値は読み手が仮定した単位の数値だからです（XC-003）"
             )
+        # One level down. The top-level check accepts `{"value": 1.0}` from a probe, because `value`
+        # is a declared field - and then a bare number has reached the caller with no unit, no digits
+        # and no provenance, which is the exact thing XC-253 made the contract require. A field the
+        # contract states as a reported value is held to that shape here, and a build that returns
+        # less **fails** rather than answers (XC-257).
+        for field, keys in handler.reported.items():
+            if field not in value:
+                continue
+            inner = value[field]
+            if inner is None and dry_run:
+                continue
+            if not isinstance(inner, Mapping):
+                return (
+                    f"'{handler.operation}' の '{field}' は値・単位・桁・来歴を持つオブジェクトですが、"
+                    f"{type(inner).__name__} を返しています（CT-003, XC-253）。"
+                    "単位のない数値は、読み手が仮定した単位の数値です（XC-003）"
+                )
+            lacking = sorted(keys - set(inner))
+            if lacking:
+                return (
+                    f"'{handler.operation}' の '{field}' に {lacking} がありません（CT-003, XC-253）。"
+                    "値が無いなら value は null で、単位・桁・来歴はそれでも要ります（XC-001）"
+                )
         return None
 
     def _keep(self, command: Command, effect: Effect) -> str:

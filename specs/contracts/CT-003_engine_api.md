@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-25
+updated: 2026-09-19
 ---
 
 # Contract: engine API
@@ -10,7 +10,26 @@ updated: 2026-08-25
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 2.1.0
+- version: 2.4.0
+- correction: 2026-09-19, version 2.3.0 to 2.4.0. `view.render` takes `legend`, default true. A
+  document must carry its colour bar inside the picture because nothing else in a document can
+  (XC-254); a screen has chrome beside the picture that carries the legend **with its unit**, which
+  the picture's own bar cannot (E-192: the embedded face draws Japanese as nothing). Drawn in both
+  places, the screen showed two scales for one image. The legend is a property of the drawing, like
+  width and format, not of the view, so it is a render parameter and not a CT-004 field. Additive
+- correction: 2026-09-19, version 2.2.0 to 2.3.0. `dataset.probe` takes a point in canonical metres,
+  which is the right thing for a script and the wrong thing for a person: an interface has a **pixel**
+  a person clicked, and turning one into the other needs the camera the picture was drawn with. The
+  interface does not have that camera; the engine drew with it. So `view.pick` is added, taking the
+  view and a pixel and answering what `dataset.probe` answers. Additive - `dataset.probe` is
+  unchanged and is still how a script asks. Recorded because the alternative was the interface
+  passing something it had computed from a fraction of a pane, which would put a number in the
+  readout belonging to a place nobody clicked
+- correction: 2026-09-18, version 2.1.0 to 2.2.0. `dataset.probe` took a dataset id, a point and a
+  result position and answered "the value at that point" - **of no named field**. The operation could
+  not be implemented as written: a dataset holds several fields and nothing in the request said
+  which. It now takes a `fieldName`. Additive to an operation no release has shipped, and recorded
+  here rather than silently, because the row read as complete for three weeks and was not
 - strictness: unknown fields are **rejected** - a request carrying a parameter the engine does not
   understand is refused, because the caller believes something is happening that is not (CT-002)
 - compatibility: an operation name and its parameters keep their meaning once shipped. Behaviour
@@ -74,7 +93,8 @@ no identifier to report.
 | `view.duplicate` | write | view id, new name | new independent workspace view id |
 | `view.rename` | write | view id, new name | new revision; stored id references unchanged |
 | `view.delete` | write | view id | deleted id; dependent pipeline units retained as unresolved |
-| `view.render` | read | view id, width, height, format | image bytes or a handle to them |
+| `view.render` | read | view id, width, height, format, legend (default true) | image bytes or a handle to them |
+| `view.pick` | read | view id, width, height, pixel x and y | the value under that pixel with its unit, digits, provenance and location, and which point or cell it is - or nothing, where the pixel is off the model (view/AC-027, view/AC-029) |
 | `graph.create` | write | workspace id, definition (CT-005), source template id and revision? | workspace graph id and revision (XC-109) |
 | `graph.update` | write | graph id, definition | new graph revision |
 | `graph.duplicate` | write | graph id, new name | new independent workspace graph id |
@@ -92,7 +112,7 @@ no identifier to report.
 | `system.protocols` | read | - | protocol versions this engine speaks |
 | `history.undo` | write | undo id | ids restored |
 | `history.list` | read | workspace id | operations with origin, time and outcome |
-| `dataset.probe` | read | dataset id, point in metres, result position | value, association, unit, significant digits, provenance - missing where there is none (view/AC-027) |
+| `dataset.probe` | read | dataset id, field name, point in metres, result position | value, association, unit, significant digits, provenance - missing where there is none (view/AC-027) |
 | `dataset.parts` | read | dataset id | source-named parts with type, parent identifier where present, counts and bounds (GL-029, GL-042); absent hierarchy remains absent |
 | `field.derive` | read | dataset id, field name, quantity from the catalogue, frame? | the derived field with the formula and conventions it used (INV-020) |
 | `field.setDisplayUnit` | write | workspace id, quantity, unit symbol | - - presentation only; storage stays canonical (INV-026) |
@@ -124,6 +144,20 @@ would have to reach past the surface to do it. The gate compares the catalogue a
 
 Adding an operation is additive and needs no change to existing callers. **Changing what one means is
 forbidden**; the replacement is a new name and the old one is retired with a pointer to it.
+
+## How it is carried
+
+The envelope above is the shape; **HTTP/1.1 with JSON bodies on the loopback interface is how it
+travels** (XC-258). `POST /command` takes one request and answers with one response; `GET /handle/{id}`
+fetches the bytes a response named; `GET /health` answers the protocol versions and nothing else. The
+engine binds 127.0.0.1 on a port the operating system chooses and writes that port and a per-session
+token to a file the shell reads. **Every request but `/health` carries the token**, and one without it
+is refused with `authorisation.required` - loopback is reachable by every process running as the user,
+so a port without a token is a command surface any program on the machine can drive.
+
+The hosted transport (XC-032) is the same framing with a different host and a certificate. A
+WebSocket becomes right the day the engine must speak first, and is added beside this rather than
+instead of it, because one request and one response fits both.
 
 ## Large payloads
 

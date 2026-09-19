@@ -51,6 +51,8 @@ jobs:
         if: '!cancelled()'
       - run: python validate/check_automerge_policy.py
         if: '!cancelled()'
+      - run: python validate/check_client_types.py
+        if: '!cancelled()'
 
   # XC-219: the review becomes a merge gate on the day the secret exists, and this is what stops that
   # day passing unnoticed. The secret is only visible from inside a workflow, so the check lives here
@@ -117,10 +119,17 @@ jobs:
       # it copies cell values into points (INV-012). A stub would assert what we believe it does.
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e ".[dev]"
+      # The renderer's tests draw. On this runner the published toolkit wheel does not refuse to draw
+      # without a display - it segfaults in Render() (E-194, measured here on 2026-09-18) - so the
+      # suite runs under a virtual X display with Mesa's software OpenGL. The tests themselves ask the
+      # product's own child-process probe first, so a machine without either fails with a sentence
+      # rather than a core dump.
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgl1 libglx-mesa0 libegl1
       # SIM_VIEWER_REQUIRE_VTK turns the local "VTK is not installed, skipping" into a failure. A skip
       # is a reasonable answer on a laptop and never a reasonable answer here, and a suite that is
-      # allowed to skip in CI reports success for tests that did not run.
-      - run: python -m pytest tests -q
+      # allowed to skip in CI reports success for tests that did not run. The same rule covers the
+      # offscreen probe: a runner that cannot draw fails the run rather than skipping the renderer.
+      - run: xvfb-run -a python -m pytest tests -q
         env:
           SIM_VIEWER_REQUIRE_VTK: "1"
 
@@ -156,3 +165,35 @@ jobs:
       - run: python validate/check_mockup_states.py
         env:
           MOCKUP_BASE_URL: http://localhost:3000
+
+  interface:
+    name: interface typecheck and render
+    runs-on: ubuntu-latest
+    # src/ui is the production interface. Until 2026-09-18 CI never looked at it: it was neither
+    # typechecked nor swept, so `check_interface_states.py` existed, passed nothing, and reported
+    # exit 3 - "not run here" - on every machine including this one. A gate nothing runs is a gate
+    # that says what somebody hoped rather than what is true.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/ui/package-lock.json
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: npm ci
+        working-directory: src/ui
+      - run: npm run typecheck
+        working-directory: src/ui
+      - run: npm run build
+        working-directory: src/ui
+      - name: serve the built interface
+        run: npm run preview -- --port 4173 --strictPort &
+        working-directory: src/ui
+      - name: wait for it
+        run: for i in $(seq 1 30); do curl -sf http://localhost:4173/ >/dev/null && exit 0; sleep 2; done; echo "the interface did not start"; exit 1
+      - run: python validate/check_interface_states.py
+        env:
+          INTERFACE_BASE_URL: http://localhost:4173

@@ -133,7 +133,7 @@ class TestPrecisionDoesNotGrow:
         assert caveat_notes(value) == [
             "データセットの一部が欠落しています",
             "セル間で平均した値です",
-            "単位が宣言されていません",
+            "単位未宣言",
         ]
 
 

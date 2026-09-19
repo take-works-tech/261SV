@@ -91,7 +91,7 @@ class TestEveryQuantityIsOffered:
     def test_an_undeclared_quantity_is_offered_with_the_marker(self) -> None:
         bare = {"case:009": {"ratio": Value(0.5)}}
 
-        assert "宣言されていません" in available_quantities(bare)[0].describe()
+        assert "単位未宣言" in available_quantities(bare)[0].describe()
 
 
 class TestAMissingQuantityStaysVisible:

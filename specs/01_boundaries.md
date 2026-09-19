@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-29
+updated: 2026-09-19
 ---
 
 # Modules and dependency direction
@@ -34,7 +34,7 @@ touches a file, a device or a clock.
 
 ### MOD-001 - domain-core
 - layer: domain-core
-- paths: src/domain_core, src/engine/limits.py, src/engine/render_limits.py
+- paths: src/domain_core, src/engine/limits.py, src/engine/render_limits.py, src/engine/report_limits.py
 - owns: the vocabulary of glossary section 1 as types - @Workspace, @Case, @Variable, @Field, units,
   the canonical frame, ID rules, and the invariants that guard them. Including the **two** geometries
   a @Dataset holds - the connectivity the file declared and the surface it is drawn as, which INV-001
@@ -143,9 +143,12 @@ touches a file, a device or a clock.
 
 ### MOD-012 - command
 - layer: service
-- paths: src/service/command
+- paths: src/service/command, src/service/transport
 - owns: the one command surface (CT-002) - dispatch, validation, undo grouping, the dry-run mode, and
-  the log every command is recorded in
+  the log every command is recorded in - **and the wire it is reached over** (CT-003, XC-258): the
+  loopback listener, its token, and the handle endpoint the bytes of a large answer are fetched
+  through. The wire is here rather than in a module of its own because it adds no rule: it carries the
+  surface's own envelope, and a second module would be a second place a request could be interpreted
 - depends_on: domain-core, dataset-io, visualization, analysis, graph, report, workspace
 - decidedness: Fixed
 - basis: E-001 (T1)
@@ -208,7 +211,9 @@ module; a surface owned by one of its callers is a dependency waiting to be inve
 - owns: typed calls to the local service and **nothing else** - one function per CT-003 operation,
   the transport under them, and the failure of the transport itself. It holds no retry policy, no
   caching and no interpretation of a result: each of those is a decision some layer above should be
-  making visibly
+  making visibly. The transport is HTTP on loopback with a per-session token (XC-258); which host it
+  reaches is this module's business and nobody else's, which is what lets the desktop and hosted
+  builds be one product
 - depends_on: domain-core
 - decidedness: Fixed
 - basis: E-001 (T1)

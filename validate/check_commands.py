@@ -105,6 +105,12 @@ def check_parameters_are_stated(findings: list[Finding]) -> None:
             findings.append(Finding(SCHEMA.name, f"{name} has a parameter schema and is not in the catalogue"))
 
 
+#: What makes a result field a reported value: the four keys XC-253 requires of `$defs.reportedValue`.
+#: Read from each field's own `required` rather than from a `$ref`, because CT-003 inlines the shape
+#: into every result that carries it, and a check keyed on the definition alone would find none.
+REPORTED_VALUE_KEYS = frozenset({"value", "unit", "digits", "provenance"})
+
+
 def render() -> str:
     """The catalogue as a Python module the product can import.
 
@@ -125,6 +131,32 @@ def render() -> str:
     def answered(name: str) -> tuple[list[str], list[str]]:
         one = answers.get(name, {})
         return sorted(one.get("properties", {})), sorted(one.get("required", []))
+
+    def reported(name: str) -> dict[str, list[str]]:
+        """The result fields of one operation that are reported values, with the keys each must hold."""
+        one = answers.get(name, {})
+        return {
+            field: sorted(node.get("required") or [])
+            for field, node in sorted((one.get("properties") or {}).items())
+            if isinstance(node, dict)
+            and node.get("type") == "object"
+            and REPORTED_VALUE_KEYS <= set(node.get("required") or [])
+        }
+
+    def reported_row(name: str) -> str:
+        inner = ", ".join(f"{field!r}: frozenset({keys!r})" for field, keys in reported(name).items())
+        return f'    "{name}": {{{inner}}},'
+
+    version = re.search(r"^- version:\s*(\S+)", CATALOGUE.read_text(encoding="utf-8"), re.M)
+    protocol_version = version.group(1) if version else ""
+    # The names both sides of the wire must agree on, from CT-003's `$defs.transport` (XC-258). Read
+    # from the contract rather than written here, so the header a request carries and the header the
+    # listener checks cannot drift apart in a way only a failing request would reveal.
+    transport = json.loads(SCHEMA.read_text(encoding="utf-8")).get("$defs", {}).get("transport", {})
+    wire = {
+        name: node.get("const", "")
+        for name, node in (transport.get("properties") or {}).items()
+    }
     lines = [
         '"""The operation catalogue of CT-003, as code.',
         "",
@@ -175,6 +207,26 @@ def render() -> str:
             for name, _ in rows
         ],
         "}",
+        "",
+        "#: The result fields that are a **reported value** - an object carrying value, unit, digits",
+        "#: and provenance (XC-253) - and the keys each must hold. Checked one level down from",
+        "#: RESULT_FIELDS: a probe that answered `{\"value\": 1.0}` passed the top-level check and was",
+        "#: `answered`, and a number with no unit beside it is a number in whatever unit the reader",
+        "#: assumed (XC-003).",
+        "REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {",
+        *[reported_row(name) for name, _ in rows],
+        "}",
+        "",
+        "#: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below",
+        "#: the engine's floor is refused politely rather than answered in a shape it cannot read.",
+        f'PROTOCOL_VERSION = "{protocol_version}"',
+        "",
+        "#: The wire's own names, from CT-003's `$defs.transport` (XC-258). The interface generates",
+        "#: the same values from the same place; neither side is derived from the other (XC-252).",
+        f'TOKEN_HEADER = "{wire.get("tokenHeader", "")}"',
+        f'COMMAND_PATH = "{wire.get("commandPath", "")}"',
+        f'HANDLE_PATH = "{wire.get("handlePath", "")}"',
+        f'HEALTH_PATH = "{wire.get("healthPath", "")}"',
         "",
         "",
         "def writes(operation: str) -> bool:",

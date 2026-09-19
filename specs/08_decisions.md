@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-26
+updated: 2026-09-19
 ---
 
 # Decisions and open questions
@@ -942,7 +942,7 @@ deliberate `Save as template` action creates or revises a reusable blueprint.
   compared to last year's report is a result nobody trusts - but selecting one **records a note on the
   view and in any report using it**, stating that the map is not perceptually uniform. Colour maps do
   not follow the interface theme (XC-098)
-- basis: E-001 (T1)
+- basis: E-001 (T1), E-193 (T1)
 - alternatives: removing rainbow entirely is the technically correct choice and makes the product
   unusable next to a decade of existing reports
 - affects: GL-018, CT-004, XC-098
@@ -5093,6 +5093,8 @@ model or the prompt, never in a description that quietly went stale.
   12_business_model.md says which of its figures are segment figures rather than market figures
 - affects: XC-070, XC-035, XC-049, OPEN-012, OPEN-036
 - decidedness: Open
+- status: superseded
+- superseded_by: XC-257
 
 ### XC-255 - What is sold is that a result can be checked by somebody who was not there
 - decided: 2026-08-26
@@ -5172,3 +5174,190 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a deliverable surface (the exported report) needing a light reading mode for
   print - which is the document's own style (GL-013), not the tool's, and so would not reverse this
   decision but would test whether its boundary was drawn correctly
+
+### XC-257 - The first vertical is CAE visualisation, and the first working prototype is defined by it
+- decided: 2026-09-18
+- status: active
+- decision: the first release serves **CAE result visualisation** - a solver's result file is read,
+  its geometry is shown coloured by a field with a legend and a camera, a number is read off it with
+  its unit, its digits and its provenance, and the deliverable is written from that. The scope
+  OPEN-037 asked for is stated: **CAE is the first vertical and the boundary of the first release.**
+  Domains the readers already accept (general 3D, point clouds, and the rest of E-167) are not refused
+  by the code, but nothing is built for them, no figure in 12_business_model.md is restated for them,
+  and no issue is opened for them until this vertical has a paying customer. The features on the path
+  are ingest, view, graph as far as a result plot, and report; assistant, diff, scripting and the hosted
+  transport are built only where that path needs them.
+  **The first working prototype - the boundary XC-218 ends at and never defined - is this:** on one
+  machine, from the interface, a person opens a solver result in one of the three formats read
+  end-to-end today (`.vtu`, `.ex2`, `.cgns`), sees its geometry coloured by a field they chose with a
+  legend that carries the declared unit or 単位未宣言, orbits it, picks a point and reads the value
+  with its unit, the digits its storage supports, its provenance and its location in the source's own
+  words, declares a unit and watches the legend change while no stored number does, and exports a
+  self-contained HTML that carries the picture with its legend, the reported values, and its own
+  statement of what it could not carry - and **the number in the document, the number in the readout
+  and the number computed on the full dataset are the same number** (INV-001). Scenario 1 and
+  Scenario 2 of 17_user_scenarios.md, joined to a report export. Not in it: derived quantities,
+  comparison, plotted graphs, the assistant, scripting, animation, the rotatable view inside the
+  deliverable, and packaging - the prototype may run as the built interface served locally against
+  the engine process on loopback, with the Electron shell of XC-040 a release item rather than a
+  prototype one
+- decided_by: the product owner, 2026-09-18, in their own words: 「CAE可視化の部分にまずは注力したい」,
+  after the survey of 2026-08-26 to 2026-09-03 recorded in evidence/market_survey.md,
+  evidence/visualisation_competitors.md, evidence/mandated_reporting.md and
+  evidence/individual_scale.md
+- rationale: **what the survey found is the reason this is a decision and not a default.** It tested,
+  against primary sources, every direction the owner raised - rendering and promotion imagery (E-165,
+  E-166), CAD conversion (E-167: no CAD kernel is in the build and CAD is the most contested
+  direction), consumer imagery and 3D printing (E-178, E-179), video (E-180), adjacent product data
+  (E-174), technical illustration and light simulation (E-175, E-176), journal figures (E-183 to
+  E-185), patent drawings (E-182), mandated-form fields (E-171 to E-173), and safety data sheets
+  (E-186 to E-190). Four of its own hypotheses it refuted by checking the incumbent. What survived is
+  narrow and measured: **field data on geometry is served by none of the rendering products and
+  rendered least attractively by the products that read it** (E-166); the price band between free and
+  USD 1,670 a year has no published price in it (E-160); the closest domestic product depends on a
+  ParaView five major versions behind and publishes no price (E-163); and the domestic mechanical CAE
+  market grew about 7 per cent a year to JPY 104 billion in 2024 (E-171, T2). The engine's readers
+  cover CAE most densely of any domain (E-167: 30 of 181 reader classes), and every rule in this
+  specification set - INV-001, INV-009, INV-014, INV-032 to INV-034, XC-003, XC-001 - was written for a
+  solver's output. The vertical with the measured gap is also the one the code and the rules already
+  fit.
+  **What this decision costs, stated so it is not rediscovered later.** The owner's constraint of
+  2026-08-30 - that demand must exist at the scale of an individual or a very small business, or
+  there is no first customer - is **not** met by CAE visualisation on the record: the buyer is an
+  organisation (OPEN-036), the standalone category measures about USD 5 million (E-043), and the one
+  candidate that met the constraint on every measured point was the safety data sheet (E-186 to
+  E-190). That candidate is set aside with its finding intact: it is enterable by one person and
+  someone has entered it, **as a service at JPY 15,000 a sheet, not as a tool**, and the buyer a tool
+  would serve is not individual scale (E-190). The owner has chosen the vertical the product was built
+  for over the one the constraint pointed at; this record says so, because a decision fixed for a
+  reason that turned out false gets reversed later for the wrong cause.
+  **Where the path stands, measured on 2026-09-18** by ten parallel readings of the repository, each
+  claim carrying a file and line, and the load-bearing ones re-read by hand. The vocabulary, the
+  readers for three formats, the display reduction that keeps numbers off the picture, the reductions
+  with their weighting, the averaged-versus-unaveraged extremum, and the HTML writer that refuses what
+  it cannot carry all exist as tested library code (1,281 tests collected; the VTK-gated ones pass here
+  and in CI). **Nothing joins them.** The command surface has no production handler for any of the 61
+  operations (`Surface.register` has no caller under `src/`); no code turns a dataset into pixels
+  (zero uses of a render window, a mapper, a lookup table or a scalar bar under `src/`; the only
+  rendering code is a spike); no probe maps a picked point to `Dataset.value`; the deliverable refuses
+  every VIEW block; the interface's single dispatch path returns `{status: "design-state"}` and its
+  viewport is an SVG silhouette. Five defects sit on the path and change what every later step would
+  show: every field is promoted to float64 on read (`reader.py:267`), so a float32 result would report
+  fifteen digits against INV-014 - hidden today because the one end-to-end test declares `digits=4`
+  by hand; `Dataset.mean` and `total` accumulate in the storage dtype (`dataset.py:322-323`, against
+  INV-031 - harmless only because of the first defect); `Field.declared()` drops `points_per_cell`, so
+  declaring a unit on an integration-point field raises; `read_case` drops the source frame and the
+  partition count; and the surface checks only the top-level names of a result, so a probe handler
+  returning a bare number would be `answered` rather than `failed` (`surface.py:357-401`). One thing
+  was measured rather than read: **offscreen colour-mapped rendering with a scalar bar works on this
+  machine with the pinned VTK 9.5.2** - two 800x600 frames, 81,338 and 76,222 bytes of PNG, differing
+  after a camera move, 0.26 s in total (E-191). The renderer question that XC-251 and OPEN-031 left open
+  concerns ray tracing only; the visualisation path does not need it.
+  **The path, in dependency order, each step sized as an estimate for one person.** (1) The five
+  defects above, first, with tests that would have caught them - store what the file gave, compute in
+  float64, keep the frame and the partition count, keep `points_per_cell`, check the nested
+  `reportedValue` shape (S-M). (2) The composition root: production handlers on the surface for
+  `workspace.open`, `dataset.load`, `dataset.describe`, `dataset.parts`, `field.declareUnit`,
+  `field.statistics`, `view.create`, `view.update`, `view.render`, `dataset.probe`, `report.create`,
+  `report.export`, `report.provenance`, `system.capabilities`, `system.protocols`, wrapping the
+  existing engine modules, plus the conversion from `Summary` to `ReportedValue` and a handle store
+  (L). (3) The native renderer for XC-087's image role: display surface plus a field sampled through
+  `source_points` - colours from the display surface, numbers never from it - to a lookup table, a
+  scalar bar carrying the unit or 単位未宣言, a camera from CT-004, and PNG bytes, with the reduction
+  statement attached (M-L).
+  **Correction, 2026-09-18, same day**: the scalar bar in the image does **not** carry the unit or
+  単位未宣言. Measured after this was written (E-192): the toolkit's embedded faces render a Japanese
+  title as nothing at all - no glyph and no warning, the bar merely laid out shorter - and 単位未宣言
+  is exactly the string the prototype must show. So the native image carries the colour ramp and
+  Latin tick digits only, and the title, the unit and 単位未宣言 are typeset by whatever shows the
+  image: the document, which already embeds a font and checks its coverage per character, and the
+  interface. The sentence above is kept because the design it describes looked complete and was not,
+  and a legend that silently lost its one honest word is the failure XC-001 exists to refuse. (4) The probe: a pick on the display geometry mapped to a source point and
+  answered by `Dataset.value` with its location (M). (5) The deliverable carries a still: CT-006 gains
+  the `form` field 16_application_model.md already names, `html.py` accepts a VIEW block whose form is
+  `still` as an embedded image with its legend, and the document states that it is a still - the
+  rotatable form of report/AC-001 stays r1 and outside the prototype (M, spec and code together).
+  (6) The transport: the wire framing XC-045 left open is decided when it is built, one typed function
+  per operation is generated into `src/ui/client` (XC-252), and the engine runs as the loopback
+  process (L; interface work, announced before it starts). (7) The interface states on the path -
+  about 27 of the 99 - read real data: session state for the loaded dataset, its fields, the colour
+  map and range and the picked point; the viewport shows the rendered image and re-renders on camera
+  operations; the legend, field selector, probe readout and unit declaration are fed by results; the
+  design-state parameter names that CT-003 refuses are corrected (L; interface work). (8) Honesty of
+  the readiness report: `check_specs --report` counts a `(planned)` verification row as a
+  verification, so it says 384 of 384 while 74 of 89 view rows are planned - the count is split, the
+  interface is typechecked and swept in CI, and one end-to-end test asserts that the probe value, the
+  document value and the full-data value are one number (M). About 25 to 35 engineer-days in total,
+  as an estimate that assumes no decision above reopens the renderer or the transport
+- alternatives: the safety data sheet - measured population of about 46,700 establishments (E-187),
+  every structural barrier absent (E-189), and the individual-scale segment already served by
+  individuals at a price no subscription undercuts (E-190); the whole 3D and visualisation half of the
+  repository would be discarded, which the owner had said was not a consideration and which is
+  therefore not the reason. Journal figures - the gap proposed does not exist (E-185). Patent
+  drawings - a form fixed outside the buyer and a per-figure price (E-182), but line work rather than
+  numbers, so nothing of this product's discipline applies. A general 3D comparison tool across CAD,
+  scans, point clouds and results - difference-on-geometry with a colour scale is already free and
+  scriptable (E-169), and CAD needs a kernel the build does not have (E-167). Rendering and promotion -
+  served, priced from JPY 207,048 a year with a free tier from Epic, and none of it reads results
+  (E-165, E-166). And for the path itself: wiring the interactive vtk.js viewport first - it is the
+  decided interactive route (XC-044) and it is still the route, but it is the one step that needs a
+  new dependency, a geometry serialisation that does not exist, and a JavaScript build, and it is not
+  what makes a number trustworthy; the image route reaches a shown, probed, exported number sooner
+  and every piece of it is kept
+- basis: E-160 (T1), E-163 (T1), E-166 (T1), E-167 (T1), E-187 (T1), E-190 (T1), E-191 (T1), E-194 (T1)
+- affects: OPEN-037 (closed by this), OPEN-036 (its denominator is now the CAE segment by decision;
+  how many organisations remains open), OPEN-035 (the channel stays open; nothing here decides it),
+  OPEN-012 (format priority follows the CAE reading), XC-070, XC-035, XC-218 (its end is now defined),
+  specs/12_business_model.md (the preface that read every figure as "one segment" is restated)
+- decidedness: Bounded
+- reversal_trigger: XC-035's own trigger stands - twelve months of domestic effort with fewer than five
+  paying customers. Two are added. **Five conversations with CAE engineers on their own files in which
+  nobody names an occasion when a reported number was doubted, disputed or re-run** - the same trigger
+  XC-255 carries, because the two decisions rest on the same buyer. And **an incumbent shipping a
+  deliverable with declared units, provenance and honest digits, free or bundled**, which would remove
+  the differentiator E-166 measures. The individual-scale constraint that this decision relaxes is
+  not itself a trigger: it was a way of finding the first customer, and the first trigger above is the
+  direct test of whether one exists
+
+### XC-258 - The engine is reached over HTTP on loopback, with a per-session token
+- decided: 2026-09-19
+- status: active
+- decision: CT-003's envelope travels as **HTTP/1.1 with JSON bodies over the loopback interface**.
+  `POST /command` takes one request object and answers with one response object; `GET /handle/{id}`
+  fetches the bytes a response named (CT-003 "Large payloads"); `GET /health` answers the protocol
+  versions and nothing else. The engine binds **127.0.0.1 on a port the operating system chooses**,
+  and writes the port and a **per-session token** to a file the shell reads - the shell's own
+  process, never an argument another process can read from a process list. **Every request but
+  `/health` carries the token**, and one without it is refused with `authorisation.required`. The
+  same framing serves the hosted transport (XC-032): what changes is the host and the certificate,
+  not the shape
+- decided_by: the engineering judgement XC-045 left open, recorded when it was built rather than
+  before, so the decision names what the code does
+- rationale: **the choice is between HTTP, a WebSocket and a pipe, and the deliverable decides it.**
+  A picture and a geometry payload are bytes a browser must fetch; over HTTP that is a `GET` with a
+  content type, and the browser's own cache, range requests and `<img src>` all work without this
+  product writing any of it. Over a pipe or a WebSocket the same bytes need a framing, a correlation
+  id and a reassembly - three things to get wrong for no gain, because nothing in the prototype
+  pushes from the engine.
+  **A WebSocket becomes right the moment the engine must speak first** - a long read reporting
+  progress, a watched file changing - and that day it is added beside this, not instead of it: the
+  command envelope is already one request and one response, which is what makes both shapes able to
+  carry it.
+  **And loopback is not private.** Any process running as the user can reach 127.0.0.1, so a port
+  with no token is a command surface every program on the machine can drive - including one that can
+  ask this engine to read and write files anywhere the user can. The token costs a header and closes
+  it. It is written to a file rather than passed as an argument because arguments are visible in the
+  process list to every user on the machine; JupyterLab's local server is the same shape for the same
+  reason (E-024)
+- alternatives: **stdio with a length prefix** - no port to secure and no listener at all, which is
+  genuinely simpler, and it cannot serve an image to a browser without a second channel that is
+  HTTP anyway. **A WebSocket** - one connection, server-push available, and every large payload then
+  needs its own framing on top. **A Unix socket or named pipe** - closes the port question and is two
+  different implementations on the two platforms, with the browser unable to reach either
+- basis: E-024 (T1)
+- affects: XC-045, XC-032, XC-040, MOD-017, CT-003
+- decidedness: Bounded
+- reversal_trigger: the engine needing to speak first - progress on a long read, a watched input
+  changing - which is a WebSocket beside this one rather than a replacement for it. Or a measured
+  cost: if fetching geometry through `GET` is slower than the same bytes over a socket by enough to
+  matter at LIM-002's budget, the payload path moves and the command path stays

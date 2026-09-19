@@ -342,3 +342,51 @@ class TestADifferenceReportsTheDigitsItHasLeft:
 
         assert stored == 15
         assert actual == 5
+
+
+class TestTheDatasetItselfAccumulatesInDouble:
+    """INV-031 at the domain layer, not only in `engine.analysis.summary`.
+
+    `Dataset.mean` and `Dataset.total` summed in the storage dtype until 2026-09-18. It was harmless
+    only because the reader promoted every field to float64 on the way in - which was itself the
+    defect XC-246 forbids - so fixing the one exposed the other. Both are fixed together here, and
+    this test is the one that would have failed had either been fixed alone.
+    """
+
+    @staticmethod
+    def _dataset(values: np.ndarray) -> Dataset:
+        # Points are only what the field is indexed by here; their positions play no part in an
+        # unweighted mean. Zeros, so that ten million of them cost the test nothing to fill.
+        return Dataset(
+            points_m=np.zeros((values.size, 3), dtype=np.float64),
+            cells=Cells(np.zeros(1, np.int64), np.zeros(0, np.int64), np.zeros(0, np.uint8)),
+            fields={"stress": Field("stress", Association.POINT, values, unit="MPa")},
+        )
+
+    def test_the_mean_of_a_float32_field_keeps_its_variation(self) -> None:
+        values = a_field(COUNT)
+        exact = math.fsum(values.astype(np.float64).tolist()) / COUNT
+
+        found = self._dataset(values).mean("stress")
+
+        assert found.value is not None
+        assert abs(found.value - exact) < 1.0e-9
+        assert found.value != OFFSET, "the variation is gone - accumulated in the storage type"
+        assert found.digits == 6, "the digits still follow the storage, not the accumulator"
+
+    def test_the_total_is_accumulated_the_same_way(self) -> None:
+        values = a_field(COUNT)
+        exact = math.fsum(values.astype(np.float64).tolist())
+
+        found = self._dataset(values).total("stress")
+
+        assert found.value is not None
+        assert abs(found.value - exact) < 1.0e-3 * COUNT * 1.0e-9 + 1.0e-6
+
+    def test_the_storage_is_still_float32_afterwards(self) -> None:
+        values = a_field(COUNT)
+        dataset = self._dataset(values)
+
+        dataset.mean("stress")
+
+        assert dataset.fields["stress"].values.dtype == np.float32

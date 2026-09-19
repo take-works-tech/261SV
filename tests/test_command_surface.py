@@ -107,7 +107,7 @@ def a_surface(store: Store | None = None) -> tuple[Surface, Store]:
 
 class TestTheCatalogueIsTheSet:
     def test_it_holds_every_operation_the_contract_lists(self) -> None:
-        assert len(OPERATIONS) == 61
+        assert len(OPERATIONS) == 62
         assert "view.rename" in OPERATIONS
 
     def test_reads_and_writes_partition_it(self) -> None:
@@ -165,11 +165,16 @@ class TestRegistrationIsAgainstTheCatalogue:
         assert "newName" in handler.required
 
     def test_every_operation_in_the_catalogue_has_its_parameters_stated(self) -> None:
-        """134 parameters over 61 operations, so a handler for any of them is checkable."""
+        """141 parameters over 62 operations, so a handler for any of them is checkable.
+
+        The count is pinned rather than recomputed: it is a contract change, and a contract change
+        that nothing notices is one nobody read. It went from 134 to 135 on 2026-09-18 when CT-003
+        2.2.0 gave `dataset.probe` the `fieldName` it needed to be answerable at all.
+        """
         from service.command.catalogue import OPERATIONS, PARAMETERS
 
         assert set(PARAMETERS) == set(OPERATIONS)
-        assert sum(len(accepted) for accepted, _ in PARAMETERS.values()) == 134
+        assert sum(len(accepted) for accepted, _ in PARAMETERS.values()) == 141
 
     def test_what_is_not_implemented_is_reportable(self) -> None:
         """A build that answers "unimplemented" for most of the catalogue should be able to say which,
@@ -582,3 +587,125 @@ class TestEveryOperationSaysWhatItAnswers:
         figure that does not say which it is cannot be checked."""
         assert "weighting" in RESULT_FIELDS["field.statistics"][1]
         assert "scope" in RESULT_FIELDS["field.statistics"][1]
+
+
+class TestAReportedValueIsHeldToItsShape:
+    """XC-253 made value, unit, digits and provenance required of a reported value **in the contract**;
+    the surface checked only the top-level field names, so a probe that answered `{"value": 1.0}` was
+    `answered` (XC-257). A bare number with no unit beside it is a number in whatever unit the reader
+    assumed (XC-003), and it is the build's defect rather than the caller's, so it **fails**."""
+
+    @staticmethod
+    def _probe(value: object) -> Surface:
+        surface = Surface(clock=at(9))
+        surface.register(Handler("dataset.probe", lambda p, t: Effect("読みました", value=value)))
+        return surface
+
+    @staticmethod
+    def _ask(surface: Surface):
+        return surface.submit(
+            Command("dataset.probe", {
+                "datasetId": "d", "fieldName": "stress", "pointM": [0.0, 0.0, 0.0], "resultPosition": 0,
+            })
+        )
+
+    def test_a_bare_number_where_the_contract_wants_a_reported_value_fails(self) -> None:
+        result = self._ask(self._probe({"value": 182.4}))
+
+        assert result.status is Status.FAILED
+        assert "単位" in (result.reason or "")
+
+    def test_a_reported_value_missing_its_unit_fails_and_names_it(self) -> None:
+        result = self._ask(self._probe({"value": {"value": 182.4, "digits": 6, "provenance": "dataset"}}))
+
+        assert result.status is Status.FAILED
+        assert "unit" in (result.reason or "")
+
+    def test_a_complete_reported_value_is_answered(self) -> None:
+        result = self._ask(self._probe({
+            "value": {"value": 182.4, "unit": "MPa", "digits": 6, "provenance": "dataset"},
+        }))
+
+        assert result.status is Status.ANSWERED
+
+    def test_a_stated_absence_is_a_null_value_with_its_unit_still_beside_it(self) -> None:
+        """XC-001: missing stays missing, and it still says what unit it would have been in."""
+        result = self._ask(self._probe({
+            "value": {"value": None, "unit": "MPa", "digits": 6, "provenance": "dataset"},
+        }))
+
+        assert result.status is Status.ANSWERED
+
+    def test_every_reported_value_field_the_contract_names_is_checked(self) -> None:
+        """The table is generated from CT-003; this pins the six fields it holds today so that a
+        contract change that adds one is noticed here rather than silently checked."""
+        from service.command.catalogue import REPORTED_VALUES
+
+        named = {(op, field) for op, fields in REPORTED_VALUES.items() for field in fields}
+        assert named == {
+            ("dataset.probe", "value"),
+            ("view.pick", "value"),
+            ("field.statistics", "minimum"),
+            ("field.statistics", "maximum"),
+            ("field.statistics", "mean"),
+            ("variable.detach", "keptValue"),
+            ("diff.create", "roundTripError"),
+        }
+        for fields in REPORTED_VALUES.values():
+            for keys in fields.values():
+                assert keys >= {"value", "unit", "digits", "provenance"}
+
+
+class TestAHandlerMayRefuse:
+    """CT-002 keeps two words apart: a **refusal** is the caller's mistake and changes nothing; a
+    **failure** is the build's. Until 2026-09-18 a handler had no way to return the first - the surface
+    read `.undo` off whatever came back, so a returned `Result` crashed and a raised one became
+    FAILED. A handler that wanted to say "that case is not here" could only say "I am broken"."""
+
+    @staticmethod
+    def _refusing(operation: str, reason: str) -> Surface:
+        surface = Surface(clock=at(9))
+        surface.register(Handler(operation, lambda p, t: Result(Status.REFUSED, reason=reason)))
+        return surface
+
+    def test_a_refusal_returned_by_a_write_handler_is_refused_not_failed(self) -> None:
+        surface = self._refusing("view.rename", "そのビューはありません")
+
+        result = surface.submit(Command("view.rename", {"viewId": "v", "newName": "n"}))
+
+        assert result.status is Status.REFUSED
+        assert result.reason == "そのビューはありません"
+        assert result.changed == ()
+        assert result.undo_id is None, "a refusal applied nothing, so there is nothing to undo"
+
+    def test_a_refusal_returned_by_a_read_handler_is_refused_too(self) -> None:
+        # `system.protocols` takes no parameters, so the command reaches the handler - the first
+        # version of this used `history.list`, whose missing `workspaceId` had the surface refuse
+        # before the handler ran, and the test passed for a reason that was not the one it named.
+        surface = self._refusing("system.protocols", "この版は答えられません")
+
+        result = surface.submit(Command("system.protocols", {}))
+
+        assert result.status is Status.REFUSED
+        assert result.reason == "この版は答えられません"
+
+    def test_a_refusal_is_logged_as_one(self) -> None:
+        surface = self._refusing("view.rename", "そのビューはありません")
+
+        surface.submit(Command("view.rename", {"viewId": "v", "newName": "n"}))
+
+        assert surface.history()[-1].status is Status.REFUSED
+
+    def test_raising_still_reads_as_the_build_s_failure(self) -> None:
+        """The other word keeps its meaning: an exception is a defect here, not a caller's error."""
+        surface = Surface(clock=at(9))
+
+        def broken(parameters, targets):
+            raise RuntimeError("壊れています")
+
+        surface.register(Handler("system.protocols", broken))
+
+        result = surface.submit(Command("system.protocols", {}))
+
+        assert result.status is Status.FAILED
+        assert "壊れています" in (result.reason or "")

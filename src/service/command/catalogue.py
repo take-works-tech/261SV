@@ -67,6 +67,7 @@ READS = frozenset({
     "dataset.describe",
     "field.statistics",
     "view.render",
+    "view.pick",
     "graph.data",
     "system.capabilities",
     "system.protocols",
@@ -103,6 +104,7 @@ OPERATIONS = (
     "view.rename",
     "view.delete",
     "view.render",
+    "view.pick",
     "graph.create",
     "graph.update",
     "graph.duplicate",
@@ -169,7 +171,8 @@ PARAMETERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "view.duplicate": (frozenset(['newName', 'viewId']), frozenset(['newName', 'viewId'])),
     "view.rename": (frozenset(['newName', 'viewId']), frozenset(['newName', 'viewId'])),
     "view.delete": (frozenset(['viewId']), frozenset(['viewId'])),
-    "view.render": (frozenset(['format', 'height', 'viewId', 'width']), frozenset(['format', 'height', 'viewId', 'width'])),
+    "view.render": (frozenset(['format', 'height', 'legend', 'viewId', 'width']), frozenset(['format', 'height', 'viewId', 'width'])),
+    "view.pick": (frozenset(['height', 'viewId', 'width', 'x', 'y']), frozenset(['height', 'viewId', 'width', 'x', 'y'])),
     "graph.create": (frozenset(['definition', 'sourceTemplateId', 'sourceTemplateRevision', 'workspaceId']), frozenset(['definition', 'workspaceId'])),
     "graph.update": (frozenset(['definition', 'graphId']), frozenset(['definition', 'graphId'])),
     "graph.duplicate": (frozenset(['graphId', 'newName']), frozenset(['graphId', 'newName'])),
@@ -187,7 +190,7 @@ PARAMETERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "system.protocols": (frozenset([]), frozenset([])),
     "history.undo": (frozenset(['undoId']), frozenset(['undoId'])),
     "history.list": (frozenset(['workspaceId']), frozenset(['workspaceId'])),
-    "dataset.probe": (frozenset(['datasetId', 'pointM', 'resultPosition']), frozenset(['datasetId', 'pointM', 'resultPosition'])),
+    "dataset.probe": (frozenset(['datasetId', 'fieldName', 'pointM', 'resultPosition']), frozenset(['datasetId', 'fieldName', 'pointM', 'resultPosition'])),
     "dataset.parts": (frozenset(['datasetId']), frozenset(['datasetId'])),
     "field.derive": (frozenset(['datasetId', 'fieldName', 'frameId', 'quantity']), frozenset(['datasetId', 'fieldName', 'quantity'])),
     "field.setDisplayUnit": (frozenset(['quantity', 'unitSymbol', 'workspaceId']), frozenset(['quantity', 'unitSymbol', 'workspaceId'])),
@@ -238,6 +241,7 @@ RESULT_FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "view.rename": (frozenset(['id', 'revision']), frozenset(['id', 'revision'])),
     "view.delete": (frozenset(['deletedId', 'unresolvedUnitIds']), frozenset(['deletedId', 'unresolvedUnitIds'])),
     "view.render": (frozenset(['handle', 'reduced']), frozenset(['handle'])),
+    "view.pick": (frozenset(['association', 'value']), frozenset(['value'])),
     "graph.create": (frozenset(['id', 'revision']), frozenset(['id', 'revision'])),
     "graph.update": (frozenset(['id', 'revision']), frozenset(['id', 'revision'])),
     "graph.duplicate": (frozenset(['id']), frozenset(['id'])),
@@ -280,6 +284,87 @@ RESULT_FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "workspace.pack": (frozenset(['bytes', 'omitted', 'path']), frozenset(['bytes', 'path'])),
     "output.prune": (frozenset(['deletedFiles', 'freedBytes', 'removedRunIds']), frozenset(['deletedFiles', 'freedBytes', 'removedRunIds'])),
 }
+
+#: The result fields that are a **reported value** - an object carrying value, unit, digits
+#: and provenance (XC-253) - and the keys each must hold. Checked one level down from
+#: RESULT_FIELDS: a probe that answered `{"value": 1.0}` passed the top-level check and was
+#: `answered`, and a number with no unit beside it is a number in whatever unit the reader
+#: assumed (XC-003).
+REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
+    "workspace.open": {},
+    "workspace.save": {},
+    "workspace.close": {},
+    "case.create": {},
+    "case.delete": {},
+    "case.move": {},
+    "case.tag": {},
+    "dataset.load": {},
+    "dataset.describe": {},
+    "field.declareUnit": {},
+    "field.statistics": {'maximum': frozenset(['digits', 'provenance', 'unit', 'value']), 'mean': frozenset(['digits', 'provenance', 'unit', 'value']), 'minimum': frozenset(['digits', 'provenance', 'unit', 'value'])},
+    "variable.declare": {},
+    "variable.set": {},
+    "variable.detach": {'keptValue': frozenset(['digits', 'provenance', 'unit', 'value'])},
+    "view.create": {},
+    "view.update": {},
+    "view.duplicate": {},
+    "view.rename": {},
+    "view.delete": {},
+    "view.render": {},
+    "view.pick": {'value': frozenset(['digits', 'provenance', 'unit', 'value'])},
+    "graph.create": {},
+    "graph.update": {},
+    "graph.duplicate": {},
+    "graph.rename": {},
+    "graph.delete": {},
+    "graph.data": {},
+    "diff.create": {'roundTripError': frozenset(['digits', 'provenance', 'unit', 'value'])},
+    "report.create": {},
+    "report.update": {},
+    "report.duplicate": {},
+    "report.rename": {},
+    "report.delete": {},
+    "report.export": {},
+    "system.capabilities": {},
+    "system.protocols": {},
+    "history.undo": {},
+    "history.list": {},
+    "dataset.probe": {'value': frozenset(['digits', 'provenance', 'unit', 'value'])},
+    "dataset.parts": {},
+    "field.derive": {},
+    "field.setDisplayUnit": {},
+    "frame.declare": {},
+    "measurement.import": {},
+    "case.proposeTags": {},
+    "template.createFromItem": {},
+    "template.apply": {},
+    "template.promote": {},
+    "template.export": {},
+    "template.import": {},
+    "library.list": {},
+    "pipeline.create": {},
+    "pipeline.update": {},
+    "pipeline.dryRun": {},
+    "pipeline.run": {},
+    "pipeline.cancel": {},
+    "script.run": {},
+    "report.provenance": {},
+    "system.audit": {},
+    "system.supportBundle": {},
+    "workspace.pack": {},
+    "output.prune": {},
+}
+
+#: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below
+#: the engine's floor is refused politely rather than answered in a shape it cannot read.
+PROTOCOL_VERSION = "2.4.0"
+
+#: The wire's own names, from CT-003's `$defs.transport` (XC-258). The interface generates
+#: the same values from the same place; neither side is derived from the other (XC-252).
+TOKEN_HEADER = "X-Solvia-Token"
+COMMAND_PATH = "/command"
+HANDLE_PATH = "/handle/"
+HEALTH_PATH = "/health"
 
 
 def writes(operation: str) -> bool:

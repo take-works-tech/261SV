@@ -9,8 +9,10 @@
 import { useState, type ReactNode } from "react";
 import "./view.css";
 import { session, useSession } from "../../state/session";
+import { engineState, useEngine } from "../../state/engine";
+import { EngineField } from "../../shared/EngineField";
 import { submit } from "../../client/operations";
-import { disabledBecause } from "../../logic/format";
+import { disabledBecause, formatValue } from "../../logic/format";
 import { SplitLayout } from "../../shared/SplitLayout";
 import { ViewportPlaceholder } from "../../shared/ViewportPlaceholder";
 import { ProbeReadout } from "../../shared/ProbeReadout";
@@ -21,6 +23,7 @@ import { ConversationDrawer } from "../../shared/ConversationDrawer";
 import { ColourMapControl, type ColourMapId } from "../../shared/ColourMapControl";
 import { FieldSelector } from "../../shared/FieldSelector";
 import { QuantityChip } from "../../shared/QuantityChip";
+import { UNDECLARED } from "../../shared/primitives";
 import { ProvenanceBadge } from "../../shared/ProvenanceBadge";
 import { MissingDataStyle } from "../../shared/MissingDataStyle";
 
@@ -284,8 +287,33 @@ export function ViewScreen(props: { variant: string }) {
 
 function ViewCanvas({ variant }: { variant: string }) {
   const s = useSession();
+  const e = useEngine();
   const [axisId, setAxisId] = useState<AxisId>("time");
-  const caseName = CASE_LABEL[s.selectedCaseId ?? ""] ?? "ケース未選択";
+  const caseName = e.sourceName ?? CASE_LABEL[s.selectedCaseId ?? ""] ?? "ケース未選択";
+  // With an engine, the first pane carries what it drew and the readout carries what it answered.
+  // Without one, every line below is the design state it has always been.
+  const live = e.imageUrl
+    ? {
+        imageUrl: e.imageUrl,
+        // The picture carries the engine's own colour ramp. The rail's legend must carry the
+        // engine's own numbers or none: fixture ticks beside a real image are a scale that says
+        // something untrue about the picture next to it (XC-001).
+        legendTicks: legendTicksFrom(e.statistics),
+        fieldLabel: e.fieldName
+          ? `${e.fieldName}（${e.fields.find((one) => one.name === e.fieldName)?.unit ?? UNDECLARED}）`
+          : null,
+        reduced: e.reduced && !e.reduced.startsWith("全三角形") ? e.reduced : null,
+        // A drag turns the model and a click reads the value under it. Both go to the engine as
+        // what the interface actually has - pixels moved, and a pixel of the drawn frame - because
+        // the camera the picture was made with only exists there (CT-003 2.3.0, view/AC-027).
+        onOrbit: (by: { x: number; y: number }) => {
+          void engineState.orbit(by.x * 0.4, -by.y * 0.4);
+        },
+        onPickPixel: (at: { x: number; y: number }) => {
+          void engineState.pick(at.x, at.y);
+        },
+      }
+    : undefined;
 
   if (variant === "empty") return <EmptyCanvas />;
   if (variant === "renderer-error") return <RendererErrorCanvas />;
@@ -305,7 +333,7 @@ function ViewCanvas({ variant }: { variant: string }) {
       {spec ? (
         <ComparisonCanvas spec={spec} borrowed={variant === "comparison-borrowed"} />
       ) : (
-        <SplitLayout panes={buildPanes(variant, caseName, paneCount)} />
+        <SplitLayout panes={buildPanes(variant, caseName, paneCount, live)} />
       )}
 
       {notices.length > 0 || variant === "unresolved-template" ? (
@@ -315,7 +343,18 @@ function ViewCanvas({ variant }: { variant: string }) {
         </div>
       ) : null}
 
-      {variant === "probe" ? (
+      {e.probe ? (
+        /* What the engine answered: the value at the digits its storage supports, its unit or the
+         * statement that none was declared, where it came from, and where it is in the source's own
+         * words. Nothing here is formatted twice - `digits` came with the number (INV-014). */
+        <ProbeReadout
+          field={e.fieldName ?? ""}
+          value={e.probe.value === null ? "値なし" : formatValue(e.probe.value, e.probe.digits)}
+          unit={e.probe.unit}
+          origin={e.probe.provenance}
+          location={e.probeLocation ?? ""}
+        />
+      ) : variant === "probe" ? (
         <ProbeReadout
           field="ミーゼス応力"
           value="182.4"
@@ -355,7 +394,29 @@ function ViewCanvas({ variant }: { variant: string }) {
   );
 }
 
-function buildPanes(variant: string, caseName: string, count: number): ReactNode[] {
+/** Five ticks from the range the engine reported, at the digits it reported them to. Never computed
+ *  here: these are the numbers the picture's own ramp was built from (INV-001, INV-014). */
+function legendTicksFrom(statistics: ReturnType<typeof useEngine>["statistics"]): string[] | undefined {
+  const low = statistics?.minimum?.value;
+  const high = statistics?.maximum?.value;
+  const digits = statistics?.maximum?.digits;
+  if (low === null || low === undefined || high === null || high === undefined || !digits) return undefined;
+  return [4, 3, 2, 1, 0].map((step) => formatValue(low + ((high - low) * step) / 4, digits));
+}
+
+function buildPanes(
+  variant: string,
+  caseName: string,
+  count: number,
+  live?: {
+    imageUrl: string | null;
+    fieldLabel: string | null;
+    legendTicks?: string[];
+    reduced: string | null;
+    onOrbit: (by: { x: number; y: number }) => void;
+    onPickPixel: (at: { x: number; y: number }) => void;
+  },
+): ReactNode[] {
   const others = variant === "camera-unresolved" ? ["Run 09"] : ["Run 11", "Run 09", "Run 07"];
   return Array.from({ length: count }, (_, index) => {
     const name = index === 0 ? caseName : others[index - 1] ?? "Run 07";
@@ -370,10 +431,17 @@ function buildPanes(variant: string, caseName: string, count: number): ReactNode
       <ViewportPlaceholder
         key={index}
         caseName={label}
-        fieldLabel={index === 0 ? FIELD_LABEL : undefined}
+        fieldLabel={index === 0 ? live?.fieldLabel ?? FIELD_LABEL : undefined}
         map="viridis"
-        legendTicks={index === 0 ? LEGEND_TICKS : undefined}
-        reducedNote={variant === "reduced" && index === 0 ? "要素 1,244 万 → 156 万に間引き" : undefined}
+        legendTicks={index === 0 ? live?.legendTicks ?? LEGEND_TICKS : undefined}
+        reducedNote={
+          index === 0
+            ? live?.reduced ?? (variant === "reduced" ? "要素 1,244 万 → 156 万に間引き" : undefined)
+            : undefined
+        }
+        imageUrl={index === 0 ? live?.imageUrl ?? null : null}
+        onOrbit={index === 0 ? live?.onOrbit : undefined}
+        onPickPixel={index === 0 ? live?.onPickPixel : undefined}
       >
         {showCamera ? (
           <div className="pane-badge" style={{ left: "auto", right: 8 }} title="この画面が覗くカメラ">
@@ -773,7 +841,14 @@ function RendererErrorCanvas() {
 /* ================================ rail ====================================================== */
 
 export function ViewRail(props: { tab: string; variant: string }) {
-  return <RailBody key={`${props.tab}:${props.variant}`} tab={props.tab} variant={props.variant} />;
+  return (
+    <>
+      {/* What an engine makes possible, above the design state's own rail. Renders nothing when
+          there is no engine, so the catalogue is unchanged. */}
+      <EngineField />
+      <RailBody key={`${props.tab}:${props.variant}`} tab={props.tab} variant={props.variant} />
+    </>
+  );
 }
 
 const RAIL_TAB_LABEL: Record<string, string> = {

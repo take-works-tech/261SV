@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-25
+updated: 2026-09-19
 ---
 
 # Specifications
@@ -35,7 +35,7 @@ Index. The always-loaded layer points here and nowhere else; every body below is
 
 ## Gates
 
-Ten run in the build, and each says what it could **not** check rather than letting silence read as
+Twelve run in the build, and each says what it could **not** check rather than letting silence read as
 coverage:
 
 | Gate | Checks |
@@ -50,6 +50,8 @@ coverage:
 | `validate/check_gates_wired.py` | every validator here is invoked by something that runs it |
 | `validate/check_automerge_policy.py` | the automatic-merge workflow still checks every condition XC-218 names, still fails closed, and is present or absent in step with that decision's status |
 | `validate/check_mockup_states.py` | every catalogue state renders, not only typechecks - needs `MOCKUP_BASE_URL` and refuses to report success without it |
+| `validate/check_interface_states.py` | every design state of the production interface renders - needs `INTERFACE_BASE_URL` and refuses to report success without it |
+| `validate/check_client_types.py` | `src/ui/client/generated.ts` against CT-003: the interface's types are generated from the contract and regenerated here, so a hand edit or a contract change that did not reach them fails the build (XC-252) |
 | `ci` job `the wiring the merge depends on` | the review's `pull_request` trigger and `CLAUDE_CODE_OAUTH_TOKEN` are both present or both absent (XC-219), and every label the automation names exists (XC-218's `no-auto-merge` brake among them) - both read repository state a validator on disk cannot see |
 
 ## Format
