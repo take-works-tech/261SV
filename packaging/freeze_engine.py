@@ -42,6 +42,20 @@ DIST = BUILD / "engine"
 NAME = "solvia-engine"
 RUNTIME_DISTRIBUTIONS = ("vtk", "numpy")
 
+#: What `--collect-all vtkmodules` drags in that the engine never uses: VTK's GUI bindings import
+#: Tk, Qt, GTK and wx, and its image utilities import Pillow, so the first freeze shipped 830 Tcl
+#: data files, Tk, and Pillow's extension modules - found by the notices generator, which attributes
+#: every shipped file and refused to (XC-025). None of it is reachable from the engine's surface,
+#: which renders offscreen and hands bytes over HTTP; excluding it here keeps the closure to what the
+#: product is, and the notices generator is what proves the exclusion held.
+EXCLUDED_MODULES = (
+    "tkinter", "_tkinter", "PIL",
+    "vtkmodules.tk", "vtkmodules.qt", "vtkmodules.gtk", "vtkmodules.wx",
+    # readline is GPL-3.0 and pulls libreadline and libtinfo into a Linux freeze; nothing in the
+    # engine reads a terminal. Found by the notices generator on the first Linux run.
+    "readline",
+)
+
 
 def freeze() -> Path:
     if DIST.exists():
@@ -62,6 +76,8 @@ def freeze() -> Path:
     ]
     for distribution in RUNTIME_DISTRIBUTIONS:
         command += ["--copy-metadata", distribution]
+    for excluded in EXCLUDED_MODULES:
+        command += ["--exclude-module", excluded]
     command.append(str(ROOT / "packaging" / "engine_entry.py"))
     started = time.perf_counter()
     subprocess.run(command, check=True, cwd=ROOT)

@@ -26,6 +26,14 @@ extraResources:
   # verified through /health before anything is called "connected" (XC-259).
   - from: ../../build/engine/solvia-engine
     to: engine
+  # The notices as data, for the application to show (XC-025: "viewable in the application").
+  - from: ../../build/notices/notices.json
+    to: notices.json
+extraFiles:
+  # The notices as a file next to the executable (XC-025), generated from the closure by
+  # packaging/notices.py before packaging and verified against the packaged result after.
+  - from: ../../build/notices/THIRD-PARTY-NOTICES.txt
+    to: THIRD-PARTY-NOTICES.txt
 asar: true
 npmRebuild: false
 win:

@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-25
+updated: 2026-09-19
 ---
 
 # Technology
@@ -39,7 +39,12 @@ yet, and the path away from it does not exist.
   looked like the cheapest compliance decision - until the wheel showed it is not available without
   building VTK ourselves (XC-034)
 - decidedness: Fixed
-- basis: E-002 (T1), E-004 (T1), E-045 (T1), E-046 (T1), E-051 (T1)
+- basis: E-002 (T1), E-004 (T1), E-045 (T1), E-046 (T1), E-051 (T1), E-207 (T1)
+- correction: 2026-09-19. E-207 added: the notices are generated from the shipped files as this
+  decision says, and reading 9.5.2's own module descriptions for it found that scnlib - which E-046
+  placed on CommonCore's mandatory path from the master branch - is a test dependency in the release
+  that ships, so it is not in the closure. The decision's substance is unchanged; the basis now
+  names the release actually read
 - correction: the earlier version of this decision said copyleft entered only through modules that are
   off by default. That was false: gl2ps arrives through the default-on path. A guard written against
   the wrong list would have passed every build while the obligation stood
