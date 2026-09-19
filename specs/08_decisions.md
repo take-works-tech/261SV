@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-19
+updated: 2026-09-20
 ---
 
 # Decisions and open questions
@@ -5589,3 +5589,38 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a real case that needs more than fifty undo steps, at which point the number
   moves and the reason is written here; or a closure found holding a dataset again, at which point
   the surface gains a check that an undo is registered with a stated weight
+
+### XC-265 - A workspace document has a measured ceiling on items, and a file past it is opened and told
+- decided: 2026-09-20
+- status: active
+- decision: a workspace holds at most LIM-016 concrete items - views, graphs, reports and
+  simulations counted together. Creating one past that is refused with the limit's name and how
+  many each list holds. A document holding more - written by another version, by a script or by
+  hand - is opened whole with every field kept (CT-001); the open's answer warns with the count and
+  the limit; saving it is never refused; creating into it is, until it is under. The walk every
+  creation makes over the whole document to check the name (`naming.registry_of`) stays a walk: the
+  ceiling is what bounds it, and a cached registry would be a second copy of the document's names
+  to keep in step with handlers that edit the document directly (XC-015)
+- decided_by: engineering judgement on a measurement taken here (E-209)
+- rationale: **the cost of an item is a cost of the document**, three times over: every creation
+  walks all of them, every save and load carries all of them, and the list the interface is sent
+  names all of them. Measured (E-209): at ten thousand items each of those is a fraction of a
+  second and 68 MB; at a hundred thousand it is 2.9 s on every save and 682 MB - a dataset's memory
+  spent on definitions, on a machine whose dataset budget is LIM-001. Creating items one at a time
+  is quadratic in what is already there - 11.5 s for ten thousand from empty - and LIM-008 bounds
+  one loop to a thousand, so at the ceiling a loop costs about 2.5 s and not a night. **A file past
+  the ceiling is the person's work**, and refusing to read it over a limit on what this build will
+  add is losing it - failing quietly, which XC-011 puts below failing loudly; so it opens, says so,
+  and takes no more
+- alternatives: **a cap per list** - the interface shows lists, but the costs are per document, and
+  four lists of ten thousand is forty thousand of everything above. **No cap, and a registry kept
+  in memory** - fixes the walk and not the save, the load or the answer, and adds a second source
+  of the document's names (XC-015). **Refusing to open a file past the cap** - loses work to
+  protect a number. **Refusing to save one** - the same, later
+- basis: E-209 (T1), LIM-001, LIM-008
+- affects: MOD-007, LIM-016
+- decidedness: Bounded
+- reversal_trigger: a real workspace that needs more than ten thousand items, at which point the
+  number moves and the cost at the new number is measured and written beside it; or the interface
+  found unable to list ten thousand, at which point the ceiling is the interface's and not the
+  document's

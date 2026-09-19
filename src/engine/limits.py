@@ -57,6 +57,13 @@ MAX_INTERACTIVE_TRIANGLES = 10000000
 # specs/05_limits.md LIM-005: cases in one workspace, still an assumption
 MAX_CASES_PER_WORKSPACE = 500
 
+#: LIM-016. Concrete items - views, graphs, reports and simulations together - in one workspace
+#: document. Measured (E-209): at ten thousand a save and a load each take about 0.3 s, the parsed
+#: document peaks at 68 MB and one more item costs 5 ms, because every creation walks the whole
+#: document to check the name (naming.registry_of); at a hundred thousand each of those is ten times
+#: more and the memory is a dataset's. The walk stays a walk because this bounds it (XC-265).
+MAX_WORKSPACE_ITEMS = 10000
+
 # specs/05_limits.md LIM-007: how deep a pipeline may nest before it stops being readable
 MAX_PIPELINE_DEPTH = 3
 

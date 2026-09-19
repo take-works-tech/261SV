@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-19
+updated: 2026-09-20
 ---
 
 # Plan: workspace, cases and variables
@@ -36,3 +36,5 @@ features are storing data is a migration rather than an edit.
 - a @Variable has one definition, and inheritance resolves rather than copies (INV-004)
 - a damaged file never overwrites the original (workspace/AC-013)
 - a document written by a newer version keeps its unknown fields when an older version saves it (CT-001)
+- the document has a measured ceiling on items: creation past it is refused by name, and a file past
+  it opens whole and says so (LIM-016, XC-265)

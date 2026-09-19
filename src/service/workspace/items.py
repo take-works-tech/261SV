@@ -26,6 +26,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterable
 
+from engine.limits import MAX_WORKSPACE_ITEMS
 from service.workspace.hierarchy import walk
 from service.workspace.naming import NamingError, Registry, registry_of
 
@@ -66,6 +67,38 @@ def _collection(document: dict[str, Any], kind: str) -> list[dict[str, Any]]:
     return document.setdefault("workspaceItems", {}).setdefault(kind, [])
 
 
+def held_counts(document: dict[str, Any]) -> dict[str, int]:
+    """How many concrete items each collection holds, in the order XC-109 lists them."""
+    held = document.get("workspaceItems") or {}
+    counts: dict[str, int] = {}
+    for kind in COLLECTIONS:
+        entries = held.get(kind)
+        counts[kind] = len(entries) if isinstance(entries, list) else 0
+    return counts
+
+
+def _breakdown(counts: dict[str, int]) -> str:
+    return "・".join(f"{COLLECTIONS[kind]} {count:,} 件" for kind, count in counts.items() if count)
+
+
+def capacity_warning(document: dict[str, Any]) -> str | None:
+    """What to say about a document holding more items than LIM-016 allows, or None (XC-265).
+
+    Said rather than enforced at open: a document written by another version, by a script or by hand
+    is the person's work, and refusing to read it over a limit on what this build will add is losing
+    it. Opening keeps everything (CT-001) and saving is never refused; creating is, until it is under.
+    """
+    counts = held_counts(document)
+    total = sum(counts.values())
+    if total <= MAX_WORKSPACE_ITEMS:
+        return None
+    return (
+        f"項目が {total:,} 件あり、上限 {MAX_WORKSPACE_ITEMS:,} 件（LIM-016）を超えています"
+        f"（{_breakdown(counts)}）。開いて読み書きすることはできますが、"
+        "項目を作ることは上限を下回るまで拒みます"
+    )
+
+
 def templates_of(document: dict[str, Any], kind: str) -> list[dict[str, Any]]:
     """The workspace-scoped reusable entries of one kind.
 
@@ -85,7 +118,18 @@ def create(
     *,
     source: SourceTemplate | None = None,
 ) -> dict[str, Any]:
-    """Add a concrete item to the workspace. Never to a @Case, and never as a template (AC-030)."""
+    """Add a concrete item to the workspace. Never to a @Case, and never as a template (AC-030).
+
+    Refused past LIM-016, by the limit's name and with what each list holds (XC-265): the cost of an
+    item is a cost of the whole document - this very walk over every name, every save and load, and
+    the list the interface is sent - and the ceiling is what keeps each of those a fraction of a second.
+    """
+    counts = held_counts(document)
+    if sum(counts.values()) >= MAX_WORKSPACE_ITEMS:
+        raise ItemError(
+            f"ワークスペースの項目が上限 {MAX_WORKSPACE_ITEMS:,} 件（LIM-016）に達しています"
+            f"（{_breakdown(counts)}）。作るには、要らない項目を消すか、ワークスペースを分けてください"
+        )
     registry = registry_of(document)
     singular = kind[:-1] if kind.endswith("s") else kind
     try:

@@ -13,17 +13,20 @@ from typing import Any
 
 import pytest
 
+from engine.limits import MAX_WORKSPACE_ITEMS
 from service.workspace.hierarchy import add, new_case
 from service.workspace.items import (
     COLLECTIONS,
     ItemError,
     SourceTemplate,
     apply_template,
+    capacity_warning,
     preview_application,
     cases_owning_items,
     create,
     edit,
     find,
+    held_counts,
     save_as_template,
 )
 
@@ -234,3 +237,59 @@ class TestTheResolutionIsShownBeforeAnythingIsCreated:
 
         assert item["definition"] == shown.definition
         assert item["sourceTemplate"]["revision"] == shown.revision
+
+class TestTheWorkspaceIsBoundedInItems:
+    """LIM-016 (XC-265). The cost of an item is a cost of the document: a walk over every name at each
+    creation, a share of every save and load, and a line in the list the interface is sent. Ten
+    thousand is where each measured cost is still a fraction of a second (E-209); past it creation is
+    refused by name, and a document already past it is described rather than refused."""
+
+    def full(self) -> dict[str, Any]:
+        document = workspace()
+        held = document["workspaceItems"]
+        held["views"] = [
+            {"id": f"view:{n:05d}", "name": f"v{n}", "definition": {}} for n in range(MAX_WORKSPACE_ITEMS - 1)
+        ]
+        held["reports"] = [{"id": "report:00001", "name": "r", "definition": {}}]
+        return document
+
+    def test_the_item_that_would_pass_the_limit_is_refused_by_name(self) -> None:
+        document = self.full()
+
+        with pytest.raises(ItemError) as refusal:
+            create(document, "graphs", "graph:00001", "g", {})
+
+        said = str(refusal.value)
+        assert "LIM-016" in said and f"{MAX_WORKSPACE_ITEMS:,} 件" in said
+        assert f"ビュー一覧 {MAX_WORKSPACE_ITEMS - 1:,} 件" in said and "レポート一覧 1 件" in said
+        assert held_counts(document) == {
+            "views": MAX_WORKSPACE_ITEMS - 1, "graphs": 0, "reports": 1, "simulations": 0,
+        }
+
+    def test_the_item_before_it_is_created(self) -> None:
+        document = self.full()
+        document["workspaceItems"]["reports"].clear()
+
+        create(document, "graphs", "graph:00001", "g", {})
+
+        assert sum(held_counts(document).values()) == MAX_WORKSPACE_ITEMS
+
+    def test_applying_a_template_goes_through_the_same_door(self) -> None:
+        document = with_template(self.full())
+
+        with pytest.raises(ItemError) as refusal:
+            apply(document, "view:99999", "断面")
+
+        assert "LIM-016" in str(refusal.value)
+
+    def test_a_document_over_the_limit_is_described_and_not_refused(self) -> None:
+        document = self.full()
+        document["workspaceItems"]["graphs"] = [
+            {"id": f"graph:{n:05d}", "name": f"g{n}", "definition": {}} for n in range(1)
+        ]
+
+        said = capacity_warning(document)
+
+        assert said is not None
+        assert "LIM-016" in said and f"{MAX_WORKSPACE_ITEMS + 1:,} 件" in said
+        assert capacity_warning(workspace()) is None

@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-22
+updated: 2026-09-20
 ---
 
 # Feature: workspace, cases and variables
@@ -259,6 +259,9 @@ updated: 2026-08-22
     and shall never touch input data
   - AC-054: When any time is recorded, the system shall store it in UTC with the local offset beside it,
     and shall display it in the reader's own zone (XC-142)
+  - AC-075: When the @Workspace holds LIM-016 concrete items, the system shall refuse to create another,
+    naming the limit and the count in each list; a document holding more shall open with everything
+    kept and a warning naming the count and the limit, and shall still save (XC-265)
 
 ### REQ-017 - Workspace and Workspace list are distinct shell destinations
 - priority: MUST

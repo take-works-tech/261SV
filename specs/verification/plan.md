@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-22
+updated: 2026-09-20
 ---
 
 # Verification plan
@@ -443,6 +443,7 @@ honestly is better than an automated check that passes while the proposal is use
 | workspace/AC-072 | unit | tests/test_ui_mockup_catalog.py | both executable UI catalogues' View current-state and material-library labels | authored in the mockups | exact | current-state controls say Object, the reusable View category says Object, and reusable-resource lifecycle remains Asset |
 | workspace/AC-073 | unit plus responsive mockup | tests/test_ui_mockup_catalog.py | six top work-area tabs and View, Graph and Report material-library category groups at desktop and narrow widths | authored in the mockup | exact | one stable width within each group; icon-only top tabs at the narrow breakpoint; equal readable library tabs retain horizontal overflow |
 | workspace/AC-074 | unit plus interaction | tests/test_ui_mockup_catalog.py::test_every_right_sidebar_mode_uses_responsibility_specific_editors | every right-rail tab in Simulation, Automation, View, Graph, Report, Settings and Network, including dependent mode choices and unavailable states | authored in the mockup | exact | no generic placeholder editor remains; each tab exposes only responsibility-specific controls; switching background/output/dimension/commentary/material mapping choices reveals only applicable fields; unsupported solvers, renderers, variables, models and permissions remain named; Graph and Report expose their contract output families |
+| workspace/AC-075 | unit plus integration | tests/test_workspace_items.py::TestTheWorkspaceIsBoundedInItems and tests/test_handlers.py::TestAWorkspaceIsBoundedInItems | a document holding LIM-016 items, and one holding one more | generated in the test | exact | creation past the limit is refused naming LIM-016 and the count in each list; the document past it opens with every item kept and a warning naming the count and the limit, and saves |
 | assistant/AC-035 | unit (planned) | - | the contracts as they stand | the specification itself | exact | the description matches the catalogue exactly |
 | assistant/AC-036 | unit (planned) | - | a workspace with loaded data | generated in the test | exact | no array of field values appears in what is sent |
 | assistant/AC-037 | unit (planned) | - | an operation added to the contracts | authored in the test | exact | the generated description changes with no second edit |

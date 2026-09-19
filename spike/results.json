@@ -146,5 +146,76 @@
     },
     "megabytes": 6,
     "settles": "XC-262: one transient root, pid-named sessions, orphans detected at start and removed only on a person's word; the smoke and the measurement remove their own"
+  },
+  "workspace_document": {
+    "measured": "2026-09-20",
+    "script": "spike/measure_workspace_document.py",
+    "machine": "Windows 11 (platform reports 'Windows 10'), Python 3.11.9, warm cache",
+    "item_shape": "views, graphs and reports in equal parts over one case; each carries a definition of the shape CT-004 to CT-006 describe (a camera and a colour map, three series with axes, four report blocks with a commentary)",
+    "sizes": [
+      {
+        "items": 100,
+        "file_bytes": 95035,
+        "save_ms": 3.9,
+        "load_ms": 2.1,
+        "load_peak_mb": 0.7,
+        "open_answer_bytes": 5920,
+        "open_answer_ms": 0.0,
+        "create_one_more_ms": 0.0
+      },
+      {
+        "items": 1000,
+        "file_bytes": 948235,
+        "save_ms": 28.9,
+        "load_ms": 21.2,
+        "load_peak_mb": 6.8,
+        "open_answer_bytes": 58720,
+        "open_answer_ms": 0.2,
+        "create_one_more_ms": 0.0
+      },
+      {
+        "items": 10000,
+        "file_bytes": 9483235,
+        "save_ms": 285.2,
+        "load_ms": 273.7,
+        "load_peak_mb": 68.2,
+        "open_answer_bytes": 586720,
+        "open_answer_ms": 2.4,
+        "create_one_more_ms": 5.2
+      },
+      {
+        "items": 100000,
+        "file_bytes": 94863235,
+        "save_ms": 2855.2,
+        "load_ms": 2883.9,
+        "load_peak_mb": 681.8,
+        "open_answer_bytes": 5866720,
+        "open_answer_ms": 29.9,
+        "create_one_more_ms": 106.3
+      }
+    ],
+    "sequential_create": [
+      {
+        "items": 1000,
+        "total_s": 0.09,
+        "last_create_ms": 0.21
+      },
+      {
+        "items": 2000,
+        "total_s": 0.38,
+        "last_create_ms": 0.37
+      },
+      {
+        "items": 5000,
+        "total_s": 2.5,
+        "last_create_ms": 1.04
+      },
+      {
+        "items": 10000,
+        "total_s": 11.45,
+        "last_create_ms": 2.45
+      }
+    ],
+    "not_measured": "a first open from a cold disk; the interface rendering the lists it is sent; a document with hundreds of cases beside the items (LIM-005 is measured separately when it is)"
   }
 }

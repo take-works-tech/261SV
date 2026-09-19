@@ -359,6 +359,12 @@ def workspace_open(session: Session, parameters: Mapping[str, Any]) -> Effect | 
         except OSError as error:
             warnings = (f"{interrupted.name} を消せませんでした：{error}",)
 
+    # A document holding more items than LIM-016 allows is opened whole and said, not refused: it is
+    # the person's work, and the limit is on what this build adds to it (XC-265).
+    over = items.capacity_warning(loaded.raw)
+    if over is not None:
+        warnings += (over,)
+
     # A dataset belongs to a case of a workspace; the one that was open is no longer, so neither are
     # they. They are **not** kept for undo: an undo closure holding every dataset of every workspace
     # a session has opened is the memory #315 is about (LIM-001 per case, times the history). The
