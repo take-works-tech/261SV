@@ -23,6 +23,7 @@ Specification: CT-001, workspace/AC-012.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -146,3 +147,75 @@ def resolve_case(case: dict[str, Any], *, relative_to: Path) -> CaseResolution:
             status_of(source, relative_to=relative_to) for source in case.get("sources", [])
         ),
     )
+
+
+# ---- what a person declared about a source's fields (CT-001 `declaredUnits`, XC-003) ------------
+
+def _same_file(candidate: Path, path: Path) -> bool:
+    try:
+        return candidate.resolve() == path.resolve()
+    except OSError:
+        return False
+
+
+def find_source(case: dict[str, Any], path: Path, *, relative_to: Path) -> dict[str, Any] | None:
+    """The case's entry for this file, by its relative or its absolute path, or None."""
+    for source in case.get("sources") or []:
+        relative = source.get("pathRelative")
+        if relative and _same_file(relative_to / str(relative), path):
+            return source
+        absolute = source.get("pathAbsolute")
+        if absolute and _same_file(Path(str(absolute)), path):
+            return source
+    return None
+
+
+def ensure_source(case: dict[str, Any], path: Path, *, relative_to: Path) -> tuple[dict[str, Any], bool]:
+    """The case's entry for this file, created from the file itself when the case had none.
+
+    Returns the entry and whether it was created. A file outside the workspace's directory gets the
+    nearest relative path the platform allows and its absolute path beside it (CT-001 keeps both);
+    on another drive, where no relative path exists, the absolute path stands in and says so by
+    being absolute.
+    """
+    found = find_source(case, path, relative_to=relative_to)
+    if found is not None:
+        found.setdefault("declaredUnits", {})
+        return found, False
+    try:
+        source = record(path, relative_to=relative_to)
+    except ValueError:
+        source = record(path, relative_to=path.parent)
+        try:
+            source["pathRelative"] = Path(os.path.relpath(path.resolve(), relative_to.resolve())).as_posix()
+        except ValueError:
+            source["pathRelative"] = path.resolve().as_posix()
+    source["pathAbsolute"] = str(path.resolve())
+    source["declaredUnits"] = {}
+    case.setdefault("sources", []).append(source)
+    return source, True
+
+
+def declared_units(source: dict[str, Any]) -> dict[str, str]:
+    """Field name to unit symbol, as declared; empty where nothing was. Never a guess (XC-003)."""
+    units = source.get("declaredUnits")
+    if not isinstance(units, dict):
+        return {}
+    return {str(name): symbol for name, symbol in units.items() if isinstance(symbol, str)}
+
+
+def record_unit(source: dict[str, Any], field_name: str, symbol: str) -> str | None:
+    """Write one declaration into the entry; returns what it replaced, if anything."""
+    units = source.setdefault("declaredUnits", {})
+    previous = units.get(field_name)
+    units[field_name] = symbol
+    return previous if isinstance(previous, str) else None
+
+
+def forget_unit(source: dict[str, Any], field_name: str, previous: str | None) -> None:
+    """Undo `record_unit`: put back what was there, or remove what was not."""
+    units = source.setdefault("declaredUnits", {})
+    if previous is None:
+        units.pop(field_name, None)
+    else:
+        units[field_name] = previous
