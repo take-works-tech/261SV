@@ -16,6 +16,8 @@ Specification: GL-034, INV-023, ingest/AC-035, AC-036. Evidence: E-075 (T1), E-1
 
 from __future__ import annotations
 
+from domain_core.association import Association
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -82,11 +84,29 @@ class SourceIdentifiers:
 
 #: What is said instead of a location, when the file named nothing. Stated once so that two reports of
 #: the same absence agree, and phrased as a fact about the file rather than as a failure of this product.
+#: Kept in the cell form for the two tests that pin it; `no_identifier(association)` says which kind.
 NO_IDENTIFIER = "このファイルは要素の識別子を持たないため、位置を示せません（配列位置は識別子ではありません）"
 
+#: What each kind of identifier is called where its absence is stated. A node value picked from
+#: a file with no node numbers was told "no element identifiers" - true of nothing it was asked
+#: about, and exactly the wrong thing to send a person checking their mesh after.
+IDENTIFIER_KIND: dict[Association, str] = {
+    Association.POINT: "節点",
+    Association.CELL: "要素",
+    Association.INTEGRATION_POINT: "積分点",
+}
 
-def location_of(identifiers: SourceIdentifiers | None, index: int) -> str:
+
+def no_identifier(association: Association) -> str:
+    """The statement that the source carries no identifiers of this kind, naming the kind."""
+    kind = IDENTIFIER_KIND.get(association, "要素")
+    return f"このファイルは{kind}の識別子を持たないため、位置を示せません（配列位置は識別子ではありません）"
+
+
+def location_of(
+    identifiers: SourceIdentifiers | None, index: int, association: Association = Association.CELL
+) -> str:
     """Where a value is, in the source's own words, or the statement that the source did not say."""
     if identifiers is None:
-        return NO_IDENTIFIER
-    return identifiers.at(index) or NO_IDENTIFIER
+        return no_identifier(association)
+    return identifiers.at(index) or no_identifier(association)

@@ -10,7 +10,13 @@ updated: 2026-09-19
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 2.3.0
+- version: 2.4.0
+- correction: 2026-09-19, version 2.3.0 to 2.4.0. `view.render` takes `legend`, default true. A
+  document must carry its colour bar inside the picture because nothing else in a document can
+  (XC-254); a screen has chrome beside the picture that carries the legend **with its unit**, which
+  the picture's own bar cannot (E-192: the embedded face draws Japanese as nothing). Drawn in both
+  places, the screen showed two scales for one image. The legend is a property of the drawing, like
+  width and format, not of the view, so it is a render parameter and not a CT-004 field. Additive
 - correction: 2026-09-19, version 2.2.0 to 2.3.0. `dataset.probe` takes a point in canonical metres,
   which is the right thing for a script and the wrong thing for a person: an interface has a **pixel**
   a person clicked, and turning one into the other needs the camera the picture was drawn with. The
@@ -87,7 +93,7 @@ no identifier to report.
 | `view.duplicate` | write | view id, new name | new independent workspace view id |
 | `view.rename` | write | view id, new name | new revision; stored id references unchanged |
 | `view.delete` | write | view id | deleted id; dependent pipeline units retained as unresolved |
-| `view.render` | read | view id, width, height, format | image bytes or a handle to them |
+| `view.render` | read | view id, width, height, format, legend (default true) | image bytes or a handle to them |
 | `view.pick` | read | view id, width, height, pixel x and y | the value under that pixel with its unit, digits, provenance and location, and which point or cell it is - or nothing, where the pixel is off the model (view/AC-027, view/AC-029) |
 | `graph.create` | write | workspace id, definition (CT-005), source template id and revision? | workspace graph id and revision (XC-109) |
 | `graph.update` | write | graph id, definition | new graph revision |

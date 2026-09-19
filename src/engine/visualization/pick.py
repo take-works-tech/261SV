@@ -168,7 +168,7 @@ def _value_at(
         vertex = int(corners[int(np.argmin(np.einsum("ij,ij->i", offsets, offsets)))])
         source = int(geometry.source_points[vertex])
         value = dataset.value(field.name, source)
-        location = location_of(dataset.identifiers.get(Association.POINT), source)
+        location = location_of(dataset.identifiers.get(Association.POINT), source, Association.POINT)
         return Pick(replace(value, location=location), Association.POINT, distance, triangle)
 
     source_cell = int(geometry.source_cells[triangle])
@@ -186,5 +186,5 @@ def _value_at(
             triangle=triangle,
         )
     value = dataset.value(field.name, source_cell)
-    location = location_of(dataset.identifiers.get(Association.CELL), source_cell)
+    location = location_of(dataset.identifiers.get(Association.CELL), source_cell, Association.CELL)
     return Pick(replace(value, location=location), Association.CELL, distance, triangle)

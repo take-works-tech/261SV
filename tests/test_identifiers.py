@@ -15,7 +15,7 @@ import pytest
 
 from domain_core.association import Association
 from domain_core.dataset import Dataset, Field
-from domain_core.identifiers import NO_IDENTIFIER, SourceIdentifiers, location_of
+from domain_core.identifiers import NO_IDENTIFIER, SourceIdentifiers, location_of, no_identifier
 from domain_core.mesh import Cells
 
 QUAD = Cells(np.array([0, 3, 6], np.int64), np.array([0, 1, 2, 1, 3, 2], np.int64), np.array([5, 5], np.uint8))
@@ -48,7 +48,10 @@ class TestAnExtremeValueSaysWhereItIs:
         value = dataset(identified=False).maximum("stress")
 
         assert value.value == 90.0
-        assert value.location == NO_IDENTIFIER
+        # "stress" is a point field, so the absence it states is of node identifiers - not element
+        # ones, which is what every value was told before the kind was named.
+        assert value.location == no_identifier(Association.POINT)
+        assert "節点" in value.location
         assert "2" not in (value.location or "")
 
     def test_the_absence_is_phrased_as_a_fact_about_the_file(self) -> None:

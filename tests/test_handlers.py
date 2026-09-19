@@ -13,6 +13,7 @@ Verifies: CT-003, INV-006, INV-017, XC-003, XC-253, XC-257 (step 2).
 
 from __future__ import annotations
 
+import base64
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -712,6 +713,34 @@ class TestADeliverableCarriesAStill:
             "blocks": [block, {"kind": "valueTable", "fields": ["stress"]}],
         }})).value["id"]
         return view, report
+
+    def test_a_document_s_figure_keeps_its_bar_whatever_the_screen_asked(self, tmp_path: Path) -> None:
+        """The screen renders with `legend: false` (E-192). The document must not inherit that: its
+        figure is drawn by `report.export` with the default, and the bar is inside the picture."""
+        surface, session, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        view_id = surface.submit(Command("view.create", {"workspaceId": "ws:1", "definition": {
+            "name": "全体図", "datasetId": dataset_id, "representation": "surface",
+            "colouring": {"fieldName": "temperature", "association": "point", "colourMap": "viridis"},
+        }})).value["id"]
+        # The screen's render of the same view, without a bar.
+        screen = surface.submit(Command("view.render", {
+            "viewId": view_id, "width": 400, "height": 300, "format": "png", "legend": False,
+        }))
+        assert screen.status is Status.ANSWERED, screen.reason
+        bare = session.handles.fetch(screen.value["handle"])
+        report_id = surface.submit(Command("report.create", {"workspaceId": "ws:1", "definition": {
+            "name": "図つき", "targets": ["html"],
+            "blocks": [{"kind": "view", "viewId": view_id, "form": "still"}],
+        }})).value["id"]
+        target = tmp_path / "with-figure.html"
+
+        surface.submit(Command("report.export", {"reportId": report_id, "path": str(target)}))
+
+        document = target.read_text(encoding="utf-8")
+        start = document.index("data:image/png;base64,") + len("data:image/png;base64,")
+        embedded = base64.b64decode(document[start : document.index('"', start)])
+        assert embedded != bare, "the document's figure is not the screen's bare frame"
+        assert len(embedded) > len(bare) * 0.9, "and is a full picture of the same view, not a stub"
 
     def test_the_picture_its_legend_and_the_still_statement_are_in_the_file(self, tmp_path: Path) -> None:
         surface, _, dataset_id = loaded(tmp_path)

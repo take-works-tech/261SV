@@ -352,7 +352,9 @@ export const engineState = {
       setState({ viewId });
     }
     if (!viewId) return;
-    const rendered = await ask("view.render", { viewId, ...FRAME, format: "png" });
+    // No bar inside the picture: the rail's legend carries the range with its unit, which the
+    // bar cannot (E-192), and two scales for one image is one too many. A document asks for it.
+const rendered = await ask("view.render", { viewId, ...FRAME, format: "png", legend: false });
     if (rendered?.handle) {
       try {
         const blob = await engine.handle(rendered.handle);
