@@ -10,7 +10,14 @@ updated: 2026-09-19
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 2.5.0
+- version: 2.6.0
+- correction: 2026-09-19, version 2.5.0 to 2.6.0. `workspace.open` answers the items the document
+  holds. Found by the recovery path of #306: after an engine restart the interface reopened the
+  saved document and then created its working view again under the same name, which the document
+  refuses because names are unique within a kind (workspace/AC-030) - correctly. Nothing in the
+  contract let a caller learn what a document it had just opened contained, so it could neither
+  update the saved view nor know it existed. Additive; no listing operation is added, because the
+  moment of opening is when the answer is wanted
 - correction: 2026-09-19, version 2.4.0 to 2.5.0. `$defs.transport` gains `connectionFile`, the name of
   the file the engine writes and the shell reads. The shell (MOD-018) defined it a second time in
   TypeScript and the duplication gate caught it the same hour; the two sides cannot import from each
@@ -78,7 +85,7 @@ no identifier to report.
 
 | Operation | Reads or writes | Parameters | Result |
 |---|---|---|---|
-| `workspace.open` | write | path | workspace id, unresolved cases, format version |
+| `workspace.open` | write | path | workspace id, unresolved cases, format version, and the items the document holds (views, graphs, reports: id, name, dataset) |
 | `workspace.save` | write | workspace id, path? | path written, previous version kept |
 | `workspace.close` | write | workspace id | - |
 | `case.create` | write | workspace id, parent case id?, name | case id |

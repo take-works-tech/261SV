@@ -27,6 +27,18 @@ const api: ShellApi = {
     },
     restart: () => ipcRenderer.invoke("engine:restart"),
   },
+  app: {
+    onWillQuit: (listener: () => void) => {
+      const handler = () => listener();
+      ipcRenderer.on("app:will-quit", handler);
+      return () => {
+        ipcRenderer.removeListener("app:will-quit", handler);
+      };
+    },
+    quitReady: () => {
+      ipcRenderer.send("app:quit-ready");
+    },
+  },
   dialog: {
     openWorkspace: () => ipcRenderer.invoke("dialog:openWorkspace"),
     openResult: () => ipcRenderer.invoke("dialog:openResult"),

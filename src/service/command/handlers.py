@@ -345,9 +345,29 @@ def workspace_open(session: Session, parameters: Mapping[str, Any]) -> Effect | 
             "workspaceId": loaded.identifier,
             "formatVersion": loaded.format_version,
             "unresolvedCases": unresolved,
+            "items": items_of(loaded),
         },
         undo=undo,
     )
+
+
+def items_of(workspace: WorkspaceDocument) -> dict[str, list[dict[str, str]]]:
+    """The views, graphs and reports a document holds, by id and name - what a caller needs to
+    update one rather than create a second under a name the document refuses (AC-030)."""
+    held = workspace.raw.get("workspaceItems") or {}
+    answer: dict[str, list[dict[str, str]]] = {}
+    for kind in ("views", "graphs", "reports"):
+        entries = []
+        for entry in held.get(kind) or []:
+            if not isinstance(entry, dict):
+                continue
+            one = {"id": str(entry.get("id", "")), "name": str(entry.get("name", ""))}
+            definition = entry.get("definition") or {}
+            if kind == "views" and isinstance(definition, dict) and definition.get("datasetId"):
+                one["datasetId"] = str(definition["datasetId"])
+            entries.append(one)
+        answer[kind] = entries
+    return answer
 
 
 def workspace_save(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:

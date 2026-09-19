@@ -211,10 +211,27 @@ app.on("second-instance", () => {
 });
 
 app.on("before-quit", (event) => {
-  if (stopping || !engine || engine.status().state === "exited") return;
+  if (stopping) return;
   event.preventDefault();
   stopping = true;
-  void engine.stop().then(() => app.quit());
+  // The interface gets the chance to save first, bounded: a quit that waits forever on a renderer
+  // that will not answer is a hang, and a quit that does not wait loses what a crash would have.
+  const windows = BrowserWindow.getAllWindows();
+  const waitForSave = new Promise<void>((resolve) => {
+    if (windows.length === 0 || !engine || engine.status().state !== "running") {
+      resolve();
+      return;
+    }
+    const timer = setTimeout(resolve, 3_000);
+    ipcMain.once("app:quit-ready", () => {
+      clearTimeout(timer);
+      resolve();
+    });
+    for (const each of windows) each.webContents.send("app:will-quit");
+  });
+  void waitForSave
+    .then(() => (engine && engine.status().state !== "exited" ? engine.stop() : Promise.resolve(null)))
+    .then(() => app.quit());
 });
 
 app.on("window-all-closed", () => {

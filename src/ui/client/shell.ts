@@ -65,6 +65,12 @@ export interface ShellApi {
     /** Stop what is running, if anything, and start again. Resolves with the new status. */
     restart(): Promise<EngineProcessStatus>;
   };
+  readonly app: {
+    /** The shell is about to quit and will wait, bounded, for `quitReady` (XC-259): the interface
+     *  saves the document in between, so quitting does not lose what a crash would have. */
+    onWillQuit(listener: () => void): () => void;
+    quitReady(): void;
+  };
   readonly dialog: {
     /** A path the person chose, or null if they cancelled. The path is the shell's to obtain: a page
      *  in a browser gets a File and never a path, and the engine reads from disk (XC-259). */

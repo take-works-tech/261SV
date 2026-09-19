@@ -40,8 +40,42 @@ export interface FieldSummary {
  *  its unit, digits and provenance is a value in whatever unit the reader assumed (XC-003). */
 export type Reported = Results["dataset.probe"]["value"];
 
+/** One write the engine applied since the document was last saved. What a crash loses is exactly
+ *  this list, so it is kept as the engine answers it - operation and the engine's own summary - and
+ *  never reconstructed afterwards (XC-259). */
+export interface AppliedWrite {
+  readonly operation: string;
+  readonly summary: string;
+  readonly at: string;
+}
+
+/** What was opened, so that what was saved can be opened again after the engine is restarted. */
+export interface Opened {
+  readonly workspacePath: string;
+  readonly caseId: string | null;
+  readonly filePath: string | null;
+}
+
+/** A view the opened document already holds, as `workspace.open` answered it. */
+export interface SavedView {
+  readonly id: string;
+  readonly name: string;
+  readonly datasetId?: string;
+}
+
 export interface EngineState {
   readonly reachability: Reachability;
+  readonly opened: Opened | null;
+  /** What the document held when it was opened. A working view is updated when one of these has
+   *  its name, because the document refuses a second view under a name it holds (AC-030). */
+  readonly savedViews: readonly SavedView[];
+  /** Applied writes since the last save. Cleared by a save, by opening a workspace, and by an exit -
+   *  into `lost`. */
+  readonly journal: readonly AppliedWrite[];
+  /** What the last exit lost, until a person dismisses it. Null when nothing was lost or nothing
+   *  ended. */
+  readonly lost: readonly AppliedWrite[] | null;
+  readonly savedAt: string | null;
   readonly workspaceId: string | null;
   readonly unresolvedCases: readonly string[];
   readonly caseId: string | null;
@@ -107,6 +141,11 @@ function cameraFrom(turntable: Turntable, bounds: readonly [number[], number[]] 
 
 const EMPTY: EngineState = {
   reachability: { kind: "unknown" },
+  opened: null,
+  savedViews: [],
+  journal: [],
+  lost: null,
+  savedAt: null,
   workspaceId: null,
   unresolvedCases: [],
   caseId: null,
@@ -184,8 +223,21 @@ async function ask<O extends Operation>(
     setState({ refusal: reasonText(answer.reason) || `'${operation}' は行えませんでした` });
     return null;
   }
+  if (answer.status === "applied" && !NOT_UNSAVED_WORK.has(operation)) {
+    setState({
+      journal: [
+        ...state.journal,
+        { operation, summary: answer.effectSummary ?? operation, at: new Date().toISOString() },
+      ],
+    });
+  }
   return (answer.result ?? null) as Results[O] | null;
 }
+
+/** Applied writes that are not unsaved work: opening and saving reset the journal, and loading a
+ *  file is recoverable from the path this store remembers rather than lost. Everything else the
+ *  engine applies - a declaration, a view, a report - lives in the document until saved. */
+const NOT_UNSAVED_WORK = new Set<string>(["workspace.open", "workspace.save", "dataset.load"]);
 
 export const engineState = {
   /** Point the interface at an engine. Called once by the shell with what the connection file said. */
@@ -218,7 +270,41 @@ export const engineState = {
         signal: status.signal,
       },
       busy: false,
+      // What was applied and never saved is what is gone. It is said, not rebuilt (XC-259).
+      lost: state.journal.length > 0 ? state.journal : state.lost,
+      journal: [],
     });
+  },
+
+  /** After a restart: connect, and open again what was saved - the document from disk and the
+   *  file from its path. The unsaved writes stay in `lost`, on screen, until dismissed; nothing
+   *  here re-applies them. */
+  async recover(connection: Connection): Promise<Reachability> {
+    const opened = state.opened;
+    const reachability = await engineState.connect(connection);
+    if (reachability.kind !== "reachable" || !opened) return reachability;
+    const lost = state.lost;
+    if (!(await engineState.openWorkspace(opened.workspacePath))) return reachability;
+    if (opened.caseId && opened.filePath) {
+      if (await engineState.loadDataset(opened.caseId, opened.filePath)) await engineState.refresh();
+    }
+    setState({ lost });
+    return reachability;
+  },
+
+  dismissLost() {
+    setState({ lost: null });
+  },
+
+  /** Class 3: write the document back. The journal empties because the document on disk now holds
+   *  what it held; the previous version is kept beside it by the engine (XC-055). */
+  async save(): Promise<boolean> {
+    if (!state.workspaceId) return false;
+    setState({ refusal: null });
+    const saved = await ask("workspace.save", { workspaceId: state.workspaceId });
+    if (!saved) return false;
+    setState({ journal: [], savedAt: new Date().toISOString() });
+    return true;
   },
 
   /** No engine: the screens stay the catalogue of design states they are, and say so. */
@@ -240,6 +326,10 @@ export const engineState = {
     if (!opened) return false;
     setImage(null, null);
     setState({
+      opened: { workspacePath: path, caseId: null, filePath: null },
+      savedViews: (opened.items?.views ?? []) as readonly SavedView[],
+      journal: [],
+      savedAt: null,
       workspaceId: opened.workspaceId,
       unresolvedCases: opened.unresolvedCases ?? [],
       caseId: null,
@@ -263,6 +353,7 @@ export const engineState = {
     const fields = (loaded.fields ?? []) as readonly FieldSummary[];
     setImage(null, null);
     setState({
+      opened: state.opened ? { ...state.opened, caseId, filePath } : null,
       caseId,
       datasetId: loaded.datasetId,
       sourceName: filePath.split(/[\\/]/).pop() ?? filePath,
@@ -362,6 +453,15 @@ export const engineState = {
       background: { rgb: SCREEN_GROUND },
     };
     let viewId = state.viewId;
+    if (!viewId) {
+      // The document may already hold this view - saved in an earlier session - and a second one
+      // under the same name is refused (AC-030). Updating it is what a person means by "the view".
+      const saved = state.savedViews.find((one) => one.name === state.fieldName);
+      if (saved) {
+        viewId = saved.id;
+        setState({ viewId });
+      }
+    }
     if (viewId) {
       await ask("view.update", { viewId, definition });
     } else {
