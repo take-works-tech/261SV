@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import unquote
 
-from service.command.catalogue import (
+from service.command.catalogue import (CONNECTION_FILE, 
     COMMAND_PATH,
     HANDLE_PATH,
     HEALTH_PATH,
@@ -52,7 +52,6 @@ from service.command.surface import Command, Origin, Permission, Result, Status,
 # in it lands in logs, in a browser's history and in a referrer.
 
 #: How the interface finds the engine. Written by the engine, read by the shell that started it.
-CONNECTION_FILE = "connection.json"
 
 #: The address. Never 0.0.0.0: binding every interface would put the command surface on the network,
 #: which is the one thing INV-007 and this product's whole position refuse.

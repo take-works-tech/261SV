@@ -41,7 +41,7 @@ SKIP_DIRS = {
 # add one only when the second definition is genuinely a different thing that happens to share a name.
 #: Names defined twice on purpose, each with the reason it is not a duplication to fix.
 #:
-#: `PROTOCOL_VERSION`, `TOKEN_HEADER`, `COMMAND_PATH`, `HANDLE_PATH`, `HEALTH_PATH`: the two sides of
+#: `PROTOCOL_VERSION`, `TOKEN_HEADER`, `COMMAND_PATH`, `HANDLE_PATH`, `HEALTH_PATH`, `CONNECTION_FILE`: the two sides of
 #: the wire are different languages and cannot import from each other, so both are **generated from
 #: CT-003** - `src/service/command/catalogue.py` by check_commands.py and
 #: `src/ui/client/generated.ts` by check_client_types.py. Neither is derived from the other and both
@@ -49,7 +49,7 @@ SKIP_DIRS = {
 #: this gate asks for, arriving in two files because it has to.
 EXEMPT: frozenset[str] = frozenset({
     "__all__", "TYPE_CHECKING",
-    "PROTOCOL_VERSION", "TOKEN_HEADER", "COMMAND_PATH", "HANDLE_PATH", "HEALTH_PATH",
+    "PROTOCOL_VERSION", "TOKEN_HEADER", "COMMAND_PATH", "HANDLE_PATH", "HEALTH_PATH", "CONNECTION_FILE",
 })
 
 _PY = re.compile(r"^([A-Z][A-Z0-9_]{2,})\s*(?::[^=]+)?=\s*(.+?)\s*(?:#.*)?$")

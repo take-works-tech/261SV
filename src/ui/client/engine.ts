@@ -19,13 +19,9 @@ import type { Operation, Parameters, Results } from "./generated";
 export { OPERATIONS, PROTOCOL_VERSION };
 export type { Operation, Parameters, Results };
 
-/** What the engine wrote for the shell to find it by (XC-258). */
-export interface Connection {
-  readonly host: string;
-  readonly port: number;
-  readonly token: string;
-  readonly protocol: string;
-}
+import type { Connection } from "./shell";
+
+export type { Connection };
 
 /** CT-003's four statuses. `answered` is what a read returns: it applied nothing. */
 export type Status = "applied" | "answered" | "refused" | "failed";

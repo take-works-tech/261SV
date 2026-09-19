@@ -10,19 +10,34 @@
  */
 import type { Reachability } from "../state/engine";
 
-export function EngineStatus(props: { reachability: Reachability; busy?: boolean; refusal?: string | null }) {
+export function EngineStatus(props: {
+  reachability: Reachability;
+  busy?: boolean;
+  refusal?: string | null;
+  /** Offered only where a shell can do it (XC-259); a browser build has nothing to restart. */
+  onRestart?: () => void;
+}) {
   const { reachability } = props;
   const label =
     reachability.kind === "reachable"
       ? `エンジン接続中（protocol ${reachability.protocols.join(", ")}）`
       : reachability.kind === "absent"
         ? "エンジン未接続：画面は設計状態です"
-        : "エンジン未確認";
+        : reachability.kind === "exited"
+          ? `エンジン停止（${reachability.because}）：表示は停止前のものです`
+          : "エンジン未確認";
+  const detail =
+    reachability.kind === "absent" || reachability.kind === "exited" ? reachability.because : undefined;
   return (
-    <span className="engine-status" title={reachability.kind === "absent" ? reachability.because : undefined}>
+    <span className="engine-status" title={detail}>
       <span className={`engine-dot ${reachability.kind}`} aria-hidden="true" />
       <span>{label}</span>
       {props.busy ? <span className="engine-busy">…</span> : null}
+      {reachability.kind === "exited" && props.onRestart ? (
+        <button type="button" className="btn ghost" onClick={props.onRestart}>
+          再起動
+        </button>
+      ) : null}
     </span>
   );
 }

@@ -29,7 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_specs import parse_spec_file  # noqa: E402
 
 # Highest first. A module may import from its own layer or any layer after it in this order.
-LAYERS = ("ui", "ui-logic", "state", "client", "service", "engine", "domain-core")
+LAYERS = ("shell", "ui", "ui-logic", "state", "client", "service", "engine", "domain-core")
 SKIP_DIRS = {".git", "__pycache__", ".venv", ".venv-spike", "node_modules", "spike", "tests", "validate"}
 
 
@@ -114,12 +114,12 @@ def imported_modules(source: Path, modules: list[Module], root: Path) -> set[str
 def unchecked(modules: list[Module], root: Path) -> list[str]:
     """What this gate could not examine. Printed every run, never left as silence.
 
-    It reads `*.py`, so the four layers above `service` - which are TypeScript (XC-252) - are invisible
+    It reads `*.py`, so the five layers above `service` - which are TypeScript (XC-252) - are invisible
     to it. A gate that checked the Python half and reported "boundaries hold" would be describing a
     product that is half here.
     """
     gaps: list[str] = []
-    above = [m for m in modules if m.layer in ("ui", "ui-logic", "state", "client")]
+    above = [m for m in modules if m.layer in ("shell", "ui", "ui-logic", "state", "client")]
     if above:
         present = [m for m in above if any((root / path).exists() for path in m.paths)]
         named = ", ".join(m.name for m in above)

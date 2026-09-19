@@ -227,6 +227,7 @@ def render() -> str:
         f'COMMAND_PATH = "{wire.get("commandPath", "")}"',
         f'HANDLE_PATH = "{wire.get("handlePath", "")}"',
         f'HEALTH_PATH = "{wire.get("healthPath", "")}"',
+        f'CONNECTION_FILE = "{wire.get("connectionFile", "")}"',
         "",
         "",
         "def writes(operation: str) -> bool:",

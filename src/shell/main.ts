@@ -1,0 +1,269 @@
+/* The desktop shell's main process (MOD-018, XC-259, XC-260).
+ *
+ * It does four things and computes nothing: it owns the engine process, it owns the window, it
+ * answers the operating system's file dialogs, and it hands the interface the connection through a
+ * bridge the preload exposes. Every number a screen shows still comes from the engine.
+ *
+ * The renderer is served from `solvia://app/`, a privileged scheme backed by the interface's built
+ * files, and not from `file://` (E-198, E-199 item 18). The engine is told that origin and no other.
+ * The renderer runs with context isolation, the sandbox and no Node integration (E-199 items 2-4).
+ *
+ * `--smoke` runs the same wiring with no person present: start the engine, verify it, kill it the
+ * way a crash would, see the exit arrive as an event, restart, and stop - printing one JSON object
+ * with no token in it. `--capture <png>` additionally opens the window on the built interface and
+ * writes what it shows, so a picture of the shell exists that a person can look at.
+ */
+import { app, BrowserWindow, dialog, ipcMain, net, protocol } from "electron";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { extname, join, normalize, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+import type { EngineProcessStatus } from "../ui/client/shell";
+import { startEngine, type Engine } from "./engine-process.js";
+
+const HERE = fileURLToPath(new URL(".", import.meta.url)); // <package>/dist/shell/
+const PACKAGE = resolve(HERE, "..", "..");
+const ROOT = resolve(PACKAGE, "..", "..");
+const UI_DIST = join(ROOT, "src", "ui", "dist");
+const SCHEME = "solvia";
+const ORIGIN = `${SCHEME}://app`;
+const PYTHON = process.env.SOLVIA_PYTHON ?? "python";
+
+const argv = process.argv.slice(1);
+const SMOKE = argv.includes("--smoke");
+const captureIndex = argv.indexOf("--capture");
+const CAPTURE = captureIndex >= 0 ? argv[captureIndex + 1] ?? null : null;
+
+// ---- one instance, one engine (E-195) ---------------------------------------------------------
+
+if (!SMOKE && !app.requestSingleInstanceLock()) {
+  app.quit();
+}
+
+protocol.registerSchemesAsPrivileged([
+  { scheme: SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
+]);
+
+let engine: Engine | null = null;
+let window: BrowserWindow | null = null;
+let stopping = false;
+const log: string[] = [];
+
+function note(line: string): void {
+  log.push(line);
+  if (log.length > 500) log.shift();
+}
+
+function broadcast(status: EngineProcessStatus): void {
+  for (const each of BrowserWindow.getAllWindows()) each.webContents.send("engine:status", status);
+}
+
+async function start(directory: string): Promise<Engine> {
+  const started = await startEngine({
+    python: PYTHON,
+    root: ROOT,
+    directory,
+    allowOrigin: ORIGIN,
+    onStatus: broadcast,
+    output: note,
+  });
+  engine = started;
+  return started;
+}
+
+function engineDirectory(): string {
+  return SMOKE ? join(app.getPath("temp"), `solvia-smoke-${process.pid}`) : join(app.getPath("userData"), "engine");
+}
+
+// ---- the renderer's origin (E-198) -------------------------------------------------------------
+
+const MIME: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".woff2": "font/woff2",
+  ".woff": "font/woff",
+  ".ico": "image/x-icon",
+};
+
+function serveInterface(): void {
+  protocol.handle(SCHEME, async (request) => {
+    const url = new URL(request.url);
+    const relative = decodeURIComponent(url.pathname);
+    const wanted = relative === "/" || relative === "" ? "index.html" : relative.replace(/^\/+/, "");
+    const file = normalize(join(UI_DIST, wanted));
+    if (!file.startsWith(normalize(UI_DIST))) return new Response("forbidden", { status: 403 });
+    if (!existsSync(file)) return new Response(`not found: ${wanted}`, { status: 404 });
+    const answer = await net.fetch(pathToFileURL(file).toString());
+    const type = MIME[extname(file).toLowerCase()];
+    if (!type) return answer;
+    const headers = new Headers(answer.headers);
+    headers.set("Content-Type", type);
+    return new Response(answer.body, { status: answer.status, headers });
+  });
+}
+
+function createWindow(): BrowserWindow {
+  const created = new BrowserWindow({
+    width: 1440,
+    height: 900,
+    minWidth: 960,
+    minHeight: 600,
+    backgroundColor: "#101314",
+    title: "SOLVIA",
+    show: !SMOKE,
+    webPreferences: {
+      preload: join(HERE, "preload.cjs"),
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+    },
+  });
+  void created.loadURL(`${ORIGIN}/index.html`);
+  created.on("closed", () => {
+    window = null;
+  });
+  return created;
+}
+
+// ---- the bridge's other side --------------------------------------------------------------------
+
+function registerBridge(): void {
+  ipcMain.handle("engine:connection", () => engine?.connection ?? null);
+  ipcMain.handle("engine:status", (): EngineProcessStatus => {
+    return (
+      engine?.status() ?? {
+        state: "starting",
+        pid: null,
+        since: new Date().toISOString(),
+        exitCode: null,
+        signal: null,
+        reason: null,
+      }
+    );
+  });
+  ipcMain.handle("engine:restart", async (): Promise<EngineProcessStatus> => {
+    if (engine) await engine.stop();
+    const restarted = await start(engineDirectory());
+    return restarted.status();
+  });
+  ipcMain.handle("dialog:openWorkspace", async () => {
+    const chosen = await dialog.showOpenDialog({
+      title: "ワークスペースを開く",
+      properties: ["openFile"],
+      filters: [
+        { name: "SOLVIA ワークスペース", extensions: ["svw"] },
+        { name: "すべてのファイル", extensions: ["*"] },
+      ],
+    });
+    return chosen.canceled ? null : chosen.filePaths[0] ?? null;
+  });
+  ipcMain.handle("dialog:openResult", async () => {
+    const chosen = await dialog.showOpenDialog({
+      title: "結果ファイルを開く",
+      properties: ["openFile"],
+      filters: [
+        { name: "解析結果（読める三形式、XC-257）", extensions: ["vtu", "ex2", "cgns"] },
+        { name: "すべてのファイル", extensions: ["*"] },
+      ],
+    });
+    return chosen.canceled ? null : chosen.filePaths[0] ?? null;
+  });
+  ipcMain.handle("dialog:saveReport", async (_event, suggestedName: unknown) => {
+    const name = typeof suggestedName === "string" && suggestedName ? suggestedName : "report.html";
+    const chosen = await dialog.showSaveDialog({
+      title: "成果物を書き出す",
+      defaultPath: name.endsWith(".html") ? name : `${name}.html`,
+      filters: [{ name: "自己完結 HTML", extensions: ["html"] }],
+    });
+    return chosen.canceled ? null : chosen.filePath ?? null;
+  });
+}
+
+// ---- lifetime -------------------------------------------------------------------------------------
+
+app.on("second-instance", () => {
+  if (window) {
+    if (window.isMinimized()) window.restore();
+    window.focus();
+  }
+});
+
+app.on("before-quit", (event) => {
+  if (stopping || !engine || engine.status().state === "exited") return;
+  event.preventDefault();
+  stopping = true;
+  void engine.stop().then(() => app.quit());
+});
+
+app.on("window-all-closed", () => {
+  app.quit();
+});
+
+async function smoke(): Promise<number> {
+  const summary: Record<string, unknown> = { python: PYTHON, root: ROOT };
+  const directory = engineDirectory();
+  mkdirSync(directory, { recursive: true });
+  try {
+    const first = await start(directory);
+    summary.started = { pid: first.status().pid, protocol: first.connection?.protocol ?? null };
+
+    // A crash, as a crash would arrive: the process is gone and 'exit' says so (E-200).
+    const crashed = new Promise<EngineProcessStatus>((resolveStatus) => {
+      first.onStatus((status) => {
+        if (status.state === "exited") resolveStatus(status);
+      });
+    });
+    first.child.kill("SIGKILL");
+    const seen = await Promise.race([crashed, new Promise<null>((r) => setTimeout(() => r(null), 10_000))]);
+    summary.crashDetected = seen
+      ? { exitCode: seen.exitCode, signal: seen.signal, reason: seen.reason, connectionAfter: first.connection }
+      : "NOT DETECTED within 10 s";
+
+    const second = await start(directory);
+    summary.restarted = { pid: second.status().pid, differentPid: second.status().pid !== first.status().pid };
+
+    if (CAPTURE) {
+      serveInterface();
+      registerBridge();
+      window = createWindow();
+      await new Promise<void>((done) => window?.webContents.once("did-finish-load", () => done()));
+      await new Promise((r) => setTimeout(r, 4_000));
+      const image = await window.webContents.capturePage();
+      writeFileSync(CAPTURE, image.toPNG());
+      summary.captured = { path: CAPTURE, size: image.getSize() };
+    }
+
+    const stopped = await second.stop();
+    summary.stopped = { state: stopped.state, exitCode: stopped.exitCode, signal: stopped.signal };
+    summary.connectionFileAfterStop = existsSync(join(directory, "connection.json"));
+    summary.ok = Boolean(seen) && summary.connectionFileAfterStop === false;
+  } catch (error) {
+    summary.error = error instanceof Error ? error.message : String(error);
+    summary.ok = false;
+  }
+  summary.tokenInLog = log.some((line) => engine?.connection?.token && line.includes(engine.connection.token));
+  process.stdout.write(JSON.stringify(summary, null, 2) + "\n");
+  return summary.ok === true ? 0 : 1;
+}
+
+void app.whenReady().then(async () => {
+  if (SMOKE) {
+    const code = await smoke();
+    app.exit(code);
+    return;
+  }
+  serveInterface();
+  registerBridge();
+  window = createWindow();
+  try {
+    await start(engineDirectory());
+  } catch (error) {
+    // The interface hears about it through the status the failure set; nothing is thrown at a
+    // person. The window is already open and says "エンジン停止" with the reason.
+    note(`shell: ${error instanceof Error ? error.message : String(error)}`);
+  }
+});

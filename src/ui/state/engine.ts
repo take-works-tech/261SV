@@ -21,7 +21,12 @@ import type { Connection, Operation, Parameters, Response, Results } from "../cl
 export type Reachability =
   | { kind: "unknown" }
   | { kind: "reachable"; protocols: readonly string[] }
-  | { kind: "absent"; because: string };
+  | { kind: "absent"; because: string }
+  /** The shell's engine process was running and ended (XC-259). What is on screen came from it
+   *  and is kept, labelled as from an engine that is gone; nothing is asked of it again until a
+   *  person restarts it. Distinct from `absent` because a person does different things about the
+   *  two: one never had an engine, the other lost one and can be told why. */
+  | { kind: "exited"; because: string; exitCode: number | null; signal: string | null };
 
 /** One field of a loaded dataset, as `dataset.load` answered it. The unit is null until a person
  *  declares one: nothing in this product infers one (XC-003). */
@@ -198,6 +203,22 @@ export const engineState = {
       setState({ reachability });
       return reachability;
     }
+  },
+
+  /** The shell says the engine process ended. The picture, the numbers and the probe stay as they
+   *  were - they are what the engine last answered - and every further ask is refused here rather
+   *  than sent to a port nothing answers on. */
+  engineExited(status: { reason: string | null; exitCode: number | null; signal: string | null }) {
+    engine = null;
+    setState({
+      reachability: {
+        kind: "exited",
+        because: status.reason ?? "エンジンが終了しました",
+        exitCode: status.exitCode,
+        signal: status.signal,
+      },
+      busy: false,
+    });
   },
 
   /** No engine: the screens stay the catalogue of design states they are, and say so. */

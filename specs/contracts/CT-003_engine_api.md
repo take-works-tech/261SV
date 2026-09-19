@@ -10,7 +10,11 @@ updated: 2026-09-19
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 2.4.0
+- version: 2.5.0
+- correction: 2026-09-19, version 2.4.0 to 2.5.0. `$defs.transport` gains `connectionFile`, the name of
+  the file the engine writes and the shell reads. The shell (MOD-018) defined it a second time in
+  TypeScript and the duplication gate caught it the same hour; the two sides cannot import from each
+  other, so the name is generated to both from here like the header and the paths. Additive
 - correction: 2026-09-19, version 2.3.0 to 2.4.0. `view.render` takes `legend`, default true. A
   document must carry its colour bar inside the picture because nothing else in a document can
   (XC-254); a screen has chrome beside the picture that carries the legend **with its unit**, which

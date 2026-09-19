@@ -1,0 +1,21 @@
+{
+  "name": "@solvia/shell",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The desktop shell: an Electron main process that owns the engine process, the window, the OS dialogs and the bridge to the interface (XC-259, XC-260).",
+  "type": "module",
+  "main": "dist/shell/main.js",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.preload.json",
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.preload.json && node -e \"require('fs').copyFileSync('dist-preload/shell/preload.cjs','dist/shell/preload.cjs')\"",
+    "test": "vitest run",
+    "start": "npm run build && electron .",
+    "smoke": "npm run build && electron . --smoke"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.2",
+    "electron": "44.4.3",
+    "typescript": "7.0.2",
+    "vitest": "5.0.1"
+  }
+}
