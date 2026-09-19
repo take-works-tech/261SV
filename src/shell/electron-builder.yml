@@ -8,6 +8,10 @@
 # and walked end to end before there is anything to sign.
 appId: tech.take-works.solvia
 productName: SOLVIA
+# The executable's name on every platform, stated rather than derived: electron-builder derives
+# it from the product name in a platform-dependent way, and CI's first run of the Linux package
+# failed with 127 - command not found - on the name I had assumed.
+executableName: solvia
 copyright: FSL-1.1-MIT (LICENSE.md)
 directories:
   output: release

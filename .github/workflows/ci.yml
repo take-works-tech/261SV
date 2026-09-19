@@ -293,6 +293,7 @@ jobs:
       - name: Start the packaged shell with no Python on the path
         run: |
           set -e
+          ls -la release/linux-unpacked | head -20
           out=$(xvfb-run -a ./release/linux-unpacked/solvia --smoke --no-sandbox)
           echo "$out"
           echo "$out" | python3 -c 'import json,sys; s=json.load(sys.stdin); assert s["ok"] and s["packaged"], s; print("packaged start to running:", s["started"]["afterMs"], "ms")'
