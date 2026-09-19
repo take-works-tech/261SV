@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-22
+updated: 2026-09-20
 ---
 
 # Tasks: workspace, cases and variables
@@ -659,3 +659,14 @@ updated: 2026-08-22
   scrolls without unequal or truncated labels
 
 - blocked: shell composition. `src/ui/shell` and `src/ui/shared` (MOD-009, MOD-010) do not exist, and the mockup catalogue is a design state rather than evidence of behaviour.
+
+### TASK-068 - A ceiling on items, measured, and a file past it opened and told
+- satisfies: AC-075
+- depends_on: TASK-029
+- done_when: creating past LIM-016 is refused by name with the count in each list; a document past it
+  opens whole with a warning and still saves; the cost at the ceiling is measured and recorded
+- done: 2026-09-20. Measured first (E-209, `spike/measure_workspace_document.py`): the cost of an
+  item is a cost of the document three times over, and ten thousand is where each is still a
+  fraction of a second. The ceiling is counted across the four lists because that is what the costs
+  are counted across; the walk every creation makes stays a walk because the ceiling bounds it
+  (XC-265). What the interface makes of the warning and the refusal is the next frontend piece

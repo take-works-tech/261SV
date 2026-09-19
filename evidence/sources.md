@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-18
+updated: 2026-09-20
 ---
 
 # Sources
@@ -2113,3 +2113,18 @@ Recorded so that nothing silently depends on them:
   The shell's session directories under `userData/engine` were not among them because the shell had
   been started only through the smoke. A crash leaves the connection file too (E-197)
 - justifies: XC-262
+
+### E-209 - What a workspace document costs as it grows, measured here
+- tier: T1
+- url: spike/results.json `workspace_document`, produced by spike/measure_workspace_document.py
+- verified: 2026-09-20
+- says: on the development machine (Windows 11, Python 3.11.9, warm cache), a document of views,
+  graphs and reports in equal parts, each with a realistic definition, costs per item about 950
+  bytes on disk and 28 µs to save or to load. 1,000 items: 0.95 MB, 29 ms to save, 21 ms to load,
+  6.8 MB parsed. 10,000: 9.5 MB, 285 ms, 274 ms, 68 MB, with the `items` answer of `workspace.open`
+  at 0.59 MB and one more creation at 5 ms. 100,000: 95 MB, 2.9 s each way, 682 MB parsed, a 5.9 MB
+  answer and 106 ms per creation. Creating one at a time from empty is quadratic in what is there:
+  0.09 s for 1,000, 0.38 s for 2,000, 2.5 s for 5,000, 11.5 s for 10,000. Not measured: a cold
+  first open, the interface rendering the lists it is sent, a document with hundreds of cases
+  beside the items
+- justifies: LIM-016, XC-265

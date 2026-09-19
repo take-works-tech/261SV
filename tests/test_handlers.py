@@ -32,6 +32,7 @@ needs_offscreen = pytest.mark.skipif(
 )
 
 
+from engine.limits import MAX_WORKSPACE_ITEMS  # noqa: E402
 from service.command.catalogue import OPERATIONS, PROTOCOL_VERSION  # noqa: E402
 from service.command.handlers import HandleExpired, HandleStore, Session, build_surface  # noqa: E402
 from service.command.surface import Command, Status, Surface  # noqa: E402
@@ -1125,3 +1126,40 @@ class TestUndoHoldsNothingItCanReread:
         last = listed.value["entries"][-1]
         assert last["operation"] == "field.declareUnit" and last["undoId"] == declared.undo_id and last["undoable"] is True
         assert all(one["undoable"] is False for one in listed.value["entries"] if one["operation"] == "dataset.describe")
+
+class TestAWorkspaceIsBoundedInItems:
+    """LIM-016 (XC-265): a document past the ceiling opens whole and says so, saves, and refuses to
+    take one more item by the limit's name. Nothing it holds is dropped for the sake of a number."""
+
+    def test_a_document_past_the_limit_opens_whole_says_so_and_takes_no_more(self, tmp_path: Path) -> None:
+        surface, session = a_surface()
+        path = a_workspace(tmp_path)
+        document = json.loads(path.read_text(encoding="utf-8"))
+        document["workspaceItems"]["views"] = [
+            {"id": f"view:{n:05d}", "name": f"v{n}", "definition": {}} for n in range(MAX_WORKSPACE_ITEMS + 1)
+        ]
+        path.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+
+        result = surface.submit(Command("workspace.open", {"path": str(path)}))
+
+        assert result.status is Status.APPLIED, result.reason
+        assert any("LIM-016" in one and f"{MAX_WORKSPACE_ITEMS + 1:,} 件" in one for one in result.warnings)
+        assert session.workspace is not None
+        assert len(session.workspace.raw["workspaceItems"]["views"]) == MAX_WORKSPACE_ITEMS + 1
+        assert len(result.value["items"]["views"]) == MAX_WORKSPACE_ITEMS + 1
+
+        created = surface.submit(Command("view.create", {"workspaceId": "ws:1", "definition": {"name": "もう一つ"}}))
+        assert created.status is Status.REFUSED
+        assert "LIM-016" in (created.reason or "")
+
+        saved = surface.submit(Command("workspace.save", {"workspaceId": "ws:1"}))
+        assert saved.status is Status.APPLIED, saved.reason
+        assert len(json.loads(path.read_text(encoding="utf-8"))["workspaceItems"]["views"]) == MAX_WORKSPACE_ITEMS + 1
+
+    def test_a_document_under_the_limit_opens_without_a_word_about_it(self, tmp_path: Path) -> None:
+        surface, _ = a_surface()
+
+        result = surface.submit(Command("workspace.open", {"path": str(a_workspace(tmp_path))}))
+
+        assert result.status is Status.APPLIED, result.reason
+        assert not any("LIM-016" in one for one in result.warnings)

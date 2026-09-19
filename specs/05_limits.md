@@ -17,7 +17,7 @@ Three labels are in use here and they mean different things to an implementer:
 | Label | What it means for this limit | Which |
 |---|---|---|
 | Fixed | measured, cited, and held in one place the linter compares against the code | LIM-001, LIM-002, LIM-003, LIM-004, LIM-006, LIM-007 |
-| Bounded | a working value is in force and enforced, but the number itself is a judgement nobody has yet had to defend against a real case | LIM-008, LIM-009, LIM-012, LIM-014, LIM-015 |
+| Bounded | a working value is in force and enforced, but the number itself is a judgement nobody has yet had to defend against a real case | LIM-008, LIM-009, LIM-012, LIM-014, LIM-015, LIM-016 |
 | Open | no number exists, or the one written is a placeholder; the tracking ID says what would settle it | LIM-005, LIM-010, LIM-011, LIM-013 |
 
 A Bounded limit still has a value in the code, because a guard with no number guards nothing. The
@@ -258,3 +258,22 @@ applies the matching row; the class it chose is visible in settings, and can be 
   starts in the middle says so
 - decidedness: Bounded
 - basis: E-001 (T1)
+
+### LIM-016 - Concrete items in one Workspace document
+- value: 10000
+- unit: items
+- source_of_truth: src/engine/limits.py:MAX_WORKSPACE_ITEMS
+- rationale: views, graphs, reports and simulations counted together, because every cost of an item
+  is a cost of the document: each creation walks all of them to check the name and the identifier,
+  each save and load carries all of them, and the list the interface is sent names all of them.
+  Measured here (E-209): at ten thousand items a save and a load each take about 0.3 s, the parsed
+  document peaks at 68 MB, the open answer is 0.6 MB and one more item costs 5 ms; at a hundred
+  thousand each of those is ten times more - 2.9 s on every save and 682 MB, which is a dataset's
+  memory spent on definitions. The number sits where the curve is still a fraction of a second;
+  where a real workspace needs more, the number moves and the reason is written here (XC-265)
+- on_exceed: creating an item is refused with the limit's name and the count in each list; a
+  document holding more opens whole, says so in `workspace.open`'s warnings, and still saves -
+  refusing to read or write a person's work over a limit on what this build adds is losing it,
+  which is failing quietly and not loudly (XC-011)
+- decidedness: Bounded
+- basis: E-209 (T1)
