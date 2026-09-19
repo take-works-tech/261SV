@@ -25,6 +25,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = ROOT / "specs" / "contracts" / "schema" / "CT-003.json"
 CONTRACT = ROOT / "specs" / "contracts" / "CT-003_engine_api.md"
+DOCUMENT_SCHEMA = ROOT / "specs" / "contracts" / "schema" / "CT-001.json"
 GENERATED = ROOT / "src" / "ui" / "client" / "generated.ts"
 NEWLINE = "\n"
 
@@ -32,9 +33,18 @@ NEWLINE = "\n"
 #: pretending otherwise would be a type the language cannot enforce.
 PRIMITIVES = {"string": "string", "number": "number", "integer": "number", "boolean": "boolean"}
 
+#: A shape defined once in another contract and referenced from CT-003 (XC-266): named here, and
+#: generated below from the definition it points at. Anything else referenced becomes `unknown`,
+#: which fails the build at the first use rather than passing as `any`.
+REFERENCED = {"CT-001.json#/$defs/recordedTime": "RecordedTime"}
+
 
 def schema() -> dict:
     return json.loads(SCHEMA.read_text(encoding="utf-8"))
+
+
+def document_schema() -> dict:
+    return json.loads(DOCUMENT_SCHEMA.read_text(encoding="utf-8"))
 
 
 def protocol_version() -> str:
@@ -52,6 +62,9 @@ def type_of(node: object, indent: int = 0) -> str:
     """
     if not isinstance(node, dict):
         return "unknown"
+    reference = node.get("$ref")
+    if reference:
+        return REFERENCED.get(reference, "unknown")
     if "enum" in node:
         return " | ".join(json.dumps(one, ensure_ascii=False) for one in node["enum"])
     kind = node.get("type")
@@ -137,6 +150,11 @@ def render() -> str:
         "  * came from. Never a bare number - one without its unit is a number in whatever unit the",
         "  * reader assumed (XC-003, XC-253). */",
         "export type ReportedValue = " + type_of(document["$defs"]["reportedValue"], 0) + ";",
+        "",
+        "/** A time this product recorded: the UTC instant, and the offset of the zone it was recorded",
+        "  * in - or null where a record written before the offset was kept has none (XC-142, XC-266).",
+        "  * Defined once, in CT-001's $defs.recordedTime, and referenced by every contract. */",
+        "export type RecordedTime = " + type_of(document_schema()["$defs"]["recordedTime"], 0) + ";",
         "",
     ]
     return NEWLINE.join(lines)

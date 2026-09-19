@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-22
+updated: 2026-09-20
 ---
 
 # The application model
@@ -522,7 +522,7 @@ the contract gains with the code that implements them.
 
 ```
 WorkspaceDocument {
-  formatVersion, id, name, createdBy, createdIso
+  formatVersion, id, name, createdBy, created: RecordedTime   // {utc, offsetMinutes}, XC-266
   cases:            Case[]
   datasets:         Dataset[]                 // new: referenced by Case, so two cases may share one
   variables:        Variable[]
@@ -548,7 +548,7 @@ Case {
   datasetIds:  Id<Dataset>[]
   resultAxis:  ResultAxis
   variables:   VariableBinding[]               // declared here, inherited by children
-  provenance:  { sourceFiles: FileRef[], importedIso, readerId, readerVersion }
+  provenance:  { sourceFiles: FileRef[], imported: RecordedTime, readerId, readerVersion }
 }
 
 Dataset {
@@ -591,7 +591,7 @@ representable, which is what makes view/AC-033 a type error rather than a runtim
 Quantity { value: number | null, unit: Unit | null, digits: number, provenance: Provenance }
 
 Provenance =
-  | { kind: 'declared',  by: string, atIso: string }
+  | { kind: 'declared',  by: string, at: RecordedTime }
   | { kind: 'dataset',   datasetId, fieldId, association, resultPosition }
   | { kind: 'computed',  expression: string, inputs: Ref[], engineVersion }
   | { kind: 'reference', documentId, locator: string }          // never a numerical basis
@@ -801,7 +801,7 @@ ColourMap {
 
 RangeRule =
   | { kind: 'explicit', min: Quantity, max: Quantity }
-  | { kind: 'dataRange', over: 'currentPosition'|'allPositions'|'selection', updatedIso }
+  | { kind: 'dataRange', over: 'currentPosition'|'allPositions'|'selection', updated: RecordedTime }
   | { kind: 'symmetric', around: number, over: ... }
 
 Legend { id, colourMapId, title, component, placement, orientation, labelFormat, precision,
@@ -871,7 +871,7 @@ ReportDefinition {                                  // CT-006, complete form
   blocks:     ReportBlock[]
   commentary: { mode: 'mechanical'|'generated', direction?, depth?, modelId?, searchPolicy: 'off'|'ask' }
   targets:    OutputSpec[]
-  producedFrom: { itemRevisions: Ref[], engineVersion, producedIso }   // written at export
+  producedFrom: { itemRevisions: Ref[], engineVersion, produced: RecordedTime }   // written at export
 }
 
 ReportBlock =
@@ -899,7 +899,7 @@ PipelineUnit {
 }
 
 RunRecord {
-  id, startedIso, finishedIso?, issuer, authorisedUnits: Id<PipelineUnit>[]
+  id, started: RecordedTime, finished?: RecordedTime, issuer, authorisedUnits: Id<PipelineUnit>[]
   outcomes: { caseId, unitId, outcome: 'applied'|'skipped'|'failed'|'refused',
               note?: string, conditionValue?: boolean }[]
   filesWritten: { path, bytes, atIso }[]

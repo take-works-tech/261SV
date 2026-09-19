@@ -16,6 +16,7 @@ from typing import Any
 from service.workspace.case_state import CaseState, state_of
 from service.workspace.hierarchy import add, find, new_case
 from service.workspace.pack import Omission, opened_without_data, plan
+from conftest import FIXED_MOMENT
 from service.workspace.sources import record
 
 
@@ -28,7 +29,7 @@ def workspace(tmp_path: Path, *, sources: list[str] | None = None) -> dict[str, 
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("result data", encoding="utf-8")
-        case["sources"].append(record(path, relative_to=tmp_path))
+        case["sources"].append(record(path, relative_to=tmp_path, where=FIXED_MOMENT))
     add(document["cases"], case)
     return document
 
@@ -99,7 +100,7 @@ class TestEverythingLeftBehindIsNamed:
         their project."""
         document = workspace(tmp_path)
         find(document["cases"], "case:001")[0]["sources"] = [
-            {"pathRelative": "../elsewhere/run.vtu", "sizeBytes": 10, "modifiedIso": "x"}
+            {"pathRelative": "../elsewhere/run.vtu", "sizeBytes": 10, "modified": {"utc": "x", "offsetMinutes": None}}
         ]
 
         result = plan(document, root=tmp_path, document_bytes=100, with_data=True)

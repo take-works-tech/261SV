@@ -314,7 +314,7 @@ class TestTheAuditIsReadableAndExportable:
         gate.search(SearchRequest("疲労限度", HOST), workspace_id=WORKSPACE, confirmed=True)
 
         line = gate.audit()[-1].describe()
-        assert "2026-08-25T00:00:00Z" in line
+        assert "2026-08-25 09:00（UTC+09:00）" in line, "the recorded moment with its zone named (XC-266)"
         assert HOST in line
         assert "疲労限度" in line
 

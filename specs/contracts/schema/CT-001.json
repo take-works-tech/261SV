@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-001 workspace document",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "type": "object",
   "additionalProperties": true,
   "required": [
@@ -66,7 +66,7 @@
               "required": [
                 "pathRelative",
                 "sizeBytes",
-                "modifiedIso"
+                "modified"
               ],
               "properties": {
                 "pathRelative": {
@@ -79,8 +79,9 @@
                   "type": "integer",
                   "minimum": 0
                 },
-                "modifiedIso": {
-                  "type": "string"
+                "modified": {
+                  "$ref": "#/$defs/recordedTime",
+                  "description": "ファイルの更新時刻。瞬間はファイルの、オフセットは記録した人の（XC-266）"
                 },
                 "declaredUnits": {
                   "type": "object",
@@ -112,9 +113,9 @@
                 "value": {
                   "description": "present only when independent"
                 },
-                "detachedIso": {
-                  "type": "string",
-                  "description": "when it stopped following the parent"
+                "detached": {
+                  "$ref": "#/$defs/recordedTime",
+                  "description": "親から切り離した時刻"
                 }
               }
             }
@@ -456,6 +457,31 @@
               "minimum": 1
             }
           }
+        }
+      }
+    },
+    "recordedTime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "utc",
+        "offsetMinutes"
+      ],
+      "description": "記録された時刻：UTC の瞬間と、記録した場所の UTC からのずれ（XC-142、XC-266）。この一つの形を、時刻を運ぶすべての契約が参照する。ISO 文字列一本で運ぶことはしない",
+      "properties": {
+        "utc": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+          "description": "瞬間。UTC、秒まで、末尾 Z"
+        },
+        "offsetMinutes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": -1439,
+          "maximum": 1439,
+          "description": "記録した時点の、UTC から東向きの分。オフセットが残される前の記録（版 4 以前の文書が書いた時刻）では null＝不明であり、0 に置き換えない（XC-001）"
         }
       }
     }

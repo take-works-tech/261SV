@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from domain_core.recorded_time import RecordedTime, from_stored, record
+from domain_core.recorded_time import RecordedTime, from_stored, record, record_instant
 from engine.limits import MAX_OUTPUT_BYTES
 from service.workspace.output import (
     RECORD_NAMES,
@@ -198,3 +198,38 @@ class TestARecordedTimeIsTwoFacts:
     def test_a_stored_local_time_is_refused_on_the_way_back_in(self) -> None:
         with pytest.raises(ValueError):
             RecordedTime(utc="2026-08-24T21:00:00+09:00", offset_minutes=540)
+
+class TestATimeWhoseZoneWasNeverKeptSaysSo:
+    """XC-266: a record written before the offset was kept has none - null, never zero (XC-001)."""
+
+    def test_null_reads_back_as_unknown_and_is_shown_as_unknown(self) -> None:
+        stored = from_stored({"utc": "2026-08-24T12:00:00Z", "offsetMinutes": None})
+
+        assert stored.offset_minutes is None and stored.local is None
+        assert stored.describe(540) == "2026-08-24 21:00（記録時のゾーンは不明）"
+        assert stored.describe_where_recorded() == "2026-08-24T12:00:00Z（記録時のゾーンは不明）"
+        assert stored.as_stored() == {"utc": "2026-08-24T12:00:00Z", "offsetMinutes": None}
+
+    def test_a_form_without_the_offset_key_is_refused(self) -> None:
+        """Absent is a shape this build does not know; null is a record that never kept it."""
+        with pytest.raises(ValueError):
+            from_stored({"utc": "2026-08-24T12:00:00Z"})
+        with pytest.raises(ValueError):
+            from_stored("2026-08-24T12:00:00Z")
+
+    def test_an_instant_from_elsewhere_takes_the_recorder_s_offset(self) -> None:
+        """A file's modification time: the instant is the file's, the offset is whoever records it."""
+        instant = datetime(2026, 8, 24, 12, 0, tzinfo=timezone.utc)
+        osaka = datetime(2026, 9, 20, 9, 0, tzinfo=timezone(timedelta(hours=9)))
+
+        stored = record_instant(instant, where=osaka)
+
+        assert stored == RecordedTime("2026-08-24T12:00:00Z", 540)
+        assert stored.describe_where_recorded() == "2026-08-24 21:00（UTC+09:00）"
+        with pytest.raises(ValueError):
+            record_instant(instant, where=datetime(2026, 9, 20, 9, 0))
+
+    def test_the_moment_where_it_was_recorded_is_named_with_its_zone(self) -> None:
+        stored = record(datetime(2026, 8, 24, 21, 0, tzinfo=timezone(timedelta(hours=9))))
+
+        assert stored.describe_where_recorded() == "2026-08-24 21:00（UTC+09:00）"

@@ -76,7 +76,7 @@ class Line:
                 )
 
     def describe(self) -> str:
-        line = f"{self.at.utc} {self.level.value} {self.event}"
+        line = f"{self.at.describe_where_recorded()} {self.level.value} {self.event}"
         if self.context:
             line += "｜" + "、".join(f"{k}={v}" for k, v in sorted(self.context.items()))
         return line
@@ -85,8 +85,7 @@ class Line:
         """The line as it is written to the file: when (UTC and the offset it was recorded in), the
         level, the event, and the context - which the constructor already refused a value into."""
         return {
-            "at": self.at.utc,
-            "offsetMinutes": self.at.offset_minutes,
+            "at": self.at.as_stored(),
             "level": self.level.value,
             "event": self.event,
             **self.context,

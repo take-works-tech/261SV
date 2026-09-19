@@ -10,7 +10,14 @@ updated: 2026-09-20
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 2.9.0
+- version: 3.0.0
+- correction: 2026-09-20, version 2.9.0 to 3.0.0. Every time an answer carries is the one wire form
+  `{utc, offsetMinutes}` (CT-001 `$defs.recordedTime`, XC-266): `history.list` entries `atUtc`
+  become `at`; `pipeline.run` `startedUtc` and `finishedUtc` become `started` and `finished`;
+  `report.provenance` `sources[].modifiedUtc` becomes `modified` and the answer gains `produced`;
+  `system.audit` entries `atUtc` become `at`; `dataset.inspect` `modifiedIso` becomes `modified`,
+  present only when the file exists. The engine had held both facts of every one of these in
+  memory and written one of them to the wire. Breaking; no released client existed
 - correction: 2026-09-20, version 2.8.0 to 2.9.0. `history.list` says what memory no longer holds:
   each entry carries `undoable`, and the answer carries the undo cap and how many groups it dropped
   (LIM-014), the history cap and how many entries fell out (LIM-015). #315's condition is that a

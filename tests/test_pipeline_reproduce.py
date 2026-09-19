@@ -218,7 +218,7 @@ class TestTheHeadlessRunReportsWhileItRuns:
         last = json.loads(stream.getvalue().splitlines()[-1])
         assert last["event"] == "finished"
         assert last["failedCases"] == []
-        assert last["startedUtc"] is not None
+        assert last["started"]["utc"] and last["started"]["offsetMinutes"] is not None
 
 
 class TestTheExitCodeAnswersOneQuestion:

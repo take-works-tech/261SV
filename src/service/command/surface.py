@@ -176,7 +176,7 @@ class LogEntry:
     dry_run: bool = False
 
     def describe(self) -> str:
-        line = f"{self.at.utc} {self.origin.value} {self.operation} → {self.status.value}"
+        line = f"{self.at.describe_where_recorded()} {self.origin.value} {self.operation} → {self.status.value}"
         if self.dry_run:
             line += "（試算）"
         if self.reason:

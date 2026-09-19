@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import os
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -34,6 +35,10 @@ REQUIRE_VTK = os.environ.get("SIM_VIEWER_REQUIRE_VTK") == "1"
 #: same document and a failure never depends on the minute it ran. Here rather than in each file
 #: because two copies of a constant are two answers waiting to differ.
 FIXED_INSTANT = "2026-08-24T12:00:00Z"
+
+#: The same instant as an aware moment in Osaka (UTC+09:00): what a record needs to say where it was
+#: made (XC-142), for `record(path, relative_to=..., where=FIXED_MOMENT)` and the like.
+FIXED_MOMENT = datetime(2026, 8, 24, 21, 0, tzinfo=timezone(timedelta(hours=9)))
 
 
 def requires_vtk() -> None:

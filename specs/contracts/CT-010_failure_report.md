@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-22
+updated: 2026-09-20
 ---
 
 # Contract: how a failure is reported
@@ -9,7 +9,10 @@ updated: 2026-08-22
 - purpose: the one shape every refusal, failure and partial result takes, wherever it surfaces - the
   interface, a command result, a pipeline run record, a headless exit, a report
 - schema: schema/CT-010.json
-- version: 1.1.0
+- version: 2.0.0
+- correction: 2026-09-20, version 1.1.0 to 2.0.0. `occurredIso` becomes `occurred`, the one wire
+  form of a recorded time (CT-001 `$defs.recordedTime`, XC-266): a failure report is sent to
+  somebody in another zone, which is the case the offset exists for. Breaking
 - strictness: unknown fields are **preserved** - a failure written by a newer build must still be
   readable by an older one, because a failure report is exactly what gets sent to somebody for help
 - compatibility: a reason code is never reused for a different meaning, and never removed while any

@@ -113,7 +113,7 @@ class TestTheLogStaysLocal:
         assert "dataset.load" in a_log().as_text()
 
     def test_each_line_carries_when(self) -> None:
-        assert "2026-08-25T00:00:00Z" in a_log().as_text()
+        assert "2026-08-25 09:00（UTC+09:00）" in a_log().as_text(), "the moment where it was recorded, with the zone named (XC-266)"
 
 
 class TestTheManifestExistsBeforeTheBundle:
@@ -226,7 +226,7 @@ class TestTheLogOnDisk:
         assert len(written) == 1
         line = json.loads(written[0])
         assert line["event"] == "command" and line["operation"] == "view.render"
-        assert line["level"] == "info" and line["at"] and isinstance(line["offsetMinutes"], int)
+        assert line["level"] == "info" and line["at"]["utc"] and isinstance(line["at"]["offsetMinutes"], int)
 
     def test_below_the_level_nothing_is_written_anywhere(self, tmp_path: Path) -> None:
         log = Log(directory=tmp_path / "logs", level=Level.WARNING)

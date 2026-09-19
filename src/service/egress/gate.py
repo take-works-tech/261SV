@@ -155,7 +155,7 @@ class Record:
     withheld: tuple[str, ...] = dataclass_field(default_factory=tuple)
 
     def describe(self) -> str:
-        line = f"{self.at.utc} {self.purpose.value} → {self.host}：{self.outcome.value}"
+        line = f"{self.at.describe_where_recorded()} {self.purpose.value} → {self.host}：{self.outcome.value}"
         if self.reason:
             line += f"（{self.reason}）"
         if self.withheld:

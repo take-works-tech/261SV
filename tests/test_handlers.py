@@ -168,7 +168,7 @@ class TestOpeningAWorkspace:
         surface, _ = a_surface()
         workspace = a_workspace(tmp_path, cases=[{
             "id": "case:1", "name": "baseline",
-            "sources": [{"pathRelative": "gone.vtu", "sizeBytes": 10, "modifiedIso": "2026-09-18T00:00:00Z"}],
+            "sources": [{"pathRelative": "gone.vtu", "sizeBytes": 10, "modified": {"utc": "2026-09-18T00:00:00Z", "offsetMinutes": 540}}],
         }])
 
         result = surface.submit(Command("workspace.open", {"path": str(workspace)}))
@@ -489,7 +489,8 @@ class TestExportingADeliverable:
         assert result.value["workspaceId"] == "ws:1"
         assert result.value["caseIds"] == ["case:1"]
         assert result.value["sources"][0]["path"].endswith("case.vtu")
-        assert result.value["sources"][0]["modifiedUtc"]
+        assert result.value["sources"][0]["modified"]["utc"]
+        assert result.value["produced"]["offsetMinutes"] == 540
         assert result.value["declaredUnits"] == {"stress": "MPa"}
         assert result.value["productVersion"]
 

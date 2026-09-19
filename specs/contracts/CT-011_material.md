@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-22
+updated: 2026-09-20
 ---
 
 # Contract: Material Asset definition
@@ -10,7 +10,11 @@ updated: 2026-08-22
   one qualified root MaterialX material, its typed inputs, resources, SOLVIA result dependencies,
   provenance, traceability and conversion requirements
 - schema: schema/CT-011.json
-- version: 1.0.0
+- version: 2.0.0
+- correction: 2026-09-20, version 1.0.0 to 2.0.0. `thumbnail.generatedIso`, `provenance.createdIso`
+  and `provenance.importedIso` become `generated`, `created` and `imported`, each the one wire form
+  of a recorded time (CT-001 `$defs.recordedTime`, XC-266); an Asset declares `version` 2.0.0.
+  Breaking
 - strictness: unknown fields, unknown MaterialX elements and imported source bytes are **preserved**.
   A reader may report an unsupported requirement, but may not rewrite or discard it while moving,
   copying or saving the Asset

@@ -133,8 +133,8 @@ def run_headless(
         "failedCases": failed,
         "written": list(record.written),
         "stoppedAt": record.stopped_at,
-        "startedUtc": record.started.utc if record.started else None,
-        "finishedUtc": record.finished.utc if record.finished else None,
+        "started": record.started.as_stored() if record.started else None,
+        "finished": record.finished.as_stored() if record.finished else None,
         "exit": code,
     })
     return code, record

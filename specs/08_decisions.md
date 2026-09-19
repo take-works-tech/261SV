@@ -1444,6 +1444,11 @@ model or the prompt, never in a description that quietly went stale.
 - affects: CT-009, CT-010, CT-006, XC-046
 - decidedness: Fixed
 - reversal_trigger: none foreseen
+- correction: 2026-09-20, the decision had reached the code and not the contracts. The engine held
+  both facts in memory from the day this was decided; every contract that carried a time carried
+  it as a bare UTC string named `...Iso` or `...Utc` - eighteen fields in seven schemas, the three
+  named above among them - and the offset was dropped at every wire (#318). The decision stands;
+  XC-266 gives a recorded time one wire form and a sweep that keeps it
 
 ### XC-143 - Dataset structure belongs in a View Outliner
 - decided: 2026-08-21
@@ -5624,3 +5629,40 @@ model or the prompt, never in a description that quietly went stale.
   number moves and the cost at the new number is measured and written beside it; or the interface
   found unable to list ten thousand, at which point the ceiling is the interface's and not the
   document's
+
+### XC-266 - A recorded time has one wire form in every contract, and a time recorded before the offset was kept says so
+- decided: 2026-09-20
+- status: active
+- decision: wherever a contract carries a time this product recorded, it carries `{utc, offsetMinutes}`
+  - the stored form of a recorded time (XC-142) - defined once as CT-001 `$defs.recordedTime` and
+  referenced from CT-003, CT-006, CT-008, CT-009, CT-010 and CT-011. No contract carries a recorded
+  time as a bare string, and no field of one ends in `Iso` or `Utc`; a test sweeps every schema for
+  both. A file's modification time is recorded with the offset of whoever records it: the file's own
+  zone no filesystem keeps, and XC-142's offset is "at the moment of writing". A record made before
+  the offset was kept - a version-4 document's - carries **null** for it: unknown, shown as unknown,
+  never zero. A document with no reader's zone to display in - an exported deliverable, a log line
+  - shows the moment where it was recorded with that zone named
+- decided_by: engineering judgement, from reading every contract against XC-142
+- rationale: XC-142 was decided on 2026-08-20 and named three contracts; on 2026-09-20 every contract
+  that carried a time carried it as a bare UTC string - eighteen fields in seven contracts, each named
+  `...Iso` or `...Utc` - and the engine, which held both facts in memory (`RecordedTime`), dropped the
+  second at every wire: the history answer, the provenance answer, the inspection answer, the run
+  event, the document's source and detachment records. **A rule that reached the code and not the
+  contracts held until the first serialisation.** One shape, defined once and referenced, is what
+  makes a sweep possible: a string field cannot be told from a timestamp by a test, and an object
+  with two named facts can. Null for the unknown offset is XC-001 applied to a date: a substituted
+  zero is a plausible value in place of a missing one, and it is a claim that the writer stood in
+  Greenwich. The recorder's offset for a file's time is the honest one: the record says when the file
+  changed and where the person who recorded that was standing, and claims nothing about the file's
+  own clock, which nobody has
+- alternatives: **a sibling field per timestamp** (`modifiedIso` + `modifiedOffsetMinutes`) - additive
+  and compatible, and eighteen pairs of loose fields with no shape a test can name; the pair would
+  drift as the string did. **Zero for a missing offset** - a claim the writer stood in Greenwich.
+  **Refusing a version-4 document** - a person's work, lost to a field rename. **A local ISO string
+  with its offset folded in** (`2026-08-24T12:00:00+09:00`) - readers disagree on whether that is the
+  instant or the local moment, which is why XC-142 kept the two apart
+- basis: E-001 (T1)
+- affects: CT-001, CT-003, CT-006, CT-008, CT-009, CT-010, CT-011, MOD-007, MOD-012
+- decidedness: Fixed
+- reversal_trigger: none foreseen; a contract found carrying a time in another shape is a defect
+  against this decision, not a reason to revisit it

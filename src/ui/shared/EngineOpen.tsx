@@ -142,7 +142,7 @@ function ConnectedImportReview(props: { inspection: Inspection; busy: boolean; o
               <span className="ho-file-name" title={inspection.path}>{name}</span>
               <span className={inspection.supportLevel === "Verified" ? "ho-tier verified" : "ho-tier"}>{inspection.supportLevel}</span>
               <span className="ho-file-meta">
-                {inspection.exists ? `${formatBytes(inspection.sizeBytes)}・更新 ${inspection.modifiedIso}` : "ファイルが見つかりません"}
+                {inspection.exists ? `${formatBytes(inspection.sizeBytes)}・更新 ${inspection.modified?.utc ?? ""}` : "ファイルが見つかりません"}
               </span>
               <p className="ho-file-note">
                 {inspection.supportLevel === "Absent"
