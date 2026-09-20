@@ -22,6 +22,7 @@ import { PROTOCOL_VERSION, type Connection } from "../client/engine";
 import { informationOf } from "../logic/information";
 import { absentParts, visibilityAfter } from "../logic/parts";
 import { moveBlock } from "../logic/report";
+import { viewFooter } from "../logic/showing";
 import { engineState, FRAME, snapshot } from "./engine";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
@@ -154,6 +155,14 @@ describe("the prototype thread from the interface's side", () => {
     expect(view?.notAnswered.length).toBeGreaterThan(0);
   });
 
+  test("footer: what the area shows and why it may be incomplete, every clause from the store (XC-276)", async () => {
+    const footer = viewFooter(snapshot(), "単位未宣言");
+    expect(footer?.showing).toContain("データセット cube.vtu");
+    expect(footer?.showing).toContain("場 temperature（単位未宣言）");
+    // No picture yet and no unit declared: both said, nothing else - the file is whole.
+    expect(footer?.incomplete).toEqual(["単位未宣言の場：temperature（換算しない・XC-003）", "絵はまだありません"]);
+  });
+
   test("colour: a frame arrives, and the legend's numbers are the file's own at float32 digits", async () => {
     await engineState.refresh();
 
@@ -188,6 +197,9 @@ describe("the prototype thread from the interface's side", () => {
     expect(s.fields[0]?.unit).toBe("K");
     expect(s.statistics?.maximum).toMatchObject({ value: before, unit: "K" });
     expect(s.statistics?.minimum?.value).toBe(1);
+    // The footer follows: the unit is on the line, and the picture is there, so nothing is missing.
+    expect(viewFooter(s, "単位未宣言")?.showing).toContain("場 temperature（K）");
+    expect(viewFooter(s, "単位未宣言")?.incomplete).toEqual([]);
   });
 
   test("pick: the pixel in the middle of the frame reads a value the file holds, with everything a number needs", async () => {
@@ -373,6 +385,7 @@ describe("the prototype thread from the interface's side", () => {
     // The absence with its reason, as the logic layer says it from the engine's three facts.
     expect(absentParts(s.parts).some((one) => one.includes("Ghost") && one.includes("要素なし"))).toBe(true);
     expect(s.parts?.find((one) => one.type === "absent")?.path).toEqual(["assembly", "Base", "Ghost"]);
+    expect(viewFooter(s, "単位未宣言")?.incomplete.some((one) => one.includes("不完全なケース") && one.includes("Ghost"))).toBe(true);
     expect(s.warnings.some((one) => one.includes("不完全"))).toBe(true);
     expect(s.fields.map((one) => one.name)).toContain("stress");
     engineState.clearWarnings();

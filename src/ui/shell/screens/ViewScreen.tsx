@@ -18,6 +18,7 @@ import { ViewportPlaceholder } from "../../shared/ViewportPlaceholder";
 import { ProbeReadout } from "../../shared/ProbeReadout";
 import { Outliner, type OutlinerNode } from "../../shared/Outliner";
 import { absentParts, isShown, outlinerTree, visibilityAfter } from "../../logic/parts";
+import { reducedNote, viewFooter } from "../../logic/showing";
 import { UnresolvedList } from "../../shared/UnresolvedList";
 import { WorkspaceItemList } from "../../shared/WorkspaceItemList";
 import { ConversationDrawer } from "../../shared/ConversationDrawer";
@@ -283,7 +284,33 @@ function forcedPaneCount(variant: string): 1 | 2 | 3 | 4 | null {
 export function ViewScreen(props: { variant: string }) {
   // Keyed remount per variant: each design state gets a fresh instance, so per-variant seed
   // state (selected camera, grade, axis) never leaks between deep links.
-  return <ViewCanvas key={props.variant} variant={props.variant} />;
+  return (
+    <>
+      <ViewCanvas key={props.variant} variant={props.variant} />
+      <ViewFooter />
+    </>
+  );
+}
+
+/* ---- the footer region: what this area shows, and why it may be incomplete (XC-276) ----------- */
+
+function ViewFooter() {
+  const e = useEngine();
+  // With an engine only. Without one the design states keep their in-viewport mock label, which
+  // 11_ui.md says is sufficient and which a status footer would repeat (view/AC-057).
+  const footer = viewFooter(e, UNDECLARED);
+  if (!footer) return null;
+  const why = footer.incomplete.join("　");
+  return (
+    <footer className="vi-footer" aria-label="表示中のものと、不完全な理由">
+      <span className="vi-footer-showing" title={footer.showing}>{footer.showing}</span>
+      {footer.incomplete.length > 0 ? (
+        <span className="vi-footer-why" title={why}>{why}</span>
+      ) : (
+        <span className="vi-footer-why vi-footer-whole">欠けている理由はありません</span>
+      )}
+    </footer>
+  );
 }
 
 function ViewCanvas({ variant }: { variant: string }) {
@@ -303,7 +330,7 @@ function ViewCanvas({ variant }: { variant: string }) {
         fieldLabel: e.fieldName
           ? `${e.fieldName}（${e.fields.find((one) => one.name === e.fieldName)?.unit ?? UNDECLARED}）`
           : null,
-        reduced: e.reduced && !e.reduced.startsWith("全三角形") ? e.reduced : null,
+        reduced: reducedNote(e.reduced),
         // The case's own incompleteness, from the engine: the file named these and they are not there.
         partialNote: e.partial
           ? absentParts(e.parts).length > 0
