@@ -420,3 +420,13 @@ updated: 2026-09-20
 - done: 2026-09-20 (XC-276). `src/ui/logic/showing.ts` builds both lines; the reduction test the
   pane's marker used has one definition there now. The seventh region of #278 - the six others
   were already in `App.tsx` and `ViewScreen.tsx`
+
+### TASK-067 - A shown value copies as a spreadsheet takes it
+- satisfies: AC-092
+- depends_on: TASK-064
+- done_when: the statistics, the probe readout and the information area's structure copy as
+  tab-separated rows with the value at its digits, the unit or the marker, the provenance, the
+  location and the caveats, and a missing value as the stated absence
+- done: 2026-09-20 (XC-279). `src/ui/logic/copy.ts` builds the rows from the engine's answers; the
+  labels are the interface's own (`COPY_LABELS`), defined once. `CopyValues` writes the text and says
+  what happened beside the button

@@ -6042,3 +6042,29 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: the `script` editor, at which point the palette is its command line rather than
   a popover of its own
+
+### XC-279 - A shown value is copied as a spreadsheet takes it, and never alone
+- decided: 2026-09-20
+- status: active
+- decision: the field's statistics in the View rail, the probe readout and the information area's
+  structure each offer a copy: tab-separated lines with a header, one value per row - the value
+  written at the digits the engine answered, exactly as the screen writes it; the declared unit or
+  the undeclared marker; the significant digits; the provenance in the screen's own words; the
+  location; the caveats. A missing value is written as the stated absence with its reason, never as
+  a blank cell or a zero; a count is written as the integer it is; a bound the engine answered
+  without digits is written as answered and says so. The labels are the interface's, defined once
+  and handed to the logic that builds the rows
+- decided_by: engineering judgement, from #265's condition, XC-003, XC-001 and INV-014
+- rationale: a spreadsheet is where an engineer takes a number next, and a number pasted alone is
+  a number in whatever unit the reader assumed with whatever digits the cell shows (XC-003,
+  INV-014). Writing the value at its own digits keeps the pasted number the same claim the screen
+  makes; carrying the provenance and the caveats keeps it a claim rather than a figure. A blank
+  cell for a missing value is the substituted zero of spreadsheets (XC-001)
+- alternatives: **copying the bare number** - the number the reader assumes a unit for. **Full
+  storage precision** - digits the source never had (INV-014). **The clipboard as HTML** - a table
+  a spreadsheet reads but a text field does not; tab-separated text pastes into both
+- basis: E-001 (T1)
+- affects: MOD-009, view/REQ-010
+- decidedness: Fixed
+- reversal_trigger: a recipient format that carries units natively, at which point the unit column
+  becomes the cell's own unit

@@ -249,6 +249,10 @@ overlay on hover (XC-160); probe readout; @Deformation scale stamp drawn into th
 reduced-representation marker (INV-001); selection highlight; widget handles; the conversation drawer
 (XC-151).
 
+A shown value copies as a spreadsheet takes it (XC-279): the statistics in the rail, the probe
+readout and the information area's structure write tab-separated rows - value at its digits, unit
+or marker, digits, provenance, location, caveats - and a missing value as the stated absence.
+
 Footer region (§3), drawn below the pane grid while an engine is connected (XC-276): what is shown -
 workspace, case, dataset, field with its declared unit or the undeclared marker, colour map, whether
 the look is the saved one - and why it may be incomplete - reduction, a partial case and its absent

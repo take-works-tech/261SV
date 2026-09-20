@@ -1,6 +1,7 @@
 /* Probe readout (11_ui.md): the value under the pick - with unit, digits, provenance and the
  * source's own location words (INV-023: GlobalNodeId, never an array index). Holding it as a
  * variable is an explicit act, not a side effect. */
+import { CopyValues } from "./CopyValues";
 import { ProvenanceBadge } from "./ProvenanceBadge";
 import { QuantityChip } from "./QuantityChip";
 import type { Provenance } from "./primitives";
@@ -12,6 +13,8 @@ export function ProbeReadout(props: {
   origin: Provenance;
   location: string;
   onHold?: () => void;
+  /** The value as a spreadsheet takes it, built by the caller from the engine's answer (XC-279). */
+  copyRows?: readonly (readonly string[])[];
 }) {
   return (
     <div className="probe-readout" role="status">
@@ -28,6 +31,7 @@ export function ProbeReadout(props: {
           変数として保持
         </button>
       ) : null}
+      {props.copyRows ? <CopyValues rows={props.copyRows} /> : null}
     </div>
   );
 }

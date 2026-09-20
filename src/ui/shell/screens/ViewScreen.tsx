@@ -19,6 +19,8 @@ import { ProbeReadout } from "../../shared/ProbeReadout";
 import { Outliner, type OutlinerNode } from "../../shared/Outliner";
 import { absentParts, isShown, outlinerTree, visibilityAfter } from "../../logic/parts";
 import { reducedNote, viewFooter } from "../../logic/showing";
+import { probeRows } from "../../logic/copy";
+import { COPY_LABELS } from "../../shared/primitives";
 import { UnresolvedList } from "../../shared/UnresolvedList";
 import { WorkspaceItemList } from "../../shared/WorkspaceItemList";
 import { ConversationDrawer } from "../../shared/ConversationDrawer";
@@ -387,6 +389,7 @@ function ViewCanvas({ variant }: { variant: string }) {
           unit={e.probe.unit}
           origin={e.probe.provenance}
           location={e.probeLocation ?? ""}
+          copyRows={probeRows(e.fieldName ?? "", e.probe, e.probeLocation, COPY_LABELS)}
         />
       ) : variant === "probe" ? (
         <ProbeReadout

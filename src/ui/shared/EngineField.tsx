@@ -10,7 +10,9 @@ import { engineState, useEngine } from "../state/engine";
 import { COLOUR_MAPS } from "./ColourMapControl";
 import { ReportExport } from "./ReportExport";
 import { formatValue } from "../logic/format";
-import { UNDECLARED } from "./primitives";
+import { statisticsRows } from "../logic/copy";
+import { CopyValues } from "./CopyValues";
+import { COPY_LABELS, UNDECLARED } from "./primitives";
 
 export function EngineField() {
   const e = useEngine();
@@ -90,6 +92,15 @@ export function EngineField() {
           {maximum.unit ?? UNDECLARED}
           {maximum.location ? `（${maximum.location}）` : null}
         </p>
+      ) : null}
+      {e.statistics && e.fieldName ? (
+        <div className="prop-row">
+          <label>値を写す</label>
+          <CopyValues
+            rows={statisticsRows(e.fieldName, e.statistics, COPY_LABELS)}
+            title="最大・最小・平均・欠損数を、単位・有効桁・来歴・位置つきのタブ区切りで写します。表計算にそのまま貼れます（XC-279）"
+          />
+        </div>
       ) : null}
 
       <div className="prop-row">
