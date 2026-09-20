@@ -15,7 +15,7 @@
  */
 import { useCallback, useSyncExternalStore } from "react";
 import { Engine, TransportFailure, reasonText } from "../client/engine";
-import type { Connection, Operation, Parameters, Response, Results } from "../client/engine";
+import type { Connection, Operation, Options, Parameters, Response, Results } from "../client/engine";
 import type { RecordedTime } from "../client/generated";
 import { recordNow } from "../client/time";
 
@@ -212,6 +212,7 @@ function setImage(url: string | null, reduced: string | null) {
 async function ask<O extends Operation>(
   operation: O,
   parameters: Parameters[O],
+  options: Options = {},
 ): Promise<Results[O] | null> {
   if (!engine) {
     setState({ refusal: "エンジンに接続していません" });
@@ -224,7 +225,7 @@ async function ask<O extends Operation>(
   setState({ busy: true });
   let answer: Response<O>;
   try {
-    answer = await engine.submit(operation, parameters);
+    answer = await engine.submit(operation, parameters, options);
   } catch (failure) {
     const because = failure instanceof TransportFailure ? failure.message : String(failure);
     setState({ busy: false, refusal: because, reachability: { kind: "absent", because } });
@@ -249,7 +250,8 @@ async function ask<O extends Operation>(
 /** Applied writes that are not unsaved work: opening and saving reset the journal, and loading a
  *  file is recoverable from the path this store remembers rather than lost. Everything else the
  *  engine applies - a declaration, a view, a report - lives in the document until saved. */
-const NOT_UNSAVED_WORK = new Set<string>(["workspace.open", "workspace.save", "dataset.load"]);
+// `output.prune` changes the disk and not the document: nothing of it is waiting to be saved.
+const NOT_UNSAVED_WORK = new Set<string>(["workspace.open", "workspace.save", "dataset.load", "output.prune"]);
 
 export const engineState = {
   /** Point the interface at an engine. Called once by the shell with what the connection file said. */
@@ -574,6 +576,30 @@ const rendered = await ask("view.render", { viewId, ...FRAME, format: "png", leg
   /** What has left the machine, as the gate recorded it (XC-106, XC-267): read, never kept here. */
   async audit(since?: string): Promise<Results["system.audit"] | null> {
     return ask("system.audit", since ? { since } : {});
+  },
+
+  /** What the runs left behind, run by run, against LIM-012 (XC-141). */
+  async outputList(): Promise<Results["output.list"] | null> {
+    if (!state.workspaceId) return null;
+    return ask("output.list", { workspaceId: state.workspaceId });
+  },
+
+  /** Every file that pruning the chosen runs would delete, shown before anything goes (AC-053). */
+  async outputPlan(runIds: readonly string[]): Promise<Results["output.plan"] | null> {
+    if (!state.workspaceId) return null;
+    return ask("output.plan", { workspaceId: state.workspaceId, runsToRemove: [...runIds] });
+  },
+
+  /** Class 3, destructive: deletes exactly what the plan showed, with the person's say-so on the
+   *  envelope (CT-002) and the files they saw sent back so a folder that changed is refused (XC-268). */
+  async outputPrune(runIds: readonly string[], expectedFiles: readonly string[]): Promise<Results["output.prune"] | null> {
+    if (!state.workspaceId) return null;
+    setState({ refusal: null });
+    return ask(
+      "output.prune",
+      { workspaceId: state.workspaceId, runsToRemove: [...runIds], expectedFiles: [...expectedFiles] },
+      { authorisation: { allowDestructive: true } },
+    );
   },
 
   clearRefusal() {

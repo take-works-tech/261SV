@@ -93,6 +93,7 @@ export const SCENARIOS: readonly Scenario[] = [
   { id: "settings.shortcuts", screen: "settings" as ScreenId, variant: "shortcuts", label: "ショートカット", intent: "コマンドとキーの一覧を示し、破壊的な操作が単一キーを持たないことを明示する。" },
   { id: "settings.support-bundle", screen: "settings" as ScreenId, variant: "support-bundle", label: "サポートバンドル確認", intent: "含める情報、要確認情報、除外する顧客データを作成前に列挙する。" },
   { id: "settings.licences", screen: "settings" as ScreenId, variant: "licences", label: "ライセンス", intent: "同梱する構成要素とその条件。パッケージ版は notices.json から一覧を出し、ブラウザでは一覧がないと言う（XC-025）" },
+  { id: "settings.output", screen: "settings" as ScreenId, variant: "output", label: "出力の整理", intent: "実行が残した成果物の容量を実行ごとに示し、消えるファイルを名指しで確認してから消す。記録と入力は消さない（XC-141、XC-268）" },
   { id: "network.default", screen: "network" as ScreenId, variant: "default", label: "ネットワークと監査", intent: "端末外へ出せる内容を表示し、ローカル監査履歴を保持する。" },
   { id: "network.offline", screen: "network" as ScreenId, variant: "offline", label: "既定でオフライン", intent: "検索が未許可であることと、許可方法を説明する。" },
   { id: "network.refused", screen: "network" as ScreenId, variant: "refused", label: "要求拒否", intent: "送信せず、拒否したホストと要求を明示する。" },
