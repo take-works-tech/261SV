@@ -409,3 +409,14 @@ updated: 2026-09-20
   builds the rows and the map; the Object tab shows the selected part and the rail moves to it.
   What is not built: the header's search and filters, and the preview before a large recursive
   change. AC-056's unnamed marker is the reader's own (`block N`), not a marker this layer adds
+
+### TASK-066 - The area's footer says what it shows and why it may be incomplete
+- satisfies: AC-091
+- depends_on: TASK-064
+- done_when: with an engine connected the View area draws its footer region from the store - what
+  is shown, and the reduction, the partial case with its absent parts, hidden parts, undeclared
+  units, a read-only document and a missing picture as the reasons it may be incomplete - and draws
+  none without an engine
+- done: 2026-09-20 (XC-276). `src/ui/logic/showing.ts` builds both lines; the reduction test the
+  pane's marker used has one definition there now. The seventh region of #278 - the six others
+  were already in `App.tsx` and `ViewScreen.tsx`

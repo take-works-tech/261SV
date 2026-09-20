@@ -5950,3 +5950,33 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a second report per dataset in one document - a comparison report beside the
   dataset's own - at which point the area lists the document's reports and the name is chosen rather
   than derived
+
+### XC-276 - The View area's footer says what it shows and why it may be incomplete, with an engine only
+- decided: 2026-09-20
+- status: active
+- decision: the `viewport` Area's `footer` region (§3, §4) is drawn below the pane grid while an
+  engine is connected, from the store and nothing else: one line of what is shown - workspace,
+  case, dataset, the field with its declared unit or the undeclared marker, the colour map, and
+  whether the look is the saved one - and one line of why it may be incomplete: the reduction the
+  picture carries, a partial case with its absent parts, hidden parts, fields without a declared
+  unit, a read-only document, a picture not yet drawn. Without an engine the region is not drawn:
+  the design states keep their in-viewport mock label, which 11_ui.md's mock-viewport rule says is
+  sufficient and which a status footer would repeat (view/AC-057). The reduction test - the engine's
+  statement that nothing was reduced - has one definition, used by the pane's marker and the footer
+- decided_by: engineering judgement, from #278's condition and 16_application_model §3
+- rationale: the region's purpose is what the Area shows and why it may be incomplete, and every
+  clause of that is an engine answer the store already holds; a footer that computed or invented
+  any of it would be a second source. The same rule that forbids a status footer around the mock
+  canvas forbids a fixture footer: a design state has nothing true to say there. The Area's footer
+  is a region outside the pane, so the pane's Canvas still fills the centre display region without
+  a wrapper or a footer of its own
+- alternatives: **a fixture footer in the design states** - a status footer around the mock canvas,
+  which 11_ui.md and view/AC-057 rule out, saying something untrue beside a mock label that says
+  nothing. **Folding the footer into the pane badge** - the badge is per pane and carries the
+  partial mark (AC-091); the footer is per Area and says the rest
+- basis: E-001 (T1)
+- affects: MOD-009, view/REQ-002
+- decidedness: Fixed
+- reversal_trigger: a second Area of the View screen that says something different from the first
+  pane - a comparison whose panes show different cases - at which point the footer says which pane
+  it speaks for, or each pane's badge takes the line

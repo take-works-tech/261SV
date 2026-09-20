@@ -249,6 +249,13 @@ overlay on hover (XC-160); probe readout; @Deformation scale stamp drawn into th
 reduced-representation marker (INV-001); selection highlight; widget handles; the conversation drawer
 (XC-151).
 
+Footer region (§3), drawn below the pane grid while an engine is connected (XC-276): what is shown -
+workspace, case, dataset, field with its declared unit or the undeclared marker, colour map, whether
+the look is the saved one - and why it may be incomplete - reduction, a partial case and its absent
+parts, hidden parts, fields without a unit, a read-only document, no picture yet. Every clause is an
+engine answer the store holds. Without an engine the region is not drawn, because the design states'
+mock label is what 11_ui.md asks for there and a fixture footer would say something untrue.
+
 ### 7.2 `outliner`
 
 | Region | Elements | Bound to | Unresolved |

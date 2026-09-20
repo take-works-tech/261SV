@@ -141,3 +141,14 @@ button.vi-row:hover { background: var(--surface-raise); }
 
 /* Bookmark markers on the playback axis. */
 .vi-mark { position: absolute; top: 50%; width: 6px; height: 6px; transform: translate(-50%, -50%) rotate(45deg); background: var(--ink-muted); }
+
+/* The area's footer region (16_application_model §3): one line of what is shown, one of why it may be
+   incomplete. Chrome, not canvas: it sits below the pane grid and never over it. */
+.vi-footer {
+  flex: none; display: flex; align-items: center; gap: 12px; min-width: 0;
+  border-top: 1px solid var(--line-strong); background: var(--surface-panel);
+  padding: 5px 12px; color: var(--ink-muted); font-size: var(--text-caption);
+}
+.vi-footer-showing { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+.vi-footer-why { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vi-footer-whole { color: var(--ink-faint); }
