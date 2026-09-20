@@ -5692,3 +5692,34 @@ model or the prompt, never in a description that quietly went stale.
 - affects: CT-003, MOD-014
 - decidedness: Fixed
 - reversal_trigger: none foreseen
+
+### XC-268 - Pruning across the wire deletes what was shown, and refuses a folder that changed in between
+- decided: 2026-09-20
+- status: active
+- decision: pruning is three operations. `output.list` says what the output folder holds, run by
+  run, with each run's size and time and where the time came from, the total against LIM-012, and
+  which runs pruning oldest-first would take. `output.plan` says, for the runs a person chose, every
+  file that would go by path and every record that stays. `output.prune` takes the same runs and the
+  files the caller expects to go, deletes exactly the plan it recomputes, and is refused with nothing
+  deleted where that plan no longer matches what the caller saw. A run holding a file the workspace
+  records as an input refuses the whole plan, naming the run and the file. The act has no undo: a
+  deleted artefact is regenerated from its record (XC-046), not brought back from memory - and
+  the command surface, which otherwise refuses a write that returns no way back, admits one only
+  where the handler declares destruction and the caller authorised it (CT-002, XC-061's boundary)
+- decided_by: engineering judgement, from what `output.py` already refused in process
+- rationale: **what is deleted is what was shown.** In process, `prune` takes the plan it showed
+  rather than the runs, so nothing can go that the person did not see. Across the wire the plan and
+  the act are two requests, and between them a run can gain a file - the export somebody just made
+  into the folder they are about to clear. Recomputing the plan at the act and deleting it would
+  delete that file unshown; sending the plan's file list back with the act, and refusing on a
+  difference, keeps the in-process guarantee across the wire at the cost of one list. **Refused, not
+  narrowed**: a plan that quietly dropped a run holding an input would delete less than it said and
+  say nothing, which is the shape of every silent substitution XC-001 forbids
+- alternatives: **a plan handle** - a token the act presents; the same guarantee with state the
+  engine must keep and expire, for a list the caller already holds. **Deleting whatever is there at
+  the time of the act** - the file somebody just made goes unshown. **Undo by keeping the bytes** - a
+  deleted export held in memory for the sake of an undo nobody asked for (LIM-014)
+- basis: E-001 (T1)
+- affects: CT-002, CT-003, MOD-011, MOD-012
+- decidedness: Fixed
+- reversal_trigger: none foreseen

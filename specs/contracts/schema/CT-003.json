@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -80,6 +80,8 @@
         "system.audit",
         "system.supportBundle",
         "workspace.pack",
+        "output.list",
+        "output.plan",
         "output.prune"
       ]
     },
@@ -1483,6 +1485,13 @@
                 "type": "string"
               },
               "description": "取り除く実行の識別子"
+            },
+            "expectedFiles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "消えると示されたファイル（output.plan の files）。今の計画と一致しなければ、何も消さずに拒む（XC-268）"
             }
           }
         },
@@ -1532,6 +1541,40 @@
             "path": {
               "type": "string",
               "description": "読む前のファイル。中身は開かない"
+            }
+          }
+        },
+        "output.list": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "workspaceId"
+          ],
+          "properties": {
+            "workspaceId": {
+              "type": "string",
+              "description": "ワークスペース の識別子（CT-001）"
+            }
+          }
+        },
+        "output.plan": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "workspaceId",
+            "runsToRemove"
+          ],
+          "properties": {
+            "workspaceId": {
+              "type": "string",
+              "description": "ワークスペース の識別子（CT-001）"
+            },
+            "runsToRemove": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "取り除く実行の識別子"
             }
           }
         }
@@ -4073,6 +4116,127 @@
             },
             "exists": {
               "type": "boolean"
+            }
+          }
+        },
+        "output.list": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "outputDirectory",
+            "runs",
+            "totalBytes",
+            "limitBytes",
+            "overLimit",
+            "suggestedRunIds"
+          ],
+          "properties": {
+            "outputDirectory": {
+              "type": "string",
+              "description": "ワークスペースの出力フォルダ（XC-113）"
+            },
+            "runs": {
+              "type": "array",
+              "description": "実行ごとに、何がどれだけ残っているか",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "started",
+                  "startedFrom",
+                  "artefactFiles",
+                  "artefactBytes",
+                  "hasRecord"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "<名前>/<実行のタイムスタンプ>"
+                  },
+                  "started": {
+                    "$ref": "CT-001.json#/$defs/recordedTime",
+                    "description": "始まった時刻"
+                  },
+                  "startedFrom": {
+                    "type": "string",
+                    "enum": [
+                      "record",
+                      "folder"
+                    ],
+                    "description": "時刻の出どころ：実行の記録か、フォルダ自身の更新時刻か"
+                  },
+                  "artefactFiles": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "作り直せる成果物の数。記録は数えない"
+                  },
+                  "artefactBytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "hasRecord": {
+                    "type": "boolean",
+                    "description": "作り方の記録があるか（XC-046）"
+                  }
+                }
+              }
+            },
+            "totalBytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "limitBytes": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "LIM-012"
+            },
+            "overLimit": {
+              "type": "boolean",
+              "description": "超えていれば確認のお願いであり、拒否ではない（XC-141）"
+            },
+            "suggestedRunIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "上限を下回るまで古い順に取り除くなら、どの実行か。最新の実行は決して含まない"
+            }
+          }
+        },
+        "output.plan": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runIds",
+            "files",
+            "freedBytes",
+            "keptRecords"
+          ],
+          "properties": {
+            "runIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "files": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "消えるファイル。出力フォルダからの相対パスで、一つ残らず（AC-053）"
+            },
+            "freedBytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "keptRecords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "残す実行の記録（XC-046）"
             }
           }
         }

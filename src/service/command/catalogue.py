@@ -81,6 +81,8 @@ READS = frozenset({
     "pipeline.dryRun",
     "report.provenance",
     "system.audit",
+    "output.list",
+    "output.plan",
 })
 
 #: Every operation this build knows the name of, in the order the contract lists them.
@@ -147,6 +149,8 @@ OPERATIONS = (
     "system.audit",
     "system.supportBundle",
     "workspace.pack",
+    "output.list",
+    "output.plan",
     "output.prune",
 )
 
@@ -216,7 +220,9 @@ PARAMETERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "system.audit": (frozenset(['since']), frozenset([])),
     "system.supportBundle": (frozenset(['consent', 'path']), frozenset(['consent', 'path'])),
     "workspace.pack": (frozenset(['includeData', 'path', 'workspaceId']), frozenset(['includeData', 'path', 'workspaceId'])),
-    "output.prune": (frozenset(['runsToRemove', 'workspaceId']), frozenset(['runsToRemove', 'workspaceId'])),
+    "output.list": (frozenset(['workspaceId']), frozenset(['workspaceId'])),
+    "output.plan": (frozenset(['runsToRemove', 'workspaceId']), frozenset(['runsToRemove', 'workspaceId'])),
+    "output.prune": (frozenset(['expectedFiles', 'runsToRemove', 'workspaceId']), frozenset(['runsToRemove', 'workspaceId'])),
 }
 
 #: What each operation **answers**, and which of those fields it must carry. From CT-003's
@@ -286,6 +292,8 @@ RESULT_FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "system.audit": (frozenset(['entries']), frozenset(['entries'])),
     "system.supportBundle": (frozenset(['contents', 'path']), frozenset(['contents', 'path'])),
     "workspace.pack": (frozenset(['bytes', 'omitted', 'path']), frozenset(['bytes', 'path'])),
+    "output.list": (frozenset(['limitBytes', 'outputDirectory', 'overLimit', 'runs', 'suggestedRunIds', 'totalBytes']), frozenset(['limitBytes', 'outputDirectory', 'overLimit', 'runs', 'suggestedRunIds', 'totalBytes'])),
+    "output.plan": (frozenset(['files', 'freedBytes', 'keptRecords', 'runIds']), frozenset(['files', 'freedBytes', 'keptRecords', 'runIds'])),
     "output.prune": (frozenset(['deletedFiles', 'freedBytes', 'removedRunIds']), frozenset(['deletedFiles', 'freedBytes', 'removedRunIds'])),
 }
 
@@ -357,12 +365,14 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
     "system.audit": {},
     "system.supportBundle": {},
     "workspace.pack": {},
+    "output.list": {},
+    "output.plan": {},
     "output.prune": {},
 }
 
 #: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below
 #: the engine's floor is refused politely rather than answered in a shape it cannot read.
-PROTOCOL_VERSION = "3.1.0"
+PROTOCOL_VERSION = "3.2.0"
 
 #: The wire's own names, from CT-003's `$defs.transport` (XC-258). The interface generates
 #: the same values from the same place; neither side is derived from the other (XC-252).

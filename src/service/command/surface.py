@@ -371,7 +371,13 @@ class Surface:
             # had no way to refuse: raising became FAILED, which blames the build for the caller's
             # mistake, and CT-002 keeps the two words apart for a reason.
             return effect
-        if writes(command.operation) and not command.dry_run and effect.undo is None:
+        # A write with no way back is refused here - unless it declares destruction and the caller
+        # authorised exactly that (CT-002). XC-061 draws undo's boundary at the document: files
+        # beyond it are not undone, and deleting a regenerable artefact on a person's say-so has no
+        # undo but its record (XC-046, XC-268). Holding the bytes for an undo nobody asked for is the
+        # closure LIM-014 exists to forbid.
+        irreversible_by_declaration = Permission.DESTRUCTIVE in handler.needs
+        if writes(command.operation) and not command.dry_run and effect.undo is None and not irreversible_by_declaration:
             return Result(
                 Status.FAILED,
                 reason=(
@@ -453,7 +459,11 @@ class Surface:
                 )
         return None
 
-    def _keep(self, command: Command, effect: Effect) -> str:
+    def _keep(self, command: Command, effect: Effect) -> str | None:
+        # No way back, no undo id: an entry that carried one without an undo would read as one the
+        # cap dropped (LIM-014), and this one was never undoable (XC-061).
+        if effect.undo is None:
+            return None
         undo_id = command.group_id or self._identifier()
         if effect.undo is not None:
             self._undo.setdefault(undo_id, []).append(effect.undo)

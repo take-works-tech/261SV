@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "3.1.0";
+export const PROTOCOL_VERSION = "3.2.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -81,6 +81,8 @@ export type Operation =
   | "output.prune"
   | "view.pick"
   | "dataset.inspect"
+  | "output.list"
+  | "output.plan"
   ;
 
 export const OPERATIONS: readonly Operation[] = [
@@ -147,6 +149,8 @@ export const OPERATIONS: readonly Operation[] = [
   "output.prune",
   "view.pick",
   "dataset.inspect",
+  "output.list",
+  "output.plan",
 ];
 
 /** What each operation takes. From CT-003's $defs.operationParameters. */
@@ -412,6 +416,7 @@ export interface Parameters {
   "output.prune": {
     workspaceId: string;
     runsToRemove: readonly (string)[];
+    expectedFiles?: readonly (string)[];
   };
   "view.pick": {
     viewId: string;
@@ -422,6 +427,13 @@ export interface Parameters {
   };
   "dataset.inspect": {
     path: string;
+  };
+  "output.list": {
+    workspaceId: string;
+  };
+  "output.plan": {
+    workspaceId: string;
+    runsToRemove: readonly (string)[];
   };
 }
 
@@ -880,6 +892,27 @@ export interface Results {
     sizeBytes: number;
     modified?: RecordedTime;
     exists: boolean;
+  };
+  "output.list": {
+    outputDirectory: string;
+    runs: readonly ({
+      id: string;
+      started: RecordedTime;
+      startedFrom: "record" | "folder";
+      artefactFiles: number;
+      artefactBytes: number;
+      hasRecord: boolean;
+    })[];
+    totalBytes: number;
+    limitBytes: number;
+    overLimit: boolean;
+    suggestedRunIds: readonly (string)[];
+  };
+  "output.plan": {
+    runIds: readonly (string)[];
+    files: readonly (string)[];
+    freedBytes: number;
+    keptRecords: readonly (string)[];
   };
 }
 

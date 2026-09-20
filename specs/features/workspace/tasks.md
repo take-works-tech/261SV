@@ -684,3 +684,13 @@ updated: 2026-09-20
   it differs (`src/ui/logic/time.ts`, held to the same cases as the Python side), and the engine's
   own record with what the caps dropped (`EngineHistory`, #315); the shell records its status and
   orphan times the same way
+
+### TASK-070 - Output listed, planned and pruned by name through the API
+- satisfies: AC-053
+- depends_on: TASK-052
+- done_when: `output.list`, `output.plan` and `output.prune` answer from the workspace's output folder;
+  the act needs authorisation, deletes exactly the plan, and refuses a folder that changed
+- done: 2026-09-20 (engine half). `runs_of` reads the XC-113 layout and says where each run's time came
+  from; `plan_for` refuses an unknown run and a run holding a recorded input rather than narrowing the
+  plan; the act names the files it expects and is refused where they differ (XC-268). The page that
+  lets a person choose runs and read the plan before confirming follows in the next change

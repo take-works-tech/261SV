@@ -30,6 +30,7 @@ from typing import Any, Callable, Mapping
 import numpy as np
 
 from domain_core.association import Association
+from domain_core.locale_format import bytes_as_text
 from domain_core.dataset import Dataset, Field
 from domain_core.parts import LoadedCase, Part
 from domain_core.recorded_time import STORED_FORMAT, RecordedTime, from_stored, record as record_time, record_instant
@@ -52,10 +53,10 @@ from engine.visualization import render as render_module
 from engine.visualization.backends import REQUIRES, Backend, probe
 from engine.visualization.render import Camera, Colouring, RenderError, probe_offscreen, render_view
 from service.command.catalogue import PROTOCOL_VERSION
-from service.command.surface import Effect, Handler, LogEntry, Result, Status, Surface
+from service.command.surface import Effect, Handler, LogEntry, Permission, Result, Status, Surface
 from service.egress import diagnostics
 from service.egress.gate import Gate
-from service.workspace import items, sources
+from service.workspace import items, output, sources
 from service.workspace.document import FORMAT_VERSION, WorkspaceDocument, WorkspaceFileError, load as load_workspace
 from service.workspace.document import WorkspaceVersionError, save as save_document
 from service.workspace.hierarchy import find as find_case, walk as walk_cases
@@ -359,6 +360,11 @@ def handlers(session: Session) -> tuple[Handler, ...]:
         Handler("report.provenance", lambda p, t: report_provenance(session, p)),
         Handler("system.capabilities", lambda p, t: system_capabilities(session)),
         Handler("system.audit", lambda p, t: system_audit(session, p)),
+        Handler("output.list", lambda p, t: output_list(session, p)),
+        Handler("output.plan", lambda p, t: output_plan(session, p)),
+        # Deleting files is destructive and needs the caller's say-so on the envelope (CT-002);
+        # what it deletes is what `output.plan` showed, and nothing else (XC-268).
+        Handler("output.prune", lambda p, t: output_prune(session, p), needs=frozenset({Permission.DESTRUCTIVE})),
         Handler("system.protocols", lambda p, t: Effect("対応する版です", value={"versions": [PROTOCOL_VERSION]})),
     )
 
@@ -1320,6 +1326,110 @@ def report_provenance(session: Session, parameters: Mapping[str, Any]) -> Effect
             "productVersion": provenance.product_version,
             "produced": provenance.produced.as_stored() if provenance.produced else None,
         },
+    )
+
+
+# -- output: what the runs left behind, and pruning it by name (XC-141, XC-268, #314) -------------
+
+
+def _output_root(session: Session, parameters: Mapping[str, Any]) -> tuple[WorkspaceDocument, Path, Path] | Result:
+    """The open workspace, its folder, and its output folder under it (XC-113)."""
+    workspace = session.open_workspace(str(parameters["workspaceId"]))
+    if isinstance(workspace, Result):
+        return workspace
+    if session.workspace_path is None:
+        return refused("保存先のないワークスペースには出力フォルダがありません（XC-113）")
+    base = session.workspace_path.parent
+    return workspace, base, base / output.OUTPUT_DIRECTORY
+
+
+def output_list(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
+    """What the output folder holds, run by run, against LIM-012 (workspace/AC-052): each run's size
+    and time - and where the time came from - the total, and which runs pruning oldest-first would
+    take to get under the limit. An ask, never a refusal (XC-141)."""
+    found = _output_root(session, parameters)
+    if isinstance(found, Result):
+        return found
+    _, _, root = found
+    runs = output.runs_of(root, where=session.clock())
+    size = output.size_of(runs)
+    suggested = output.plan_pruning(runs)
+    return Effect(
+        size.describe(),
+        value={
+            "outputDirectory": str(root),
+            "runs": [run.as_stored() for run in runs],
+            "totalBytes": size.total_bytes,
+            "limitBytes": size.limit_bytes,
+            "overLimit": size.over_limit,
+            "suggestedRunIds": [run.identifier for run in suggested.runs],
+        },
+    )
+
+
+def _recorded_inputs(workspace: WorkspaceDocument, base: Path) -> list[Path]:
+    """Every file a case records as a source. Never this product's to delete, whatever folder it is in."""
+    inputs: list[Path] = []
+    for case, _ in walk_cases(workspace.cases):
+        for source in case.get("sources") or []:
+            if not isinstance(source, dict):
+                continue
+            if source.get("pathAbsolute"):
+                inputs.append(Path(str(source["pathAbsolute"])))
+            if source.get("pathRelative"):
+                inputs.append(base / str(source["pathRelative"]))
+    return inputs
+
+
+def _planned(session: Session, parameters: Mapping[str, Any]) -> tuple[Path, output.PrunePlan] | Result:
+    found = _output_root(session, parameters)
+    if isinstance(found, Result):
+        return found
+    workspace, base, root = found
+    chosen = parameters.get("runsToRemove")
+    if not isinstance(chosen, list):
+        return refused("runsToRemove は実行の識別子の一覧です")
+    runs = output.runs_of(root, where=session.clock())
+    try:
+        plan = output.plan_for(runs, chosen, protected=_recorded_inputs(workspace, base))
+    except output.OutputError as error:
+        return refused(str(error))
+    return root, plan
+
+
+def output_plan(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
+    """What pruning the chosen runs would delete, file by file, and the records it would keep - shown
+    before anything goes (workspace/AC-053)."""
+    made = _planned(session, parameters)
+    if isinstance(made, Result):
+        return made
+    root, plan = made
+    return Effect(plan.describe(), value=plan.as_stored(root))
+
+
+def output_prune(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
+    """Delete exactly what the plan showed (AC-053, XC-268). The caller names the files it expects to
+    go; a folder that changed since the plan is refused with nothing deleted, because a list a person
+    confirmed is the only list this may act on. No undo: a deleted artefact is regenerated from its
+    record (XC-046), not brought back from memory."""
+    made = _planned(session, parameters)
+    if isinstance(made, Result):
+        return made
+    root, plan = made
+    stored = plan.as_stored(root)
+    expected = parameters.get("expectedFiles")
+    if expected is not None and sorted(str(one) for one in expected) != sorted(stored["files"]):
+        return refused(
+            "計画を見せたあとに出力フォルダが変わっています。何も消していません。"
+            "一覧を読み直して、もう一度確認してください（XC-268）"
+        )
+    removed = output.prune(plan)
+    return Effect(
+        f"{len(plan.runs)} 実行分から {removed} ファイル、{bytes_as_text(plan.freed_bytes)} を消しました。"
+        f"実行の記録 {len(plan.kept_records)} 件は残しています",
+        changed=tuple(run.identifier for run in plan.runs),
+        value={"removedRunIds": stored["runIds"], "freedBytes": plan.freed_bytes, "deletedFiles": stored["files"]},
+        warnings=("この操作は取り消せません。消した成果物は実行の記録から作り直します（XC-046、XC-061）",),
     )
 
 
