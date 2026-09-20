@@ -25,6 +25,7 @@ import { informationOf } from "../logic/information";
 import { absentParts, visibilityAfter } from "../logic/parts";
 import { moveBlock } from "../logic/report";
 import { viewFooter } from "../logic/showing";
+import { HEADER, probeRows, statisticsRows, tsv } from "../logic/copy";
 import { engineState, FRAME, snapshot } from "./engine";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
@@ -202,6 +203,15 @@ describe("the prototype thread from the interface's side", () => {
     // The footer follows: the unit is on the line, and the picture is there, so nothing is missing.
     expect(viewFooter(s, "単位未宣言")?.showing).toContain("場 temperature（K）");
     expect(viewFooter(s, "単位未宣言")?.incomplete).toEqual([]);
+    // The values as a spreadsheet takes them: the engine's digits, the declared unit, the provenance,
+    // and the missing count as the integer it is (XC-279).
+    if (!s.statistics) throw new Error("the statistics were not read");
+    const copied = tsv(statisticsRows("temperature", s.statistics, { undeclared: "単位未宣言", provenance: { dataset: "データ", computed: "計算" } })).split("\n");
+    expect(copied[0]).toBe(HEADER.join("\t"));
+    expect(copied[1]).toMatch(/^temperature（最大）\t8\tK\t6\t/);
+    expect(copied[2]).toMatch(/^temperature（最小）\t1\tK\t6\t/);
+    expect(copied[3]).toMatch(/^temperature（平均）\t[0-9.]+\tK\t6\t計算\t/);
+    expect(copied[4]).toMatch(/^temperature（欠損数）\t0\t件\t整数\t/);
   });
 
   test("pick: the pixel in the middle of the frame reads a value the file holds, with everything a number needs", async () => {
@@ -216,6 +226,13 @@ describe("the prototype thread from the interface's side", () => {
     expect(s.probeLocation).toContain("節点");
     // The part under the pixel is the selection now (view/AC-055): the outliner follows the viewport.
     expect(s.selectedPart).toBe("cube");
+    // The probed value copied: the same number the readout shows, with its unit and the location.
+    if (!s.probe) throw new Error("the probe was not read");
+    const row = probeRows("temperature", s.probe, s.probeLocation, { undeclared: "単位未宣言", provenance: { dataset: "データ" } })[1];
+    expect(row?.[0]).toBe("temperature（プローブ）");
+    expect(Number(row?.[1])).toBe(s.probe.value);
+    expect(row?.slice(2, 5)).toEqual(["K", "6", "データ"]);
+    expect(row?.[5]).toContain("節点");
   });
 
   test("pick: a pixel off the model reads nothing, and says so rather than the nearest value", async () => {

@@ -21,6 +21,10 @@ export const PROVENANCE_LABEL: Record<Provenance, string> = {
   reference: "資料",
 };
 
+/** What a copied value carries as words (XC-279): the same marker and the same provenance labels
+ *  the screen shows, handed to the logic layer rather than spelled again there. */
+export const COPY_LABELS = { undeclared: UNDECLARED, provenance: PROVENANCE_LABEL } as const;
+
 export function Chrome({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }

@@ -177,6 +177,10 @@ updated: 2026-09-20
     shall report it as missing rather than as zero (INV-011)
   - AC-030: Where a probed value is kept, the system shall make it a @Variable carrying the case, the
     position and the time it was taken at
+  - AC-092: When a shown value is copied, the clipboard shall carry it as a spreadsheet takes it - the
+    value at its shown digits, its unit or the undeclared marker, its significant digits, its
+    @Provenance, its location and its caveats, tab-separated with a header - and a missing value as
+    the stated absence rather than a blank cell (XC-279)
 
 ### REQ-011 - The displayed time step is a variable
 - priority: MUST

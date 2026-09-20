@@ -15,6 +15,9 @@ import { UnitLabel } from "../../shared/UnitLabel";
 import { UnresolvedList } from "../../shared/UnresolvedList";
 import { disabledBecause, formatBytes, formatValue } from "../../logic/format";
 import { informationOf, type InformationView } from "../../logic/information";
+import { structureRows } from "../../logic/copy";
+import { CopyValues } from "../../shared/CopyValues";
+import { COPY_LABELS } from "../../shared/primitives";
 import { useEngine } from "../../state/engine";
 import "./information.css";
 
@@ -613,7 +616,7 @@ function LiveInformation({ view, caseId }: { view: InformationView; caseId: stri
           </section>
 
           <section className="in-section">
-            <h3>構造 <ProvenanceBadge origin="dataset" /></h3>
+            <h3>構造 <ProvenanceBadge origin="dataset" /> <CopyValues rows={structureRows(view, COPY_LABELS)} label="写す" title="節点数・要素数・範囲・パートごとの数を、単位・来歴つきのタブ区切りで写します（XC-279）" /></h3>
             {view.structure ? (
               <>
                 <div className="in-kv"><span className="in-k">要素数</span><span className="in-v in-num">{group(view.structure.cells)}</span></div>
