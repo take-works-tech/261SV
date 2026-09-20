@@ -119,6 +119,10 @@ export interface EngineState {
    *  (ingest/AC-027). Kept, not only warned: a mark that can be dismissed is a mark that was. */
   readonly partial: boolean;
   readonly absentParts: readonly string[];
+  /** What `dataset.describe` and `dataset.parts` answered for the loaded dataset, kept whole: the
+   *  information area reads them rather than a fixture (XC-273). */
+  readonly described: Results["dataset.describe"] | null;
+  readonly parts: Results["dataset.parts"]["parts"] | null;
   readonly probe: Reported | null;
   readonly probeLocation: string | null;
   readonly statistics: Results["field.statistics"] | null;
@@ -196,6 +200,8 @@ const EMPTY: EngineState = {
   reduced: null,
   partial: false,
   absentParts: [],
+  described: null,
+  parts: null,
   probe: null,
   probeLocation: null,
   statistics: null,
@@ -408,6 +414,8 @@ export const engineState = {
       viewId: null,
       partial: false,
       absentParts: [],
+      described: null,
+      parts: null,
       probe: null,
       probeLocation: null,
       statistics: null,
@@ -454,6 +462,8 @@ export const engineState = {
       savedCamera: null,
       partial: false,
       absentParts: [],
+      described: null,
+      parts: null,
       probe: null,
       probeLocation: null,
       statistics: null,
@@ -463,12 +473,15 @@ export const engineState = {
     setState({
       bounds: described?.boundsM ? [described.boundsM.minM as number[], described.boundsM.maxM as number[]] : null,
       partial: described?.partial ?? false,
+      described,
     });
-    if (described?.partial) {
-      // What is missing, by name, from the parts the engine lists as absent (AC-027).
-      const parts = await ask("dataset.parts", { datasetId: loaded.datasetId });
-      setState({ absentParts: (parts?.parts ?? []).filter((one) => one.type === "absent").map((one) => one.name) });
-    }
+    // The parts, present and absent, as the engine lists them: what the information area shows and
+    // where a partial case's missing parts are named (AC-027, XC-273).
+    const parts = await ask("dataset.parts", { datasetId: loaded.datasetId });
+    setState({
+      parts: parts?.parts ?? null,
+      absentParts: (parts?.parts ?? []).filter((one) => one.type === "absent").map((one) => one.name),
+    });
     return true;
   },
 

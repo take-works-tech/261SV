@@ -17,6 +17,9 @@ ROOT = Path(__file__).resolve().parents[1]
 MODEL = ROOT / "specs" / "16_application_model.md"
 SCENARIOS = ROOT / "specs" / "17_user_scenarios.md"
 CATALOG = ROOT / "mockups" / "ui" / "lib" / "screen-catalog.json"
+# The production interface's own catalogue (mockup 2, src/ui): the screens the product carries, some
+# of them as design states for surfaces r1 sets aside.
+INTERFACE_CATALOG = ROOT / "src" / "ui" / "shell" / "catalog.ts"
 
 # Section 3 of the design fixes the vocabulary. It is read from the file rather than restated here for
 # the reason XC-189 gives: two copies of one list agree with each other and with nothing else.
@@ -63,11 +66,16 @@ def test_every_area_declares_regions_from_the_one_vocabulary() -> None:
 
 def test_the_area_catalogue_and_the_design_catalogue_agree_in_both_directions() -> None:
     """A screen the mockup carries with no Area is a surface the model cannot place; an Area claiming a
-    screen the mockup does not carry is a claim about shipped work that is not there."""
+    screen no catalogue carries is a claim about shipped work that is not there. Two catalogues count:
+    the design catalogue (mockup 1) and the production interface's (mockup 2), which may carry design
+    states for surfaces r1 sets aside without the model claiming them - so every design-catalogue
+    screen must be placed, and every claimed screen must exist in one of the two."""
     rows = area_rows()
     claimed = {row[4].strip("`") for row in rows if row[4] != "-"}
-    shipped = {str(item["screen"]) for item in json.loads(CATALOG.read_text(encoding="utf-8"))["scenarios"]}
-    assert claimed == shipped, f"only in the model: {sorted(claimed - shipped)}; only in the catalogue: {sorted(shipped - claimed)}"
+    designed = {str(item["screen"]) for item in json.loads(CATALOG.read_text(encoding="utf-8"))["scenarios"]}
+    interface = set(re.findall(r'screen: "([a-z]+)"', INTERFACE_CATALOG.read_text(encoding="utf-8")))
+    assert designed <= claimed, f"only in the design catalogue: {sorted(designed - claimed)}"
+    assert claimed <= designed | interface, f"claimed and carried by no catalogue: {sorted(claimed - designed - interface)}"
 
 
 def test_an_area_that_claims_a_screen_is_marked_as_shipped() -> None:

@@ -110,7 +110,7 @@ that column against `mockups/ui/lib/screen-catalog.json` in both directions.
 | `nodes` | a typed graph: MaterialX for a @Material, or an @Expression graph | main, header, properties, footer | partly, as a dialogue over the centre | - |
 | `timeline` | the @Result axis, camera paths and animation cues over the current item | main, header, footer | a canvas overlay and a property tab; the docked editor is future | - |
 | `diff` | a @Diff between two @Case: the field, the method, and what it cost | main, header, properties, composer, footer | **no** - the feature is specified, the surface is not | - |
-| `information` | what the loaded @Dataset actually contains: fields, associations, ranges, counts, frames | main, header, footer | **no** | - |
+| `information` | what the loaded @Dataset actually contains: fields, associations, ranges, counts, frames | main, header, footer | yes | `information` |
 | `find` | a data selection built as a query, and what it resolved to | main, header, footer | **no** | - |
 | `library` | the Asset organiser: import, metadata, revisions, scope, bulk management | main, header, navigator, properties, footer | named as future in 11_ui.md | - |
 | `script` | the Python surface of [13_scripting.md](13_scripting.md): editor, console, and the log of what was just done | main, header, footer | a copyable popover only | - |
@@ -369,6 +369,12 @@ Read-only, and the answer to "is the number I am looking at supported by the fil
 
 Nothing here is editable, and nothing is inferred: a field with no declared unit says undeclared, and a
 frame that did not resolve says so rather than defaulting to global Cartesian.
+
+In the production interface the area reads `dataset.load`, `dataset.describe` and `dataset.parts`
+(XC-273). Of the elements above, the reader and its version, the cell types, the checksum, the
+declared frame and the import time are not in CT-003's answers; the area names them as not
+answered rather than showing a value, and nothing on it comes from a fixture while an engine is
+connected.
 
 ### 7.11 `find`
 
@@ -1110,7 +1116,6 @@ reading exercise. Each row is a surface or a structure that exists in this file 
 | the Screen and Area grammar | every new surface below needs somewhere to live (XC-190) |
 | `table` Area and `TableDefinition` | a number on screen cannot currently be checked at full precision (XC-191) |
 | `diff` Area | a specified feature with acceptance criteria and no surface |
-| `information` Area | nothing says what the file actually contains after import |
 | `find` Area and `Selection` | no way to select points or cells by a condition |
 | `timeline` Area, `CameraPath`, `AnimationCue` | a video output requires a named camera path that nothing can author |
 | `ColourMap` as a document object | comparison panes and the report each hold their own copy today (XC-194) |

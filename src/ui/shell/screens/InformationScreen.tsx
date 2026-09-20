@@ -14,6 +14,8 @@ import { QuantityChip } from "../../shared/QuantityChip";
 import { UnitLabel } from "../../shared/UnitLabel";
 import { UnresolvedList } from "../../shared/UnresolvedList";
 import { disabledBecause, formatBytes, formatValue } from "../../logic/format";
+import { informationOf, type InformationView } from "../../logic/information";
+import { useEngine } from "../../state/engine";
 import "./information.css";
 
 /* ---- the two illustrative datasets (design states, not evidence of behaviour) --------------- */
@@ -463,6 +465,13 @@ function AxisSection({ info, pos }: { info: DatasetInfo; pos: { index: number; t
 
 export function InformationScreen(props: { variant: string }) {
   const s = useSession();
+  const e = useEngine();
+  // With an engine, the area is the engine's answers whatever the deep link says: a fixture beside
+  // a live engine is the failure XC-001 names. Without one, the design states it has always been.
+  if (e.reachability.kind === "reachable") {
+    const view = informationOf(e);
+    return view ? <LiveInformation view={view} caseId={e.caseId} /> : <NothingLoaded live />;
+  }
 
   if (props.variant === "empty") {
     return (
@@ -528,10 +537,233 @@ export function InformationScreen(props: { variant: string }) {
   );
 }
 
+/* ---- the live area: what the engine answered, and what it does not (XC-273) ------------------ */
+
+function NothingLoaded({ live }: { live?: boolean }) {
+  return (
+    <div className="in-root">
+      <div className="empty-state">
+        <h2>未読込</h2>
+        <p>
+          {live
+            ? "エンジンに接続しています。読み込んだデータセットがまだないので、示せる中身はありません。見本の構造は発明しません。"
+            : "この画面は、読み込んだファイルが実際に何を含むかをいつでも読める場所です。まだ何も読み込まれていないため、示せる中身はありません。"}
+        </p>
+        <div className="actions">
+          <button className="btn primary" onClick={() => session.navigate("home")}>
+            ホームでファイルを読み込む
+          </button>
+        </div>
+      </div>
+      <footer className="in-footer">
+        <span className="in-clip">何も読み込まれていません — 表示できる中身はありません。</span>
+      </footer>
+    </div>
+  );
+}
+
+function LiveLevel({ view }: { view: InformationView }) {
+  const tone = view.file.supportLevel === "verified" ? "in-verified" : view.file.supportLevel === "offered" ? "in-offered" : "";
+  return (
+    <span className={`in-level ${tone}`} title={view.file.supportNote}>
+      {view.file.supportLabel}
+    </span>
+  );
+}
+
+function LiveInformation({ view, caseId }: { view: InformationView; caseId: string | null }) {
+  const footer =
+    `表示中：${view.file.name}（${view.file.format}・${view.file.supportLabel}）。エンジンの答え（dataset.load / describe / parts）です。` +
+    (view.structure?.partial ? "このケースは不完全です。" : "") +
+    "この画面は読み取り専用です。";
+  return (
+    <div className="in-root">
+      <div className="in-scroll">
+        <div className="in-grid">
+          <header className="in-header">
+            <span className="in-file" title={view.file.path ?? view.file.name}>{view.file.name}</span>
+            <span className="in-sub">{view.file.format}{caseId ? `・ケース ${caseId}` : ""}</span>
+            <LiveLevel view={view} />
+            <span className="in-right">
+              <span className="in-readonly" title="この画面は読み込んだ内容を表示するだけで、何も編集しません">
+                読み取り専用
+              </span>
+            </span>
+          </header>
+
+          <section className="in-section">
+            <h3>ファイル</h3>
+            <div className="in-kv">
+              <span className="in-k">場所</span>
+              <span className="in-v"><span className="in-mono in-clip" title={view.file.path ?? ""}>{view.file.path ?? "（パスはエンジンの答えにありません）"}</span></span>
+            </div>
+            <div className="in-kv"><span className="in-k">形式</span><span className="in-v">{view.file.format || "（拡張子なし）"}</span></div>
+            <div className="in-kv">
+              <span className="in-k">対応レベル</span>
+              <span className="in-v"><LiveLevel view={view} /> {view.file.supportNote}</span>
+            </div>
+            {view.file.gaps.length > 0 ? (
+              <UnresolvedList
+                title="読めなかったもの（XC-049 — リーダー既知の欠落）"
+                items={view.file.gaps.map((gap) => ({ what: gap, missing: "このリーダーは読みません" }))}
+              />
+            ) : (
+              <p className="in-note">リーダー既知の欠落はありません（XC-049）。</p>
+            )}
+          </section>
+
+          <section className="in-section">
+            <h3>構造 <ProvenanceBadge origin="dataset" /></h3>
+            {view.structure ? (
+              <>
+                <div className="in-kv"><span className="in-k">要素数</span><span className="in-v in-num">{group(view.structure.cells)}</span></div>
+                <div className="in-kv"><span className="in-k">節点数</span><span className="in-v in-num">{group(view.structure.points)}</span></div>
+                {view.structure.bounds ? (
+                  <>
+                    <div className="in-kv">
+                      <span className="in-k">範囲（正準フレーム）</span>
+                      <span className="in-v"><UnitLabel unit="m" /> <ProvenanceBadge origin="computed" /></span>
+                    </div>
+                    {view.structure.bounds.map((b) => (
+                      <div className="in-kv" key={b.axis}>
+                        <span className="in-k">　{b.axis}</span>
+                        <span className="in-v in-num">{formatValue(b.min, 4)} … {formatValue(b.max, 4)}</span>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <p className="in-note">範囲はエンジンの答えにありませんでした。</p>
+                )}
+                {view.structure.partial ? (
+                  <p className="notice warn">
+                    <b>このケースは不完全です。</b>
+                    <span className="why">ファイルが名前を挙げた部分のうち読めなかったものが下の表に「欠け」として並びます。このケースから出る数値にも同じ印が付きます（AC-027）。</span>
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <p className="in-note">構造はエンジンの答えにありませんでした。</p>
+            )}
+            <div className="table-scroll">
+              <table className="value-table in-blocks">
+                <thead>
+                  <tr><th>パート</th><th>状態</th><th>節点数</th><th>要素数</th></tr>
+                </thead>
+                <tbody>
+                  {view.parts.map((part) => (
+                    <tr key={part.name}>
+                      <td><span className="in-mono">{part.name}</span></td>
+                      <td>{part.present ? "あり" : "欠け"}</td>
+                      <NumberCell value={part.present ? group(part.points) : null} missingBecause={part.present ? undefined : "読めなかったパートに数はありません"} />
+                      <NumberCell value={part.present ? group(part.cells) : null} missingBecause={part.present ? undefined : "読めなかったパートに数はありません"} />
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="in-section in-span">
+            <h3>
+              フィールド
+              <span className="in-count">{view.fields.length} フィールド</span>
+            </h3>
+            <div className="table-scroll">
+              <table className="value-table in-fields">
+                <thead>
+                  <tr><th>名称（原資料のまま）</th><th>関連</th><th>宣言単位</th></tr>
+                </thead>
+                <tbody>
+                  {view.fields.map((f) => (
+                    <tr key={f.name}>
+                      <td><span className="in-mono">{f.name}</span></td>
+                      <td>{f.associationLabel}</td>
+                      <td>
+                        {f.unit !== null
+                          ? <><UnitLabel unit={f.unit} /> <ProvenanceBadge origin="declared" /></>
+                          : <UnitLabel unit={null} />}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="in-note">単位は人が宣言したものだけを示し、ファイルからは推定しません（XC-003）。成分数・実測範囲・欠損値数は場ごとに field.statistics が答えるもので、この一覧には載せません。</p>
+          </section>
+
+          <section className="in-section">
+            <h3>結果軸 <ProvenanceBadge origin="dataset" /></h3>
+            {view.axis ? (
+              <>
+                <div className="in-kv"><span className="in-k">種類</span><span className="in-v">{view.axis.label}</span></div>
+                <div className="in-kv"><span className="in-k">位置数</span><span className="in-v in-num">{view.axis.positions === null ? "（位置の値はファイルにありません）" : group(view.axis.positions)}</span></div>
+                {view.axis.first !== null && view.axis.last !== null ? (
+                  <div className="in-kv">
+                    <span className="in-k">範囲</span>
+                    <span className="in-v"><QuantityChip value={`${formatValue(view.axis.first, 3)} … ${formatValue(view.axis.last, 3)}`} unit={view.axis.unit} /></span>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <p className="in-note">結果軸はエンジンの答えにありませんでした。</p>
+            )}
+            <p className="in-note">保存位置以外の時刻は存在しません — 丸めも補間もしません（view/AC-033）。</p>
+          </section>
+
+          <section className="in-section">
+            <h3>この版が答えないもの</h3>
+            <p className="in-note">設計はこの画面に次の項目も置きますが、契約（CT-003）が運んでいないので、見本の値を出す代わりにそう言います（XC-273）。</p>
+            <ul className="in-filelist">
+              {view.notAnswered.map((one) => (
+                <li key={one.what}>
+                  <span className="in-fname">{one.what}</span>
+                  <span className="in-frole">{one.because}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+      </div>
+      <footer className="in-footer">
+        <span className="in-clip" title={footer}>{footer}</span>
+      </footer>
+    </div>
+  );
+}
+
+function LiveInformationRail({ view }: { view: InformationView }) {
+  return (
+    <>
+      <div className="prop-section">
+        <h3>ファイル（エンジンの答え）</h3>
+        <div className="prop-row"><label>名称</label><span className="in-mono in-clip" title={view.file.name}>{view.file.name}</span></div>
+        <div className="prop-row"><label>形式</label><span>{view.file.format || "（拡張子なし）"}</span></div>
+        <div className="prop-row"><label>対応レベル</label><span><LiveLevel view={view} /></span></div>
+      </div>
+      <div className="prop-section">
+        <h3>内容の要約</h3>
+        <div className="prop-row"><label>要素数</label><span>{view.structure ? group(view.structure.cells) : "—"}</span></div>
+        <div className="prop-row"><label>節点数</label><span>{view.structure ? group(view.structure.points) : "—"}</span></div>
+        <div className="prop-row"><label>フィールド</label><span>{view.fields.length}</span></div>
+        <div className="prop-row"><label>パート</label><span>{view.parts.filter((one) => one.present).length}{view.parts.some((one) => !one.present) ? `（欠け ${view.parts.filter((one) => !one.present).length}）` : ""}</span></div>
+        <div className="prop-row"><label>結果軸</label><span>{view.axis ? view.axis.label : "—"}</span></div>
+      </div>
+      <div className="prop-section">
+        <p className="prop-note">リーダーの版・チェックサム・取込時刻は契約が運んでいないので、ここにはありません（XC-273）。この画面は読み取り専用です。</p>
+      </div>
+    </>
+  );
+}
+
 /* ---- the rail: file summary ------------------------------------------------------------------ */
 
 export function InformationRail(props: { tab: string; variant: string }) {
   // The information area declares a single rail tab (ファイル); `tab` stays in the contract shape.
+  const e = useEngine();
+  if (e.reachability.kind === "reachable") {
+    const view = informationOf(e);
+    if (view) return <LiveInformationRail view={view} />;
+  }
   if (props.variant === "empty") {
     return (
       <div className="prop-section">

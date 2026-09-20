@@ -5840,3 +5840,31 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a supported format whose legitimate parts have no cells - a point set the
   product decides to show - at which point the rule reads the reader's disposition rather than the
   cell count
+
+### XC-273 - The information area shows the engine's answers and names what the contract does not carry
+- decided: 2026-09-20
+- status: active
+- decision: while an engine is connected, the `information` area shows what `dataset.load`,
+  `dataset.describe` and `dataset.parts` answered for the loaded dataset - the file's name, format
+  and support level with the reader's named gaps; the counts, the bounds in the canonical frame and
+  whether the case is partial; the parts present and absent; the fields with their association and
+  their declared unit or the undeclared marker; the result axis - and nothing from a fixture. Of the
+  elements 16_application_model §7.10 lists, the reader and its version, the cell types, the
+  checksum, the declared frame and the import time are not in CT-003's answers: the area names each
+  as not answered, with the reason, rather than showing a value. The area ships in r1 as the
+  `information` screen of the production interface
+- decided_by: engineering judgement, from #284's condition and XC-001
+- rationale: the product's claim is trustworthy numbers, and this is the surface that says whether
+  the number on screen is supported by the file (§7.10). A fixture on that surface beside a live
+  engine is the exact failure XC-001 names - a value that looks read and was invented. Where the
+  contract does not carry a fact, the honest screen is one that says so: a checksum the engine never
+  computed, shown from a fixture, would be believed. Naming the gaps also states what a later contract
+  version would have to carry, in the place a person would look for it
+- alternatives: **extending CT-003 first** to carry reader version, cell types, checksum, frame and
+  import time - each is a real addition and none is needed for the number to be trusted today; they
+  are listed on the screen and can be added one by one. **Keeping the fixture until the contract
+  catches up** - what #284 found, and what XC-001 forbids
+- basis: E-001 (T1)
+- affects: MOD-009, CT-003
+- decidedness: Fixed
+- reversal_trigger: none foreseen; a fact added to CT-003 moves from the not-answered list to its section
