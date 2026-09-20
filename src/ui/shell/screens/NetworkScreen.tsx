@@ -14,11 +14,13 @@
  * how to permit it), refused (the refused host and request, nothing sent), request-review (one
  * request reviewed in full before a judgement).
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ProvenanceBadge } from "../../shared/ProvenanceBadge";
 import type { Provenance } from "../../shared/primitives";
 import { submit } from "../../client/operations";
 import { formatBytes, disabledBecause } from "../../logic/format";
+import { auditLines, egressFacts, type AuditEntry, type Egress } from "../../logic/egress";
+import { engineState, useEngine } from "../../state/engine";
 import "./NetworkScreen.css";
 
 /* ---- the one audit dataset (centre and rail both read it) --------------------------------- */
@@ -112,6 +114,32 @@ function countByOutcome(rows: readonly AuditRow[]): Record<Outcome, number> {
   const counts: Record<Outcome, number> = { sent: 0, refused: 0, awaiting: 0, "not-sent": 0 };
   for (const row of rows) counts[row.outcome] += 1;
   return counts;
+}
+
+/* ---- the engine's own answers, when one is connected (XC-267) ------------------------------ */
+
+type LiveEgress = {
+  reachable: boolean;
+  egress: Egress | null;
+  entries: readonly AuditEntry[] | null;
+  refresh: () => void;
+};
+
+/** What may leave and what did, from `system.capabilities` and `system.audit`. Read when an engine
+ *  is reachable and on request; kept nowhere else, because the audit is the engine's. */
+function useLiveEgress(): LiveEgress {
+  const reachable = useEngine().reachability.kind === "reachable";
+  const [egress, setEgress] = useState<Egress | null>(null);
+  const [entries, setEntries] = useState<readonly AuditEntry[] | null>(null);
+  const refresh = () => {
+    void engineState.capabilities().then((answer) => setEgress(answer?.egress ?? null));
+    void engineState.audit().then((answer) => setEntries(answer?.entries ?? null));
+  };
+  useEffect(() => {
+    if (reachable) refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- read once per connection, and on request
+  }, [reachable]);
+  return { reachable, egress, entries, refresh };
 }
 
 /* ---- the request under review (request-review variant) ------------------------------------ */
@@ -344,13 +372,19 @@ function ReviewDialog(props: { onDecide: (decision: Decision, redactedCount: num
 
 /* ---- centre: summary + audit table ---------------------------------------------------------- */
 
-function AuditCanvas({ variant }: { variant: string }) {
+function AuditCanvas({ variant, live }: { variant: string; live?: LiveEgress }) {
   const [filter, setFilter] = useState<"all" | Outcome>("all");
   const [decision, setDecision] = useState<Decision | null>(null);
   const [redactedCount, setRedactedCount] = useState(0);
 
-  const permission = permissionFor(variant);
-  const baseline = auditRowsFor(variant);
+  // With an engine the permission and the rows are its answers; the design rows are a catalogue.
+  const permission = live
+    ? {
+        external: Boolean(live.egress && (live.egress.search || live.egress.languageModel || live.egress.updateCheck)),
+        hosts: live.egress?.hosts ?? [],
+      }
+    : permissionFor(variant);
+  const baseline: readonly AuditRow[] = live ? auditLines(live.entries ?? []) : auditRowsFor(variant);
 
   // The awaiting record follows the reviewer's judgement - the audit reflects what was decided.
   const rows: readonly AuditRow[] = baseline.map((row): AuditRow => {
@@ -369,7 +403,14 @@ function AuditCanvas({ variant }: { variant: string }) {
   const filterLabel = filter === "all" ? "すべて" : outcomeLabel[filter];
 
   const summary = [
-    { key: "default", label: "既定", value: "何も送らない", note: "許可されるまで通信を試行しません" },
+    live
+      ? {
+          key: "default",
+          label: "送信経路",
+          value: live.egress ? (live.egress.transportConfigured ? "あり" : "なし — 何も出られません") : "確認中…",
+          note: "エンジンの答え（system.capabilities、XC-267）",
+        }
+      : { key: "default", label: "既定", value: "何も送らない", note: "許可されるまで通信を試行しません" },
     {
       key: "external",
       label: "外部通信",
@@ -385,7 +426,12 @@ function AuditCanvas({ variant }: { variant: string }) {
           ? "登録なし・宛先が未登録の要求は送信しません"
           : permission.hosts.join("、"),
     },
-    { key: "audit", label: "監査", value: "ローカル保存", note: `記録 ${rows.length}件・書き出しは明示操作` },
+    {
+      key: "audit",
+      label: "監査",
+      value: live ? "エンジンの記録" : "ローカル保存",
+      note: live ? `記録 ${rows.length}件・system.audit の答えそのもの` : `記録 ${rows.length}件・書き出しは明示操作`,
+    },
   ];
 
   return (
@@ -400,7 +446,7 @@ function AuditCanvas({ variant }: { variant: string }) {
         ))}
       </div>
 
-      {variant === "refused" ? (
+      {!live && variant === "refused" ? (
         <div className="notice error" role="alert">
           <b>外部要求を拒否しました — 何も送信していません。</b>
           <span className="why">
@@ -411,7 +457,7 @@ function AuditCanvas({ variant }: { variant: string }) {
         </div>
       ) : null}
 
-      {variant === "request-review" && decision !== null ? (
+      {!live && variant === "request-review" && decision !== null ? (
         <div className="notice" role="status">
           {decision === "refuse" ? (
             <>
@@ -458,14 +504,27 @@ function AuditCanvas({ variant }: { variant: string }) {
                 </option>
               ))}
             </select>
+            {live ? (
+              <button className="btn ghost" title="エンジンに記録を問い合わせ直します" onClick={live.refresh}>
+                更新
+              </button>
+            ) : null}
             <button
               className="btn"
-              title="監査記録をファイルとして書き出します。書き出しは端末内で完結します。"
+              title={
+                live
+                  ? "監査記録を全文のままクリップボードへ写します。端末内で完結します。"
+                  : "監査記録をファイルとして書き出します。書き出しは端末内で完結します。"
+              }
               onClick={() =>
-                submit({ operation: "system.audit", parameters: { since: "2026-08-29T00:00:00+09:00" } })
+                live
+                  ? void navigator.clipboard?.writeText(
+                      rows.map((row) => [row.at, row.purpose, row.host, outcomeLabel[row.outcome], row.content, row.note].join("\t")).join("\n"),
+                    )
+                  : submit({ operation: "system.audit", parameters: { since: "2026-08-28T15:00:00Z" } })
               }
             >
-              監査記録を書き出し
+              {live ? "監査記録をコピー" : "監査記録を書き出し"}
             </button>
           </div>
         </header>
@@ -511,8 +570,9 @@ function AuditCanvas({ variant }: { variant: string }) {
               {visible.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="ne-empty-row">
-                    該当する記録はありません — 絞り込み「{filterLabel}」に一致する要求がまだ無いためです。
-                    「すべて」に戻すと {rows.length}件が表示されます。
+                    {live && rows.length === 0
+                      ? "外部要求の記録はありません — エンジンの監査（system.audit）は空です。何も送っていないことは、この記録が空であることで確かめられます（XC-267）。"
+                      : `該当する記録はありません — 絞り込み「${filterLabel}」に一致する要求がまだ無いためです。「すべて」に戻すと ${rows.length}件が表示されます。`}
                   </td>
                 </tr>
               ) : null}
@@ -525,7 +585,7 @@ function AuditCanvas({ variant }: { variant: string }) {
         </p>
       </section>
 
-      {variant === "request-review" && decision === null ? (
+      {!live && variant === "request-review" && decision === null ? (
         <ReviewDialog
           onDecide={(nextDecision, count) => {
             setDecision(nextDecision);
@@ -538,6 +598,10 @@ function AuditCanvas({ variant }: { variant: string }) {
 }
 
 export function NetworkScreen(props: { variant: string }) {
+  // With an engine the page is the engine's answers whatever the deep link says: the design states
+  // are a catalogue, and a catalogue shown beside a live engine is the failure XC-001 names.
+  const live = useLiveEgress();
+  if (live.reachable) return <AuditCanvas variant="default" live={live} />;
   if (props.variant === "offline") return <OfflineState />;
   return <AuditCanvas variant={props.variant} />;
 }
@@ -687,8 +751,8 @@ function PermissionsRail({ variant }: { variant: string }) {
 
 /* ---- rail: audit ------------------------------------------------------------------------------ */
 
-function AuditRail({ variant }: { variant: string }) {
-  const rows = auditRowsFor(variant);
+function AuditRail({ variant, live }: { variant: string; live?: LiveEgress }) {
+  const rows: readonly AuditRow[] = live ? auditLines(live.entries ?? []) : auditRowsFor(variant);
   const counts = countByOutcome(rows);
 
   return (
@@ -718,7 +782,9 @@ function AuditRail({ variant }: { variant: string }) {
         <h3>記録 {rows.length}件</h3>
         {rows.length === 0 ? (
           <p className="prop-note">
-            外部要求はまだありません。要求が発生すると、送信の有無にかかわらず全文がここに残ります。
+            {live
+              ? "エンジンの監査は空です：外部要求は一件も記録されていません（system.audit）。"
+              : "外部要求はまだありません。要求が発生すると、送信の有無にかかわらず全文がここに残ります。"}
           </p>
         ) : (
           <ul className="ne-count-list">
@@ -736,6 +802,35 @@ function AuditRail({ variant }: { variant: string }) {
 }
 
 export function NetworkRail(props: { tab: string; variant: string }) {
-  if (props.tab === "audit") return <AuditRail variant={props.variant} />;
+  const live = useLiveEgress();
+  if (props.tab === "audit") return <AuditRail variant={props.variant} live={live.reachable ? live : undefined} />;
+  if (live.reachable) return <LivePermissionsRail live={live} />;
   return <PermissionsRail variant={props.variant} />;
+}
+
+/** The permission as the engine holds it - read only, because no operation in the contract writes
+ *  one yet, and a control that changed nothing would be a claim (XC-001). */
+function LivePermissionsRail({ live }: { live: LiveEgress }) {
+  return (
+    <div>
+      <div className="prop-section">
+        <h3>許可（エンジンの答え）</h3>
+        {live.egress ? (
+          <ul className="ne-count-list">
+            {egressFacts(live.egress).map((fact) => (
+              <li key={fact.key} title={fact.note}>
+                <span>{fact.label}</span>
+                <em>{fact.value}</em>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="prop-note">確認中…</p>
+        )}
+        <p className="prop-note">
+          この版では許可をエンジンに書く操作が契約にないため、ここでは読むだけです。変更できるように見せて何も変えないことはしません（XC-001）。
+        </p>
+      </div>
+    </div>
+  );
 }
