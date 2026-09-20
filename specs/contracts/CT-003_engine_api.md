@@ -10,7 +10,13 @@ updated: 2026-09-20
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 3.0.0
+- version: 3.1.0
+- correction: 2026-09-20, version 3.0.0 to 3.1.0. `system.capabilities` answers `egress`: whether this
+  build has a way out at all, the open workspace's permission (search, language model, update
+  check, the allow-list, per-search confirmation, workspace content) and how many audit entries
+  there are and how many left. #317 asks that a person be able to check that nothing was sent
+  rather than read that it is the policy; `system.audit`, already in the contract, gains its
+  handler in the same change. Additive
 - correction: 2026-09-20, version 2.9.0 to 3.0.0. Every time an answer carries is the one wire form
   `{utc, offsetMinutes}` (CT-001 `$defs.recordedTime`, XC-266): `history.list` entries `atUtc`
   become `at`; `pipeline.run` `startedUtc` and `finishedUtc` become `started` and `finished`;

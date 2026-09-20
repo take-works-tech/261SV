@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-25
+updated: 2026-09-20
 ---
 
 # Tasks: assistant and headless operation
@@ -273,3 +273,14 @@ updated: 2026-08-25
 - depends_on: TASK-042
 - done_when: the drawer can cover the available centre surface, remains dismissible and creates no
   application-level overflow
+
+### TASK-046 - What may leave, and what did, answered by the engine and shown
+- satisfies: AC-046
+- depends_on: TASK-020
+- done_when: `system.capabilities` carries `egress` and `system.audit` has a handler; the settings
+  page shows the permission and whether a way out exists, and the network page the audit, both from
+  the engine when one is connected
+- done: 2026-09-20 (engine half). `Gate.describe_policy` and `Record.as_stored` are the one place each
+  is described; the session holds the gate, with no transport injected, so the answer in this build
+  is "no way out, nothing permitted, nothing recorded" and every attempt would be a refusal in the
+  audit. The pages follow in the next change

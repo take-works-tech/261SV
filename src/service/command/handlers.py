@@ -32,7 +32,7 @@ import numpy as np
 from domain_core.association import Association
 from domain_core.dataset import Dataset, Field
 from domain_core.parts import LoadedCase, Part
-from domain_core.recorded_time import RecordedTime, from_stored, record as record_time, record_instant
+from domain_core.recorded_time import STORED_FORMAT, RecordedTime, from_stored, record as record_time, record_instant
 from domain_core.reported_value import Caveat, Provenance, ReportedValue
 from domain_core.units import UndeclaredUnitError, unit as known_unit
 from engine import reader
@@ -54,6 +54,7 @@ from engine.visualization.render import Camera, Colouring, RenderError, probe_of
 from service.command.catalogue import PROTOCOL_VERSION
 from service.command.surface import Effect, Handler, LogEntry, Result, Status, Surface
 from service.egress import diagnostics
+from service.egress.gate import Gate
 from service.workspace import items, sources
 from service.workspace.document import FORMAT_VERSION, WorkspaceDocument, WorkspaceFileError, load as load_workspace
 from service.workspace.document import WorkspaceVersionError, save as save_document
@@ -231,12 +232,18 @@ class Session:
     datasets: dict[str, Loaded] = dataclass_field(default_factory=dict)
     revisions: dict[str, int] = dataclass_field(default_factory=dict)
     handles: HandleStore = dataclass_field(default=None)  # type: ignore[assignment]
+    #: The one door out (MOD-014, XC-106). This build injects no transport into it, so nothing can
+    #: leave and every attempt is a refusal in the audit; `system.capabilities` says so and
+    #: `system.audit` shows it, which is how a person checks it rather than believes it (#317).
+    gate: Gate = dataclass_field(default=None)  # type: ignore[assignment]
 
     _offscreen: tuple[bool, str] | None = None
 
     def __post_init__(self) -> None:
         if self.handles is None:
             self.handles = HandleStore(self.clock)
+        if self.gate is None:
+            self.gate = Gate(clock=self.clock)
 
     def offscreen(self) -> tuple[bool, str]:
         """The offscreen probe's answer, asked once per session: a child process is not free."""
@@ -351,6 +358,7 @@ def handlers(session: Session) -> tuple[Handler, ...]:
         Handler("report.export", lambda p, t: report_export(session, p)),
         Handler("report.provenance", lambda p, t: report_provenance(session, p)),
         Handler("system.capabilities", lambda p, t: system_capabilities(session)),
+        Handler("system.audit", lambda p, t: system_audit(session, p)),
         Handler("system.protocols", lambda p, t: Effect("対応する版です", value={"versions": [PROTOCOL_VERSION]})),
     )
 
@@ -1315,6 +1323,25 @@ def report_provenance(session: Session, parameters: Mapping[str, Any]) -> Effect
     )
 
 
+def system_audit(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
+    """What has left this machine, as the gate recorded it (XC-106, assistant/AC-021): every
+    request, sent or refused, with its time as the pair. Empty is an answer - "nothing" said by the
+    record, not by a sentence about the policy (#317)."""
+    since = parameters.get("since")
+    floor: str | None = None
+    if since is not None:
+        try:
+            floor = RecordedTime(str(since), None).utc
+        except ValueError:
+            return refused(f"since は UTC の時刻（{STORED_FORMAT}）で指定してください：{since!r}")
+    recorded = session.gate.audit()
+    entries = [one.as_stored() for one in recorded if floor is None or one.at.utc >= floor]
+    return Effect(
+        "外部に出た要求はありません" if not recorded else f"外部要求の記録 {len(entries)} 件",
+        value={"entries": entries},
+    )
+
+
 def system_capabilities(session: Session) -> Effect:
     native, detail = session.offscreen()
     availability = probe(
@@ -1339,6 +1366,7 @@ def system_capabilities(session: Session) -> Effect:
         "この機械でできることです",
         value={
             "diagnostics": session.log.describe_location(),
+            "egress": session.gate.describe_policy(session.workspace.identifier if session.workspace else None),
             "machineClass": session.machine_class.value,
             "renderers": [
                 {"backend": one.backend.value, "available": one.available, "requires": REQUIRES[one.backend]}

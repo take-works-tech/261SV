@@ -259,7 +259,7 @@ RESULT_FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "report.rename": (frozenset(['id', 'revision']), frozenset(['id', 'revision'])),
     "report.delete": (frozenset(['deletedId', 'unresolvedUnitIds']), frozenset(['deletedId', 'unresolvedUnitIds'])),
     "report.export": (frozenset(['bytes', 'omitted', 'path', 'reductions']), frozenset(['bytes', 'omitted', 'path', 'reductions'])),
-    "system.capabilities": (frozenset(['diagnostics', 'formats', 'machineClass', 'renderers']), frozenset(['formats', 'machineClass', 'renderers'])),
+    "system.capabilities": (frozenset(['diagnostics', 'egress', 'formats', 'machineClass', 'renderers']), frozenset(['formats', 'machineClass', 'renderers'])),
     "system.protocols": (frozenset(['versions']), frozenset(['versions'])),
     "history.undo": (frozenset(['restoredIds']), frozenset(['restoredIds'])),
     "history.list": (frozenset(['entries', 'historyLimit', 'omitted', 'undoDropped', 'undoLimit']), frozenset(['entries'])),
@@ -362,7 +362,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
 
 #: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below
 #: the engine's floor is refused politely rather than answered in a shape it cannot read.
-PROTOCOL_VERSION = "3.0.0"
+PROTOCOL_VERSION = "3.1.0"
 
 #: The wire's own names, from CT-003's `$defs.transport` (XC-258). The interface generates
 #: the same values from the same place; neither side is derived from the other (XC-252).

@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-20
+updated: 2026-09-20
 ---
 
 # Feature: assistant and headless operation
@@ -123,6 +123,10 @@ updated: 2026-08-20
     host, and when - in an audit the user can read and export
   - AC-022: If a host is not on the workspace's allow-list, then the system shall refuse the request and
     shall name the host, rather than silently substituting another source
+  - AC-046: The system shall answer, from the engine, whether this build can send anything at all,
+    what the workspace permits, and every request the audit holds with its exact content and time;
+    the settings page shall show the first two and the network page the audit, an empty audit shown
+    as an empty record rather than as a sentence (XC-267)
 
 ### REQ-008 - Retrieved material is evidence with a date, never a source of numbers
 - priority: MUST

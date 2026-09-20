@@ -36,7 +36,9 @@ from engine.limits import MAX_WORKSPACE_ITEMS  # noqa: E402
 from service.command.catalogue import OPERATIONS, PROTOCOL_VERSION  # noqa: E402
 from service.command.handlers import HandleExpired, HandleStore, Session, build_surface  # noqa: E402
 from service.command.surface import Command, Status, Surface  # noqa: E402
+from service.egress.gate import Outcome, Permission, SearchRequest  # noqa: E402
 from service.workspace.document import FORMAT_VERSION  # noqa: E402
+from domain_core.recorded_time import STORED_FORMAT, record as record_time  # noqa: E402
 from test_reader import write_grid  # noqa: E402
 from demo_case import write_cube  # noqa: E402, F401 - re-exported for the tests that import it from here
 
@@ -106,9 +108,9 @@ class TestWhatThisBuildRegisters:
             "field.declareUnit", "field.statistics", "view.create", "view.update", "view.render",
             "dataset.probe", "view.pick", "report.create", "report.export", "report.provenance",
             "workspace.save", "dataset.inspect", "history.list",
-            "system.capabilities", "system.protocols",
+            "system.capabilities", "system.protocols", "system.audit",
         }
-        assert len(surface.unimplemented()) == len(OPERATIONS) - 19
+        assert len(surface.unimplemented()) == len(OPERATIONS) - 20
 
     def test_an_unimplemented_operation_is_refused_and_named_as_such(self) -> None:
         surface, _ = a_surface()
@@ -1164,3 +1166,59 @@ class TestAWorkspaceIsBoundedInItems:
 
         assert result.status is Status.APPLIED, result.reason
         assert not any("LIM-016" in one for one in result.warnings)
+
+class TestNothingHasLeftAndItSaysSo:
+    """#317 (XC-267): a person checks the fact, not the sentence. What may leave and whether anything
+    can is in `system.capabilities`; what did leave is in `system.audit`; both are the engine's own
+    answers, from the gate that would have had to do the sending."""
+
+    HOST = "search.example.test"
+
+    def test_the_capabilities_say_no_way_out_nothing_permitted_and_an_empty_audit(self, tmp_path: Path) -> None:
+        surface, _, _ = opened(tmp_path)
+
+        result = surface.submit(Command("system.capabilities", {}))
+
+        assert result.status is Status.ANSWERED, result.reason
+        egress = result.value["egress"]
+        assert egress["transportConfigured"] is False, "this build injects no transport: nothing can leave"
+        assert egress["workspaceId"] == "ws:1"
+        assert (egress["search"], egress["languageModel"], egress["updateCheck"]) == (False, False, False)
+        assert egress["hosts"] == [] and egress["withoutAsking"] is False and egress["workspaceContent"] is False
+        assert egress["auditEntries"] == 0 and egress["sentEntries"] == 0
+
+    def test_the_audit_is_empty_as_a_record_and_not_as_a_sentence(self) -> None:
+        surface, _ = a_surface()
+
+        result = surface.submit(Command("system.audit", {}))
+
+        assert result.status is Status.ANSWERED, result.reason
+        assert result.value == {"entries": []}
+
+    def test_a_refused_request_is_in_the_audit_with_its_host_content_and_time(self) -> None:
+        surface, session = a_surface()
+        session.gate.permit("ws:1", Permission(search=True, hosts=frozenset({self.HOST}), without_asking=True))
+        attempted = session.gate.search(SearchRequest("疲労限度", self.HOST), workspace_id="ws:1", confirmed=True)
+        assert attempted.outcome is Outcome.REFUSED, "no transport: refused, never pretended"
+
+        result = surface.submit(Command("system.audit", {}))
+
+        assert result.status is Status.ANSWERED, result.reason
+        [entry] = result.value["entries"]
+        assert entry["host"] == self.HOST and entry["purpose"] == "webSearch" and entry["outcome"] == "refused"
+        assert entry["at"] == record_time(at(9)()).as_stored()
+        assert "送信経路" in entry["reason"]
+        egress = surface.submit(Command("system.capabilities", {})).value["egress"]
+        assert egress["auditEntries"] == 1 and egress["sentEntries"] == 0
+
+    def test_since_narrows_the_record_and_a_folded_offset_is_refused(self) -> None:
+        surface, session = a_surface()
+        session.gate.permit("ws:1", Permission(search=True, hosts=frozenset({self.HOST}), without_asking=True))
+        session.gate.search(SearchRequest("一", self.HOST), workspace_id="ws:1", confirmed=True)
+        moment = record_time(at(9)()).utc
+
+        assert len(surface.submit(Command("system.audit", {"since": moment})).value["entries"]) == 1
+        later = (record_time(at(9)()).instant + timedelta(seconds=1)).strftime(STORED_FORMAT)
+        assert surface.submit(Command("system.audit", {"since": later})).value["entries"] == []
+        refused_ = surface.submit(Command("system.audit", {"since": "2026-09-18T09:00:00+09:00"}))
+        assert refused_.status is Status.REFUSED and "UTC" in (refused_.reason or "")

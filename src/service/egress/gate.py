@@ -28,7 +28,7 @@ import re
 from dataclasses import dataclass, field as dataclass_field
 from datetime import datetime
 from enum import Enum
-from typing import Callable, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from domain_core.recorded_time import RecordedTime, record as record_time
 
@@ -154,6 +154,23 @@ class Record:
     reason: str | None = None
     withheld: tuple[str, ...] = dataclass_field(default_factory=tuple)
 
+    def as_stored(self) -> dict[str, Any]:
+        """The wire form (CT-003 `system.audit`): the time as the pair, and nothing summarised - the
+        exact content that went or would have gone, because a summary is what a person cannot check."""
+        stored: dict[str, Any] = {
+            "at": self.at.as_stored(),
+            "purpose": self.purpose.value,
+            "host": self.host,
+            "outcome": self.outcome.value,
+        }
+        if self.sent:
+            stored["sent"] = self.sent
+        if self.reason:
+            stored["reason"] = self.reason
+        if self.withheld:
+            stored["withheld"] = list(self.withheld)
+        return stored
+
     def describe(self) -> str:
         line = f"{self.at.describe_where_recorded()} {self.purpose.value} → {self.host}：{self.outcome.value}"
         if self.reason:
@@ -206,6 +223,29 @@ class Gate:
 
     def audit(self) -> tuple[Record, ...]:
         return tuple(self._audit)
+
+    def describe_policy(self, workspace_id: str | None) -> dict[str, Any]:
+        """What may leave this machine and whether anything can - what a settings page shows, so a
+        person checks the fact rather than reads the sentence (#317, XC-106).
+
+        A build with no transport says so first: every other field is what the permission would
+        allow if there were a way out, and `transportConfigured` says whether there is one. The
+        permission is the open workspace's, or the default - which allows nothing - where none is.
+        """
+        permission = self.permission(workspace_id) if workspace_id else Permission()
+        return {
+            "transportConfigured": self._send is not None,
+            "offline": self.offline,
+            "workspaceId": workspace_id,
+            "search": permission.search,
+            "languageModel": permission.language_model,
+            "updateCheck": permission.update_check,
+            "hosts": sorted(permission.hosts),
+            "withoutAsking": permission.without_asking,
+            "workspaceContent": permission.workspace_content,
+            "auditEntries": len(self._audit),
+            "sentEntries": sum(1 for one in self._audit if one.outcome is Outcome.SENT),
+        }
 
     def export_audit(self) -> str:
         """The audit as text the user can read and keep (AC-021)."""

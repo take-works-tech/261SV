@@ -5666,3 +5666,29 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: none foreseen; a contract found carrying a time in another shape is a defect
   against this decision, not a reason to revisit it
+
+### XC-267 - What may leave the machine, and what did, is answered by the engine and shown as its answer
+- decided: 2026-09-20
+- status: active
+- decision: `system.capabilities` says whether this build can send anything at all
+  (`transportConfigured`), what the open workspace permits and how many requests the audit holds;
+  `system.audit` lists every request the gate recorded, sent or refused, with its exact content and
+  its time. The settings page shows the first and the network page the second, both labelled as the
+  engine's answers; where no engine is connected the pages are the design states they always were and
+  say so. An empty audit is shown as an empty record, never replaced by a sentence about the policy
+- decided_by: engineering judgement, from #317's own words
+- rationale: **a policy statement is believed; a record is checked.** XC-106 decided that nothing
+  leaves by default and that every request is audited, and the interface said so in prose. A person
+  who must answer "did anything leave this machine" to a customer cannot cite a sentence in a
+  settings page; they can cite a record that says nothing, produced by the process that would have
+  had to do the sending. `transportConfigured` comes first because it is the fact that makes the
+  rest moot in this build: with no transport injected, every permission is what would be allowed if
+  there were a way out, and there is none - saying that plainly is more useful than a list of
+  refusals
+- alternatives: **a static "offline" chip** - what the interface had; a claim, not a check. **Reading
+  the audit from the diagnostic log** - the log records names and outcomes, never content (XC-126),
+  and the audit's point is the exact content
+- basis: E-001 (T1)
+- affects: CT-003, MOD-014
+- decidedness: Fixed
+- reversal_trigger: none foreseen

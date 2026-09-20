@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -2882,6 +2882,76 @@
                 },
                 "bytes": {
                   "type": "integer"
+                }
+              }
+            },
+            "egress": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "何が外に出られ、そもそも出られるのか（XC-106、#317）。設定画面が方針の文の代わりにこれを見せる",
+              "required": [
+                "transportConfigured",
+                "offline",
+                "workspaceId",
+                "search",
+                "languageModel",
+                "updateCheck",
+                "hosts",
+                "withoutAsking",
+                "workspaceContent",
+                "auditEntries",
+                "sentEntries"
+              ],
+              "properties": {
+                "transportConfigured": {
+                  "type": "boolean",
+                  "description": "この版が外部に送る経路を持つか。false なら何も出られず、試みは監査に拒否として残る"
+                },
+                "offline": {
+                  "type": "boolean",
+                  "description": "明示的なオフライン状態。何も試みない（INV-007）"
+                },
+                "workspaceId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "どのワークスペースの許可か。null なら既定（何も許可しない）"
+                },
+                "search": {
+                  "type": "boolean",
+                  "description": "Web 検索の許可"
+                },
+                "languageModel": {
+                  "type": "boolean",
+                  "description": "言語モデルへの要求の許可"
+                },
+                "updateCheck": {
+                  "type": "boolean",
+                  "description": "更新確認の許可"
+                },
+                "hosts": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "許可ホスト。空は「なし」であり「どこでも」ではない"
+                },
+                "withoutAsking": {
+                  "type": "boolean",
+                  "description": "検索を毎回確認せずに送ってよいか"
+                },
+                "workspaceContent": {
+                  "type": "boolean",
+                  "description": "ワークスペースの内容（値・ケース名・パス）が検索語に入ってよいか"
+                },
+                "auditEntries": {
+                  "type": "integer",
+                  "description": "監査の件数。送られたものも拒まれたものも数える"
+                },
+                "sentEntries": {
+                  "type": "integer",
+                  "description": "うち実際に外へ出た件数"
                 }
               }
             }
