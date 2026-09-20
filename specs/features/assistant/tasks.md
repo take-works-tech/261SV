@@ -280,7 +280,9 @@ updated: 2026-09-20
 - done_when: `system.capabilities` carries `egress` and `system.audit` has a handler; the settings
   page shows the permission and whether a way out exists, and the network page the audit, both from
   the engine when one is connected
-- done: 2026-09-20 (engine half). `Gate.describe_policy` and `Record.as_stored` are the one place each
-  is described; the session holds the gate, with no transport injected, so the answer in this build
-  is "no way out, nothing permitted, nothing recorded" and every attempt would be a refusal in the
-  audit. The pages follow in the next change
+- done: 2026-09-20. `Gate.describe_policy` and `Record.as_stored` are the one place each is described;
+  the session holds the gate, with no transport injected, so the answer in this build is "no way
+  out, nothing permitted, nothing recorded" and every attempt would be a refusal in the audit. With
+  an engine connected the settings page lists the facts and the network page shows the audit as
+  the engine holds it, an empty audit as an empty record; the permission rail reads and does not
+  pretend to write, because no operation in the contract writes one yet

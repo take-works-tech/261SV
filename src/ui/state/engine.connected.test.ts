@@ -229,6 +229,15 @@ describe("the prototype thread from the interface's side", () => {
     }
   });
 
+  test("nothing has left, and it says so as a record: capabilities and an empty audit (XC-267)", async () => {
+    const capabilities = await engineState.capabilities();
+
+    expect(capabilities?.egress?.transportConfigured).toBe(false);
+    expect(capabilities?.egress?.hosts).toEqual([]);
+    expect(capabilities?.egress?.auditEntries).toBe(0);
+    expect(await engineState.audit()).toEqual({ entries: [] });
+  });
+
   test("export: a self-contained document with the picture, the unit and the maximum, of the size it says", async () => {
     const target = join(directory, "from-the-interface.html");
 

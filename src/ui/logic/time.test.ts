@@ -4,10 +4,10 @@
  * exercised by rendering a component is a rule nobody tests. */
 import { describe, expect, test } from "vitest";
 
+import { OSAKA } from "./fixtures";
 import { offsetText, recordInstant, recordNow } from "../client/time";
 import { describeRecorded, describeWhereRecorded } from "./time";
 
-const OSAKA = 540;
 const NOON_UTC = { utc: "2026-08-24T12:00:00Z", offsetMinutes: OSAKA };
 
 describe("a recorded time, as a person here reads it (XC-142, XC-266)", () => {

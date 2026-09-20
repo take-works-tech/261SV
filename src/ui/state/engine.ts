@@ -571,6 +571,11 @@ const rendered = await ask("view.render", { viewId, ...FRAME, format: "png", leg
     return listed;
   },
 
+  /** What has left the machine, as the gate recorded it (XC-106, XC-267): read, never kept here. */
+  async audit(since?: string): Promise<Results["system.audit"] | null> {
+    return ask("system.audit", since ? { since } : {});
+  },
+
   clearRefusal() {
     setState({ refusal: null });
   },

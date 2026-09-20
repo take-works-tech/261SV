@@ -9,7 +9,7 @@
  * - support-bundle: バンドルの内容を作成前に列挙する - 含める / 確認が必要 / 含めない顧客データ（XC-055b）。
  * - licences:       同梱する構成要素とその条件。一覧はビルド閉包から生成した notices.json で、シェルが渡す。
  *                   ブラウザでは一覧がないと言い、例示は出さない（XC-025, XC-001）。 */
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { QuantityChip } from "../../shared/QuantityChip";
 import { UnitLabel } from "../../shared/UnitLabel";
@@ -17,6 +17,7 @@ import { ProvenanceBadge } from "../../shared/ProvenanceBadge";
 import { MissingDataStyle } from "../../shared/MissingDataStyle";
 import { ScopeConfirmation } from "../../shared/ScopeConfirmation";
 import { formatBytes, disabledBecause } from "../../logic/format";
+import { egressFacts } from "../../logic/egress";
 import { submit } from "../../client/operations";
 import { session } from "../../state/session";
 import { engineState, useEngine } from "../../state/engine";
@@ -412,6 +413,14 @@ function AssistantPanel() {
   const [keyPresent, setKeyPresent] = useState(true);
   const [provider, setProvider] = useState("external");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // With an engine: what may leave and whether anything can, from `system.capabilities` (XC-267).
+  // Without one, the design state's sentence, labelled as design.
+  const [egress, setEgress] = useState<Results["system.capabilities"]["egress"] | null>(null);
+  const reachable = useEngine().reachability.kind === "reachable";
+  useEffect(() => {
+    if (!reachable) return;
+    void engineState.capabilities().then((answer) => setEgress(answer?.egress ?? null));
+  }, [reachable]);
 
   return (
     <>
@@ -460,12 +469,35 @@ function AssistantPanel() {
 
       <section className="se-section">
         <h3>外部送信</h3>
-        <p className="notice">
-          <b>外部モデルへの要求は、送信前に内容を確認します。</b>
-          <span className="why">
-            送信の可否と許可ホストはネットワーク画面が持ち、要求・日時・判断はローカル監査に記録されます（XC-106）。
-          </span>
-        </p>
+        {egress ? (
+          <>
+            <p className={egress.transportConfigured ? "notice" : "notice good"}>
+              <b>{egress.transportConfigured ? "外部に送る経路があります。" : "この版は外部に送る経路を持ちません — 何も出られません。"}</b>
+              <span className="why">
+                エンジンの答え（system.capabilities）です。方針の文ではなく、送る側の状態を読んでいます（XC-267）。
+              </span>
+            </p>
+            <div className="se-field-grid">
+              {egressFacts(egress).map((fact) => (
+                <Fragment key={fact.key}>
+                  <span className="se-field-label">{fact.label}</span>
+                  <span>
+                    {fact.value}
+                    <small style={{ color: "var(--ink-faint)" }}> — {fact.note}</small>
+                  </span>
+                </Fragment>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="notice">
+            <b>外部モデルへの要求は、送信前に内容を確認します。</b>
+            <span className="why">
+              送信の可否と許可ホストはネットワーク画面が持ち、要求・日時・判断はローカル監査に記録されます（XC-106）。
+              {reachable ? "エンジンに問い合わせています…" : "（設計状態：エンジン未接続）"}
+            </span>
+          </p>
+        )}
         <div>
           <button className="btn ghost" onClick={() => session.navigate("network")}>ネットワーク画面を開く</button>
         </div>
