@@ -20,6 +20,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { PROTOCOL_VERSION, type Connection } from "../client/engine";
 import { informationOf } from "../logic/information";
+import { absentParts, visibilityAfter } from "../logic/parts";
 import { engineState, FRAME, snapshot } from "./engine";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
@@ -79,6 +80,9 @@ afterAll(() => {
   rmSync(directory, { recursive: true, force: true });
 });
 
+// The camera a person kept, to be found again after the engine is restarted (XC-274).
+let kept: ReturnType<typeof snapshot>["savedCamera"] = null;
+
 describe("the prototype thread from the interface's side", () => {
   test("connect: the engine is reachable and speaks the protocol this build was generated from", async () => {
     const reachability = await engineState.connect(connection);
@@ -133,6 +137,9 @@ describe("the prototype thread from the interface's side", () => {
     expect(s.described?.pointCount).toBe(8);
     expect(s.described?.cellCount).toBe(1);
     expect(s.parts?.map((one) => one.type)).toEqual(["part"]);
+    // The file's own hierarchy, as a path: one step for a flat file, and no parent (INV-019).
+    expect(s.parts?.[0]?.path).toEqual(["cube"]);
+    expect(s.parts?.[0]?.parentId).toBeUndefined();
 
     const view = informationOf(s);
 
@@ -192,6 +199,8 @@ describe("the prototype thread from the interface's side", () => {
     expect(s.probe).toMatchObject({ unit: "K", digits: 6, provenance: "dataset" });
     // A node value from a file with no node numbers: the absence names the kind it lacks.
     expect(s.probeLocation).toContain("節点");
+    // The part under the pixel is the selection now (view/AC-055): the outliner follows the viewport.
+    expect(s.selectedPart).toBe("cube");
   });
 
   test("pick: a pixel off the model reads nothing, and says so rather than the nearest value", async () => {
@@ -223,6 +232,25 @@ describe("the prototype thread from the interface's side", () => {
     expect(snapshot().journal.length).toBe(writes + 1);
     expect(snapshot().journal.at(-1)?.operation).toBe("view.update");
     expect(snapshot().savedCamera?.position_m).toHaveLength(3);
+    kept = snapshot().savedCamera;
+  });
+
+  test("outliner: hiding the only part is refused by name rather than drawn empty, and showing it draws again (view/AC-055, XC-274)", async () => {
+    const parts = snapshot().parts ?? [];
+    await engineState.setPartVisibility(visibilityAfter(parts, {}, "cube", "toggle"));
+    let s = snapshot();
+    expect(s.partVisibility).toEqual({ cube: false });
+    // A document write: the map went into the definition, and the engine refused to draw nothing.
+    expect(s.journal.at(-1)?.operation).toBe("view.update");
+    expect(s.refusal).toContain("非表示");
+
+    await engineState.setPartVisibility(visibilityAfter(parts, s.partVisibility, "cube", "toggle"));
+    s = snapshot();
+    expect(s.partVisibility).toEqual({});
+    expect(s.refusal).toBeNull();
+    expect(s.imageUrl).toMatch(/^blob:/);
+    // Isolating the one part there is shows it and hides nothing else: the minimal map again.
+    expect(visibilityAfter(parts, {}, "cube", "isolate")).toEqual({});
   });
 
   test("a write the engine applied is unsaved work until the document is saved", async () => {
@@ -310,7 +338,9 @@ describe("the prototype thread from the interface's side", () => {
 
     const s = snapshot();
     expect(s.partial).toBe(true);
-    expect(s.absentParts.some((one) => one.includes("Ghost"))).toBe(true);
+    // The absence with its reason, as the logic layer says it from the engine's three facts.
+    expect(absentParts(s.parts).some((one) => one.includes("Ghost") && one.includes("要素なし"))).toBe(true);
+    expect(s.parts?.find((one) => one.type === "absent")?.path).toEqual(["assembly", "Base", "Ghost"]);
     expect(s.warnings.some((one) => one.includes("不完全"))).toBe(true);
     expect(s.fields.map((one) => one.name)).toContain("stress");
     engineState.clearWarnings();
@@ -364,6 +394,10 @@ describe("when the engine ends", () => {
     expect(s.sourceName).toBe("cube.vtu");
     // The saved declaration came back from the document; the unsaved one did not.
     expect(s.fields[0]?.unit).toBe("K");
+    // The look a person kept came back from the document too, read before the first redraw wrote
+    // the view (XC-274) - until 2026-09-20 this window's turntable overwrote it here.
+    expect(s.savedCamera).toEqual(kept);
+    expect(s.partVisibility).toEqual({});
     expect(s.lost?.map((one) => one.operation)).toContain("field.declareUnit");
     expect(s.refusal).toBeNull();
     expect(s.imageUrl).toMatch(/^blob:/);

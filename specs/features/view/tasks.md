@@ -395,3 +395,17 @@ updated: 2026-09-20
   `dataset.parts`, and the first pane shows them for as long as the case is open
 - done: 2026-09-20. The mark is on the pane and not in the dismissable notices, because a mark that
   can be dismissed is a mark that was; the load's warning says it once
+
+### TASK-065 - The outliner reads the engine
+- satisfies: AC-055, AC-056
+- depends_on: TASK-064
+- done_when: with an engine connected the outliner's rows are the loaded dataset's parts with the
+  file's hierarchy, a row's control writes the view's `partVisibility` and the engine draws, picks
+  and exports only what the map shows, and a selection made in either the outliner or the viewport
+  is the other's and the property rail's
+- done: 2026-09-20 (XC-274, CT-003 3.5.0). `dataset.parts` carries `path`, `parentId` and `reason`;
+  `view.pick` names the `part`; `view.get` reads a definition back before the store writes it, which
+  also ends the first redraw of a session overwriting a kept camera. `src/ui/logic/parts.ts`
+  builds the rows and the map; the Object tab shows the selected part and the rail moves to it.
+  What is not built: the header's search and filters, and the preview before a large recursive
+  change. AC-056's unnamed marker is the reader's own (`block N`), not a marker this layer adds

@@ -67,6 +67,7 @@ READS = frozenset({
     "dataset.inspect",
     "dataset.describe",
     "field.statistics",
+    "view.get",
     "view.render",
     "view.pick",
     "graph.data",
@@ -104,6 +105,7 @@ OPERATIONS = (
     "variable.detach",
     "view.create",
     "view.update",
+    "view.get",
     "view.duplicate",
     "view.rename",
     "view.delete",
@@ -175,6 +177,7 @@ PARAMETERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "variable.detach": (frozenset(['caseId', 'variableId']), frozenset(['caseId', 'variableId'])),
     "view.create": (frozenset(['definition', 'sourceTemplateId', 'sourceTemplateRevision', 'workspaceId']), frozenset(['definition', 'workspaceId'])),
     "view.update": (frozenset(['definition', 'viewId']), frozenset(['definition', 'viewId'])),
+    "view.get": (frozenset(['viewId']), frozenset(['viewId'])),
     "view.duplicate": (frozenset(['newName', 'viewId']), frozenset(['newName', 'viewId'])),
     "view.rename": (frozenset(['newName', 'viewId']), frozenset(['newName', 'viewId'])),
     "view.delete": (frozenset(['viewId']), frozenset(['viewId'])),
@@ -247,11 +250,12 @@ RESULT_FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "variable.detach": (frozenset(['keptValue']), frozenset(['keptValue'])),
     "view.create": (frozenset(['id', 'revision']), frozenset(['id', 'revision'])),
     "view.update": (frozenset(['id', 'revision']), frozenset(['id', 'revision'])),
+    "view.get": (frozenset(['definition', 'id', 'revision']), frozenset(['definition', 'id', 'revision'])),
     "view.duplicate": (frozenset(['id']), frozenset(['id'])),
     "view.rename": (frozenset(['id', 'revision']), frozenset(['id', 'revision'])),
     "view.delete": (frozenset(['deletedId', 'unresolvedUnitIds']), frozenset(['deletedId', 'unresolvedUnitIds'])),
     "view.render": (frozenset(['handle', 'reduced']), frozenset(['handle'])),
-    "view.pick": (frozenset(['association', 'value']), frozenset(['value'])),
+    "view.pick": (frozenset(['association', 'part', 'value']), frozenset(['value'])),
     "graph.create": (frozenset(['id', 'revision']), frozenset(['id', 'revision'])),
     "graph.update": (frozenset(['id', 'revision']), frozenset(['id', 'revision'])),
     "graph.duplicate": (frozenset(['id']), frozenset(['id'])),
@@ -320,6 +324,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
     "variable.detach": {'keptValue': frozenset(['digits', 'provenance', 'unit', 'value'])},
     "view.create": {},
     "view.update": {},
+    "view.get": {},
     "view.duplicate": {},
     "view.rename": {},
     "view.delete": {},
@@ -372,7 +377,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
 
 #: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below
 #: the engine's floor is refused politely rather than answered in a shape it cannot read.
-PROTOCOL_VERSION = "3.4.0"
+PROTOCOL_VERSION = "3.5.0"
 
 #: The wire's own names, from CT-003's `$defs.transport` (XC-258). The interface generates
 #: the same values from the same place; neither side is derived from the other (XC-252).

@@ -118,7 +118,13 @@ export interface EngineState {
   /** Whether the loaded case is partial - the file named parts that are not there - and which
    *  (ingest/AC-027). Kept, not only warned: a mark that can be dismissed is a mark that was. */
   readonly partial: boolean;
-  readonly absentParts: readonly string[];
+  /** The view's `partVisibility` as the document holds it (CT-004): the named parts hidden, and
+   *  nothing for a shown one. Read back with the view and written with every refresh, so a toggle
+   *  survives the next redraw and a saved one survives the next session (XC-274). */
+  readonly partVisibility: Readonly<Record<string, boolean>>;
+  /** The row a person selected, in the outliner or by picking in the viewport (view/AC-055): a
+   *  part's name, or a block's. Interface state, class 1 - nothing of it reaches the document. */
+  readonly selectedPart: string | null;
   /** What `dataset.describe` and `dataset.parts` answered for the loaded dataset, kept whole: the
    *  information area reads them rather than a fixture (XC-273). */
   readonly described: Results["dataset.describe"] | null;
@@ -199,7 +205,8 @@ const EMPTY: EngineState = {
   imageUrl: null,
   reduced: null,
   partial: false,
-  absentParts: [],
+  partVisibility: {},
+  selectedPart: null,
   described: null,
   parts: null,
   probe: null,
@@ -413,7 +420,8 @@ export const engineState = {
       fieldName: null,
       viewId: null,
       partial: false,
-      absentParts: [],
+      partVisibility: {},
+      selectedPart: null,
       described: null,
       parts: null,
       probe: null,
@@ -461,7 +469,8 @@ export const engineState = {
       viewId: null,
       savedCamera: null,
       partial: false,
-      absentParts: [],
+      partVisibility: {},
+      selectedPart: null,
       described: null,
       parts: null,
       probe: null,
@@ -475,13 +484,11 @@ export const engineState = {
       partial: described?.partial ?? false,
       described,
     });
-    // The parts, present and absent, as the engine lists them: what the information area shows and
-    // where a partial case's missing parts are named (AC-027, XC-273).
+    // The parts, present and absent, with the file's own hierarchy, as the engine lists them: what
+    // the outliner and the information area show, and where a partial case's missing parts are
+    // named (AC-027, XC-273, XC-274). Kept as answered; the sentences are the logic layer's.
     const parts = await ask("dataset.parts", { datasetId: loaded.datasetId });
-    setState({
-      parts: parts?.parts ?? null,
-      absentParts: (parts?.parts ?? []).filter((one) => one.type === "absent").map((one) => one.name),
-    });
+    setState({ parts: parts?.parts ?? null });
     return true;
   },
 
@@ -526,7 +533,23 @@ export const engineState = {
     setState({
       probe: answer?.value ?? null,
       probeLocation: (answer?.value as { location?: string } | undefined)?.location ?? null,
+      // The part under the pixel is the selection now, so the outliner follows the viewport
+      // (view/AC-055). A pixel on nothing changes no selection: nothing was chosen there.
+      selectedPart: answer?.part ?? state.selectedPart,
     });
+  },
+
+  /** Class 1: choose a row - a part or a block - in the outliner or by picking. Nothing is written. */
+  selectPart(name: string | null): void {
+    setState({ selectedPart: name });
+  },
+
+  /** Class 2, and a document write: which parts the view shows (CT-004 `partVisibility`, INV-019).
+   *  The map is the definition's, written whole with the next refresh, so the engine draws and
+   *  picks what the outliner says - and refuses, by name, a map that hides everything (XC-274). */
+  async setPartVisibility(next: Readonly<Record<string, boolean>>): Promise<void> {
+    setState({ partVisibility: { ...next } });
+    await engineState.refresh();
   },
 
   /** Class 2: a unit is a declaration with an author. Declaring it changes labels and conversions
@@ -565,12 +588,38 @@ export const engineState = {
       setState({ refusal: `'${state.fieldName}' は点でも要素でもない場です。この版は色付けしません` });
       return;
     }
+    let viewId = state.viewId;
+    if (!viewId) {
+      // The document may already hold this view - saved in an earlier session - and a second one
+      // under the same name is refused (AC-030). Updating it is what a person means by "the view",
+      // and what it holds is read before it is written: the camera a person kept and the parts
+      // they hid are the document's, not this window's to rebuild. Until 2026-09-20 the first
+      // redraw of a session overwrote both with what the window had, which was nothing (XC-274).
+      const saved = state.savedViews.find((one) => one.name === state.fieldName);
+      if (saved) {
+        viewId = saved.id;
+        const held = await ask("view.get", { viewId });
+        const kept = (held?.definition ?? {}) as {
+          camera?: CameraDefinition;
+          partVisibility?: Record<string, boolean>;
+          colouring?: { colourMap?: string };
+        };
+        setState({
+          viewId,
+          savedCamera: kept.camera ?? null,
+          partVisibility: kept.partVisibility ?? {},
+          colourMap: kept.colouring?.colourMap ?? state.colourMap,
+        });
+      }
+    }
     const definition = {
-      id: state.viewId ?? "view:pending",
+      id: viewId ?? "view:pending",
       datasetId: state.datasetId,
       representation: "surface",
       name: state.fieldName,
       colouring: { fieldName: state.fieldName, association, colourMap: state.colourMap },
+      // Which parts the picture shows, as the outliner last set it (CT-004, XC-274).
+      partVisibility: { ...state.partVisibility },
       // The view's own camera, not the live one: the definition is what a report renders, and the
       // turntable stays out of it until the person keeps a look (XC-270). The first definition
       // takes the pose the model is first seen from, so a report of an unkept view is not blank.
@@ -580,16 +629,6 @@ export const engineState = {
       // report asks for its own ground, and the view is what says which (CT-004).
       background: { rgb: SCREEN_GROUND },
     };
-    let viewId = state.viewId;
-    if (!viewId) {
-      // The document may already hold this view - saved in an earlier session - and a second one
-      // under the same name is refused (AC-030). Updating it is what a person means by "the view".
-      const saved = state.savedViews.find((one) => one.name === state.fieldName);
-      if (saved) {
-        viewId = saved.id;
-        setState({ viewId });
-      }
-    }
     if (viewId) {
       await ask("view.update", { viewId, definition });
     } else {

@@ -331,21 +331,11 @@ class TestACompositeIsOneCaseOfManyParts:
         return root
 
     def walk(self, node):
-        from domain_core.case_contents import AxisKind, CaseContents, ResultAxis
-        from domain_core.parts import LoadedCase
+        from domain_core.case_contents import AxisKind, ResultAxis
 
-        found, absent, partitions = [], [], []
-        reader._walk(node, ("asm",), found, absent, partitions)
-        return LoadedCase(
-            parts=tuple(found),
-            contents=CaseContents(
-                steps=1,
-                parts=len(found),
-                axis=ResultAxis(AxisKind.NONE),
-                missing_parts=tuple(absent),
-                partitions=max(partitions or [1]),
-            ),
-        )
+        parts, partitions = [], []
+        reader._walk(node, ("asm",), parts, partitions)
+        return reader.assemble(parts, axis=ResultAxis(AxisKind.NONE), partitions=partitions)
 
     def test_nested_blocks_become_parts_with_their_hierarchy(self) -> None:
         case = self.walk(self.nested_assembly())
@@ -361,6 +351,9 @@ class TestACompositeIsOneCaseOfManyParts:
 
         assert case.is_partial is True
         assert case.contents.missing_parts == ("asm / washer",)
+        # The absence is a part with its place in the hierarchy, not a string beside the parts
+        # (INV-019): an outliner shows it where the file put it.
+        assert [(part.path, part.reason) for part in case.absent] == [(("asm", "washer"), None)]
 
     def test_the_case_wide_maximum_carries_the_missing_part(self) -> None:
         value = self.walk(self.nested_assembly()).maximum("stress")

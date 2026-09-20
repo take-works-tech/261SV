@@ -414,6 +414,7 @@ def handlers(session: Session) -> tuple[Handler, ...]:
         Handler("field.statistics", lambda p, t: field_statistics(session, p)),
         Handler("view.create", lambda p, t: item_create(session, "views", p)),
         Handler("view.update", lambda p, t: item_update(session, "views", "viewId", p)),
+        Handler("view.get", lambda p, t: item_get(session, "views", "viewId", p)),
         Handler("view.render", lambda p, t: view_render(session, p)),
         Handler("dataset.probe", lambda p, t: dataset_probe(session, p)),
         Handler("view.pick", lambda p, t: view_pick(session, p)),
@@ -758,27 +759,56 @@ def dataset_describe(session: Session, parameters: Mapping[str, Any]) -> Effect 
 
 
 def dataset_parts(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
+    """Every part the file named, present or absent, with the path the file gave it (INV-019).
+
+    The path is the file's own hierarchy, root first; `parentId` is the same path without its last
+    step, so an interface nests rows without splitting a string on a separator it did not choose.
+    An absent part is listed with nothing counted for it and the reader's reason (AC-027, XC-272).
+    """
     loaded = session.loaded(str(parameters["datasetId"]))
     if isinstance(loaded, Result):
         return loaded
     parts: list[dict[str, Any]] = []
     for part in loaded.case.parts:
-        if part.dataset is None:
-            # An absent part is listed as absent, with nothing counted for it (ingest/AC-027).
-            parts.append({"name": part.label, "type": "absent", "pointCount": 0, "cellCount": 0})
-            continue
-        parts.append({
+        row: dict[str, Any] = {
             "name": part.label,
-            "type": "part",
-            "pointCount": part.dataset.point_count,
-            "cellCount": part.dataset.cell_count,
-            "boundsM": bounds_m([part.dataset]),
-        })
-    # What the file named and the reader could not fill: listed as absent with nothing counted, so
-    # the interface can name what is missing rather than say "some" (AC-027, XC-272).
-    for name in loaded.case.contents.missing_parts:
-        parts.append({"name": name, "type": "absent", "pointCount": 0, "cellCount": 0})
+            "type": "part" if part.dataset is not None else "absent",
+            "path": list(part.path),
+            "pointCount": part.dataset.point_count if part.dataset is not None else 0,
+            "cellCount": part.dataset.cell_count if part.dataset is not None else 0,
+        }
+        if part.parent_label is not None:
+            row["parentId"] = part.parent_label
+        if part.dataset is not None:
+            row["boundsM"] = bounds_m([part.dataset])
+        elif part.reason:
+            row["reason"] = part.reason
+        parts.append(row)
     return Effect("パートの一覧です", value={"parts": parts})
+
+
+def parts_shown(loaded: Loaded, definition: Mapping[str, Any]) -> list[Part] | Result:
+    """The present parts a view shows, after its `partVisibility` (CT-004, INV-019, XC-274).
+
+    A name the dataset does not have is refused rather than skipped: a visibility written for a
+    part that is not there is a definition saying something about nothing, and a picture drawn
+    past it would look right. Every part hidden is refused too - an empty frame with a legend is
+    a picture of nothing presented as a picture of something (XC-001).
+    """
+    stated = definition.get("partVisibility") or {}
+    if not isinstance(stated, Mapping):
+        return refused(f"partVisibility はパート名から真偽値への対応です（{type(stated).__name__} が書かれています）")
+    known = {part.label for part in loaded.case.parts}
+    unknown = sorted(str(name) for name in stated if str(name) not in known)
+    if unknown:
+        return refused(
+            f"partVisibility が名指したパートはこのデータセットにありません：{unknown}。"
+            f"あるのは {sorted(known)} です"
+        )
+    shown = [part for part in loaded.case.present if stated.get(part.label, True) is not False]
+    if not shown:
+        return refused("すべてのパートが非表示です：描くものがありません。何も描かない絵を返す代わりに拒みます")
+    return shown
 
 
 def field_declare_unit(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
@@ -965,6 +995,27 @@ def item_create(session: Session, kind: str, parameters: Mapping[str, Any]) -> E
     )
 
 
+def item_get(session: Session, kind: str, key: str, parameters: Mapping[str, Any]) -> Effect | Result:
+    """One item's definition as the document holds it now, with its revision (CT-003 3.5.0).
+
+    What an interface reads before it writes: a definition rebuilt from what a window remembers
+    replaces what the document kept - the camera a person saved last session went that way on the
+    first redraw of the next, until this existed (XC-274).
+    """
+    workspace = session.open_workspace()
+    if isinstance(workspace, Result):
+        return workspace
+    item_id = str(parameters[key])
+    try:
+        item = items.find(workspace.raw, kind, item_id)
+    except ItemError as error:
+        return refused(str(error))
+    return Effect(
+        f"'{item_id}' の定義です",
+        value={"id": item_id, "revision": session.revisions.get(item_id, 1), "definition": dict(item["definition"])},
+    )
+
+
 def item_update(session: Session, kind: str, key: str, parameters: Mapping[str, Any]) -> Effect | Result:
     workspace = session.open_workspace()
     if isinstance(workspace, Result):
@@ -1089,6 +1140,9 @@ def view_render(session: Session, parameters: Mapping[str, Any]) -> Effect | Res
     colouring = colouring_of(stated)
     if isinstance(colouring, Result):
         return colouring
+    shown = parts_shown(loaded, definition)
+    if isinstance(shown, Result):
+        return shown
     # A camera given draws the picture from there and leaves the definition's camera as it is: a
     # camera move is interface state, not a document change (XC-270, 16_application_model §6).
     camera = camera_of(parameters.get("camera") or definition.get("camera"))
@@ -1104,7 +1158,7 @@ def view_render(session: Session, parameters: Mapping[str, Any]) -> Effect | Res
         return ground
     try:
         rendered = render_view(
-            loaded.datasets(), colouring,
+            [part.dataset for part in shown if part.dataset is not None], colouring,
             width=int(parameters["width"]), height=int(parameters["height"]), camera=camera,
             background=ground, legend=bool(parameters.get("legend", True)),
         )
@@ -1192,9 +1246,14 @@ def view_pick(session: Session, parameters: Mapping[str, Any]) -> Effect | Resul
         # to be able to set one up at all (E-194).
         return refused(f"画素から座標を求められません：{detail}")
 
+    # The parts the picture shows: a hidden part is not in the frame, so a value read from it
+    # would be a value from a picture nobody is looking at (XC-274).
+    shown = parts_shown(loaded, definition)
+    if isinstance(shown, Result):
+        return shown
     width, height = int(parameters["width"]), int(parameters["height"])
     pixel = (int(parameters["x"]), int(parameters["y"]))
-    datasets = loaded.datasets()
+    datasets = [part.dataset for part in shown if part.dataset is not None]
     try:
         ray = render_module.ray_through(datasets, pixel, width=width, height=height, camera=camera)
     except RenderError as error:
@@ -1203,8 +1262,9 @@ def view_pick(session: Session, parameters: Mapping[str, Any]) -> Effect | Resul
     # A case may hold several parts and the ray meets the nearest. Each is asked and the one that
     # answers with a value wins - a part the ray missed says so rather than being silently skipped.
     found: list[tuple[Part, pick.Pick]] = []
-    for part in loaded.holders(colouring.field_name):
-        assert part.dataset is not None
+    for part in shown:
+        if part.dataset is None or colouring.field_name not in part.dataset.fields:
+            continue
         try:
             found.append((part, pick.along_ray(part.dataset, colouring.field_name, ray.near_m, ray.far_m)))
         except pick.PickError as error:
@@ -1218,9 +1278,14 @@ def view_pick(session: Session, parameters: Mapping[str, Any]) -> Effect | Resul
         value = replace(value, location=f"{part.label}：{value.location}")
     if loaded.case.is_partial:
         value = value.with_caveat(Caveat.PARTIAL_DATASET)
+    answered: dict[str, Any] = {"value": reported(value), "association": ASSOCIATION_WORD[answer.association]}
+    if hit:
+        # Which part answered, so the outliner's selection can follow the viewport's (view/AC-055).
+        # Nothing hit names no part: a name there would be the part the ray happened to be asked last.
+        answered["part"] = part.label
     return Effect(
         f"画素 {pixel} の値を読みました" if not value.is_missing else f"画素 {pixel} の先には何もありません",
-        value={"value": reported(value), "association": ASSOCIATION_WORD[answer.association]},
+        value=answered,
     )
 
 
@@ -1297,12 +1362,18 @@ def figures_for_report(
         camera = camera_of(view.get("camera"))
         if isinstance(camera, Result):
             raise ReportError(camera.reason or "カメラを読めません")
+        # The document's figure shows the parts the view shows, and no more: a part hidden on
+        # screen and drawn in the deliverable would be two pictures under one name (XC-274).
+        shown = parts_shown(loaded, view)
+        if isinstance(shown, Result):
+            raise ReportError(f"ビュー '{view_id}'：{shown.reason or '表示するパートを決められません'}")
         available, detail = session.offscreen()
         if not available:
             raise ReportError(f"図を描けません：{detail}")
         try:
             rendered = render_view(
-                loaded.datasets(), colouring, width=size[0], height=size[1], camera=camera,
+                [part.dataset for part in shown if part.dataset is not None], colouring,
+                width=size[0], height=size[1], camera=camera,
             )
         except RenderError as error:
             raise ReportError(f"ビュー '{view_id}' を描けません：{error}") from None

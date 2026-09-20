@@ -22,6 +22,11 @@ from domain_core.dataset import Dataset
 from domain_core.reported_value import Caveat, Provenance, ReportedValue
 
 
+#: What joins the steps of a part's path when it is written as one line. The file's own names may
+#: contain anything, which is why the path is carried as a tuple and this form is for reading.
+SEPARATOR = " / "
+
+
 @dataclass(frozen=True, slots=True)
 class Part:
     """One named component of a @Case, or the record that the file named one and it was not there."""
@@ -32,12 +37,17 @@ class Part:
     # hierarchy is the only thing that tells them apart.
     path: tuple[str, ...]
     dataset: Dataset | None
+    # Why the part is not here, where it is not, in the reader's words (XC-272): None for a present
+    # part, and for an absence the file made visible only by naming a part it gave nothing.
+    reason: str | None = None
 
     def __post_init__(self) -> None:
         if not self.name:
             raise ValueError("a part is named; an unnamed one cannot be referred to or reported on")
         if not self.path or self.path[-1] != self.name:
             raise ValueError("a part's path ends with its own name")
+        if self.dataset is not None and self.reason is not None:
+            raise ValueError("a present part has no reason to be absent; one of the two is wrong")
 
     @property
     def is_present(self) -> bool:
@@ -46,7 +56,17 @@ class Part:
     @property
     def label(self) -> str:
         """The path as one string, for a message a person reads."""
-        return " / ".join(self.path)
+        return SEPARATOR.join(self.path)
+
+    @property
+    def parent_label(self) -> str | None:
+        """The path above this part in the same form, or None at the root."""
+        return SEPARATOR.join(self.path[:-1]) or None
+
+    @property
+    def absence(self) -> str:
+        """The absence as one line: the path, and the reason where the reader gave one."""
+        return f"{self.label}（{self.reason}）" if self.reason else self.label
 
 
 @dataclass(slots=True)
@@ -67,6 +87,11 @@ class LoadedCase:
     @property
     def present(self) -> tuple[Part, ...]:
         return tuple(part for part in self.parts if part.is_present)
+
+    @property
+    def absent(self) -> tuple[Part, ...]:
+        """The parts the file named and the reader could not fill, in the file's order."""
+        return tuple(part for part in self.parts if not part.is_present)
 
     @property
     def is_partial(self) -> bool:

@@ -24,8 +24,8 @@ const LOADED = {
     resultAxis: { kind: "time" as const, positions: [0, 0.5, 1], unit: "s" },
   },
   parts: [
-    { name: "cube", type: "part", pointCount: 8, cellCount: 1 },
-    { name: "assembly / Base / Ghost（要素なし）", type: "absent", pointCount: 0, cellCount: 0 },
+    { name: "cube", type: "part", path: ["cube"], pointCount: 8, cellCount: 1 },
+    { name: "assembly / Base / Ghost", type: "absent", path: ["assembly", "Base", "Ghost"], parentId: "assembly / Base", reason: "要素なし", pointCount: 0, cellCount: 0 },
   ],
 };
 
@@ -40,7 +40,7 @@ describe("what the loaded dataset holds", () => {
     expect(view?.file).toMatchObject({ name: "cube.vtu", format: ".vtu", supportLabel: "検証済み", path: "D:/studies/cube.vtu" });
     expect(view?.structure).toMatchObject({ points: 8, cells: 1, partial: false });
     expect(view?.structure?.bounds?.map((one) => `${one.axis}:${one.min}..${one.max}`)).toEqual(["X:0..1", "Y:0..1", "Z:0..1"]);
-    expect(view?.parts.map((one) => one.present)).toEqual([true, false]);
+    expect(view?.parts.map((one) => `${one.present}/${one.reason ?? "-"}`)).toEqual(["true/-", "false/要素なし"]);
     expect(view?.fields.map((one) => `${one.name}/${one.associationLabel}/${one.unit ?? "未宣言"}`)).toEqual([
       "temperature/点/未宣言",
       "stress/要素/MPa",

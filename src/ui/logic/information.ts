@@ -25,6 +25,8 @@ export interface StructureFacts {
 export interface PartFacts {
   name: string;
   present: boolean;
+  /** Why the part is absent, in the reader's words, or null (XC-272). */
+  reason: string | null;
   points: number;
   cells: number;
 }
@@ -127,6 +129,7 @@ export function informationOf(state: EngineState): InformationView | null {
     parts: (state.parts ?? []).map((part) => ({
       name: part.name,
       present: part.type !== "absent",
+      reason: part.reason ?? null,
       points: part.pointCount,
       cells: part.cellCount,
     })),

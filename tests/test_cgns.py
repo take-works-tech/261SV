@@ -178,6 +178,7 @@ class TestAZoneTheReaderCannotReadIsAnAbsence:
         assert case.is_partial is True
         assert [part.label for part in case.present] == ["assembly / Base / Zone"]
         assert case.contents.missing_parts == ("assembly / Base / Ghost（要素なし）",)
+        assert [(part.path, part.reason) for part in case.absent] == [(("assembly", "Base", "Ghost"), "要素なし")]
         assert "不足 1 件" in case.describe() and "Ghost" in case.describe()
 
     def test_the_engine_lists_the_absence_and_says_partial(self, tmp_path: Path) -> None:
@@ -202,5 +203,9 @@ class TestAZoneTheReaderCannotReadIsAnAbsence:
         assert surface.submit(Command("dataset.describe", {"datasetId": dataset_id})).value["partial"] is True
         parts = surface.submit(Command("dataset.parts", {"datasetId": dataset_id})).value["parts"]
         absent = [one for one in parts if one["type"] == "absent"]
-        assert [one["name"] for one in absent] == ["assembly / Base / Ghost（要素なし）"]
+        # The name is the file's, the reason is the reader's, and the path is where the file put it -
+        # three facts, carried as three (XC-274); until this change the name carried the reason.
+        assert [(one["name"], one["reason"], one["path"], one["parentId"]) for one in absent] == [
+            ("assembly / Base / Ghost", "要素なし", ["assembly", "Base", "Ghost"], "assembly / Base"),
+        ]
         assert absent[0]["pointCount"] == 0 and absent[0]["cellCount"] == 0

@@ -10,7 +10,16 @@ updated: 2026-09-20
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 3.4.0
+- version: 3.5.0
+- correction: 2026-09-20, version 3.4.0 to 3.5.0. `dataset.parts` carries each part's `path` - the
+  file's own hierarchy, root first - with `parentId` filled from it and, for an absent part, the
+  reader's `reason` as its own member: the name had carried the reason as a suffix since XC-272,
+  and the hierarchy was a string an interface would have had to split. `view.pick` names the
+  `part` that answered, so the outliner's selection can follow the viewport's (view/AC-055).
+  `view.get` is added: the definition the document holds now, with its revision - what an
+  interface reads before it writes, because a definition rebuilt from what a window remembers
+  replaced what the document kept, and a camera saved in one session was overwritten by the
+  first redraw of the next (XC-274). Additive
 - correction: 2026-09-20, version 3.3.0 to 3.4.0. `view.render` and `view.pick` take `camera` - the
   CT-004 camera shape, referenced rather than copied. A camera move is a class-1 transition
   (XC-270): it reaches the engine as the camera the picture is drawn and picked with, and never
@@ -143,11 +152,12 @@ no identifier to report.
 | `variable.detach` | write | case id, variable id | the value it kept - the variable stops following the parent (XC-117) |
 | `view.create` | write | workspace id, definition (CT-004), source template id and revision? | workspace view id and revision; source is provenance, not a live link (XC-109) |
 | `view.update` | write | view id, definition | - |
+| `view.get` | read | view id | the definition the document holds now, and its revision (XC-274) |
 | `view.duplicate` | write | view id, new name | new independent workspace view id |
 | `view.rename` | write | view id, new name | new revision; stored id references unchanged |
 | `view.delete` | write | view id | deleted id; dependent pipeline units retained as unresolved |
 | `view.render` | read | view id, width, height, format, legend (default true), camera? | image bytes or a handle to them; a camera given draws the picture from there and leaves the definition's camera as it is (XC-270) |
-| `view.pick` | read | view id, width, height, pixel x and y, camera? | the value under that pixel with its unit, digits, provenance and location, and which point or cell it is - or nothing, where the pixel is off the model (view/AC-027, view/AC-029) |
+| `view.pick` | read | view id, width, height, pixel x and y, camera? | the value under that pixel with its unit, digits, provenance and location, which point or cell it is, and which part answered - or nothing, where the pixel is off the model or on a hidden part (view/AC-027, view/AC-029, view/AC-055) |
 | `graph.create` | write | workspace id, definition (CT-005), source template id and revision? | workspace graph id and revision (XC-109) |
 | `graph.update` | write | graph id, definition | new graph revision |
 | `graph.duplicate` | write | graph id, new name | new independent workspace graph id |
@@ -166,7 +176,7 @@ no identifier to report.
 | `history.undo` | write | undo id | ids restored |
 | `history.list` | read | workspace id | operations with origin, time and outcome |
 | `dataset.probe` | read | dataset id, field name, point in metres, result position | value, association, unit, significant digits, provenance - missing where there is none (view/AC-027) |
-| `dataset.parts` | read | dataset id | source-named parts with type, parent identifier where present, counts and bounds (GL-029, GL-042); absent hierarchy remains absent |
+| `dataset.parts` | read | dataset id | every part the file named, present or absent, with its path from the root, its parent where the file has a hierarchy, counts and bounds; an absent part carries the reader's reason and nothing counted (GL-029, GL-042, INV-019); no hierarchy is inferred |
 | `field.derive` | read | dataset id, field name, quantity from the catalogue, frame? | the derived field with the formula and conventions it used (INV-020) |
 | `field.setDisplayUnit` | write | workspace id, quantity, unit symbol | - - presentation only; storage stays canonical (INV-026) |
 | `frame.declare` | write | workspace id, name, kind, origin, axis | frame id (XC-122) |
