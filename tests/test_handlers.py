@@ -42,7 +42,7 @@ from service.workspace import items  # noqa: E402
 from service.workspace.document import FORMAT_VERSION  # noqa: E402
 from domain_core.recorded_time import STORED_FORMAT, record as record_time  # noqa: E402
 from test_reader import write_grid  # noqa: E402
-from demo_case import write_cube, write_two_blocks  # noqa: E402, F401 - re-exported for the tests that import it from here
+from demo_case import write_bar, write_cube, write_two_blocks  # noqa: E402, F401 - re-exported for the tests that import it from here
 from test_render import decode  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -473,6 +473,54 @@ class TestStatistics:
         assert in_quad.value["maximum"]["location"].startswith(quad)
         assert in_triangles.value["maximum"]["value"] == 90.0
         assert in_triangles.value["scope"] == f"パート {triangles}"
+
+    def test_a_cell_field_answers_both_numbers_and_the_spread_at_the_peak(self, tmp_path: Path) -> None:
+        """INV-032, XC-247, E-144: 110 against 200 on a concentration inside the body, the spread 180 at
+        that node, each figure labelled, and the disagreement said."""
+        surface, _, dataset_id = loaded(tmp_path, write=write_bar, name="bar.vtu")
+        surface.submit(Command("field.declareUnit", {"datasetId": dataset_id, "fieldName": "stress", "unitSymbol": "MPa"}))
+
+        result = surface.submit(Command("field.statistics", {"datasetId": dataset_id, "fieldName": "stress"}))
+
+        assert result.status is Status.ANSWERED, result.reason
+        assert result.value["averaging"] == "unaveraged"
+        assert result.value["maximum"]["value"] == 200.0
+        averaged = result.value["averaged"]
+        assert averaged["maximum"]["value"] == pytest.approx(110.0)
+        assert "averaged" in averaged["maximum"]["caveats"]
+        assert averaged["maximum"]["unit"] == "MPa"
+        assert averaged["maximum"]["location"].startswith("bar：")
+        assert averaged["minimum"]["value"] == pytest.approx(10.0)
+        assert averaged["spreadAtMaximum"]["value"] == pytest.approx(180.0)
+        assert averaged["spreadFraction"]["value"] == pytest.approx(180.0 / 110.0)
+        assert averaged["spreadFraction"]["unit"] == "1", "a ratio is dimensionless, and SI writes that as 1"
+        assert "90" in averaged["disagreement"] and "45%" in averaged["disagreement"]
+
+    def test_a_point_field_has_no_averaging_question(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path)
+
+        result = surface.submit(Command("field.statistics", {"datasetId": dataset_id, "fieldName": "stress"}))
+
+        assert result.status is Status.ANSWERED
+        assert "averaging" not in result.value and "averaged" not in result.value
+
+    def test_the_document_states_both_numbers_for_a_cell_field(self, tmp_path: Path) -> None:
+        """A report that gives one without saying which has answered neither (INV-032)."""
+        surface, _, dataset_id = loaded(tmp_path, write=write_bar, name="bar.vtu")
+        surface.submit(Command("field.declareUnit", {"datasetId": dataset_id, "fieldName": "stress", "unitSymbol": "MPa"}))
+        report_id = surface.submit(Command("report.create", {"workspaceId": "ws:1", "definition": {
+            "name": "棒", "targets": ["html"], "blocks": [{"kind": "valueTable", "fields": ["stress"]}],
+        }})).value["id"]
+        target = tmp_path / "bar.html"
+
+        exported = surface.submit(Command("report.export", {"reportId": report_id, "path": str(target)}))
+
+        assert exported.status is Status.APPLIED, exported.reason
+        text = target.read_text(encoding="utf-8")
+        assert "要素値・平均なし" in text and "200" in text
+        assert "節点平均" in text and "110" in text
+        assert "ばらつき" in text and "180" in text
+        assert "セル間で平均した値です" in text
 
     def test_a_region_that_is_no_part_is_refused_by_name(self, tmp_path: Path) -> None:
         surface, _, dataset_id = loaded(tmp_path)

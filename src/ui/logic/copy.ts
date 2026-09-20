@@ -36,16 +36,32 @@ export function reportedRow(label: string, reported: Reported, labels: CopyLabel
 
 const ASSOCIATION_WORD: Record<string, string> = { point: "点", cell: "要素" };
 
-/** The field's statistics as rows: the three values, and the missing count as the integer it is. */
+/** The field's statistics as rows: the three values, and the missing count as the integer it is.
+ *  For a cell field both numbers travel, each labelled, the averaged ones with the spread at the
+ *  peak and the sentence that says how far the maxima disagree (INV-032, XC-281). */
 export function statisticsRows(fieldName: string, statistics: Results["field.statistics"], labels: CopyLabels): string[][] {
   const scope = `${statistics.scope}・重み：${statistics.weighting}・${ASSOCIATION_WORD[statistics.association] ?? statistics.association}の上`;
-  return [
+  const element = statistics.averaging === "unaveraged" ? "・要素値（平均なし）" : "";
+  const rows = [
     [...HEADER],
-    reportedRow(`${fieldName}（最大）`, statistics.maximum, labels, scope),
-    reportedRow(`${fieldName}（最小）`, statistics.minimum, labels, scope),
-    reportedRow(`${fieldName}（平均）`, statistics.mean, labels, scope),
+    reportedRow(`${fieldName}（最大${element}）`, statistics.maximum, labels, scope),
+    reportedRow(`${fieldName}（最小${element}）`, statistics.minimum, labels, scope),
+    reportedRow(`${fieldName}（平均${element}）`, statistics.mean, labels, scope),
     [`${fieldName}（欠損数）`, String(statistics.missingCount), "件", "整数", labels.provenance["computed"] ?? "computed", "", `範囲：${scope}`],
   ];
+  const averaged = statistics.averaged;
+  if (averaged) {
+    rows.push(reportedRow(`${fieldName}（最大・節点平均）`, averaged.maximum, labels, scope));
+    rows.push(reportedRow(`${fieldName}（最小・節点平均）`, averaged.minimum, labels, scope));
+    const spread = reportedRow(`${fieldName}（節点平均の最大でのばらつき・メッシュ細分の目安）`, averaged.spreadAtMaximum, labels, scope);
+    spread[6] = [spread[6], averaged.spreadFraction.value === null ? "" : `平均比 ${Math.round(averaged.spreadFraction.value * 100)}%`, averaged.disagreement]
+      .filter((one) => one !== "")
+      .join("；");
+    rows.push(spread);
+  } else if (statistics.averagingRefused) {
+    rows.push([`${fieldName}（最大・節点平均）`, `値なし（${statistics.averagingRefused}）`, statistics.maximum.unit ?? labels.undeclared, "", labels.provenance["computed"] ?? "computed", "", `範囲：${scope}`]);
+  }
+  return rows;
 }
 
 /** The probed value as one row, with the location the readout shows where the value carries none. */

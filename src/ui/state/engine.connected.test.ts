@@ -38,6 +38,7 @@ let connection: Connection;
 let workspacePath: string;
 let cubePath: string;
 let partialPath: string | null = null;
+let barPath: string;
 let engineOutput = "";
 
 async function until(what: () => boolean, ms: number, name: string): Promise<void> {
@@ -58,10 +59,11 @@ beforeAll(async () => {
     env: { ...process.env, PYTHONIOENCODING: "utf-8" },
   });
   if (written.status !== 0) throw new Error(`demo case not written:\n${written.stderr}`);
-  const paths = JSON.parse(written.stdout.trim()) as { workspace: string; cube: string; partial: string | null };
+  const paths = JSON.parse(written.stdout.trim()) as { workspace: string; cube: string; partial: string | null; bar: string };
   workspacePath = paths.workspace;
   cubePath = paths.cube;
   partialPath = paths.partial;
+  barPath = paths.bar;
 
   // The engine, started the way a shell starts it: loopback, a port the OS chooses, the token in a
   // file the shell reads and nowhere else (XC-258).
@@ -458,6 +460,33 @@ describe("the prototype thread from the interface's side", () => {
     await engineState.refresh();
     expect(snapshot().refusal).toBeNull();
     expect(snapshot().imageUrl).toMatch(/^blob:/);
+  });
+
+  test("a cell field's statistics are two numbers, each labelled, the averaged one with its spread - 110 against 200 (INV-032, XC-281)", async () => {
+    expect(await engineState.loadDataset("case:1", barPath)).toBe(true);
+    await engineState.refresh();
+    let s = snapshot();
+    expect(s.refusal).toBeNull();
+    expect(s.fields.map((one) => `${one.name}/${one.association}`)).toEqual(["stress/cell"]);
+    expect(s.statistics?.averaging).toBe("unaveraged");
+    expect(s.statistics?.maximum.value).toBe(200);
+    expect(s.statistics?.averaged?.maximum.value).toBeCloseTo(110, 6);
+    expect(s.statistics?.averaged?.maximum.caveats).toContain("averaged");
+    expect(s.statistics?.averaged?.spreadAtMaximum.value).toBeCloseTo(180, 6);
+    expect(s.statistics?.averaged?.disagreement).toContain("45%");
+    // Copied, both numbers travel with their labels.
+    if (!s.statistics) throw new Error("the statistics were not read");
+    const labels = statisticsRows("stress", s.statistics, { undeclared: "単位未宣言", provenance: { computed: "計算" } }).map((row) => row[0]);
+    expect(labels).toContain("stress（最大・要素値（平均なし））");
+    expect(labels).toContain("stress（最大・節点平均）");
+
+    // The thread goes on with the cube, as after the partial case.
+    expect(await engineState.loadDataset("case:1", cubePath)).toBe(true);
+    await engineState.refresh();
+    s = snapshot();
+    expect(s.refusal).toBeNull();
+    expect(s.statistics?.averaging).toBeUndefined();
+    expect(s.imageUrl).toMatch(/^blob:/);
   });
 });
 

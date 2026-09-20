@@ -10,7 +10,13 @@ updated: 2026-09-20
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 3.7.0
+- version: 3.8.0
+- correction: 2026-09-20, version 3.7.0 to 3.8.0. `field.statistics` on a cell field answers both
+  numbers: `averaging: unaveraged` labels the minimum, maximum and mean as the element values
+  they are, and `averaged` carries the nodal-averaged maximum and minimum with the spread at the
+  peak node and the sentence that says how far the two maxima disagree (INV-032, XC-247,
+  XC-281). Until this change the contract carried one number with no label, which is the
+  combination E-144 measured as a 45 per cent under-report. Additive
 - correction: 2026-09-20, version 3.6.0 to 3.7.0. `system.operations` is added: the catalogue
   operations this build answers and those it does not, read from the surface's own registry.
   Until this change the fact existed only inside the engine, and an interface listing the
@@ -154,7 +160,7 @@ no identifier to report.
 | `dataset.load` | write | case id, file paths | dataset id, fields with association, support level, gaps |
 | `dataset.describe` | read | dataset id | point and cell counts, bounds in metres, time steps, partial flag |
 | `field.declareUnit` | write | dataset id, field name, unit symbol | - |
-| `field.statistics` | read | dataset id, field name, region? - a part's name as `dataset.parts` lists it | min, max, mean, missing count, the association used, and the scope: the whole case or the one part (INV-017, INV-019) |
+| `field.statistics` | read | dataset id, field name, region? - a part's name as `dataset.parts` lists it | min, max, mean, missing count, the association used, and the scope: the whole case or the one part (INV-017, INV-019); for a cell field, the label that these are the element values and the averaged extrema with the spread at the peak (INV-032) |
 | `variable.declare` | write | workspace id or case id, name, value, unit? | variable id |
 | `variable.set` | write | variable id, value | ids of every place that changed |
 | `variable.detach` | write | case id, variable id | the value it kept - the variable stops following the parent (XC-117) |

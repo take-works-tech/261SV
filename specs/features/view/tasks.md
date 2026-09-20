@@ -434,3 +434,13 @@ updated: 2026-09-20
 - done: 2026-09-20 (XC-279). `src/ui/logic/copy.ts` builds the rows from the engine's answers; the
   labels are the interface's own (`COPY_LABELS`), defined once. `CopyValues` writes the text and says
   what happened beside the button
+
+### TASK-068 - Both numbers travel, with the spread
+- satisfies: AC-093
+- depends_on: TASK-030
+- done_when: a cell field's statistics answer both extrema labelled, the averaged one with the spread
+  at its node; the document's value table states both; the interface shows and copies both
+- done: 2026-09-20 (XC-281, CT-003 3.8.0). `averaged_extrema` averages part by part through
+  `engine/analysis/nodal.py`, which had produced the numbers since 2026-08-25 with nothing calling
+  it. The bar of E-144 is a file fixture now (`tests/demo_case.py`), read by the engine tests and
+  the interface's connected thread

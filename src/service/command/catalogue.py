@@ -250,7 +250,7 @@ RESULT_FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "dataset.load": (frozenset(['datasetId', 'fields', 'gaps', 'supportLevel']), frozenset(['datasetId', 'fields', 'gaps', 'supportLevel'])),
     "dataset.describe": (frozenset(['boundsM', 'cellCount', 'partial', 'pointCount', 'resultAxis']), frozenset(['boundsM', 'cellCount', 'partial', 'pointCount'])),
     "field.declareUnit": (frozenset([]), frozenset([])),
-    "field.statistics": (frozenset(['association', 'maximum', 'mean', 'minimum', 'missingCount', 'reduction', 'scope', 'weighting']), frozenset(['association', 'maximum', 'mean', 'minimum', 'missingCount', 'reduction', 'scope', 'weighting'])),
+    "field.statistics": (frozenset(['association', 'averaged', 'averaging', 'averagingRefused', 'maximum', 'mean', 'minimum', 'missingCount', 'reduction', 'scope', 'weighting']), frozenset(['association', 'maximum', 'mean', 'minimum', 'missingCount', 'reduction', 'scope', 'weighting'])),
     "variable.declare": (frozenset(['id']), frozenset(['id'])),
     "variable.set": (frozenset(['changedIds']), frozenset(['changedIds'])),
     "variable.detach": (frozenset(['keptValue']), frozenset(['keptValue'])),
@@ -387,7 +387,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
 
 #: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below
 #: the engine's floor is refused politely rather than answered in a shape it cannot read.
-PROTOCOL_VERSION = "3.7.0"
+PROTOCOL_VERSION = "3.8.0"
 
 #: The wire's own names, from CT-003's `$defs.transport` (XC-258). The interface generates
 #: the same values from the same place; neither side is derived from the other (XC-252).
