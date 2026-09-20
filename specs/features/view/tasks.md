@@ -387,3 +387,11 @@ updated: 2026-09-20
   colour map or a kept look changes. Found as a contradiction in the store's own header, which said
   class 1 while every orbit went as a write. The connected rail's 「この向きをビューに保存」 calls
   `keepCamera`, the one explicit write
+
+### TASK-064 - The partial case is marked on the pane
+- satisfies: AC-091
+- depends_on: TASK-063
+- done_when: the store keeps `partial` and the absent parts' names from `dataset.describe` and
+  `dataset.parts`, and the first pane shows them for as long as the case is open
+- done: 2026-09-20. The mark is on the pane and not in the dismissable notices, because a mark that
+  can be dismissed is a mark that was; the load's warning says it once

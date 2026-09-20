@@ -13,6 +13,9 @@ export function ViewportPlaceholder(props: {
   map?: ColourMapId;
   legendTicks?: string[];
   reducedNote?: string;
+  /** The loaded case is partial: what the file named and the reader could not read. Persistent -
+   *  a mark that can be dismissed is a mark that was (ingest/AC-027). */
+  partialNote?: string;
   children?: React.ReactNode;
   /** A frame the engine drew, when one exists. With it this is not a placeholder at all: the
    *  silhouette is replaced by the picture, and the label stops saying "design state" because it no
@@ -123,6 +126,17 @@ export function ViewportPlaceholder(props: {
               <span key={tick}>{tick}</span>
             ))}
           </span>
+        </div>
+      ) : null}
+
+      {props.partialNote ? (
+        <div
+          className="pane-badge"
+          style={{ left: "auto", right: 8, borderColor: "var(--state-warn)" }}
+          role="note"
+          title="ファイルが名前を挙げた部分のうち、読めなかったもの。このケースから出る数値にも同じ印が付きます（AC-027）"
+        >
+          不完全なケース：{props.partialNote}
         </div>
       ) : null}
 

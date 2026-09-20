@@ -158,3 +158,49 @@ class TestTheSequenceTheFileDeclares:
         assert case.contents.axis.kind is AxisKind.NONE
         assert case.contents.axis.positions is None
         assert "結果軸なし" in case.describe()
+
+class TestAZoneTheReaderCannotReadIsAnAbsence:
+    """AC-027, XC-272. A zone with a name and no coordinates comes back from the toolkit's reader with
+    points allocated from the declared size, no cells, and an error on its own log that reaches nobody
+    (E-210). The case says the part is missing rather than counting a part of nothing."""
+
+    def test_the_zone_is_a_missing_part_and_the_case_is_partial(self, tmp_path: Path) -> None:
+        import h5py
+        from cgns_fixture import node, text
+
+        path = write_minimal_cgns(tmp_path / "assembly.cgns")
+        with h5py.File(path, "a") as handle:
+            ghost = node(handle["Base"], "Ghost", "Zone_t", np.array([[4, 2, 0]], dtype=np.int32), "I4")
+            node(ghost, "ZoneType", "ZoneType_t", text("Unstructured"), "C1")
+
+        case = reader.read_case(path)
+
+        assert case.is_partial is True
+        assert [part.label for part in case.present] == ["assembly / Base / Zone"]
+        assert case.contents.missing_parts == ("assembly / Base / Ghost（要素なし）",)
+        assert "不足 1 件" in case.describe() and "Ghost" in case.describe()
+
+    def test_the_engine_lists_the_absence_and_says_partial(self, tmp_path: Path) -> None:
+        """What the interface reads: `dataset.describe` says partial and `dataset.parts` names the
+        part the reader could not fill, so a screen can say which rather than "some"."""
+        import h5py
+        from cgns_fixture import node, text
+        from service.command.surface import Command, Status
+        from test_handlers import opened
+
+        path = write_minimal_cgns(tmp_path / "assembly.cgns")
+        with h5py.File(path, "a") as handle:
+            ghost = node(handle["Base"], "Ghost", "Zone_t", np.array([[4, 2, 0]], dtype=np.int32), "I4")
+            node(ghost, "ZoneType", "ZoneType_t", text("Unstructured"), "C1")
+        surface, _, _ = opened(tmp_path)
+
+        loaded = surface.submit(Command("dataset.load", {"caseId": "case:1", "filePaths": [str(path)]}))
+
+        assert loaded.status is Status.APPLIED, loaded.reason
+        assert any("不完全" in one and "Ghost" in one for one in loaded.warnings)
+        dataset_id = loaded.value["datasetId"]
+        assert surface.submit(Command("dataset.describe", {"datasetId": dataset_id})).value["partial"] is True
+        parts = surface.submit(Command("dataset.parts", {"datasetId": dataset_id})).value["parts"]
+        absent = [one for one in parts if one["type"] == "absent"]
+        assert [one["name"] for one in absent] == ["assembly / Base / Ghost（要素なし）"]
+        assert absent[0]["pointCount"] == 0 and absent[0]["cellCount"] == 0

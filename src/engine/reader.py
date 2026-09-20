@@ -332,11 +332,21 @@ def _walk(node: vtkDataObject, path: tuple[str, ...], found: list[Part], absent:
     row = handling(node.GetClassName())
 
     if row.disposition is Disposition.READ and isinstance(node, vtkDataSet):
+        if node.GetNumberOfCells() == 0:
+            # The file named a part here and the reader returned no geometry for it - which is what a
+            # zone it could not read looks like from outside: points allocated from the declared
+            # size, no cells, and an error on the toolkit's log that reaches nobody (E-210). An
+            # absence, said as one, never a part of nothing counted as present (AC-027, XC-272).
+            absent.append(f"{where}（要素なし）")
+            return
         found.append(Part(name=path[-1], path=path, dataset=_as_dataset(node, source=source)))
         return
 
     if row.disposition is Disposition.CONVERT:
         converted, record = to_unstructured(node)
+        if converted.GetNumberOfCells() == 0:
+            absent.append(f"{where}（要素なし）")
+            return
         found.append(Part(
             name=path[-1], path=path, dataset=_as_dataset(converted, source=source, conversion=record),
         ))

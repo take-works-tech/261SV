@@ -47,6 +47,9 @@ updated: 2026-09-20
   - AC-090: When the camera is moved by interaction, the system shall draw the view from the new
     camera without changing the view's definition, entering an undo step or counting unsaved work;
     the definition's camera shall change only by an explicit act, which is one undo step (XC-270)
+  - AC-091: While the loaded case is partial, the pane shall carry a mark naming what the file named
+    and the reader could not read, which stays as long as the case is open; the load's warning
+    shall say so once (ingest/AC-027, XC-272)
 
 ### REQ-002 - Renderer choice changes the picture, never the numbers
 - priority: MUST

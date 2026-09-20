@@ -5813,3 +5813,30 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a paying customer of the desktop product who cannot install it, at which point
   the hosted edition becomes a release with its own environments and its own scope statement
+
+### XC-272 - A part the reader returns without geometry is a named absence
+- decided: 2026-09-20
+- status: active
+- decision: when a composite names a part and the reader returns a leaf for it with no cells, the
+  part is recorded as missing - the case is partial, the absence is named with the reason (要素なし),
+  and every number derived from the case carries the partial caveat (ingest/AC-027) - rather than
+  counted as a present part of nothing. The interface keeps the mark on the pane, naming what is
+  missing, for as long as the case is open; the load's warning says it once and can be dismissed,
+  the mark cannot
+- decided_by: engineering judgement on a measurement taken here (E-210)
+- rationale: the toolkit's CGNS reader, given a zone with a name and no coordinates, returns a leaf
+  with points allocated from the declared size, no cells, and an error on its own log - a log that
+  reaches nobody in a product (E-210). Read as it came, that zone was a present part with nothing in
+  it, the case was complete, and the person opening it was told nothing (#301). A part without cells
+  draws nothing and holds no result geometry; calling it present is a plausible default in place of a
+  missing value (XC-001), and the absence the file's own naming makes visible is the fact
+- alternatives: **listening for the reader's error events** - precise where the reader names the
+  part, which this one does not, and silent where a reader fails without an event; the empty leaf
+  is what every such failure looks like from outside. **A dismissable notice only** - a mark that can
+  be dismissed is a mark that was, and the case stays partial after the notice is gone
+- basis: E-210 (T1)
+- affects: MOD-002, CT-012
+- decidedness: Fixed
+- reversal_trigger: a supported format whose legitimate parts have no cells - a point set the
+  product decides to show - at which point the rule reads the reader's disposition rather than the
+  cell count

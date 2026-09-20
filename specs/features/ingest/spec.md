@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-20
+updated: 2026-09-20
 ---
 
 # Feature: result ingest

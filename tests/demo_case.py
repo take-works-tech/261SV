@@ -84,12 +84,29 @@ def write_demo_case(directory: Path) -> tuple[Path, Path]:
     return workspace, cube
 
 
+def write_partial_case(directory: Path) -> Path | None:
+    """`assembly.cgns`: one zone the reader reads and one it cannot - a case the product opens as
+    partial and says so (AC-027, XC-272). None where h5py, which writes the fixture, is not here.
+    """
+    try:
+        import h5py
+        from cgns_fixture import node, text, write_minimal_cgns
+    except ImportError:
+        return None
+    path = write_minimal_cgns(directory / "assembly.cgns")
+    with h5py.File(path, "a") as handle:
+        ghost = node(handle["Base"], "Ghost", "Zone_t", np.array([[4, 2, 0]], dtype=np.int32), "I4")
+        node(ghost, "ZoneType", "ZoneType_t", text("Unstructured"), "C1")
+    return path
+
+
 def main(argv: list[str]) -> int:
     if len(argv) != 1:
         print("usage: python tests/demo_case.py <directory>", file=sys.stderr)
         return 2
     workspace, cube = write_demo_case(Path(argv[0]))
-    print(json.dumps({"workspace": str(workspace), "cube": str(cube)}))
+    partial = write_partial_case(Path(argv[0]))
+    print(json.dumps({"workspace": str(workspace), "cube": str(cube), "partial": str(partial) if partial else None}))
     return 0
 
 

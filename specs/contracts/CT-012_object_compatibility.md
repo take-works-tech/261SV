@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-24
+updated: 2026-09-20
 ---
 
 # Object compatibility
@@ -12,7 +12,12 @@ What this product accepts, what it becomes, and what every combination it does n
   types, and the total table of conversions between them - so that a shape arriving at a boundary is
   never met without a decision having been made about it
 - schema: schema/CT-012.json
-- version: 1.0.0
+- version: 1.1.0
+- correction: 2026-09-20, version 1.0.0 to 1.1.0. A leaf whose disposition is `read` or `convert` and
+  which arrives with no cells is not a part: it is recorded as a named absence with the reason 要素なし
+  and the case is partial (XC-272). The dispositions do not change; this is what `read` means for a
+  leaf the reader could not fill - measured on a CGNS zone with a name and no coordinates, which the
+  toolkit's reader returns as points and no cells with an error on its own log (E-210). Additive
 - strictness: the tables are **total**. A data object type with no disposition, a View object type CT-004
   declares and this contract does not, or an ordered pair of View object types absent from the
   conversion table is a defect in this contract and not a permission
