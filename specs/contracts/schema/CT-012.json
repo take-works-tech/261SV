@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-012 object compatibility",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "The tables CT-012 states, as data. Not a document shape like the other contracts: what this contract constrains is which objects exist and what becomes what, so the machine-readable form is the tables themselves and validate/check_object_compatibility.py reads them.",
   "measuredAgainst": {
     "vtkVersion": "9.5.2",

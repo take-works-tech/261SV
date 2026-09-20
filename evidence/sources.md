@@ -2128,3 +2128,15 @@ Recorded so that nothing silently depends on them:
   first open, the interface rendering the lists it is sent, a document with hundreds of cases
   beside the items
 - justifies: LIM-016, XC-265
+
+### E-210 - What a CGNS zone the reader cannot read looks like from outside, measured here
+- tier: T1
+- url: tests/test_cgns.py::TestAZoneTheReaderCannotReadIsAnAbsence, from a probe run on the
+  development machine on 2026-09-20 (VTK 9.5.2, h5py 3.16.0)
+- verified: 2026-09-20
+- says: a CGNS/HDF5 file with two zones under one base, the second carrying a name and a ZoneType
+  and no GridCoordinates, is read by vtkCGNSReader into a multiblock with two leaves. The second
+  leaf holds 4 points - the zone's declared size - and 0 cells, and the reader writes "Error while
+  reading mesh coordinates node :H5Gopen:open of a node group failed" to the toolkit's output window
+  and nowhere a product reads. Before XC-272 the case counted 2 parts and reported itself complete
+- justifies: XC-272

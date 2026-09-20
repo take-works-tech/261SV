@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-20
+updated: 2026-09-20
 ---
 
 # Tasks: result ingest
@@ -405,3 +405,11 @@ is either missing a requirement or is not work this specification asked for.
   chars, and with h5py's string dtype the reader opens the file and misreads it, taking a 4-point
   unstructured zone for an 8-point structured one.
 
+### TASK-033 - A part without geometry is an absence
+- satisfies: AC-027
+- depends_on: TASK-026
+- done_when: a leaf the reader returns with no cells is recorded as a missing part with its reason,
+  and a file of one readable and one unreadable zone opens as a partial case
+- done: 2026-09-20 (XC-272, E-210). Found while giving #301 a real fixture: the CGNS reader returns a
+  zone it cannot read as 4 points and 0 cells with an error on its own log, and the case counted it
+  present. `tests/demo_case.py` writes the same file for the interface's thread

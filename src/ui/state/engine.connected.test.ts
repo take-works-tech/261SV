@@ -30,6 +30,7 @@ let engine: ChildProcess | null = null;
 let connection: Connection;
 let workspacePath: string;
 let cubePath: string;
+let partialPath: string | null = null;
 let engineOutput = "";
 
 async function until(what: () => boolean, ms: number, name: string): Promise<void> {
@@ -50,9 +51,10 @@ beforeAll(async () => {
     env: { ...process.env, PYTHONIOENCODING: "utf-8" },
   });
   if (written.status !== 0) throw new Error(`demo case not written:\n${written.stderr}`);
-  const paths = JSON.parse(written.stdout.trim()) as { workspace: string; cube: string };
+  const paths = JSON.parse(written.stdout.trim()) as { workspace: string; cube: string; partial: string | null };
   workspacePath = paths.workspace;
   cubePath = paths.cube;
+  partialPath = paths.partial;
 
   // The engine, started the way a shell starts it: loopback, a port the OS chooses, the token in a
   // file the shell reads and nowhere else (XC-258).
@@ -280,6 +282,27 @@ describe("the prototype thread from the interface's side", () => {
     expect(html).toContain("K");
     const withoutData = html.replace(/data:image[^"]+/g, "");
     expect(withoutData).not.toMatch(/https?:\/\//);
+  });
+
+  test("a case the reader could only partly read opens as partial, keeps the mark and names what is missing (AC-027)", async () => {
+    if (!partialPath) throw new Error("the partial fixture was not written: h5py is missing from the engine environment");
+
+    expect(await engineState.loadDataset("case:1", partialPath)).toBe(true);
+
+    const s = snapshot();
+    expect(s.partial).toBe(true);
+    expect(s.absentParts.some((one) => one.includes("Ghost"))).toBe(true);
+    expect(s.warnings.some((one) => one.includes("不完全"))).toBe(true);
+    expect(s.fields.map((one) => one.name)).toContain("stress");
+    engineState.clearWarnings();
+
+    // The thread goes on with the cube: a second dataset in the case would reach every report
+    // drawn over the session's datasets, and a partial one is refused there by design (AC-004).
+    expect(await engineState.loadDataset("case:1", cubePath)).toBe(true);
+    expect(snapshot().partial).toBe(false);
+    await engineState.refresh();
+    expect(snapshot().refusal).toBeNull();
+    expect(snapshot().imageUrl).toMatch(/^blob:/);
   });
 });
 

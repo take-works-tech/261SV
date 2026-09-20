@@ -115,6 +115,10 @@ export interface EngineState {
   /** An object URL for the rendered frame, or null. Revoked when it is replaced. */
   readonly imageUrl: string | null;
   readonly reduced: string | null;
+  /** Whether the loaded case is partial - the file named parts that are not there - and which
+   *  (ingest/AC-027). Kept, not only warned: a mark that can be dismissed is a mark that was. */
+  readonly partial: boolean;
+  readonly absentParts: readonly string[];
   readonly probe: Reported | null;
   readonly probeLocation: string | null;
   readonly statistics: Results["field.statistics"] | null;
@@ -190,6 +194,8 @@ const EMPTY: EngineState = {
   savedCamera: null,
   imageUrl: null,
   reduced: null,
+  partial: false,
+  absentParts: [],
   probe: null,
   probeLocation: null,
   statistics: null,
@@ -400,6 +406,8 @@ export const engineState = {
       fields: [],
       fieldName: null,
       viewId: null,
+      partial: false,
+      absentParts: [],
       probe: null,
       probeLocation: null,
       statistics: null,
@@ -444,6 +452,8 @@ export const engineState = {
       fieldName: fields[0]?.name ?? null,
       viewId: null,
       savedCamera: null,
+      partial: false,
+      absentParts: [],
       probe: null,
       probeLocation: null,
       statistics: null,
@@ -452,7 +462,13 @@ export const engineState = {
     const described = await ask("dataset.describe", { datasetId: loaded.datasetId });
     setState({
       bounds: described?.boundsM ? [described.boundsM.minM as number[], described.boundsM.maxM as number[]] : null,
+      partial: described?.partial ?? false,
     });
+    if (described?.partial) {
+      // What is missing, by name, from the parts the engine lists as absent (AC-027).
+      const parts = await ask("dataset.parts", { datasetId: loaded.datasetId });
+      setState({ absentParts: (parts?.parts ?? []).filter((one) => one.type === "absent").map((one) => one.name) });
+    }
     return true;
   },
 
@@ -569,7 +585,16 @@ export const engineState = {
         definition,
       });
       viewId = created?.id ?? null;
-      setState({ viewId });
+      // The view the document now holds, remembered beside the ones it held at open: a dataset
+      // loaded again would otherwise create a second view under this name, which the document
+      // refuses (AC-030) - the case that surfaced when a partial file was loaded and the cube put back.
+      setState({
+        viewId,
+        savedViews:
+          viewId && state.fieldName && state.datasetId
+            ? [...state.savedViews, { id: viewId, name: state.fieldName, datasetId: state.datasetId }]
+            : state.savedViews,
+      });
     }
     if (!viewId) return;
     if (!state.savedCamera && definition.camera) setState({ savedCamera: definition.camera });

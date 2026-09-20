@@ -774,6 +774,10 @@ def dataset_parts(session: Session, parameters: Mapping[str, Any]) -> Effect | R
             "cellCount": part.dataset.cell_count,
             "boundsM": bounds_m([part.dataset]),
         })
+    # What the file named and the reader could not fill: listed as absent with nothing counted, so
+    # the interface can name what is missing rather than say "some" (AC-027, XC-272).
+    for name in loaded.case.contents.missing_parts:
+        parts.append({"name": name, "type": "absent", "pointCount": 0, "cellCount": 0})
     return Effect("パートの一覧です", value={"parts": parts})
 
 

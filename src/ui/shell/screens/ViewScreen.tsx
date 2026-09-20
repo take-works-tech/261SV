@@ -303,6 +303,12 @@ function ViewCanvas({ variant }: { variant: string }) {
           ? `${e.fieldName}（${e.fields.find((one) => one.name === e.fieldName)?.unit ?? UNDECLARED}）`
           : null,
         reduced: e.reduced && !e.reduced.startsWith("全三角形") ? e.reduced : null,
+        // The case's own incompleteness, from the engine: the file named these and they are not there.
+        partialNote: e.partial
+          ? e.absentParts.length > 0
+            ? `欠け ${e.absentParts.length} 件：${e.absentParts.join("、")}`
+            : "ファイルが名前を挙げた部分の一部が読めていません"
+          : null,
         // A drag turns the model and a click reads the value under it. Both go to the engine as
         // what the interface actually has - pixels moved, and a pixel of the drawn frame - because
         // the camera the picture was made with only exists there (CT-003 2.3.0, view/AC-027).
@@ -413,6 +419,7 @@ function buildPanes(
     fieldLabel: string | null;
     legendTicks?: string[];
     reduced: string | null;
+    partialNote: string | null;
     onOrbit: (by: { x: number; y: number }) => void;
     onPickPixel: (at: { x: number; y: number }) => void;
   },
@@ -434,6 +441,7 @@ function buildPanes(
         fieldLabel={index === 0 ? live?.fieldLabel ?? FIELD_LABEL : undefined}
         map="viridis"
         legendTicks={index === 0 ? live?.legendTicks ?? LEGEND_TICKS : undefined}
+        partialNote={index === 0 ? live?.partialNote ?? undefined : undefined}
         reducedNote={
           index === 0
             ? live?.reduced ?? (variant === "reduced" ? "要素 1,244 万 → 156 万に間引き" : undefined)
