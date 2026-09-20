@@ -6068,3 +6068,29 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a recipient format that carries units natively, at which point the unit column
   becomes the cell's own unit
+
+### XC-280 - A part's statistics are asked for by the part's name, and the scope is written on the answer
+- decided: 2026-09-20
+- status: active
+- decision: `field.statistics` takes `region` as a part's name exactly as `dataset.parts` lists it,
+  and answers that part's minimum, maximum, mean and missing count computed on that part alone,
+  with `scope` naming the part; without `region` the scope names the whole case and its part count.
+  A name that is no part is refused with the parts there are; a part the reader could not fill is
+  refused as having no numbers. In the interface the selected part's Object section shows its
+  statistics for the field on screen, with the scope beside them, and copies them with it; the
+  rail's statistics stay the whole case's
+- decided_by: engineering judgement, from #211's condition, INV-017, INV-019 and view/AC-035
+- rationale: engineers discuss results by part name, and a maximum over the whole model reported
+  where a part's was meant is a wrong number with a right-looking label (INV-019). The scope on the
+  answer is what makes the two numbers distinguishable after they leave the screen (INV-017,
+  view/AC-035); a spreadsheet row that does not say which it was is the ambiguity XC-279 exists to
+  remove. Naming the part by the string `dataset.parts` gives, rather than by an index or a
+  substring, is what keeps two parts of one name in different assemblies apart
+- alternatives: **a region as a selection of ids or a box** - `find`'s surface (CT-007), not built
+  in r1; a part is the region the file itself defined. **Computing a part's numbers in the
+  interface from the whole-model answer** - impossible, and a second code path if it were (INV-001)
+- basis: E-001 (T1)
+- affects: MOD-004, MOD-009, CT-003, view/REQ-012
+- decidedness: Fixed
+- reversal_trigger: `find` in r2, at which point `region` also names a saved selection and the scope
+  says which kind it was

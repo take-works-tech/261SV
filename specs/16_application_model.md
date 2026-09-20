@@ -276,7 +276,9 @@ In the production interface the rows are `dataset.parts` - each part's `path` fr
 absent part with the reader's reason and no control - and the visibility control writes the view's
 `partVisibility`, which the engine honours when it draws, picks and exports (XC-274). A block's
 control is its descendants', so `Shift` is a plain click here; `Ctrl` isolates. The header's search
-and filters, and the preview before a large recursive change, are not yet built.
+and filters, and the preview before a large recursive change, are not yet built. The selected
+part's Object section shows its own statistics for the field on screen, read with
+`field.statistics` by the part's name and answered with the scope stated (XC-280).
 
 The complete product adds a second display mode, chosen in the header the way E-120's seven modes are:
 **source structure** (the @Dataset as authored) and **View objects** (what this @View draws, including

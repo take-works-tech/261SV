@@ -454,12 +454,33 @@ class TestStatistics:
         assert result.value["weighting"] == "dualVolume"
         assert result.value["maximum"]["value"] == 8.0
 
-    def test_a_region_is_refused_until_it_is_built(self, tmp_path: Path) -> None:
+    def test_a_region_is_one_part_and_its_numbers_are_that_part_s_with_the_scope_stated(self, tmp_path: Path) -> None:
+        """INV-019, view/AC-035: a part's maximum differs from the model's, and each says what it covered."""
+        surface, _, dataset_id = loaded(tmp_path, write=write_two_blocks, name="two.ex2")
+        parts = surface.submit(Command("dataset.parts", {"datasetId": dataset_id})).value["parts"]
+        quad = next(one["name"] for one in parts if one["cellCount"] == 1)
+        triangles = next(one["name"] for one in parts if one["cellCount"] == 2)
+
+        whole = surface.submit(Command("field.statistics", {"datasetId": dataset_id, "fieldName": "stress"}))
+        in_quad = surface.submit(Command("field.statistics", {"datasetId": dataset_id, "fieldName": "stress", "region": quad}))
+        in_triangles = surface.submit(Command("field.statistics", {"datasetId": dataset_id, "fieldName": "stress", "region": triangles}))
+
+        assert whole.status is Status.ANSWERED and in_quad.status is Status.ANSWERED, (whole.reason, in_quad.reason)
+        assert whole.value["maximum"]["value"] == 90.0 and whole.value["scope"].startswith("ケース全体")
+        assert in_quad.value["maximum"]["value"] == 60.0
+        assert in_quad.value["minimum"]["value"] == 20.0
+        assert in_quad.value["scope"] == f"パート {quad}"
+        assert in_quad.value["maximum"]["location"].startswith(quad)
+        assert in_triangles.value["maximum"]["value"] == 90.0
+        assert in_triangles.value["scope"] == f"パート {triangles}"
+
+    def test_a_region_that_is_no_part_is_refused_by_name(self, tmp_path: Path) -> None:
         surface, _, dataset_id = loaded(tmp_path)
 
         result = surface.submit(Command("field.statistics", {"datasetId": dataset_id, "fieldName": "stress", "region": "part 1"}))
 
         assert result.status is Status.REFUSED
+        assert "part 1" in (result.reason or "") and "case" in (result.reason or "")
 
 
 class TestExportingADeliverable:
