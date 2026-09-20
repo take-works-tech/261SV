@@ -18,7 +18,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
-import { PROTOCOL_VERSION, type Connection } from "../client/engine";
+import { OPERATIONS, PROTOCOL_VERSION, type Connection } from "../client/engine";
+import { commandGroups } from "../logic/commands";
 import { informationOf } from "../logic/information";
 import { absentParts, visibilityAfter } from "../logic/parts";
 import { moveBlock } from "../logic/report";
@@ -309,6 +310,19 @@ describe("the prototype thread from the interface's side", () => {
     expect(capabilities?.egress?.hosts).toEqual([]);
     expect(capabilities?.egress?.auditEntries).toBe(0);
     expect(await engineState.audit()).toEqual({ entries: [] });
+  });
+
+  test("commands: the engine says which operations this build answers, and the list is the whole catalogue (XC-277)", async () => {
+    expect(await engineState.operations()).not.toBeNull();
+
+    const s = snapshot();
+    expect(s.operations?.registered).toContain("system.operations");
+    expect(s.operations?.registered.length).toBe(27);
+    expect([...(s.operations?.registered ?? []), ...(s.operations?.unimplemented ?? [])].sort()).toEqual([...OPERATIONS].sort());
+    const rows = commandGroups(s.operations, "").flatMap((group) => group.rows);
+    expect(rows).toHaveLength(OPERATIONS.length);
+    expect(rows.find((row) => row.operation === "dataset.load")).toMatchObject({ writes: true, parameters: "caseId、filePaths", status: "answers" });
+    expect(rows.find((row) => row.operation === "graph.data")?.status).toBe("unimplemented");
   });
 
   test("output: the demo workspace has no runs, and the answer is an empty list with the limit beside it (XC-141)", async () => {

@@ -107,7 +107,7 @@ def a_surface(store: Store | None = None) -> tuple[Surface, Store]:
 
 class TestTheCatalogueIsTheSet:
     def test_it_holds_every_operation_the_contract_lists(self) -> None:
-        assert len(OPERATIONS) == 67
+        assert len(OPERATIONS) == 68
         assert "view.rename" in OPERATIONS
 
     def test_reads_and_writes_partition_it(self) -> None:
@@ -165,7 +165,7 @@ class TestRegistrationIsAgainstTheCatalogue:
         assert "newName" in handler.required
 
     def test_every_operation_in_the_catalogue_has_its_parameters_stated(self) -> None:
-        """151 parameters over 67 operations, so a handler for any of them is checkable.
+        """151 parameters over 68 operations, so a handler for any of them is checkable.
 
         The count is pinned rather than recomputed: it is a contract change, and a contract change
         that nothing notices is one nobody read. It went from 134 to 135 on 2026-09-18 when CT-003

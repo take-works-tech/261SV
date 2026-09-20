@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "3.6.0",
+  "version": "3.7.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -57,6 +57,7 @@
         "report.export",
         "system.capabilities",
         "system.protocols",
+        "system.operations",
         "history.undo",
         "history.list",
         "dataset.probe",
@@ -1617,6 +1618,12 @@
               "description": "レポート の識別子（CT-001）"
             }
           }
+        },
+        "system.operations": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {}
         }
       }
     },
@@ -4403,6 +4410,30 @@
             "definition": {
               "type": "object",
               "description": "CT-006。文書が今持っている定義そのもの：書く前に読むためのもの（XC-275）"
+            }
+          }
+        },
+        "system.operations": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "registered",
+            "unimplemented"
+          ],
+          "properties": {
+            "registered": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "この版が答える操作。表面の登録簿そのもの（INV-006）"
+            },
+            "unimplemented": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "カタログにあって、この版に実装のない操作。隠さず挙げる（XC-277）"
             }
           }
         }

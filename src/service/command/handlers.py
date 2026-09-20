@@ -397,8 +397,10 @@ def build_surface(session: Session, *, clock: Callable[[], datetime] | None = No
     surface = Surface(clock=clock or session.clock, on_entry=lambda entry: log_entry(session, entry))
     for handler in handlers(session):
         surface.register(handler)
-    # The one handler that reads the surface itself: what it recorded and what its caps dropped.
+    # The handlers that read the surface itself: what it recorded and what its caps dropped, and
+    # which operations it registers at all (XC-277).
     surface.register(Handler("history.list", lambda p, t: history_list(session, surface, p)))
+    surface.register(Handler("system.operations", lambda p, t: system_operations(surface)))
     return surface
 
 
@@ -1620,6 +1622,18 @@ def system_audit(session: Session, parameters: Mapping[str, Any]) -> Effect | Re
     return Effect(
         "外部に出た要求はありません" if not recorded else f"外部要求の記録 {len(entries)} 件",
         value={"entries": entries},
+    )
+
+
+def system_operations(surface: Surface) -> Effect:
+    """Which catalogue operations this build answers, and which it does not (XC-277, INV-006).
+
+    Read from the surface's own registry, so the list can never say more than the registry does:
+    an interface that listed the catalogue would list forty operations nothing answers.
+    """
+    return Effect(
+        "この版が答える操作です",
+        value={"registered": list(surface.registered()), "unimplemented": list(surface.unimplemented())},
     )
 
 

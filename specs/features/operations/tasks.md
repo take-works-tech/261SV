@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-25
+updated: 2026-09-20
 ---
 
 # Tasks: running the product
@@ -188,3 +188,13 @@ updated: 2026-08-25
 - satisfies: AC-028
 - depends_on: TASK-025, pipeline/TASK-034
 - done_when: partial results exit zero and real failures do not
+
+### TASK-029 - The command list is generated and the engine says what answers
+- satisfies: AC-029
+- depends_on: TASK-001
+- done_when: the settings list every operation of CT-003 from the generated catalogue with its
+  class, parameters and answer members, and mark each as answered or not from `system.operations`
+- done: 2026-09-20 (XC-277, CT-003 3.7.0). `validate/check_client_types.py` emits
+  `OPERATION_FACTS` beside the types, from the schema and the catalogue table's class column;
+  `src/ui/logic/commands.ts` groups and filters the rows; the shortcut section shows them under the
+  design-state keymap, labelled as such with an engine. No operation has a key, and each row says so

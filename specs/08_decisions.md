@@ -5980,3 +5980,36 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a second Area of the View screen that says something different from the first
   pane - a comparison whose panes show different cases - at which point the footer says which pane
   it speaks for, or each pane's badge takes the line
+
+### XC-277 - The command list is generated from the contract, and the engine says what this build answers
+- decided: 2026-09-20
+- status: active
+- decision: the settings' ショートカット section carries the command list as CT-003 has it: every
+  operation, its class, its parameters by name with the optional ones marked, and the members of
+  its answer - generated into `src/ui/client/generated.ts` by the same generator that produces the
+  types, from the same schema and the same catalogue table the engine's catalogue is generated from,
+  and never written by hand. Whether this build answers an operation is the engine's to say:
+  `system.operations` (CT-003 3.7.0) returns the surface's own registry, registered and
+  unimplemented, and the list shows it beside every row; without an engine the row says it is not
+  yet known. No operation has a key in this build, and every row says so; the keymap rows above the
+  list are design states and, with an engine connected, are labelled as such
+- decided_by: engineering judgement, from #295's condition, 11_ui.md's rule that every shortcut is
+  discoverable from the command list, and INV-006
+- rationale: a hand-written list of thirty commands beside a contract of sixty-eight is a list that
+  is wrong the day after it is written, and the generator already existed for the types. Which
+  operations answer is a fact that lived only inside the engine (`Surface.unimplemented`), so an
+  interface listing the catalogue would have listed forty operations nothing answers as if they
+  did - the plausible default XC-001 names, for a command. The class column matters because a write
+  enters the undo history and the unsaved work and a read does not; a person choosing a command
+  should see which. Keys are not invented: a key the shell does not bind is a key that does nothing,
+  and キーなし is the truthful cell
+- alternatives: **listing the catalogue without asking the engine** - forty rows that read as
+  available. **A separate settings category for the list** - the model places the command list in
+  the shortcut section (§7.13), where 11_ui.md wants shortcuts found. **Emitting the class into the
+  schema** - the class is the catalogue table's, and the engine's catalogue reads it from there;
+  a second definition in the schema would be the copy that stopped agreeing
+- basis: E-001 (T1)
+- affects: MOD-009, CT-003, operations/REQ-004
+- decidedness: Fixed
+- reversal_trigger: a keymap the shell actually binds to operations, at which point the key column
+  reads the shell's registry rather than saying キーなし

@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "3.6.0";
+export const PROTOCOL_VERSION = "3.7.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -85,6 +85,7 @@ export type Operation =
   | "output.plan"
   | "view.get"
   | "report.get"
+  | "system.operations"
   ;
 
 export const OPERATIONS: readonly Operation[] = [
@@ -155,7 +156,89 @@ export const OPERATIONS: readonly Operation[] = [
   "output.plan",
   "view.get",
   "report.get",
+  "system.operations",
 ];
+
+/** What each operation is, for a list a person reads (XC-277): whether it writes - from the
+ *  catalogue table's class column - and its parameters and answer fields by name, from the
+ *  schema. Behaviour is not here: what an operation does is the engine's to say. */
+export interface OperationFacts {
+  readonly writes: boolean;
+  readonly required: readonly string[];
+  readonly optional: readonly string[];
+  readonly answers: readonly string[];
+}
+
+export const OPERATION_FACTS: Readonly<Record<Operation, OperationFacts>> = {
+  "workspace.open": { writes: true, required: ["path"], optional: ["takeOverStaleLock"], answers: ["workspaceId", "formatVersion", "unresolvedCases", "items", "readOnly", "lock"] },
+  "workspace.save": { writes: true, required: ["workspaceId"], optional: ["path"], answers: ["path", "previousKept"] },
+  "workspace.close": { writes: true, required: ["workspaceId"], optional: [], answers: [] },
+  "case.create": { writes: true, required: ["name", "workspaceId"], optional: ["parentCaseId"], answers: ["id"] },
+  "case.delete": { writes: true, required: ["caseId"], optional: [], answers: ["affectedDescendantIds"] },
+  "case.move": { writes: true, required: ["caseId", "newParentId"], optional: [], answers: [] },
+  "case.tag": { writes: true, required: ["caseId", "tags"], optional: [], answers: [] },
+  "dataset.load": { writes: true, required: ["caseId", "filePaths"], optional: [], answers: ["datasetId", "fields", "supportLevel", "gaps"] },
+  "dataset.describe": { writes: false, required: ["datasetId"], optional: [], answers: ["pointCount", "cellCount", "boundsM", "partial", "resultAxis"] },
+  "field.declareUnit": { writes: true, required: ["datasetId", "fieldName", "unitSymbol"], optional: [], answers: [] },
+  "field.statistics": { writes: false, required: ["datasetId", "fieldName"], optional: ["region"], answers: ["minimum", "maximum", "mean", "missingCount", "association", "reduction", "weighting", "scope"] },
+  "variable.declare": { writes: true, required: ["name", "value"], optional: ["workspaceId", "caseId", "unit"], answers: ["id"] },
+  "variable.set": { writes: true, required: ["value", "variableId"], optional: [], answers: ["changedIds"] },
+  "variable.detach": { writes: true, required: ["caseId", "variableId"], optional: [], answers: ["keptValue"] },
+  "view.create": { writes: true, required: ["definition", "workspaceId"], optional: ["sourceTemplateId", "sourceTemplateRevision"], answers: ["id", "revision"] },
+  "view.update": { writes: true, required: ["definition", "viewId"], optional: [], answers: ["id", "revision"] },
+  "view.duplicate": { writes: true, required: ["newName", "viewId"], optional: [], answers: ["id"] },
+  "view.rename": { writes: true, required: ["newName", "viewId"], optional: [], answers: ["id", "revision"] },
+  "view.delete": { writes: true, required: ["viewId"], optional: [], answers: ["deletedId", "unresolvedUnitIds"] },
+  "view.render": { writes: false, required: ["format", "height", "viewId", "width"], optional: ["legend", "camera"], answers: ["handle", "reduced"] },
+  "graph.create": { writes: true, required: ["definition", "workspaceId"], optional: ["sourceTemplateId", "sourceTemplateRevision"], answers: ["id", "revision"] },
+  "graph.update": { writes: true, required: ["definition", "graphId"], optional: [], answers: ["id", "revision"] },
+  "graph.duplicate": { writes: true, required: ["graphId", "newName"], optional: [], answers: ["id"] },
+  "graph.rename": { writes: true, required: ["graphId", "newName"], optional: [], answers: ["id", "revision"] },
+  "graph.delete": { writes: true, required: ["graphId"], optional: [], answers: ["deletedId", "unresolvedUnitIds"] },
+  "graph.data": { writes: false, required: ["graphId"], optional: [], answers: ["series", "resultAxisNote"] },
+  "diff.create": { writes: true, required: ["basisCaseId", "caseIdA", "caseIdB"], optional: [], answers: ["diffId", "outsideCount", "outsideFraction", "roundTripError", "disclosure"] },
+  "report.create": { writes: true, required: ["definition", "workspaceId"], optional: ["sourceTemplateId", "sourceTemplateRevision"], answers: ["id", "revision"] },
+  "report.update": { writes: true, required: ["definition", "reportId"], optional: [], answers: ["id", "revision"] },
+  "report.duplicate": { writes: true, required: ["newName", "reportId"], optional: [], answers: ["id"] },
+  "report.rename": { writes: true, required: ["newName", "reportId"], optional: [], answers: ["id", "revision"] },
+  "report.delete": { writes: true, required: ["reportId"], optional: [], answers: ["deletedId", "unresolvedUnitIds"] },
+  "report.export": { writes: true, required: ["path", "reportId"], optional: [], answers: ["path", "bytes", "reductions", "omitted"] },
+  "system.capabilities": { writes: false, required: [], optional: [], answers: ["machineClass", "renderers", "formats", "diagnostics", "egress"] },
+  "system.protocols": { writes: false, required: [], optional: [], answers: ["versions"] },
+  "history.undo": { writes: true, required: ["undoId"], optional: [], answers: ["restoredIds"] },
+  "history.list": { writes: false, required: ["workspaceId"], optional: [], answers: ["entries", "undoLimit", "undoDropped", "historyLimit", "omitted"] },
+  "dataset.probe": { writes: false, required: ["datasetId", "fieldName", "pointM", "resultPosition"], optional: [], answers: ["value", "association"] },
+  "dataset.parts": { writes: false, required: ["datasetId"], optional: [], answers: ["parts"] },
+  "field.derive": { writes: false, required: ["datasetId", "fieldName", "quantity"], optional: ["frameId"], answers: ["fieldName", "formula", "conventions", "frameId"] },
+  "field.setDisplayUnit": { writes: true, required: ["quantity", "unitSymbol", "workspaceId"], optional: [], answers: [] },
+  "frame.declare": { writes: true, required: ["axis", "kind", "name", "origin", "workspaceId"], optional: [], answers: ["id"] },
+  "measurement.import": { writes: true, required: ["caseId", "source", "values"], optional: [], answers: ["importedIds", "undeclared"] },
+  "case.proposeTags": { writes: false, required: ["caseIds"], optional: [], answers: ["proposals"] },
+  "template.createFromItem": { writes: true, required: ["name", "targetScope", "workspaceItemId", "workspaceItemRevision"], optional: [], answers: ["id", "revision"] },
+  "template.apply": { writes: true, required: ["targetSelection", "templateId", "templateRevision", "workspaceId"], optional: [], answers: ["resolved", "unresolved", "itemId"] },
+  "template.promote": { writes: true, required: ["targetScope", "templateId"], optional: [], answers: ["templateId", "requirements"] },
+  "template.export": { writes: true, required: ["path", "templateId"], optional: [], answers: ["path", "assetsEmbedded", "assetsListed"] },
+  "template.import": { writes: true, required: ["path", "targetScope"], optional: [], answers: ["templateId", "origin", "unresolvedReferences"] },
+  "library.list": { writes: false, required: [], optional: ["scope", "kind"], answers: ["entries"] },
+  "pipeline.create": { writes: true, required: ["definition", "workspaceId"], optional: [], answers: ["id", "revision"] },
+  "pipeline.update": { writes: true, required: ["definition", "pipelineId"], optional: [], answers: ["id", "revision"] },
+  "pipeline.dryRun": { writes: false, required: ["pipelineId"], optional: ["startingCases"], answers: ["steps"] },
+  "pipeline.run": { writes: true, required: ["pipelineId"], optional: ["startingCases", "destructiveAuthorisation"], answers: ["runId", "resolvedCases", "results", "written", "failedCases", "stoppedAt", "started", "finished"] },
+  "pipeline.cancel": { writes: true, required: ["runId"], optional: [], answers: ["stoppedAt", "written"] },
+  "script.run": { writes: true, required: ["authorisation"], optional: ["scriptText", "path"], answers: ["undoId", "commandCount"] },
+  "report.provenance": { writes: false, required: [], optional: ["exportedPath", "reportId"], answers: ["workspaceId", "caseIds", "sources", "declaredUnits", "productVersion", "produced"] },
+  "system.audit": { writes: false, required: [], optional: ["since"], answers: ["entries"] },
+  "system.supportBundle": { writes: true, required: ["consent", "path"], optional: [], answers: ["path", "contents"] },
+  "workspace.pack": { writes: true, required: ["includeData", "path", "workspaceId"], optional: [], answers: ["path", "bytes", "omitted"] },
+  "output.prune": { writes: true, required: ["runsToRemove", "workspaceId"], optional: ["expectedFiles"], answers: ["removedRunIds", "freedBytes", "deletedFiles"] },
+  "view.pick": { writes: false, required: ["viewId", "width", "height", "x", "y"], optional: ["camera"], answers: ["value", "association", "part"] },
+  "dataset.inspect": { writes: false, required: ["path"], optional: [], answers: ["format", "supportLevel", "gaps", "sizeBytes", "modified", "exists"] },
+  "output.list": { writes: false, required: ["workspaceId"], optional: [], answers: ["outputDirectory", "runs", "totalBytes", "limitBytes", "overLimit", "suggestedRunIds"] },
+  "output.plan": { writes: false, required: ["workspaceId", "runsToRemove"], optional: [], answers: ["runIds", "files", "freedBytes", "keptRecords"] },
+  "view.get": { writes: false, required: ["viewId"], optional: [], answers: ["id", "revision", "definition"] },
+  "report.get": { writes: false, required: ["reportId"], optional: [], answers: ["id", "revision", "definition"] },
+  "system.operations": { writes: false, required: [], optional: [], answers: ["registered", "unimplemented"] },
+};
 
 /** What each operation takes. From CT-003's $defs.operationParameters. */
 export interface Parameters {
@@ -448,6 +531,7 @@ export interface Parameters {
   "report.get": {
     reportId: string;
   };
+  "system.operations": Record<string, unknown>;
 }
 
 /** What each operation answers. From CT-003's $defs.operationResults. */
@@ -951,6 +1035,10 @@ export interface Results {
     id: string;
     revision: number;
     definition: Record<string, unknown>;
+  };
+  "system.operations": {
+    registered: readonly (string)[];
+    unimplemented: readonly (string)[];
   };
 }
 

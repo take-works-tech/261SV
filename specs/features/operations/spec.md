@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-20
+updated: 2026-09-20
 ---
 
 # Feature: running the product
@@ -76,6 +76,10 @@ updated: 2026-08-20
     unimplemented half never reads as a pass
   - AC-013: Where a command exists, the system shall provide a keyboard route to it, following the
     scheme in [../../11_ui.md](../../11_ui.md)
+  - AC-029: When the settings show the command list, every operation of CT-003 shall appear with its
+    class, its parameters, the members of its answer and whether this build answers it - generated
+    from the contract and read from the engine, never written by hand - and an operation with no
+    keyboard route shall say so rather than show one (XC-277)
 
 ### REQ-005 - The headless product authenticates before it acts
 - priority: MUST

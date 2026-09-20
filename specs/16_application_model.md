@@ -431,6 +431,12 @@ the command list rather than a printed copy of it.
 | ショートカット | the command list generated from the registry, grouped by the keymap scope; per command its label, its resolved key, and the area the binding belongs to; search by command name or by key; rebind, restore one, restore all; import and export a scheme | `Application.keymaps` | a command marked destructive shows キーなし with the confirmation it is reached through, and refuses a binding (XC-193) |
 | コマンド衝突 | two bindings of one key inside one scope; one command bound to different keys in two scopes | derived from the registry | listed at startup and in this section; neither is silently resolved by order |
 
+In the production interface the command list is CT-003's operations, generated beside the client
+types with each operation's class, parameters and answer members, and marked from
+`system.operations` as answered or not by this build (XC-277). No operation has a key in this build
+and every row says so; the keymap rows are design states and, with an engine connected, are
+labelled as such.
+
 ## 8. The object model
 
 Four layers, separated by what each one survives. The separation is the design: a value in the wrong

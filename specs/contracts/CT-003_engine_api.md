@@ -10,7 +10,11 @@ updated: 2026-09-20
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 3.6.0
+- version: 3.7.0
+- correction: 2026-09-20, version 3.6.0 to 3.7.0. `system.operations` is added: the catalogue
+  operations this build answers and those it does not, read from the surface's own registry.
+  Until this change the fact existed only inside the engine, and an interface listing the
+  catalogue would have listed forty operations nothing answers (XC-277). Additive
 - correction: 2026-09-20, version 3.5.0 to 3.6.0. `report.get` is added, the report's counterpart of
   `view.get`: the definition the document holds now, with its revision, read by the report area
   before it writes a block list back (XC-275). `report.update` had been in the catalogue since
@@ -178,6 +182,7 @@ no identifier to report.
 | `report.export` | write | report id, path | path written, bytes, reductions applied, elements omitted |
 | `system.capabilities` | read | - | machine class, renderer backends available, formats and levels |
 | `system.protocols` | read | - | protocol versions this engine speaks |
+| `system.operations` | read | - | the catalogue operations this build answers, and those it does not (XC-277) |
 | `history.undo` | write | undo id | ids restored |
 | `history.list` | read | workspace id | operations with origin, time and outcome |
 | `dataset.probe` | read | dataset id, field name, point in metres, result position | value, association, unit, significant digits, provenance - missing where there is none (view/AC-027) |

@@ -22,6 +22,8 @@ import json
 import sys
 from pathlib import Path
 
+from check_commands import catalogue_rows
+
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = ROOT / "specs" / "contracts" / "schema" / "CT-003.json"
 CONTRACT = ROOT / "specs" / "contracts" / "CT-003_engine_api.md"
@@ -119,11 +121,27 @@ def name_of(operation: str) -> str:
     return "".join(part[:1].upper() + part[1:] for part in operation.replace(".", " ").split())
 
 
+def facts_line(operation: str, parameters: dict, results: dict, classes: dict[str, bool]) -> str:
+    """One operation's facts as a TypeScript entry. The class comes from the catalogue table, the
+    same column the engine's catalogue is generated from; an operation the table does not
+    class is a contract error, not a default."""
+    if operation not in classes:
+        raise SystemExit(f"check_client_types: {operation} is in the schema and not in the CT-003 table")
+    required = list(parameters.get("required", []))
+    optional = [name for name in parameters.get("properties", {}) if name not in required]
+    answers = list(results.get("properties", {}))
+    return (
+        f'  {json.dumps(operation)}: {{ writes: {str(classes[operation]).lower()}, '
+        f'required: {json.dumps(required)}, optional: {json.dumps(optional)}, answers: {json.dumps(answers)} }},'
+    )
+
+
 def render() -> str:
     document = schema()
     parameters = document["$defs"]["operationParameters"]["properties"]
     results = document["$defs"]["operationResults"]["properties"]
     operations = list(parameters)
+    classes = dict(catalogue_rows())
 
     lines = [
         "/* GENERATED from specs/contracts/schema/CT-003.json by validate/check_client_types.py.",
@@ -154,6 +172,20 @@ def render() -> str:
         "export const OPERATIONS: readonly Operation[] = [",
         *[f'  "{one}",' for one in operations],
         "];",
+        "",
+        "/** What each operation is, for a list a person reads (XC-277): whether it writes - from the",
+        " *  catalogue table's class column - and its parameters and answer fields by name, from the",
+        " *  schema. Behaviour is not here: what an operation does is the engine's to say. */",
+        "export interface OperationFacts {",
+        "  readonly writes: boolean;",
+        "  readonly required: readonly string[];",
+        "  readonly optional: readonly string[];",
+        "  readonly answers: readonly string[];",
+        "}",
+        "",
+        "export const OPERATION_FACTS: Readonly<Record<Operation, OperationFacts>> = {",
+        *[facts_line(one, parameters[one], results.get(one, {}), classes) for one in operations],
+        "};",
         "",
         "/** What each operation takes. From CT-003's $defs.operationParameters. */",
         "export interface Parameters {",
