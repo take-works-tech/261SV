@@ -238,6 +238,21 @@ describe("the prototype thread from the interface's side", () => {
     expect(await engineState.audit()).toEqual({ entries: [] });
   });
 
+  test("output: the demo workspace has no runs, and the answer is an empty list with the limit beside it (XC-141)", async () => {
+    const listing = await engineState.outputList();
+
+    expect(listing?.runs).toEqual([]);
+    expect(listing?.totalBytes).toBe(0);
+    expect(listing?.overLimit).toBe(false);
+    expect(listing?.suggestedRunIds).toEqual([]);
+    expect(listing?.limitBytes).toBeGreaterThan(0);
+
+    // A run that is not there is refused by name, and the refusal is where a person reads it.
+    expect(await engineState.outputPlan(["report-a/nope"])).toBeNull();
+    expect(snapshot().refusal).toContain("report-a/nope");
+    engineState.clearRefusal();
+  });
+
   test("export: a self-contained document with the picture, the unit and the maximum, of the size it says", async () => {
     const target = join(directory, "from-the-interface.html");
 

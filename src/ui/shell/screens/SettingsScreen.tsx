@@ -18,6 +18,7 @@ import { MissingDataStyle } from "../../shared/MissingDataStyle";
 import { ScopeConfirmation } from "../../shared/ScopeConfirmation";
 import { formatBytes, disabledBecause } from "../../logic/format";
 import { egressFacts } from "../../logic/egress";
+import { describePlan, describeTotal, runLines, type OutputListing, type OutputPlan } from "../../logic/output";
 import { submit } from "../../client/operations";
 import { session } from "../../state/session";
 import { engineState, useEngine } from "../../state/engine";
@@ -26,7 +27,7 @@ import { useEffect } from "react";
 import { NoticesPanel } from "./NoticesPanel";
 import "./settings.css";
 
-type Category = "単位" | "座標系" | "描画" | "アシスタント" | "ライブラリ" | "ショートカット" | "診断" | "ライセンス";
+type Category = "単位" | "座標系" | "描画" | "アシスタント" | "ライブラリ" | "ショートカット" | "診断" | "ライセンス" | "出力";
 
 const NAV_GROUPS: { scope: string; items: { id: Category; note: string }[] }[] = [
   {
@@ -45,6 +46,7 @@ const NAV_GROUPS: { scope: string; items: { id: Category; note: string }[] }[] =
       { id: "単位", note: "宣言単位と表示単位" },
       { id: "座標系", note: "成分座標系の宣言" },
       { id: "ライブラリ", note: "資産の保存先と解決" },
+      { id: "出力", note: "実行が残した成果物の容量と整理（XC-141）" },
     ],
   },
 ];
@@ -60,6 +62,7 @@ function initialCategory(variant: string): Category {
   if (variant === "shortcuts") return "ショートカット";
   if (variant === "support-bundle") return "診断";
   if (variant === "licences") return "ライセンス";
+  if (variant === "output") return "出力";
   return "単位"; // default と invalid は単位カテゴリから始まる
 }
 
@@ -108,6 +111,7 @@ export function SettingsScreen(props: { variant: string }) {
           {category === "ショートカット" ? <ShortcutsPanel /> : null}
           {category === "診断" ? <DiagnosticsPanel openBundle={variant === "support-bundle"} /> : null}
           {category === "ライセンス" ? <NoticesPanel /> : null}
+          {category === "出力" ? <OutputPanel /> : null}
         </div>
       </div>
     </div>
@@ -970,6 +974,170 @@ function DiagnosticsPanel({ openBundle }: { openBundle: boolean }) {
             </footer>
           </div>
         </div>
+      ) : null}
+    </>
+  );
+}
+
+/* ---- 出力: what the runs left behind, and pruning it by name (XC-141, AC-053, XC-268) ------------- */
+
+/** The design state's runs, labelled as design: what the page looks like with something to prune. */
+const DESIGN_LISTING: OutputListing = {
+  outputDirectory: "D:\\studies\\bracket\\output",
+  runs: [
+    { id: "全ケース書き出し/2026-08-29T10-31-00", started: { utc: "2026-08-29T01:31:00Z", offsetMinutes: 540 }, startedFrom: "record", artefactFiles: 40, artefactBytes: 1_384_120_320, hasRecord: true },
+    { id: "全ケース書き出し/2026-08-28T17-03-00", started: { utc: "2026-08-28T08:03:00Z", offsetMinutes: 540 }, startedFrom: "record", artefactFiles: 40, artefactBytes: 1_371_200_512, hasRecord: true },
+    { id: "全ケース書き出し/2026-08-27T09-12-00", started: { utc: "2026-08-27T00:12:00Z", offsetMinutes: 540 }, startedFrom: "folder", artefactFiles: 38, artefactBytes: 1_300_004_864, hasRecord: false },
+  ],
+  totalBytes: 4_055_325_696,
+  limitBytes: 21_474_836_480,
+  overLimit: false,
+  suggestedRunIds: [],
+};
+
+function OutputPanel() {
+  const e = useEngine();
+  const reachable = e.reachability.kind === "reachable";
+  const [listing, setListing] = useState<OutputListing | null>(null);
+  const [chosen, setChosen] = useState<readonly string[]>([]);
+  const [plan, setPlan] = useState<OutputPlan | null>(null);
+  const [done, setDone] = useState<{ files: number; bytes: number; records: number } | null>(null);
+  const refresh = () => {
+    void engineState.outputList().then((answer) => {
+      setListing(answer);
+      setChosen([]);
+      setPlan(null);
+    });
+  };
+  useEffect(() => {
+    if (reachable && e.workspaceId) refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- read once per workspace, and on request
+  }, [reachable, e.workspaceId]);
+
+  const live = reachable ? listing : DESIGN_LISTING;
+  const lines = live ? runLines(live) : [];
+  const toggle = (id: string) => {
+    setPlan(null);
+    setChosen((now) => (now.includes(id) ? now.filter((one) => one !== id) : [...now, id]));
+  };
+  const design = !reachable ? disabledBecause("設計状態：エンジン未接続のため、実行も削除もしません") : { disabled: false };
+
+  return (
+    <>
+      <p className="se-lead">
+        実行が書いた成果物は新しいフォルダに増え続け、上書きされません（XC-113）。ここでは実行ごとに容量を示し、
+        消すものを名指しで確認してから消します。実行の記録と入力データは消しません（XC-141）。
+      </p>
+
+      {reachable && !e.workspaceId ? (
+        <p className="prop-note">ワークスペースを開くと、その出力フォルダをここに表示します。</p>
+      ) : null}
+
+      {done !== null ? (
+        <p className="notice good">
+          <b>{done.files} ファイル、{formatBytes(done.bytes)} を消しました。</b>
+          <span className="why">実行の記録 {done.records} 件は残しています。この操作は取り消せません。消した成果物は記録から作り直します（XC-046）。</span>
+        </p>
+      ) : null}
+
+      {live ? (
+        <section className="se-section">
+          <h3>実行ごとの成果物{reachable ? "" : "（設計状態）"}</h3>
+          <p className="prop-note" title={live.outputDirectory}>
+            {describeTotal(live)}。場所：{live.outputDirectory}
+            {reachable ? "（エンジンの答え）" : "（設計状態の例）"}
+          </p>
+          {lines.length === 0 ? (
+            <p className="notice">
+              <b>出力フォルダに実行はありません。</b>
+              <span className="why">この版ではパイプラインを実行できないため、実行が残した成果物は普通ありません。あれば実行ごとにここへ並びます。</span>
+            </p>
+          ) : (
+            <div className="table-scroll">
+              <table className="value-table">
+                <thead>
+                  <tr>
+                    <th scope="col">消す</th>
+                    <th scope="col">実行</th>
+                    <th scope="col">開始</th>
+                    <th scope="col">成果物</th>
+                    <th scope="col">容量</th>
+                    <th scope="col">記録</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines.map((line) => (
+                    <tr key={line.id}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          aria-label={`${line.name} ${line.stamp} を消す対象にする`}
+                          checked={chosen.includes(line.id)}
+                          onChange={() => toggle(line.id)}
+                          {...design}
+                        />
+                      </td>
+                      <td>
+                        <b>{line.name}</b>
+                        <br />
+                        <small>{line.stamp}</small>
+                        {line.suggested ? <small> · 古い順の整理案に含まれます</small> : null}
+                      </td>
+                      <td title={line.startedNote}>
+                        {line.started}
+                        <br />
+                        <small>{line.startedNote}</small>
+                      </td>
+                      <td>{line.files} ファイル</td>
+                      <td>{line.size}</td>
+                      <td>{line.hasRecord ? "あり" : "なし"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className="se-inline" style={{ marginTop: 8 }}>
+            {live.suggestedRunIds.length > 0 ? (
+              <button className="btn ghost" onClick={() => { setPlan(null); setChosen([...live.suggestedRunIds]); }} {...design}>
+                古い順の整理案どおりに選ぶ（{live.suggestedRunIds.length} 実行）
+              </button>
+            ) : null}
+            <button
+              className="btn"
+              {...(chosen.length === 0 ? disabledBecause("消す実行を選んでください") : design)}
+              onClick={() => void engineState.outputPlan(chosen).then(setPlan)}
+              title="選んだ実行から消えるファイルを、消す前に一つ残らず示します（AC-053）"
+            >
+              消えるものを確認…
+            </button>
+            {reachable ? (
+              <button className="btn ghost" onClick={refresh} title="エンジンに出力フォルダを読み直させます">
+                更新
+              </button>
+            ) : null}
+          </div>
+        </section>
+      ) : (
+        <p className="prop-note">出力フォルダを読んでいます…</p>
+      )}
+
+      {plan !== null ? (
+        <ScopeConfirmation
+          operation="output.prune"
+          affected={[...describePlan(plan).files, describePlan(plan).kept, describePlan(plan).summary]}
+          onCancel={() => setPlan(null)}
+          onAccept={() => {
+            const expected = plan.files;
+            const runs = plan.runIds;
+            setPlan(null);
+            void engineState.outputPrune(runs, expected).then((answer) => {
+              if (!answer) return; // the refusal is on screen, in the engine's words (XC-001)
+              setDone({ files: answer.deletedFiles.length, bytes: answer.freedBytes, records: plan.keptRecords.length });
+              refresh();
+            });
+          }}
+        />
       ) : null}
     </>
   );
