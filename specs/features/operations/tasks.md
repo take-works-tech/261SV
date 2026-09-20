@@ -198,3 +198,13 @@ updated: 2026-09-20
   `OPERATION_FACTS` beside the types, from the schema and the catalogue table's class column;
   `src/ui/logic/commands.ts` groups and filters the rows; the shortcut section shows them under the
   design-state keymap, labelled as such with an engine. No operation has a key, and each row says so
+
+### TASK-030 - The command palette
+- satisfies: AC-030
+- depends_on: TASK-029
+- done_when: the top bar's palette lists every operation, runs one whose parameters the interface
+  holds through the store's own dispatch, refuses the rest with the reason, and shows the answer as
+  given
+- done: 2026-09-20 (XC-278). `src/ui/logic/palette.ts` decides what can run and with what;
+  `engineState.run` dispatches through the same `ask` as every screen, so a write enters the journal;
+  the refusal comes back as the outcome's reason. No key is bound

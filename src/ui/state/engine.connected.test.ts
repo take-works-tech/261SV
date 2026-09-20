@@ -20,6 +20,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { OPERATIONS, PROTOCOL_VERSION, type Connection } from "../client/engine";
 import { commandGroups } from "../logic/commands";
+import { paletteRows } from "../logic/palette";
 import { informationOf } from "../logic/information";
 import { absentParts, visibilityAfter } from "../logic/parts";
 import { moveBlock } from "../logic/report";
@@ -323,6 +324,29 @@ describe("the prototype thread from the interface's side", () => {
     expect(rows).toHaveLength(OPERATIONS.length);
     expect(rows.find((row) => row.operation === "dataset.load")).toMatchObject({ writes: true, parameters: "caseId、filePaths", status: "answers" });
     expect(rows.find((row) => row.operation === "graph.data")?.status).toBe("unimplemented");
+  });
+
+  test("palette: what this screen can run is what its context supplies, a run answers as the engine did, and a refusal comes back as a reason (XC-278)", async () => {
+    const s = snapshot();
+    const rows = paletteRows(s.operations, {
+      workspaceId: s.workspaceId, caseId: s.caseId, datasetId: s.datasetId, viewId: s.viewId, reportId: s.reportId, fieldName: s.fieldName,
+    }, "");
+    const runnable = rows.filter((row) => row.runnable).map((row) => row.operation);
+    expect(runnable).toEqual(expect.arrayContaining(["dataset.describe", "dataset.parts", "field.statistics", "view.get", "history.list", "system.capabilities"]));
+    expect(runnable).not.toContain("view.render");
+    expect(runnable).not.toContain("output.prune");
+    expect(rows.find((row) => row.operation === "view.render")?.because).toContain("width");
+    expect(rows.find((row) => row.operation === "output.prune")?.because).toContain("確認");
+    expect(rows.find((row) => row.operation === "graph.data")?.because).toContain("実装なし");
+
+    const described = await engineState.run("dataset.describe", { datasetId: s.datasetId });
+    expect(described.status).toBe("answered");
+    expect((described.result as { pointCount?: number }).pointCount).toBe(8);
+    const refused = await engineState.run("report.get", { reportId: "report:none" });
+    expect(refused.status).toBe("refused");
+    expect(refused.reason).toContain("report:none");
+    // The reason stayed with the palette: the window's own refusal is as it was.
+    expect(snapshot().refusal).toBeNull();
   });
 
   test("output: the demo workspace has no runs, and the answer is an empty list with the limit beside it (XC-141)", async () => {

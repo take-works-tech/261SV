@@ -10,6 +10,7 @@ import { session, useSession } from "../state/session";
 import { NotificationHistory, type Notice } from "../shared/NotificationHistory";
 import { ScriptView, type ScriptLine } from "../shared/ScriptView";
 import { EngineHistory } from "../shared/EngineHistory";
+import { CommandPalette } from "../shared/CommandPalette";
 
 type MenuItem = { label: string; key?: string; noKeyBecause?: string; disabled?: string };
 
@@ -71,6 +72,7 @@ export function Topbar() {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [showNotices, setShowNotices] = useState(false);
   const [showScript, setShowScript] = useState(false);
+  const [showPalette, setShowPalette] = useState(false);
   // The engine's record is read when the popover opens: it is the engine's, bounded there, and a
   // copy kept here would be a second history to keep in step (#315).
   useEffect(() => {
@@ -84,6 +86,7 @@ export function Topbar() {
         setOpenMenu(null);
         setShowNotices(false);
         setShowScript(false);
+        setShowPalette(false);
       }
     };
     window.addEventListener("mousedown", onDown);
@@ -184,6 +187,25 @@ export function Topbar() {
                     onCopy={(text) => void navigator.clipboard?.writeText(text)}
                   />
                 )}
+              </div>
+            </div>
+          ) : null}
+        </span>
+        <span style={{ position: "relative" }}>
+          <button
+            className="icon-button"
+            aria-pressed={showPalette}
+            aria-label="コマンド"
+            title="コマンド：契約の操作を検索して、この画面の文脈で実行する（XC-278）"
+            onClick={() => setShowPalette(!showPalette)}
+          >
+            ›_
+          </button>
+          {showPalette ? (
+            <div className="popover" style={{ right: 0, top: "calc(100% + 6px)", width: "min(460px, calc(100vw - 24px))" }}>
+              <header>コマンド</header>
+              <div className="body" style={{ maxHeight: 460 }}>
+                <CommandPalette />
               </div>
             </div>
           ) : null}

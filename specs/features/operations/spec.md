@@ -80,6 +80,10 @@ updated: 2026-09-20
     class, its parameters, the members of its answer and whether this build answers it - generated
     from the contract and read from the engine, never written by hand - and an operation with no
     keyboard route shall say so rather than show one (XC-277)
+  - AC-030: When a person runs an operation from the command palette, the interface shall dispatch it
+    through the command surface with parameters taken from what it holds, shall not run one whose
+    parameters it cannot supply, that this build does not answer, or that is destructive - naming
+    the reason - and shall show the engine's answer or refusal as given (XC-278)
 
 ### REQ-005 - The headless product authenticates before it acts
 - priority: MUST

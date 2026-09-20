@@ -18,7 +18,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { Engine, TransportFailure, reasonText } from "../client/engine";
 import type { Connection, Operation, Options, Parameters, Response, Results } from "../client/engine";
-import type { CameraDefinition, RecordedTime } from "../client/generated";
+import { OPERATION_FACTS, type CameraDefinition, type RecordedTime } from "../client/generated";
 import { recordNow } from "../client/time";
 
 /** Whether an engine is reachable, and what it said if it is not. */
@@ -88,6 +88,14 @@ export interface ReportDefinition {
   readonly blocks: readonly ReportBlock[];
   readonly locale?: string;
   readonly [member: string]: unknown;
+}
+
+/** What running one operation by name came to (XC-278): the engine's answer as given, or its
+ *  refusal as a reason. `applied` is a write the journal now holds; `answered` changed nothing. */
+export interface RunOutcome {
+  readonly status: "answered" | "applied" | "refused";
+  readonly result: unknown;
+  readonly reason: string | null;
 }
 
 /** The document's lock as `workspace.open` answered it (XC-241, XC-269). */
@@ -834,6 +842,19 @@ export const engineState = {
   /** What this build can do and where it keeps its log (system.capabilities). A read. */
   async capabilities(): Promise<Results["system.capabilities"] | null> {
     return ask("system.capabilities", {});
+  },
+
+  /** One operation by name, from the palette (XC-278), through the same `ask` every screen uses:
+   *  a write enters the journal and a warning is kept. The refusal comes back as the outcome's
+   *  reason rather than as this window's refusal - the palette shows it beside the command. */
+  async run(operation: Operation, parameters: Record<string, unknown>): Promise<RunOutcome> {
+    const before = state.refusal;
+    setState({ refusal: null });
+    const answer = await ask(operation, parameters as unknown as Parameters[Operation]);
+    const reason = answer === null ? state.refusal : null;
+    setState({ refusal: before });
+    if (answer === null) return { status: "refused", result: null, reason: reason ?? "答えがありませんでした" };
+    return { status: OPERATION_FACTS[operation].writes ? "applied" : "answered", result: answer, reason: null };
   },
 
   /** Which catalogue operations this build answers and which it does not (system.operations,
