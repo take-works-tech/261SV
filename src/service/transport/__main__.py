@@ -73,6 +73,9 @@ def main(argv: list[str] | None = None) -> int:
         print("stopping", flush=True)
     finally:
         listener.stop()
+        # The document's lock goes back with the process (XC-269); a crash never reaches here, and
+        # the next open finds the lock stale and says so (XC-241).
+        session.release_workspace()
         session.log.record(Level.INFO, "engine.stop", pid=os.getpid())
     return 0
 

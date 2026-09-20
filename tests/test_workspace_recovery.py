@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 from conftest import FIXED_INSTANT
+from domain_core.recorded_time import RecordedTime
 
 from service.workspace.journal import (
     APPLIED_SUFFIX,
@@ -27,9 +28,10 @@ from service.workspace.journal import (
     journal_for,
     read,
 )
-from service.workspace.lock import LockState, inspect, lock_for, release, take
+from service.workspace.lock import LockState, inspect, lock_for, release, take, take_over
 
 WHEN = FIXED_INSTANT
+TAKEN = RecordedTime(FIXED_INSTANT, 540)
 
 
 def a_workspace(tmp_path: Path) -> Path:
@@ -148,16 +150,16 @@ class TestJournalledWorkIsOfferedAndNotApplied:
 
 class TestASecondOpenIsReadOnlyAndSaysWhoHasIt:
     def test_taking_a_free_lock_permits_editing(self, tmp_path: Path) -> None:
-        status = take(a_workspace(tmp_path), process_id=os.getpid(), host="pc1", user="taro", at=WHEN)
+        status = take(a_workspace(tmp_path), process_id=os.getpid(), host="pc1", user="taro", at=TAKEN)
 
         assert status.may_edit
 
     def test_a_second_take_reports_the_holder_rather_than_refusing(self, tmp_path: Path) -> None:
         """AC-028. Refusing leaves a user who knows the other window is theirs with nothing to do."""
         workspace = a_workspace(tmp_path)
-        take(workspace, process_id=os.getpid(), host="pc1", user="taro", at=WHEN)
+        take(workspace, process_id=os.getpid(), host="pc1", user="taro", at=TAKEN)
 
-        second = take(workspace, process_id=os.getpid(), host="pc1", user="taro", at=WHEN)
+        second = take(workspace, process_id=os.getpid(), host="pc1", user="taro", at=TAKEN)
 
         assert second.state is LockState.HELD
         assert second.may_edit is False
@@ -166,7 +168,7 @@ class TestASecondOpenIsReadOnlyAndSaysWhoHasIt:
     def test_the_holder_is_named_well_enough_to_act_on(self, tmp_path: Path) -> None:
         """"In use by something" is not an answer anyone can act on."""
         workspace = a_workspace(tmp_path)
-        take(workspace, process_id=4321, host="pc9", user="hanako", at=WHEN)
+        take(workspace, process_id=4321, host="pc9", user="hanako", at=TAKEN)
 
         line = inspect(workspace, this_host="pc1").describe()
 
@@ -174,7 +176,7 @@ class TestASecondOpenIsReadOnlyAndSaysWhoHasIt:
 
     def test_releasing_our_own_lock_frees_it(self, tmp_path: Path) -> None:
         workspace = a_workspace(tmp_path)
-        take(workspace, process_id=os.getpid(), host="pc1", user="taro", at=WHEN)
+        take(workspace, process_id=os.getpid(), host="pc1", user="taro", at=TAKEN)
 
         assert release(workspace, process_id=os.getpid(), host="pc1") is True
         assert inspect(workspace, this_host="pc1").state is LockState.FREE
@@ -183,7 +185,7 @@ class TestASecondOpenIsReadOnlyAndSaysWhoHasIt:
         """A lock is broken by a person who knows what is going on, not by a process that would like
         the file."""
         workspace = a_workspace(tmp_path)
-        take(workspace, process_id=4321, host="pc9", user="hanako", at=WHEN)
+        take(workspace, process_id=4321, host="pc9", user="hanako", at=TAKEN)
 
         assert release(workspace, process_id=os.getpid(), host="pc1") is False
         assert lock_for(workspace).exists()
@@ -193,7 +195,7 @@ class TestAStaleOrUnreadableLock:
     def test_a_lock_from_a_dead_process_on_this_host_is_stale(self, tmp_path: Path) -> None:
         workspace = a_workspace(tmp_path)
         lock_for(workspace).write_text(
-            json.dumps({"processId": 999999, "host": "pc1", "user": "taro", "takenAt": WHEN}),
+            json.dumps({"processId": 999999, "host": "pc1", "user": "taro", "takenAt": TAKEN.as_stored()}),
             encoding="utf-8",
         )
 
@@ -207,7 +209,7 @@ class TestAStaleOrUnreadableLock:
         first machine simply went quiet."""
         workspace = a_workspace(tmp_path)
         lock_for(workspace).write_text(
-            json.dumps({"processId": 999999, "host": "pc1", "user": "taro", "takenAt": WHEN}),
+            json.dumps({"processId": 999999, "host": "pc1", "user": "taro", "takenAt": TAKEN.as_stored()}),
             encoding="utf-8",
         )
 
@@ -221,7 +223,7 @@ class TestAStaleOrUnreadableLock:
         exactly what opens a second editor on a share."""
         workspace = a_workspace(tmp_path)
         lock_for(workspace).write_text(
-            json.dumps({"processId": 999999, "host": "pc9", "user": "hanako", "takenAt": WHEN}),
+            json.dumps({"processId": 999999, "host": "pc9", "user": "hanako", "takenAt": TAKEN.as_stored()}),
             encoding="utf-8",
         )
 
@@ -235,3 +237,42 @@ class TestAStaleOrUnreadableLock:
 
         assert status.state is LockState.UNREADABLE
         assert "読み取り専用で開けます" in status.describe()
+
+class TestATakeOverIsAPersonsWord:
+    """XC-269: a stale or unreadable lock is replaced only when asked, and a live holder's never."""
+
+    def test_a_stale_lock_is_taken_over_when_asked(self, tmp_path: Path) -> None:
+        workspace = a_workspace(tmp_path)
+        lock_for(workspace).write_text(
+            json.dumps({"processId": 999999, "host": "pc1", "user": "taro", "takenAt": TAKEN.as_stored()}),
+            encoding="utf-8",
+        )
+
+        status = take_over(workspace, process_id=os.getpid(), host="pc1", user="jiro", at=TAKEN)
+
+        assert status.may_edit and status.holder is not None and status.holder.user == "jiro"
+        assert inspect(workspace, this_host="pc1").holder.process_id == os.getpid()
+
+    def test_an_unreadable_lock_is_taken_over_when_asked(self, tmp_path: Path) -> None:
+        workspace = a_workspace(tmp_path)
+        lock_for(workspace).write_text("not json at all", encoding="utf-8")
+
+        assert take_over(workspace, process_id=os.getpid(), host="pc1", user="jiro", at=TAKEN).may_edit
+
+    def test_a_live_holder_is_never_taken_over(self, tmp_path: Path) -> None:
+        """A pid on another host is never examined, so it counts as alive - and stays."""
+        workspace = a_workspace(tmp_path)
+        take(workspace, process_id=4321, host="pc9", user="hanako", at=TAKEN)
+
+        status = take_over(workspace, process_id=os.getpid(), host="pc1", user="jiro", at=TAKEN)
+
+        assert status.state is LockState.HELD and status.holder is not None and status.holder.user == "hanako"
+
+    def test_the_lock_records_when_it_was_taken_as_the_pair(self, tmp_path: Path) -> None:
+        workspace = a_workspace(tmp_path)
+        take(workspace, process_id=os.getpid(), host="pc1", user="taro", at=TAKEN)
+
+        stored = json.loads(lock_for(workspace).read_text(encoding="utf-8"))
+
+        assert stored["takenAt"] == {"utc": FIXED_INSTANT, "offsetMinutes": 540}
+        assert "2026-08-24 21:00（UTC+09:00）" in inspect(workspace, this_host="pc9").describe()

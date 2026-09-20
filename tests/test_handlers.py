@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -1331,3 +1332,96 @@ class TestOutputIsListedPlannedAndPrunedByName:
         guarded = surface.submit(Command("output.plan", {"workspaceId": "ws:1", "runsToRemove": [self.OLD]}))
         assert guarded.status is Status.REFUSED
         assert "入力" in (guarded.reason or "") and "table.csv" in (guarded.reason or "")
+
+class TestASecondOpenIsReadOnlyThroughTheAPI:
+    """XC-241 through the API (#262, XC-269): the open takes the lock; held by somebody else, the
+    document opens read-only and says who; the window works in memory; saving and pruning are refused;
+    a stale lock is taken over only on the caller's word, and a live holder's never."""
+
+    def held_elsewhere(self, path: Path) -> None:
+        # Another host is never examined for liveness, so this lock counts as held whatever the pid.
+        (path.parent / (path.name + ".lock")).write_text(json.dumps({
+            "processId": 4321, "host": "pc9", "user": "hanako",
+            "takenAt": {"utc": "2026-09-18T00:00:00Z", "offsetMinutes": 540},
+        }), encoding="utf-8")
+
+    def test_opening_takes_the_lock_and_says_so(self, tmp_path: Path) -> None:
+        surface, session, path = opened(tmp_path)
+
+        assert (path.parent / "beam.svw.lock").exists()
+        assert session.read_only is False and session.lock is not None and session.lock.holder is not None
+        assert session.lock.holder.process_id == os.getpid()
+        result = surface.submit(Command("workspace.open", {"path": str(path)}))
+        assert result.status is Status.APPLIED, result.reason
+        assert result.value["readOnly"] is False and result.value["lock"]["state"] == "free"
+        assert result.value["lock"]["holder"]["processId"] == os.getpid()
+        assert result.value["lock"]["lockFile"].endswith("beam.svw.lock")
+
+    def test_held_by_somebody_else_it_opens_read_only_and_names_the_holder(self, tmp_path: Path) -> None:
+        surface, session = a_surface()
+        path = a_workspace(tmp_path)
+        self.held_elsewhere(path)
+
+        result = surface.submit(Command("workspace.open", {"path": str(path)}))
+
+        assert result.status is Status.APPLIED, result.reason
+        assert result.value["readOnly"] is True and result.value["lock"]["state"] == "held"
+        assert result.value["lock"]["holder"]["user"] == "hanako"
+        assert any("読み取り専用" in one and "hanako" in one for one in result.warnings)
+        # The window works in memory: a view is created, because the failure is the second save.
+        created = surface.submit(Command("view.create", {"workspaceId": "ws:1", "definition": {"name": "応力"}}))
+        assert created.status is Status.APPLIED, created.reason
+        # Writing the document back is what is refused, and it names the holder.
+        saved = surface.submit(Command("workspace.save", {"workspaceId": "ws:1"}))
+        assert saved.status is Status.REFUSED and "hanako" in (saved.reason or "") and "読み取り専用" in (saved.reason or "")
+        pruned = surface.submit(Command(
+            "output.prune", {"workspaceId": "ws:1", "runsToRemove": ["x/y"]}, allowed=frozenset({Permission.DESTRUCTIVE}),
+        ))
+        assert pruned.status is Status.REFUSED and "読み取り専用" in (pruned.reason or "")
+        # The other window's lock is exactly where it was.
+        assert json.loads((path.parent / "beam.svw.lock").read_text(encoding="utf-8"))["user"] == "hanako"
+
+    def test_a_stale_lock_is_reported_and_taken_over_only_on_the_callers_word(self, tmp_path: Path) -> None:
+        surface, session = a_surface()
+        path = a_workspace(tmp_path)
+        (path.parent / "beam.svw.lock").write_text(json.dumps({
+            "processId": 999999, "host": session.host, "user": "taro",
+            "takenAt": {"utc": "2026-09-18T00:00:00Z", "offsetMinutes": 540},
+        }), encoding="utf-8")
+
+        stale = surface.submit(Command("workspace.open", {"path": str(path)}))
+        assert stale.status is Status.APPLIED, stale.reason
+        assert stale.value["readOnly"] is True and stale.value["lock"]["state"] == "stale"
+        assert any("自動では解除しません" in one for one in stale.warnings)
+        assert surface.submit(Command("workspace.save", {"workspaceId": "ws:1"})).status is Status.REFUSED
+
+        taken = surface.submit(Command("workspace.open", {"path": str(path), "takeOverStaleLock": True}))
+
+        assert taken.status is Status.APPLIED, taken.reason
+        assert taken.value["readOnly"] is False and taken.value["lock"]["holder"]["processId"] == os.getpid()
+        assert surface.submit(Command("workspace.save", {"workspaceId": "ws:1"})).status is Status.APPLIED
+
+    def test_a_live_holder_is_never_taken_over_whatever_the_caller_says(self, tmp_path: Path) -> None:
+        surface, _ = a_surface()
+        path = a_workspace(tmp_path)
+        self.held_elsewhere(path)
+
+        result = surface.submit(Command("workspace.open", {"path": str(path), "takeOverStaleLock": True}))
+
+        assert result.status is Status.APPLIED, result.reason
+        assert result.value["readOnly"] is True and result.value["lock"]["holder"]["user"] == "hanako"
+        assert any("引き継ぎませんでした" in one for one in result.warnings)
+
+    def test_opening_another_document_releases_the_first_and_stopping_releases_the_last(self, tmp_path: Path) -> None:
+        surface, session, first = opened(tmp_path)
+        second = tmp_path / "other.svw"
+        second.write_text(first.read_text(encoding="utf-8").replace("ws:1", "ws:2"), encoding="utf-8")
+
+        result = surface.submit(Command("workspace.open", {"path": str(second)}))
+
+        assert result.status is Status.APPLIED, result.reason
+        assert not (tmp_path / "beam.svw.lock").exists(), "the first document's lock went with it"
+        assert (tmp_path / "other.svw.lock").exists()
+        session.release_workspace()
+        assert not (tmp_path / "other.svw.lock").exists()
+        assert session.lock is None

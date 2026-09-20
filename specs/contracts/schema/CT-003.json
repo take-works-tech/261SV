@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -230,6 +230,10 @@
             "path": {
               "type": "string",
               "description": "開くワークスペースファイルのパス"
+            },
+            "takeOverStaleLock": {
+              "type": "boolean",
+              "description": "持ち主のプロセスが見つからない（stale）か読めないロックを、この人の言葉で引き継ぐ。生きている持ち主のロックは決して壊さない（XC-241、XC-269）"
             }
           }
         },
@@ -1651,7 +1655,9 @@
           "required": [
             "formatVersion",
             "unresolvedCases",
-            "workspaceId"
+            "workspaceId",
+            "readOnly",
+            "lock"
           ],
           "properties": {
             "workspaceId": {
@@ -1742,6 +1748,65 @@
                       }
                     }
                   }
+                }
+              }
+            },
+            "readOnly": {
+              "type": "boolean",
+              "description": "true なら文書は書き戻せない：他がロックを持っている。窓はメモリ上で動き、保存は持ち主を名指しして拒まれる（XC-241）"
+            },
+            "lock": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "state",
+                "lockFile"
+              ],
+              "description": "文書のロックについて見つかったこと（XC-269）",
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "free",
+                    "held",
+                    "stale",
+                    "unreadable"
+                  ],
+                  "description": "free ならこのセッションが持っている"
+                },
+                "lockFile": {
+                  "type": "string",
+                  "description": "ロックファイルの場所。人が壊すと決めたとき、どのファイルかが分かるように"
+                },
+                "holder": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "processId",
+                    "host",
+                    "user",
+                    "takenAt"
+                  ],
+                  "description": "誰が持っているか。free ならこのセッション自身",
+                  "properties": {
+                    "processId": {
+                      "type": "integer"
+                    },
+                    "host": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "type": "string"
+                    },
+                    "takenAt": {
+                      "$ref": "CT-001.json#/$defs/recordedTime",
+                      "description": "取った時刻"
+                    }
+                  }
+                },
+                "detail": {
+                  "type": "string",
+                  "description": "unreadable のとき、何が読めなかったか"
                 }
               }
             }

@@ -10,7 +10,12 @@ updated: 2026-09-20
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 3.2.0
+- version: 3.3.0
+- correction: 2026-09-20, version 3.2.0 to 3.3.0. `workspace.open` answers `readOnly` and `lock` -
+  what was found, who holds it and where the lock file is - and takes `takeOverStaleLock` for a
+  person who has read that a lock is stale or unreadable and says to take it over. Until this
+  change nothing took the lock at all: the mechanism and its tests had existed since 2026-08-24
+  and every open was an editor (#262, XC-269). Additive
 - correction: 2026-09-20, version 3.1.0 to 3.2.0. `output.list` and `output.plan` are added and
   `output.prune` gains `expectedFiles`. The prune had been in the contract since 2.x with nothing
   answering it and nothing to show a person what it would take: the list says what is there,
@@ -116,7 +121,7 @@ no identifier to report.
 
 | Operation | Reads or writes | Parameters | Result |
 |---|---|---|---|
-| `workspace.open` | write | path | workspace id, unresolved cases, format version, and the items the document holds (views, graphs, reports: id, name, dataset) |
+| `workspace.open` | write | path, take over stale lock? | workspace id, unresolved cases, format version, the items the document holds (views, graphs, reports: id, name, dataset), whether it opened read-only, and what the lock said - state, holder, file (XC-241, XC-269) |
 | `workspace.save` | write | workspace id, path? | path written, previous version kept |
 | `workspace.close` | write | workspace id | - |
 | `case.create` | write | workspace id, parent case id?, name | case id |

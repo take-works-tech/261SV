@@ -11,7 +11,13 @@ AC-029 covers the case that actually happens: the lock cannot be read, or names 
 A stale lock is **reported and read-only is offered**, never broken automatically. Breaking it silently
 is how two editors end up open on a network share where the first machine simply went quiet.
 
-Specification: workspace/AC-028, AC-029.
+**The product takes the lock at `workspace.open` and holds it for the session** (XC-269). Until
+2026-09-20 nothing did: the mechanism and its tests existed, and every open was an editor. Read-only
+means the document is not written back - saving is refused and names the holder - while the window
+works in memory, because the failure XC-241 guards against is the second save, not the second look. A
+stale or unreadable lock is taken over only on a person's word (`take_over`), and a live holder's never.
+
+Specification: workspace/AC-028, AC-029, XC-241, XC-269.
 """
 
 from __future__ import annotations
@@ -21,6 +27,9 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
+from typing import Any
+
+from domain_core.recorded_time import RecordedTime, from_stored
 
 LOCK_SUFFIX = ".lock"
 
@@ -41,10 +50,19 @@ class LockHolder:
     process_id: int
     host: str
     user: str
-    taken_at: str
+    #: When it was taken: UTC with the offset beside it, like every time this product records (XC-266).
+    taken_at: RecordedTime
 
     def describe(self) -> str:
-        return f"{self.host} の {self.user}（プロセス {self.process_id}、{self.taken_at} 取得）"
+        return f"{self.host} の {self.user}（プロセス {self.process_id}、{self.taken_at.describe_where_recorded()} 取得）"
+
+    def as_stored(self) -> dict[str, Any]:
+        return {
+            "processId": self.process_id,
+            "host": self.host,
+            "user": self.user,
+            "takenAt": self.taken_at.as_stored(),
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +95,16 @@ class LockStatus:
                 "応答しなくなっただけのプロセスと、終了したプロセスは違います。読み取り専用で開けます"
             )
         return f"ロックファイルを読めません（{self.detail}）。読み取り専用で開けます"
+
+    def as_stored(self, lock_file: Path) -> dict[str, Any]:
+        """The wire form (CT-003 `workspace.open`): what was found, who, and where the file is - so a
+        person who decides to break it knows which file that is."""
+        stored: dict[str, Any] = {"state": self.state.value, "lockFile": str(lock_file)}
+        if self.holder:
+            stored["holder"] = self.holder.as_stored()
+        if self.detail:
+            stored["detail"] = self.detail
+        return stored
 
 
 def lock_for(workspace: str | Path) -> Path:
@@ -124,7 +152,7 @@ def inspect(workspace: str | Path, *, this_host: str | None = None) -> LockStatu
             process_id=int(parsed["processId"]),
             host=str(parsed["host"]),
             user=str(parsed["user"]),
-            taken_at=str(parsed["takenAt"]),
+            taken_at=from_stored(parsed["takenAt"]),
         )
     except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
         return LockStatus(LockState.UNREADABLE, detail=str(error)[:120])
@@ -136,7 +164,7 @@ def inspect(workspace: str | Path, *, this_host: str | None = None) -> LockStatu
 
 
 def take(
-    workspace: str | Path, *, process_id: int, host: str, user: str, at: str
+    workspace: str | Path, *, process_id: int, host: str, user: str, at: RecordedTime
 ) -> LockStatus:
     """Take the lock, or report what is holding it. Never breaks an existing one."""
     found = inspect(workspace, this_host=host)
@@ -144,10 +172,8 @@ def take(
         return found
 
     path = lock_for(workspace)
-    body = json.dumps(
-        {"processId": process_id, "host": host, "user": user, "takenAt": at},
-        ensure_ascii=False, sort_keys=True,
-    )
+    holder = LockHolder(process_id, host, user, at)
+    body = json.dumps(holder.as_stored(), ensure_ascii=False, sort_keys=True)
     try:
         # Exclusive creation: two processes racing here, one loses and reads the other's lock rather
         # than both believing they took it.
@@ -159,7 +185,25 @@ def take(
         return inspect(workspace, this_host=host)
     except OSError as error:
         return LockStatus(LockState.UNREADABLE, detail=str(error)[:120])
-    return LockStatus(LockState.FREE, holder=LockHolder(process_id, host, user, at))
+    return LockStatus(LockState.FREE, holder=holder)
+
+
+def take_over(
+    workspace: str | Path, *, process_id: int, host: str, user: str, at: RecordedTime
+) -> LockStatus:
+    """Replace a stale or unreadable lock with ours, on a person's word - never a live holder's.
+
+    The product does not break a lock on its own (XC-241); a person who has read what was found and
+    says "take it over" is the one who knows what is going on. A lock whose holder may be alive is
+    left exactly where it was, and what was found is returned so the refusal can say why.
+    """
+    found = inspect(workspace, this_host=host)
+    if found.state in (LockState.STALE, LockState.UNREADABLE):
+        lock_for(workspace).unlink(missing_ok=True)
+        return take(workspace, process_id=process_id, host=host, user=user, at=at)
+    if found.state is LockState.FREE:
+        return take(workspace, process_id=process_id, host=host, user=user, at=at)
+    return found
 
 
 def release(workspace: str | Path, *, process_id: int, host: str) -> bool:

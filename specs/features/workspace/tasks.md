@@ -697,3 +697,15 @@ updated: 2026-09-20
   the oldest-first suggestion, shows every file that would go and what stays before the
   confirmation, and sends the destructive say-so on the envelope with the files it saw; without an
   engine it is a design state and says so
+
+### TASK-071 - The product takes the lock
+- satisfies: AC-028
+- depends_on: TASK-027, TASK-028
+- done_when: `workspace.open` takes the lock for the session, opens read-only when somebody else holds
+  it and says who, releases it when another document is opened and when the engine stops, and takes
+  over a stale one only on the caller's word
+- done: 2026-09-20 (XC-269). Until this change nothing called the lock module: every open was an
+  editor. Read-only is drawn at the save - the window works in memory, `workspace.save` and
+  `output.prune` are refused naming the holder - and `takeOverStaleLock` is the person's word for a
+  stale or unreadable lock, never a live one. The interface's part, showing the state and offering
+  the take-over, is the next change

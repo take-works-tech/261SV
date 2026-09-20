@@ -5723,3 +5723,37 @@ model or the prompt, never in a description that quietly went stale.
 - affects: CT-002, CT-003, MOD-011, MOD-012
 - decidedness: Fixed
 - reversal_trigger: none foreseen
+
+### XC-269 - The product takes the workspace lock at open, and read-only means the document is not written back
+- decided: 2026-09-20
+- status: active
+- decision: `workspace.open` takes the document's lock for the session and `workspace.open` of another
+  document, or the engine stopping, gives it back; a lock this process already holds is its own. Where
+  somebody else holds it - live, or a process that cannot be found, or a file that cannot be read - the
+  document opens **read-only**, the answer says so and names what was found, and the window works in
+  memory: colouring, probing, reading, exporting a report to a path of the person's choosing all
+  proceed. What read-only refuses is writing the document back (`workspace.save`) and deleting
+  under its folder (`output.prune`), each naming the holder and the lock file. A stale or unreadable
+  lock is taken over only when the open says `takeOverStaleLock` - a person who has read what was
+  found - and a live holder's lock is never taken over, whatever the caller says
+- decided_by: engineering judgement, from what XC-241 decided and what nothing had implemented
+- rationale: XC-241 was decided on 2026-08-24 with a measurement behind its liveness rule, the module
+  and its tests were written the same day, and on 2026-09-20 nothing in the product called them
+  (#262): every open was an editor and two windows on one document lost whichever save came second,
+  silently - the exact case the decision names. **Read-only is drawn at the save, not at the look**,
+  because the failure the lock exists to prevent is the second save; a read-only window that could
+  not colour a field would be the refusal XC-241 rejects, dressed as an opening. **A crash leaves the
+  lock**, so the next open of the same document finds it stale and says so rather than editing over
+  whatever the other window may still hold - and a person who knows the other window is gone says
+  `takeOverStaleLock`, which is the "broken by a person who knows what is going on" of XC-241 as an
+  operation. A restart after a crash therefore opens read-only until that word is given; the
+  interface's part of this - showing the state and offering the take-over - follows
+- alternatives: **refusing every write in memory when read-only** - a window that cannot show
+  anything new, which is the refusal XC-241 rejects. **Taking over a stale lock automatically after a
+  crash** - the product breaking a lock, which XC-241 forbids, and a share where the first machine
+  went quiet is indistinguishable from a crash. **An exclusive file handle held open** - XC-241's own
+  reversal trigger, and not what this build has
+- basis: E-139 (T1)
+- affects: CT-003, MOD-007, MOD-012
+- decidedness: Fixed
+- reversal_trigger: as XC-241's
