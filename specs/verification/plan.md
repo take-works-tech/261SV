@@ -68,6 +68,7 @@ we thought of**, which is why the manual rows exist rather than being quietly dr
 | ingest/AC-032 | integration | tests/test_reader.py::test_support_level_is_reported_per_format | one file of each support level | fixtures, origins recorded | exact | the level shown matches the declared table in XC-049 |
 | ingest/AC-033 | integration | tests/test_reader.py::test_partitioned_reader_declares_its_gap | an OpenFOAM case | public tutorial case, origin recorded | exact | the named gaps match that reader's documented limits |
 | ingest/AC-034 | integration (planned) | - | a CGNS file carrying DimensionalUnits | authored with the CGNS tools | exact | the unit stays undeclared, and the file's own unit is not shown as if read |
+| ingest/AC-045 | unit plus integration | src/ui/logic/information.test.ts and src/ui/state/engine.connected.test.ts against a real engine | the store after a load, hand-built and from a real engine | generated in the test | exact | the view holds the engine's counts, bounds, parts, fields and axis; nothing from a fixture; the not-answered list names the reader version, cell types, checksum, frame and import time |
 
 workspace/AC-016 is manual because "a reasonable proposal" is a judgement, not a threshold. Recording that
 honestly is better than an automated check that passes while the proposal is useless.

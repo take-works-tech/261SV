@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { PROTOCOL_VERSION, type Connection } from "../client/engine";
+import { informationOf } from "../logic/information";
 import { engineState, FRAME, snapshot } from "./engine";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
@@ -125,6 +126,24 @@ describe("the prototype thread from the interface's side", () => {
       [0, 0, 0],
       [1, 1, 1],
     ]);
+  });
+
+  test("information: what the file holds is on the screen from the engine's answers, and what the contract does not carry is named (XC-273)", async () => {
+    const s = snapshot();
+    expect(s.described?.pointCount).toBe(8);
+    expect(s.described?.cellCount).toBe(1);
+    expect(s.parts?.map((one) => one.type)).toEqual(["part"]);
+
+    const view = informationOf(s);
+
+    expect(view?.file.name).toBe("cube.vtu");
+    expect(view?.file.supportLabel).toBe("検証済み");
+    expect(view?.structure?.points).toBe(8);
+    expect(view?.structure?.bounds?.map((one) => one.axis)).toEqual(["X", "Y", "Z"]);
+    expect(view?.fields.map((one) => one.name)).toEqual(["temperature"]);
+    expect(view?.fields[0]?.unit).toBeNull();
+    expect(view?.axis?.kind).toBe("none");
+    expect(view?.notAnswered.length).toBeGreaterThan(0);
   });
 
   test("colour: a frame arrives, and the legend's numbers are the file's own at float32 digits", async () => {

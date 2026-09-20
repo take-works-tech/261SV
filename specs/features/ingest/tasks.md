@@ -413,3 +413,12 @@ is either missing a requirement or is not work this specification asked for.
 - done: 2026-09-20 (XC-272, E-210). Found while giving #301 a real fixture: the CGNS reader returns a
   zone it cannot read as 4 points and 0 cells with an error on its own log, and the case counted it
   present. `tests/demo_case.py` writes the same file for the interface's thread
+
+### TASK-034 - The information area reads the engine
+- satisfies: AC-045
+- depends_on: TASK-026
+- done_when: with an engine connected the area shows the loaded dataset from `dataset.load`,
+  `dataset.describe` and `dataset.parts`, and names what the contract does not carry
+- done: 2026-09-20 (XC-273). `src/ui/logic/information.ts` turns the store's answers into the area's
+  facts; the screen and its rail render them, and without an engine stay the design states. The
+  §4 row of 16_application_model now claims the screen, and the §14 gap row is gone

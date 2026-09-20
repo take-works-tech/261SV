@@ -101,6 +101,10 @@ updated: 2026-09-20
     than a generic warning
   - AC-034: If a @Field carried unit information in the file that the reader did not read, then the
     system shall still treat the unit as undeclared rather than implying one
+  - AC-045: After a @Dataset is loaded, the interface shall show what the file holds from the engine's
+    answers - the format's support level and the reader's gaps, the counts and bounds, the parts
+    present and absent, the fields with association and declared unit, the result axis - and shall
+    name what the contract does not carry rather than showing a value for it (XC-273)
 
 ### REQ-016 - Identifiers and measured values are first-class inputs
 - priority: MUST
