@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "3.8.0",
+  "version": "3.9.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -985,6 +985,14 @@
             "frameId": {
               "type": "string",
               "description": "報告するフレーム の識別子（CT-001）"
+            },
+            "component": {
+              "type": "string",
+              "description": "quantity が component のとき、成分名（ベクトルは X, Y, Z、対称テンソルは XX, YY, ZZ, XY, YZ, XZ）（E-073）"
+            },
+            "asTensor": {
+              "type": "boolean",
+              "description": "三成分の場を二次元対称テンソル XX, YY, XY として読む。省略時はベクトル"
             }
           }
         },
@@ -1966,6 +1974,11 @@
                       "null"
                     ],
                     "description": "ファイルは単位を運ばない。宣言されるまで null（XC-003）"
+                  },
+                  "components": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "各項目の成分数。1 がスカラー、3 がベクトル、6 が対称テンソル（E-073）。1 でない場は導出量を作ってから着色・統計する（XC-282）"
                   }
                 }
               },
@@ -3419,9 +3432,11 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
+            "association",
             "conventions",
             "fieldName",
-            "formula"
+            "formula",
+            "unit"
           ],
           "properties": {
             "fieldName": {
@@ -3442,6 +3457,30 @@
             "frameId": {
               "type": "string",
               "description": "報告したフレーム（INV-021）"
+            },
+            "fieldNames": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "できた導出量の全部。主値は三つ。fieldName はその最初"
+            },
+            "association": {
+              "type": "string",
+              "enum": [
+                "point",
+                "cell",
+                "integrationPoint",
+                "field"
+              ],
+              "description": "元の場と同じ関連（INV-003）"
+            },
+            "unit": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "元の場の宣言単位をそのまま継ぐ。未宣言なら null（XC-003）"
             }
           }
         },

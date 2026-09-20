@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "3.8.0";
+export const PROTOCOL_VERSION = "3.9.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -209,7 +209,7 @@ export const OPERATION_FACTS: Readonly<Record<Operation, OperationFacts>> = {
   "history.list": { writes: false, required: ["workspaceId"], optional: [], answers: ["entries", "undoLimit", "undoDropped", "historyLimit", "omitted"] },
   "dataset.probe": { writes: false, required: ["datasetId", "fieldName", "pointM", "resultPosition"], optional: [], answers: ["value", "association"] },
   "dataset.parts": { writes: false, required: ["datasetId"], optional: [], answers: ["parts"] },
-  "field.derive": { writes: false, required: ["datasetId", "fieldName", "quantity"], optional: ["frameId"], answers: ["fieldName", "formula", "conventions", "frameId"] },
+  "field.derive": { writes: false, required: ["datasetId", "fieldName", "quantity"], optional: ["frameId", "component", "asTensor"], answers: ["fieldName", "formula", "conventions", "frameId", "fieldNames", "association", "unit"] },
   "field.setDisplayUnit": { writes: true, required: ["quantity", "unitSymbol", "workspaceId"], optional: [], answers: [] },
   "frame.declare": { writes: true, required: ["axis", "kind", "name", "origin", "workspaceId"], optional: [], answers: ["id"] },
   "measurement.import": { writes: true, required: ["caseId", "source", "values"], optional: [], answers: ["importedIds", "undeclared"] },
@@ -406,6 +406,8 @@ export interface Parameters {
     fieldName: string;
     quantity: string;
     frameId?: string;
+    component?: string;
+    asTensor?: boolean;
   };
   "field.setDisplayUnit": {
     workspaceId: string;
@@ -589,6 +591,7 @@ export interface Results {
       name: string;
       association: "point" | "cell" | "integrationPoint" | "field";
       unit?: string | null;
+      components?: number;
     })[];
     supportLevel: "verified" | "offered";
     gaps: readonly (string)[];
@@ -857,6 +860,9 @@ export interface Results {
     formula: string;
     conventions: readonly (string)[];
     frameId?: string;
+    fieldNames?: readonly (string)[];
+    association: "point" | "cell" | "integrationPoint" | "field";
+    unit: string | null;
   };
   "field.setDisplayUnit": Record<string, unknown>;
   "frame.declare": {

@@ -38,7 +38,8 @@ export function EngineField() {
           {e.fields.map((one) => (
             <option key={one.name} value={one.name}>
               {one.name}（{one.association === "point" ? "節点" : one.association === "cell" ? "要素" : one.association}・
-              {one.unit ?? UNDECLARED}）
+              {one.unit ?? UNDECLARED}
+              {(one.components ?? 1) > 1 ? `・${one.components} 成分` : e.derived[one.name] ? "・導出" : ""}）
             </option>
           ))}
         </select>
@@ -59,6 +60,53 @@ export function EngineField() {
           ))}
         </select>
       </div>
+
+      {chosen && (chosen.components ?? 1) > 1 ? (
+        /* A vector or a tensor is never one number: no colour, no statistics, no probe. The catalogue's
+         * derived quantities are what make one of it, each carrying its formula (XC-282, INV-020). */
+        <div className="notice" role="status">
+          <b>「{chosen.name}」は {chosen.components} 成分の場です</b>
+          <span className="why">一つの数ではないので、着色・統計・プローブはしません。導出量を作ると、その場で着色・統計できます（15_derived_quantities）。</span>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+            {(chosen.components === 3
+              ? [
+                  { quantity: "magnitude", label: "大きさ" },
+                  { quantity: "component", component: "X", label: "成分 X" },
+                  { quantity: "component", component: "Y", label: "成分 Y" },
+                  { quantity: "component", component: "Z", label: "成分 Z" },
+                ]
+              : chosen.components === 6
+                ? [
+                    { quantity: "vonMises", label: "ミーゼス" },
+                    { quantity: "principal", label: "主値 σ1・σ2・σ3" },
+                    { quantity: "maximumShear", label: "最大せん断" },
+                    { quantity: "trace", label: "トレース" },
+                    ...["XX", "YY", "ZZ", "XY", "YZ", "XZ"].map((component) => ({ quantity: "component", component, label: `成分 ${component}` })),
+                  ]
+                : []
+            ).map((one) => (
+              <button
+                key={`${one.quantity}:${one.component ?? ""}`}
+                type="button"
+                className="btn"
+                disabled={e.busy}
+                onClick={() => void engineState.derive(chosen.name, one.quantity, one.component)}
+              >
+                {one.label}
+              </button>
+            ))}
+          </div>
+          {chosen.components !== 3 && chosen.components !== 6 ? (
+            <span className="why">{chosen.components} 成分の並びの意味をこの製品は知りません（ベクトルは 3、対称テンソルは 6・E-073）。</span>
+          ) : null}
+        </div>
+      ) : null}
+      {chosen && e.derived[chosen.name] ? (
+        <p className="prop-note">
+          導出量：「{e.derived[chosen.name]?.source}」の {e.derived[chosen.name]?.quantity}。式：{e.derived[chosen.name]?.formula}。
+          規約：{e.derived[chosen.name]?.conventions.join("／")}。エンジンが正準データから計算し、元の場の精度で持ちます（INV-020）。
+        </p>
+      ) : null}
 
       <div className="prop-row">
         <label htmlFor="engine-unit">単位を宣言</label>

@@ -118,6 +118,12 @@ class Field:
         """Digits this field may be displayed to, from the type it was stored as (INV-014)."""
         return significant_digits(self.values.dtype)
 
+    @property
+    def components(self) -> int:
+        """How many components each entry has: one for a scalar, three for a vector, six for a
+        symmetric tensor (E-073). A field of several is never one number (XC-282)."""
+        return 1 if self.values.ndim == 1 else int(self.values.shape[1])
+
     def formatted(self, index: int, *, missing: str = "-") -> str:
         """One entry, written to the precision the storage supports and no further."""
         return format_value(float(self.values[index]), self.significant_digits, missing=missing)
@@ -210,6 +216,12 @@ class Dataset:
     def value(self, name: str, index: int) -> ReportedValue:
         """One value of one field, carrying this dataset's caveats and the field's declared unit."""
         field = self.fields[name]
+        if field.components != 1:
+            return ReportedValue.unavailable(
+                f"'{name}' は {field.components} 成分の場です。一つの値としては読めません — 導出量を作ってから読んでください（XC-282）",
+                unit=field.unit, digits=field.significant_digits, provenance=Provenance.DATASET,
+                caveats=self.caveats() | (frozenset({Caveat.UNDECLARED_UNIT}) if field.unit is None else frozenset()),
+            )
         raw = field.values[index]
         missing = bool(np.isnan(raw)) if np.issubdtype(field.values.dtype, np.floating) else False
         caveats = self.caveats()
@@ -278,6 +290,17 @@ class Dataset:
     def _aggregate(self, name: str, aggregate: Aggregate) -> ReportedValue:
         """One number over a field, over the entries that count, or a refusal saying why not."""
         field = self.field(name)
+        if field.components != 1:
+            # The largest component of a vector is not the vector's maximum, and a maximum over the
+            # flattened components is a plausible number with no meaning - measured here on
+            # 2026-09-20, where a three-component displacement reported 4.0 (XC-001, XC-282).
+            return ReportedValue.unavailable(
+                f"'{name}' は {field.components} 成分の場です。成分をならした一つの数は量ではありません — "
+                "大きさや成分などの導出量を作ってから求めてください（15_derived_quantities, XC-282）",
+                unit=field.unit, digits=field.significant_digits, provenance=Provenance.COMPUTED,
+                caveats=self.caveats() | (frozenset({Caveat.UNDECLARED_UNIT}) if field.unit is None else frozenset()),
+                formula=f"{aggregate.value}({name})",
+            )
         # A count is dimensionless whatever the field is in; every other aggregate here is in the
         # field's own unit, so it inherits the field's undeclared-unit caveat.
         unit = DIMENSIONLESS if aggregate is Aggregate.COUNT else field.unit

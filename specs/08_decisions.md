@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-20
+updated: 2026-09-21
 ---
 
 # Decisions and open questions
@@ -6124,3 +6124,40 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: none foreseen; a material field inside a part would let the averaging stop at
   material boundaries too (INV-022), which is a refinement of where it stops, not of whether both
   numbers travel
+
+### XC-282 - The catalogue's scalar entries are derived by name, and a field of several components is never one number
+- decided: 2026-09-21
+- status: active
+- decision: `field.derive` computes, from canonical data, the catalogue entries whose result is a
+  scalar in the source's unit - component, magnitude, von Mises, the three principal values,
+  maximum shear and trace - in global Cartesian, which is named on every component; the derived
+  field is listed beside the file's own with the formula and every convention it depended on
+  (component order, principal ordering, the plane reading of a three-component tensor, the frame),
+  kept at the source's precision, and inheriting the source's declared unit. Principal directions,
+  the deviatoric part, the invariants I2 and I3 and the complex-result entries are refused by name
+  with the reason; so is a frame that does not exist, and a nine-component tensor for anything but
+  its components. A field of several components is refused as one number wherever one is asked for:
+  no aggregate, no statistics, no probe, no colour - each refusal naming the derived quantity to
+  make instead
+- decided_by: engineering judgement, from #212's condition, 15_derived_quantities.md, INV-020 and
+  a measurement taken here
+- rationale: measured on 2026-09-20, a three-component displacement loaded as it was reported a
+  maximum of 4.0 - the largest single component, labelled `extremum(displacement)` - the plausible
+  number with no meaning XC-001 exists to forbid. The catalogue's arithmetic is easy to get subtly
+  wrong and impossible to notice afterwards, which is why the formula and the conventions travel
+  with the value (INV-020) and why the entries this build does not derive say so rather than
+  approximate. A derived field stored in float64 would claim fifteen digits the source never had
+  (INV-014); it is stored at the source's precision. The unit follows the source's declaration
+  because a magnitude of millimetres is millimetres and a von Mises of megapascals is megapascals,
+  and the product infers nothing else (XC-003)
+- alternatives: **treating the largest component as the maximum** - what happened. **Averaging
+  components** - a number with no meaning. **The invariants I2 and I3 with a unit written as a
+  power** - a unit this product's unit system cannot name or convert; refused until it can.
+  **Frames other than global Cartesian** - none exist in the document yet (XC-122); a request names
+  the frame it lacks
+- basis: E-073 (T1)
+- affects: MOD-004, MOD-009, CT-003, view/REQ-016
+- decidedness: Fixed
+- reversal_trigger: named frames in the document, at which point a component is reported in the
+  frame it names; and units with powers, at which point the invariants join the catalogue's built
+  half
