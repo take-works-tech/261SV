@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-22
+updated: 2026-09-20
 ---
 
 # User scenarios
@@ -242,6 +242,6 @@ Recorded so the gap is not mistaken for coverage:
 - **collaboration on one workspace at once.** The exclusive edit lock is stated in the workspace
   settings; two people editing simultaneously is not designed here
 - **the hosted transport.** The same core over a different transport is named in the product
-  description and is not exercised by any path above
+  description and is not exercised by any path above; it is outside r1 (XC-271)
 - **a study larger than the stated capacity.** LIM-005 bounds the case count these paths assume; the
   behaviour at the boundary is a limit question, not a scenario

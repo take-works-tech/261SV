@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-19
+updated: 2026-09-20
 ---
 
 # Technology
@@ -264,7 +264,7 @@ release history. A vendor claiming wide adoption is tier T3 and cannot justify a
 
 ## Licences
 
-- distribution model: a signed desktop installer, and later a hosted service; both are binary
+- distribution model: a signed desktop installer, and - outside r1 (XC-271) - a hosted service; both are binary
   distribution, so copyleft obligations attach to what is linked, not to what is read
 - licences not acceptable here: GPL and LGPL in anything linked into the product. LGPL is excluded not
   because it is impossible but because satisfying it in a single-file desktop bundle requires relinking

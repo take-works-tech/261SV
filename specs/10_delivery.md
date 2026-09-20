@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-20
+updated: 2026-09-20
 ---
 
 # Delivery and operation
@@ -56,8 +56,9 @@ so the download page has to explain it rather than pretend it will not happen.
 - basis: E-001 (T1)
 
 ### XC-053 - Environments
-- statement: the desktop product has one environment - the user's machine. The later hosted service
-  has development, staging and production, and no customer data crosses between them
+- statement: the desktop product has one environment - the user's machine. The hosted service,
+  which is outside r1 (XC-271), has development, staging and production, and no customer data
+  crosses between them
 - configuration: settings live in a per-user file; secrets, when the user configures a model provider,
   go to the operating system's credential store, never to a plain file
 - decidedness: Fixed
