@@ -118,6 +118,9 @@ export interface EngineState {
   readonly provenanceRefusal: string | null;
   /** What the last export wrote, as the engine answered it (report/AC-014). */
   readonly exported: Results["report.export"] | null;
+  /** Which catalogue operations this build answers, as `system.operations` said (XC-277). Null
+   *  until asked; the settings ask when they open. */
+  readonly operations: Results["system.operations"] | null;
   /** Applied writes since the last save. Cleared by a save, by opening a workspace, and by an exit -
    *  into `lost`. */
   readonly journal: readonly AppliedWrite[];
@@ -227,6 +230,7 @@ const EMPTY: EngineState = {
   provenance: null,
   provenanceRefusal: null,
   exported: null,
+  operations: null,
   journal: [],
   lost: null,
   savedAt: null,
@@ -830,6 +834,14 @@ export const engineState = {
   /** What this build can do and where it keeps its log (system.capabilities). A read. */
   async capabilities(): Promise<Results["system.capabilities"] | null> {
     return ask("system.capabilities", {});
+  },
+
+  /** Which catalogue operations this build answers and which it does not (system.operations,
+   *  XC-277). A read; kept, so the command list says it beside every row. */
+  async operations(): Promise<Results["system.operations"] | null> {
+    const answered = await ask("system.operations", {});
+    if (answered) setState({ operations: answered });
+    return answered;
   },
 
   /** The engine's record of what was asked (XC-023), read rather than kept here: the engine holds

@@ -112,10 +112,24 @@ class TestWhatThisBuildRegisters:
             "dataset.probe", "view.pick", "report.create", "report.update", "report.get",
             "report.export", "report.provenance",
             "workspace.save", "dataset.inspect", "history.list",
-            "system.capabilities", "system.protocols", "system.audit",
+            "system.capabilities", "system.protocols", "system.audit", "system.operations",
             "output.list", "output.plan", "output.prune",
         }
-        assert len(surface.unimplemented()) == len(OPERATIONS) - 26
+        assert len(surface.unimplemented()) == len(OPERATIONS) - 27
+
+    def test_operations_list_what_this_build_answers_and_what_it_does_not(self) -> None:
+        """XC-277: the list is the surface's own registry, and the two halves are the whole catalogue."""
+        surface, _ = a_surface()
+
+        result = surface.submit(Command("system.operations", {}))
+
+        assert result.status is Status.ANSWERED, result.reason
+        registered, unimplemented = result.value["registered"], result.value["unimplemented"]
+        assert "system.operations" in registered and "graph.data" in unimplemented
+        assert tuple(registered) == surface.registered()
+        assert tuple(unimplemented) == surface.unimplemented()
+        assert set(registered) | set(unimplemented) == set(OPERATIONS)
+        assert not set(registered) & set(unimplemented)
 
     def test_an_unimplemented_operation_is_refused_and_named_as_such(self) -> None:
         surface, _ = a_surface()

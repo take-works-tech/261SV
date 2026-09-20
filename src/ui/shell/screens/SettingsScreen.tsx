@@ -18,6 +18,7 @@ import { MissingDataStyle } from "../../shared/MissingDataStyle";
 import { ScopeConfirmation } from "../../shared/ScopeConfirmation";
 import { formatBytes, disabledBecause } from "../../logic/format";
 import { egressFacts } from "../../logic/egress";
+import { commandGroups, describeAnswering, NO_KEY, STATUS_LABEL } from "../../logic/commands";
 import { describePlan, describeTotal, runLines, type OutputListing, type OutputPlan } from "../../logic/output";
 import { submit } from "../../client/operations";
 import { session } from "../../state/session";
@@ -643,6 +644,12 @@ function ShortcutsPanel() {
   });
   const [capturing, setCapturing] = useState<string | null>(null);
   const [confirmRestoreAll, setConfirmRestoreAll] = useState(false);
+  const e = useEngine();
+  const reachable = e.reachability.kind === "reachable";
+  useEffect(() => {
+    // Which operations this build answers is the engine's to say, asked when the section opens.
+    if (reachable) void engineState.operations();
+  }, [reachable]);
 
   const needle = query.trim();
   const resolvedKey = (command: ShortcutCommand): string | null => overrides[command.name] ?? command.key;
@@ -657,6 +664,8 @@ function ShortcutsPanel() {
   const groups = KEYMAPS
     .map((keymap) => ({ ...keymap, commands: keymap.commands.filter(matches) }))
     .filter((keymap) => keymap.commands.length > 0);
+  // The contract's operations, generated rather than written, with what the engine answers.
+  const commands = commandGroups(reachable ? e.operations : null, needle);
   const changedNames = Object.keys(overrides);
 
   const captureKey = (name: string) => (event: KeyboardEvent<HTMLButtonElement>) => {
@@ -704,7 +713,11 @@ function ShortcutsPanel() {
         <button className="btn ghost" title="キーマップ一式をファイルから読み込みます">スキームを読み込み…</button>
       </div>
 
-      {groups.length === 0 ? (
+      {reachable ? (
+        <p className="prop-note">下のキー割り当ての表は設計状態です。この版は操作にキーを割り当てません（XC-277）。契約の操作の一覧は、その下にあります。</p>
+      ) : null}
+
+      {groups.length === 0 && commands.length === 0 ? (
         <div className="se-empty" role="status">
           <b>「{needle}」に一致するコマンドはありません</b>
           <p>コマンド名の一部（例：ケース）またはキー（例：Ctrl）で検索できます。</p>
@@ -775,6 +788,39 @@ function ShortcutsPanel() {
           </section>
         ))
       )}
+
+      <section className="se-section" aria-label="コマンド一覧">
+        <h3>コマンド一覧（契約 CT-003 から生成）</h3>
+        <p className="prop-note">
+          {describeAnswering(reachable ? e.operations : null)}。書く操作は取り消し履歴と未保存の作業に入り、読む操作は入りません。
+          この版はどの操作にもキーを割り当てません（{NO_KEY}）。
+        </p>
+        {commands.length === 0 ? (
+          <p className="prop-note">「{needle}」に一致する操作はありません。操作名か引数名で検索できます。</p>
+        ) : (
+          commands.map((group) => (
+            <section className="se-shortcut-group" key={`op:${group.namespace}`}>
+              <header>
+                <b>{group.namespace}</b>
+                <small>{group.rows.length} 操作</small>
+              </header>
+              {group.rows.map((row) => (
+                <div className="se-shortcut-row" key={row.operation}>
+                  <span className="se-cmd">
+                    <b>{row.operation}</b>
+                    <small>{row.writes ? "書く" : "読む"}・引数：{row.parameters}・答え：{row.answers}</small>
+                  </span>
+                  <span className="se-nokey">
+                    {NO_KEY}
+                    <small>{STATUS_LABEL[row.status]}</small>
+                  </span>
+                  <span className="se-row-actions" />
+                </div>
+              ))}
+            </section>
+          ))
+        )}
+      </section>
 
       <section className="se-section">
         <h3>コマンド衝突</h3>
