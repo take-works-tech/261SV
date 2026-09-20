@@ -40,7 +40,7 @@ from domain_core.recorded_time import STORED_FORMAT, RecordedTime, from_stored, 
 from domain_core.reported_value import DIMENSIONLESS, Caveat, Provenance, ReportedValue
 from domain_core.units import UndeclaredUnitError, unit as known_unit
 from engine import reader
-from engine.analysis import nodal
+from engine.analysis import derived, nodal
 from engine.analysis import weights as field_weights
 from engine.analysis.summary import Reduction, Summary, SummaryError, Weighting, summarise
 from engine.limits import MachineClass
@@ -416,6 +416,7 @@ def handlers(session: Session) -> tuple[Handler, ...]:
         Handler("dataset.parts", lambda p, t: dataset_parts(session, p)),
         Handler("field.declareUnit", lambda p, t: field_declare_unit(session, p)),
         Handler("field.statistics", lambda p, t: field_statistics(session, p)),
+        Handler("field.derive", lambda p, t: field_derive(session, p)),
         Handler("view.create", lambda p, t: item_create(session, "views", p)),
         Handler("view.update", lambda p, t: item_update(session, "views", "viewId", p)),
         Handler("view.get", lambda p, t: item_get(session, "views", "viewId", p)),
@@ -712,7 +713,12 @@ def dataset_load(session: Session, parameters: Mapping[str, Any]) -> Effect | Re
         for name, field in dataset.fields.items():
             seen.setdefault(name, field)
     fields = [
-        {"name": name, "association": ASSOCIATION_WORD[field.association], "unit": field.unit}
+        {
+            "name": name, "association": ASSOCIATION_WORD[field.association], "unit": field.unit,
+            # How many numbers each entry is: a vector or a tensor is coloured, probed and summarised
+            # only through a derived quantity, and the interface has to know which fields those are.
+            "components": field.components,
+        }
         for name, field in seen.items()
     ]
 
@@ -870,6 +876,73 @@ def field_declare_unit(session: Session, parameters: Mapping[str, Any]) -> Effec
     )
 
 
+def field_derive(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
+    """A catalogue quantity of a field, added to the loaded dataset as a scalar field (INV-020, XC-282).
+
+    A read on the catalogue's side: the derived field lives in this session's memory beside its
+    source, is made again from the file next time, and is not a document change. The answer
+    carries the formula and every convention the value depended on, so a reviewer checks rather
+    than trusts; the values are kept at the source's precision, because the source supports no
+    more digits than it has (INV-014).
+    """
+    loaded = session.loaded(str(parameters["datasetId"]))
+    if isinstance(loaded, Result):
+        return loaded
+    name = str(parameters["fieldName"])
+    frame_id = parameters.get("frameId")
+    if frame_id:
+        return refused(
+            f"フレーム '{frame_id}' はこの文書にありません。この版が報告できるのは {derived.GLOBAL_CARTESIAN} だけで、"
+            "名前付きフレームはまだ作れません（INV-021, XC-122）"
+        )
+    stated = str(parameters["quantity"])
+    try:
+        quantity = derived.Quantity(stated)
+    except ValueError:
+        if stated in derived.NOT_BUILT:
+            return refused(f"'{stated}' はカタログにありますが、この版は導出しません：{derived.NOT_BUILT[stated]}")
+        return refused(
+            f"'{stated}' は 15_derived_quantities のカタログにありません。"
+            f"この版が導出するのは {[one.value for one in derived.Quantity]} です"
+        )
+    holders = loaded.holders(name)
+    if not holders:
+        return refused(f"'{name}' というフィールドはこのデータセットにありません")
+    component = parameters.get("component")
+    as_tensor = bool(parameters.get("asTensor", False))
+    made: list[derived.Derived] = []
+    for part in holders:
+        assert part.dataset is not None
+        field = part.dataset.fields[name]
+        try:
+            results = derived.derive(
+                field, quantity, component=str(component) if component is not None else None, as_tensor=as_tensor,
+            )
+        except derived.DerivedError as error:
+            return refused(str(error))
+        precision = field.values.dtype if np.issubdtype(field.values.dtype, np.floating) else np.dtype(np.float64)
+        for one in results:
+            part.dataset.fields[one.name] = Field(
+                name=one.name, association=field.association, values=one.values.astype(precision), unit=field.unit,
+            )
+            if field.unit is not None:
+                loaded.declared_units[one.name] = field.unit
+        made = list(results)
+    source = holders[0].dataset.fields[name] if holders[0].dataset is not None else None
+    first = made[0]
+    return Effect(
+        f"'{first.name}' を導出しました（{first.formula}）",
+        value={
+            "fieldName": first.name,
+            "fieldNames": [one.name for one in made],
+            "formula": first.formula,
+            "conventions": list(first.conventions),
+            "association": ASSOCIATION_WORD[source.association] if source is not None else "point",
+            "unit": source.unit if source is not None else None,
+        },
+    )
+
+
 def field_statistics(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
     """A field's minimum, maximum and mean over the case, or over one named part (INV-017).
 
@@ -901,6 +974,11 @@ def field_statistics(session: Session, parameters: Mapping[str, Any]) -> Effect 
         return refused(f"'{name}' というフィールドはこのデータセットにありません")
     fields = [part.dataset.fields[name] for part in holders if part.dataset is not None]
     association = fields[0].association
+    if fields[0].components != 1:
+        return refused(
+            f"'{name}' は {fields[0].components} 成分の場です。統計は一つの数の場に対して求めます — "
+            "大きさや成分などの導出量を作ってください（field.derive, XC-282）"
+        )
     if association is Association.INTEGRATION_POINT:
         return refused(
             f"'{name}' は積分点の値です。平均や合計には求積則の重みが要り、ファイルにはありません（XC-123）"
@@ -1315,6 +1393,10 @@ def dataset_probe(session: Session, parameters: Mapping[str, Any]) -> Effect | R
     holders = loaded.holders(name)
     if not holders:
         return refused(f"'{name}' というフィールドはこのデータセットにありません")
+    if any(part.dataset is not None and part.dataset.fields[name].components != 1 for part in holders):
+        return refused(
+            f"'{name}' は成分の複数ある場で、一点の値としては読めません。導出量を作ってから読んでください（field.derive, XC-282）"
+        )
     point = parameters["pointM"]
     picks: list[tuple[Part, pick.Pick]] = []
     for part in holders:
@@ -1378,6 +1460,10 @@ def view_pick(session: Session, parameters: Mapping[str, Any]) -> Effect | Resul
     width, height = int(parameters["width"]), int(parameters["height"])
     pixel = (int(parameters["x"]), int(parameters["y"]))
     datasets = [part.dataset for part in shown if part.dataset is not None]
+    if any(colouring.field_name in one.fields and one.fields[colouring.field_name].components != 1 for one in datasets):
+        return refused(
+            f"'{colouring.field_name}' は成分の複数ある場で、一点の値としては読めません。導出量を作ってから読んでください（field.derive, XC-282）"
+        )
     try:
         ray = render_module.ray_through(datasets, pixel, width=width, height=height, camera=camera)
     except RenderError as error:

@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-20
+updated: 2026-09-21
 ---
 
 # Verification plan
@@ -395,10 +395,10 @@ honestly is better than an automated check that passes while the proposal is use
 | ingest/AC-038 | unit (planned) | - | measured values with uncertainties | authored in the test | exact | uncertainty stays with the value through a comparison |
 | ingest/AC-039 | unit (planned) | - | measured values with no unit | authored in the test | exact | marked undeclared, not matched to the computed field |
 | ingest/AC-040 | integration (planned) | - | a file with integration-point values | generated with the toolkit writers | exact | read as written; no extrapolation to nodes |
-| view/AC-043 | unit (planned) | - | a tensor with an analytic answer for each catalogue entry | generated in the test | exact | value and recorded formula both correct |
-| view/AC-044 | unit (planned) | - | a tensor with distinct eigenvalues | generated in the test | exact | ordered largest to smallest, ordering stated |
-| view/AC-045 | unit (planned) | - | a vector component | generated in the test | exact | the frame is named, global Cartesian by default |
-| view/AC-046 | unit (planned) | - | a cylindrical component with no frame defined | authored in the test | exact | refused, naming what is missing |
+| view/AC-043 | unit plus integration | tests/test_derived.py, tests/test_handlers.py::TestDerivedQuantities and src/ui/state/engine.connected.test.ts against a real engine | a vector and a symmetric tensor with answers known by hand, in memory and as fields.vtu | generated in the test | exact | each built entry's value and recorded formula are correct; a field of several components is refused as one number; the entries not built are refused by name |
+| view/AC-044 | unit plus integration | tests/test_derived.py::TestTheTensorEntries::test_principal_values_are_three_fields_ordered_largest_to_smallest_and_say_so and tests/test_handlers.py::TestDerivedQuantities | a tensor with distinct eigenvalues | generated in the test | exact | three fields ordered largest to smallest, the ordering in the conventions |
+| view/AC-045 | unit | tests/test_derived.py::TestTheVectorEntries::test_a_vector_component_names_its_frame | a vector component | generated in the test | exact | the frame is named, global Cartesian by default |
+| view/AC-046 | unit plus integration | tests/test_derived.py::TestWhatIsRefused::test_a_frame_that_does_not_exist_is_refused_by_name and tests/test_handlers.py::TestDerivedQuantities::test_what_is_not_derived_is_refused_by_name | a cylindrical component with no frame defined | authored in the test | exact | refused, naming the frame asked for and the one that exists |
 | view/AC-093 | unit plus integration | tests/test_handlers.py::TestStatistics::test_a_cell_field_answers_both_numbers_and_the_spread_at_the_peak, tests/test_handlers.py::TestStatistics::test_the_document_states_both_numbers_for_a_cell_field, src/ui/logic/copy.test.ts and src/ui/state/engine.connected.test.ts against a real engine | E-144's bar as a file: five hexahedra carrying 10, 20, 200, 20, 10 | generated in the test | exact | the element maximum is 200 labelled unaveraged, the averaged maximum 110 carries the averaged caveat and the spread 180 at its node; the document states both with the spread as a row; a point field carries no averaging members |
 | view/AC-047 | unit (planned) | - | a two-material mesh | generated in the test | exact | no averaging across the interface; the result is labelled averaged |
 | ingest/AC-041 | integration (planned) | - | a modal result file | generated with the toolkit writers | exact | indexed by mode number with eigenfrequencies carried |

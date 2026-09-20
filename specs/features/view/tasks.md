@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-20
+updated: 2026-09-21
 ---
 
 # Tasks: view
@@ -229,21 +229,32 @@ updated: 2026-09-20
 - satisfies: AC-043
 - depends_on: analysis module
 - done_when: every catalogue entry matches an analytic answer and records its formula
+- done: 2026-09-21 (XC-282), for the scalar-valued entries in the source's unit - component,
+  magnitude, von Mises, the three principal values, maximum shear, trace - each against an
+  analytic answer in `tests/test_derived.py` with its formula and conventions asserted, and
+  reachable through `field.derive`. Not built, and refused by name: principal directions, the
+  deviatoric part, the invariants I2 and I3, the complex-result entries
 
 ### TASK-039 - Principal ordering
 - satisfies: AC-044
 - depends_on: TASK-038
 - done_when: values are ordered largest to smallest and the ordering is stated where shown
+- done: 2026-09-21 (XC-282). Three fields σ1 ≥ σ2 ≥ σ3, the ordering in the conventions the
+  interface shows beside the field
 
 ### TASK-040 - Component frames
 - satisfies: AC-045
 - depends_on: TASK-038
 - done_when: every component names its frame, defaulting to global Cartesian
+- done: 2026-09-21 (XC-282). Global Cartesian is named in every derived field's conventions; it
+  is the only frame this build has
 
 ### TASK-041 - Unresolvable frames refused
 - satisfies: AC-046
 - depends_on: TASK-040
 - done_when: a component with no resolvable frame is refused with the reason
+- done: 2026-09-21 (XC-282). A `frameId` is refused naming the frame and the one frame that
+  exists; named frames are not in the document yet (XC-122)
 
 ### TASK-042 - Averaging stops at boundaries
 - satisfies: AC-047

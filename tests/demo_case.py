@@ -21,7 +21,7 @@ from pathlib import Path
 import numpy as np
 from vtkmodules.util.numpy_support import numpy_to_vtk
 from vtkmodules.vtkCommonCore import vtkFloatArray, vtkPoints
-from vtkmodules.vtkCommonDataModel import VTK_HEXAHEDRON, vtkCellArray, vtkUnstructuredGrid
+from vtkmodules.vtkCommonDataModel import VTK_HEXAHEDRON, VTK_TRIANGLE, vtkCellArray, vtkUnstructuredGrid
 from vtkmodules.vtkIOXML import vtkXMLUnstructuredGridWriter
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -50,6 +50,42 @@ def write_cube(path: Path) -> None:
     for value in range(1, 9):
         field.InsertNextValue(float(value))
     grid.GetPointData().AddArray(field)
+    writer = vtkXMLUnstructuredGridWriter()
+    writer.SetFileName(str(path))
+    writer.SetInputData(grid)
+    writer.Write()
+
+
+def write_fields(path: Path) -> None:
+    """`fields.vtu`: the two-triangle grid carrying a three-component displacement and a six-component
+    symmetric stress, each row with a derived answer known by hand (15_derived_quantities): magnitudes
+    5, 0, 3, 7; von Mises 100, 86.60, 0, 173.2; principal values 100/0/0, 50/0/-50, 10/10/10, 200/100/0."""
+    coordinates = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]], dtype=np.float64)
+    points = vtkPoints()
+    points.SetData(numpy_to_vtk(coordinates, deep=True))
+    cells = vtkCellArray()
+    for triangle in ([0, 1, 2], [0, 2, 3]):
+        cells.InsertNextCell(3)
+        for index in triangle:
+            cells.InsertCellPoint(index)
+    grid = vtkUnstructuredGrid()
+    grid.SetPoints(points)
+    grid.SetCells(VTK_TRIANGLE, cells)
+    displacement = vtkFloatArray()
+    displacement.SetName("displacement")
+    displacement.SetNumberOfComponents(3)
+    for row in ((3.0, 4.0, 0.0), (0.0, 0.0, 0.0), (1.0, 2.0, 2.0), (2.0, 3.0, 6.0)):
+        displacement.InsertNextTuple3(*row)
+    grid.GetPointData().AddArray(displacement)
+    stress = vtkFloatArray()
+    stress.SetName("stress6")
+    stress.SetNumberOfComponents(6)
+    for row in (
+        (100.0, 0.0, 0.0, 0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 50.0, 0.0, 0.0),
+        (10.0, 10.0, 10.0, 0.0, 0.0, 0.0), (200.0, 100.0, 0.0, 0.0, 0.0, 0.0),
+    ):
+        stress.InsertNextTuple6(*row)
+    grid.GetPointData().AddArray(stress)
     writer = vtkXMLUnstructuredGridWriter()
     writer.SetFileName(str(path))
     writer.SetInputData(grid)
@@ -172,8 +208,11 @@ def main(argv: list[str]) -> int:
     partial = write_partial_case(Path(argv[0]))
     bar = Path(argv[0]) / "bar.vtu"
     write_bar(bar)
+    fields = Path(argv[0]) / "fields.vtu"
+    write_fields(fields)
     print(json.dumps({
-        "workspace": str(workspace), "cube": str(cube), "partial": str(partial) if partial else None, "bar": str(bar),
+        "workspace": str(workspace), "cube": str(cube), "partial": str(partial) if partial else None,
+        "bar": str(bar), "fields": str(fields),
     }))
     return 0
 

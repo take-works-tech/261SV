@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-20
+updated: 2026-09-21
 ---
 
 # The application model
@@ -248,6 +248,10 @@ Canvas overlays: orientation gizmo (upper right, below the representation row - 
 overlay on hover (XC-160); probe readout; @Deformation scale stamp drawn into the picture (INV-024);
 reduced-representation marker (INV-001); selection highlight; widget handles; the conversation drawer
 (XC-151).
+
+A field of several components - a vector, a symmetric tensor - is never coloured, probed or
+summarised as one number; the rail offers the catalogue's derived quantities for it, and a derived
+field is listed beside the file's own with the formula and conventions it depended on (XC-282).
 
 A cell field's statistics are two numbers wherever they are shown (XC-281): the element values,
 labelled unaveraged, and the nodal-averaged extrema with the spread at the peak node - never one

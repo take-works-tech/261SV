@@ -42,7 +42,7 @@ from service.workspace import items  # noqa: E402
 from service.workspace.document import FORMAT_VERSION  # noqa: E402
 from domain_core.recorded_time import STORED_FORMAT, record as record_time  # noqa: E402
 from test_reader import write_grid  # noqa: E402
-from demo_case import write_bar, write_cube, write_two_blocks  # noqa: E402, F401 - re-exported for the tests that import it from here
+from demo_case import write_bar, write_cube, write_fields, write_two_blocks  # noqa: E402, F401 - re-exported for the tests that import it from here
 from test_render import decode  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -108,14 +108,14 @@ class TestWhatThisBuildRegisters:
 
         assert registered == {
             "workspace.open", "dataset.load", "dataset.describe", "dataset.parts",
-            "field.declareUnit", "field.statistics", "view.create", "view.update", "view.get", "view.render",
+            "field.declareUnit", "field.statistics", "field.derive", "view.create", "view.update", "view.get", "view.render",
             "dataset.probe", "view.pick", "report.create", "report.update", "report.get",
             "report.export", "report.provenance",
             "workspace.save", "dataset.inspect", "history.list",
             "system.capabilities", "system.protocols", "system.audit", "system.operations",
             "output.list", "output.plan", "output.prune",
         }
-        assert len(surface.unimplemented()) == len(OPERATIONS) - 27
+        assert len(surface.unimplemented()) == len(OPERATIONS) - 28
 
     def test_operations_list_what_this_build_answers_and_what_it_does_not(self) -> None:
         """XC-277: the list is the surface's own registry, and the two halves are the whole catalogue."""
@@ -342,7 +342,7 @@ class TestLoadingADataset:
         assert result.value["supportLevel"] == "verified"
         assert result.value["gaps"] == []
         fields = {one["name"]: one for one in result.value["fields"]}
-        assert fields["stress"] == {"name": "stress", "association": "point", "unit": None}
+        assert fields["stress"] == {"name": "stress", "association": "point", "unit": None, "components": 1}
         assert fields["element_stress"]["association"] == "cell"
         assert "dataset:0001" in session.datasets
 
@@ -529,6 +529,94 @@ class TestStatistics:
 
         assert result.status is Status.REFUSED
         assert "part 1" in (result.reason or "") and "case" in (result.reason or "")
+
+
+class TestDerivedQuantities:
+    """`field.derive` (XC-282, INV-020): a catalogue quantity made by the engine from canonical data,
+    listed beside the file's fields with its formula and conventions; and a field of several
+    components refused as one number wherever one is asked for."""
+
+    def test_the_load_says_how_many_components_each_field_has(self, tmp_path: Path) -> None:
+        surface, session, workspace = opened(tmp_path)
+        source = workspace.parent / "fields.vtu"
+        write_fields(source)
+
+        result = surface.submit(Command("dataset.load", {"caseId": "case:1", "filePaths": [str(source)]}))
+
+        assert result.status is Status.APPLIED, result.reason
+        components = {one["name"]: one["components"] for one in result.value["fields"]}
+        assert components == {"displacement": 3, "stress6": 6}
+
+    def test_a_vector_is_refused_as_one_number_and_its_magnitude_is_derived_with_the_formula(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path, write=write_fields, name="fields.vtu")
+        surface.submit(Command("field.declareUnit", {"datasetId": dataset_id, "fieldName": "displacement", "unitSymbol": "mm"}))
+
+        raw = surface.submit(Command("field.statistics", {"datasetId": dataset_id, "fieldName": "displacement"}))
+        probed = surface.submit(Command("dataset.probe", {"datasetId": dataset_id, "fieldName": "displacement", "pointM": [0.0, 0.0, 0.0], "resultPosition": 0}))
+        made = surface.submit(Command("field.derive", {"datasetId": dataset_id, "fieldName": "displacement", "quantity": "magnitude"}))
+        statistics = surface.submit(Command("field.statistics", {"datasetId": dataset_id, "fieldName": "displacement.magnitude"}))
+
+        assert raw.status is Status.REFUSED and "3 成分" in (raw.reason or "")
+        assert probed.status is Status.REFUSED and "導出量" in (probed.reason or "")
+        assert made.status is Status.ANSWERED, made.reason
+        assert made.value["fieldName"] == "displacement.magnitude"
+        assert made.value["fieldNames"] == ["displacement.magnitude"]
+        assert made.value["formula"] == "sqrt(X^2 + Y^2 + Z^2)"
+        assert any("global Cartesian" in one for one in made.value["conventions"])
+        assert made.value["association"] == "point" and made.value["unit"] == "mm"
+        assert statistics.status is Status.ANSWERED, statistics.reason
+        assert statistics.value["maximum"]["value"] == 7.0
+        assert statistics.value["maximum"]["unit"] == "mm"
+        assert statistics.value["maximum"]["digits"] == 6, "the source's precision, not the arithmetic's"
+
+    def test_von_mises_and_the_three_principal_values_come_with_their_conventions(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path, write=write_fields, name="fields.vtu")
+
+        mises = surface.submit(Command("field.derive", {"datasetId": dataset_id, "fieldName": "stress6", "quantity": "vonMises"}))
+        principal = surface.submit(Command("field.derive", {"datasetId": dataset_id, "fieldName": "stress6", "quantity": "principal"}))
+        top = surface.submit(Command("field.statistics", {"datasetId": dataset_id, "fieldName": "stress6.principal1"}))
+        mises_stats = surface.submit(Command("field.statistics", {"datasetId": dataset_id, "fieldName": "stress6.vonMises"}))
+
+        assert mises.status is Status.ANSWERED, mises.reason
+        assert mises.value["formula"].startswith("sqrt( ((XX-YY)^2")
+        assert any("XX, YY, ZZ, XY, YZ, XZ" in one for one in mises.value["conventions"])
+        assert principal.value["fieldNames"] == ["stress6.principal1", "stress6.principal2", "stress6.principal3"]
+        assert any("大きい順" in one for one in principal.value["conventions"])
+        assert top.value["maximum"]["value"] == 200.0
+        assert mises_stats.value["maximum"]["value"] == pytest.approx(173.205, abs=0.001)
+        assert mises_stats.value["maximum"]["unit"] is None, "the source's unit was never declared"
+
+    def test_what_is_not_derived_is_refused_by_name(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path, write=write_fields, name="fields.vtu")
+
+        unknown = surface.submit(Command("field.derive", {"datasetId": dataset_id, "fieldName": "stress6", "quantity": "curl"}))
+        not_built = surface.submit(Command("field.derive", {"datasetId": dataset_id, "fieldName": "stress6", "quantity": "invariants"}))
+        framed = surface.submit(Command("field.derive", {"datasetId": dataset_id, "fieldName": "displacement", "quantity": "component", "component": "X", "frameId": "frame:cyl"}))
+        unnamed = surface.submit(Command("field.derive", {"datasetId": dataset_id, "fieldName": "displacement", "quantity": "component"}))
+
+        assert unknown.status is Status.REFUSED and "magnitude" in (unknown.reason or "")
+        assert not_built.status is Status.REFUSED and "二乗" in (not_built.reason or "")
+        assert framed.status is Status.REFUSED and "frame:cyl" in (framed.reason or "") and "global Cartesian" in (framed.reason or "")
+        assert unnamed.status is Status.REFUSED and "'X', 'Y', 'Z'" in (unnamed.reason or "")
+
+
+@needs_offscreen
+class TestColouringByAVector:
+    def test_a_vector_is_not_coloured_and_its_magnitude_is(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path, write=write_fields, name="fields.vtu")
+        surface.submit(Command("field.derive", {"datasetId": dataset_id, "fieldName": "displacement", "quantity": "magnitude"}))
+
+        def view(field: str) -> str:
+            return surface.submit(Command("view.create", {"workspaceId": "ws:1", "definition": {
+                "name": f"図 {field}", "datasetId": dataset_id, "representation": "surface",
+                "colouring": {"fieldName": field, "association": "point", "colourMap": "viridis"},
+            }})).value["id"]
+
+        raw = surface.submit(Command("view.render", {"viewId": view("displacement"), "width": 200, "height": 200, "format": "png"}))
+        magnitude = surface.submit(Command("view.render", {"viewId": view("displacement.magnitude"), "width": 200, "height": 200, "format": "png"}))
+
+        assert raw.status is Status.REFUSED and "3 成分" in (raw.reason or "")
+        assert magnitude.status is Status.ANSWERED, magnitude.reason
 
 
 class TestExportingADeliverable:
@@ -1202,7 +1290,7 @@ class TestWhatWasSavedIsIntact:
         assert entry["declaredUnits"] == {"temperature": "K"}
         assert entry["pathRelative"] == "cube.vtu"
         _, reloaded = self._second_session(tmp_path, workspace, workspace.parent / "cube.vtu")
-        assert reloaded["fields"] == [{"name": "temperature", "association": "point", "unit": "K"}]
+        assert reloaded["fields"] == [{"name": "temperature", "association": "point", "unit": "K", "components": 1}]
 
     def test_a_declaration_never_saved_is_not_found_and_the_field_is_undeclared_again(self, tmp_path: Path) -> None:
         """The other half of the sentence. Nothing rebuilds it: the next session sees what the file
@@ -1216,7 +1304,7 @@ class TestWhatWasSavedIsIntact:
 
         _, reloaded = self._second_session(tmp_path, workspace, workspace.parent / "cube.vtu")
 
-        assert reloaded["fields"] == [{"name": "temperature", "association": "point", "unit": None}]
+        assert reloaded["fields"] == [{"name": "temperature", "association": "point", "unit": None, "components": 1}]
 
     def test_saving_keeps_the_previous_version_beside_the_file(self, tmp_path: Path) -> None:
         surface, session, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")

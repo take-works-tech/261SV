@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-20
+updated: 2026-09-21
 ---
 
 # Modules and dependency direction
@@ -74,7 +74,8 @@ touches a file, a device or a clock.
 ### MOD-004 - analysis
 - layer: engine
 - paths: src/engine/analysis
-- owns: derived quantities - @Diff between cases, expressions over @Field values, statistics used by
+- owns: derived quantities - the catalogue of [15_derived_quantities.md](15_derived_quantities.md)
+  (`analysis/derived.py`, XC-282), @Diff between cases, expressions over @Field values, statistics used by
   graphs and by recommendations. Every number a user is shown that was not read from a file is computed here.
   The expression language of [13_scripting.md](13_scripting.md) is evaluated here, dimensions and all
   (XC-242); MOD-011 decides *when* an expression runs and never *what* it evaluates to

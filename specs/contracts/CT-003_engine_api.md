@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-20
+updated: 2026-09-21
 ---
 
 # Contract: engine API
@@ -10,7 +10,13 @@ updated: 2026-09-20
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 3.8.0
+- version: 3.9.0
+- correction: 2026-09-21, version 3.8.0 to 3.9.0. `field.derive` is answered: it takes `component`
+  for the component entry and `asTensor` for a three-component field read as a two-dimensional
+  symmetric tensor, and answers `fieldNames` (three for the principal values), `association`
+  and `unit` beside the formula and conventions. `dataset.load` lists each field's `components`,
+  because a field of several is coloured, probed and summarised only through a derived quantity
+  and the interface has to know which those are (XC-282). Additive
 - correction: 2026-09-20, version 3.7.0 to 3.8.0. `field.statistics` on a cell field answers both
   numbers: `averaging: unaveraged` labels the minimum, maximum and mean as the element values
   they are, and `averaged` carries the nodal-averaged maximum and minimum with the spread at the
@@ -157,7 +163,7 @@ no identifier to report.
 | `case.move` | write | case id, new parent id | - |
 | `case.tag` | write | case id, tags | - |
 | `dataset.inspect` | read | path | what can be said before the file is read: format, the support level this build promises for it, the reader's known gaps, size, modification time (ingest/AC-032) |
-| `dataset.load` | write | case id, file paths | dataset id, fields with association, support level, gaps |
+| `dataset.load` | write | case id, file paths | dataset id, fields with association and component count, support level, gaps |
 | `dataset.describe` | read | dataset id | point and cell counts, bounds in metres, time steps, partial flag |
 | `field.declareUnit` | write | dataset id, field name, unit symbol | - |
 | `field.statistics` | read | dataset id, field name, region? - a part's name as `dataset.parts` lists it | min, max, mean, missing count, the association used, and the scope: the whole case or the one part (INV-017, INV-019); for a cell field, the label that these are the element values and the averaged extrema with the spread at the peak (INV-032) |
@@ -193,7 +199,7 @@ no identifier to report.
 | `history.list` | read | workspace id | operations with origin, time and outcome |
 | `dataset.probe` | read | dataset id, field name, point in metres, result position | value, association, unit, significant digits, provenance - missing where there is none (view/AC-027) |
 | `dataset.parts` | read | dataset id | every part the file named, present or absent, with its path from the root, its parent where the file has a hierarchy, counts and bounds; an absent part carries the reader's reason and nothing counted (GL-029, GL-042, INV-019); no hierarchy is inferred |
-| `field.derive` | read | dataset id, field name, quantity from the catalogue, frame? | the derived field with the formula and conventions it used (INV-020) |
+| `field.derive` | read | dataset id, field name, quantity from the catalogue, component? for the component entry, asTensor? for a three-component symmetric tensor, frame? | the derived field or fields (three principal values) with the formula and the conventions used - component order, principal ordering, the frame - their association and the source's unit; a quantity this build does not derive, a frame that does not exist and a field of the wrong shape are refused by name (INV-020, INV-021, XC-282) |
 | `field.setDisplayUnit` | write | workspace id, quantity, unit symbol | - - presentation only; storage stays canonical (INV-026) |
 | `frame.declare` | write | workspace id, name, kind, origin, axis | frame id (XC-122) |
 | `measurement.import` | write | case id, values with units and uncertainties, source | ids imported, anything undeclared named (XC-125) |

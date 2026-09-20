@@ -284,6 +284,11 @@ def _field_of(dataset: Dataset, colouring: Colouring) -> Field:
             f"ビューは {colouring.association.value} として着色しようとしています。"
             "変換は値を変えるので、頼まれずにはしません（INV-003）"
         )
+    if field.components != 1:
+        raise RenderError(
+            f"'{colouring.field_name}' は {field.components} 成分の場で、一つの色にはなりません。"
+            "大きさや成分などの導出量で着色してください（field.derive, XC-282）"
+        )
     return field
 
 

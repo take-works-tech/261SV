@@ -39,6 +39,7 @@ let workspacePath: string;
 let cubePath: string;
 let partialPath: string | null = null;
 let barPath: string;
+let fieldsPath: string;
 let engineOutput = "";
 
 async function until(what: () => boolean, ms: number, name: string): Promise<void> {
@@ -59,11 +60,12 @@ beforeAll(async () => {
     env: { ...process.env, PYTHONIOENCODING: "utf-8" },
   });
   if (written.status !== 0) throw new Error(`demo case not written:\n${written.stderr}`);
-  const paths = JSON.parse(written.stdout.trim()) as { workspace: string; cube: string; partial: string | null; bar: string };
+  const paths = JSON.parse(written.stdout.trim()) as { workspace: string; cube: string; partial: string | null; bar: string; fields: string };
   workspacePath = paths.workspace;
   cubePath = paths.cube;
   partialPath = paths.partial;
   barPath = paths.bar;
+  fieldsPath = paths.fields;
 
   // The engine, started the way a shell starts it: loopback, a port the OS chooses, the token in a
   // file the shell reads and nowhere else (XC-258).
@@ -131,7 +133,7 @@ describe("the prototype thread from the interface's side", () => {
     const s = snapshot();
     expect(s.refusal).toBeNull();
     expect(s.sourceName).toBe("cube.vtu");
-    expect(s.fields).toEqual([{ name: "temperature", association: "point", unit: null }]);
+    expect(s.fields).toEqual([{ name: "temperature", association: "point", unit: null, components: 1 }]);
     expect(s.fieldName).toBe("temperature");
     expect(s.bounds).toEqual([
       [0, 0, 0],
@@ -343,7 +345,7 @@ describe("the prototype thread from the interface's side", () => {
 
     const s = snapshot();
     expect(s.operations?.registered).toContain("system.operations");
-    expect(s.operations?.registered.length).toBe(27);
+    expect(s.operations?.registered.length).toBe(28);
     expect([...(s.operations?.registered ?? []), ...(s.operations?.unimplemented ?? [])].sort()).toEqual([...OPERATIONS].sort());
     const rows = commandGroups(s.operations, "").flatMap((group) => group.rows);
     expect(rows).toHaveLength(OPERATIONS.length);
@@ -486,6 +488,49 @@ describe("the prototype thread from the interface's side", () => {
     s = snapshot();
     expect(s.refusal).toBeNull();
     expect(s.statistics?.averaging).toBeUndefined();
+    expect(s.imageUrl).toMatch(/^blob:/);
+  });
+
+  test("derived: a vector is never one number, and its magnitude and a tensor's von Mises come from the engine with their formulas (XC-282)", async () => {
+    expect(await engineState.loadDataset("case:1", fieldsPath)).toBe(true);
+    let s = snapshot();
+    expect(s.fields.map((one) => `${one.name}/${one.components}`)).toEqual(["displacement/3", "stress6/6"]);
+    // Colouring by the vector as loaded is refused by name - the store chose it, the engine said no.
+    await engineState.refresh();
+    expect(snapshot().refusal).toContain("3 成分");
+
+    expect(await engineState.derive("displacement", "magnitude")).toBe(true);
+    s = snapshot();
+    expect(s.fieldName).toBe("displacement.magnitude");
+    expect(s.fields.some((one) => one.name === "displacement.magnitude" && one.components === 1)).toBe(true);
+    expect(s.derived["displacement.magnitude"]?.formula).toBe("sqrt(X^2 + Y^2 + Z^2)");
+    expect(s.derived["displacement.magnitude"]?.conventions.some((one) => one.includes("global Cartesian"))).toBe(true);
+    expect(s.statistics?.maximum.value).toBe(7);
+    expect(s.statistics?.maximum.digits).toBe(6);
+    expect(s.refusal).toBeNull();
+    expect(s.imageUrl).toMatch(/^blob:/);
+
+    expect(await engineState.derive("stress6", "principal")).toBe(true);
+    s = snapshot();
+    expect(s.fieldName).toBe("stress6.principal1");
+    expect(Object.keys(s.derived).filter((name) => name.startsWith("stress6.principal"))).toHaveLength(3);
+    expect(s.derived["stress6.principal3"]?.conventions.some((one) => one.includes("大きい順"))).toBe(true);
+    expect(s.statistics?.maximum.value).toBe(200);
+
+    expect(await engineState.derive("stress6", "vonMises")).toBe(true);
+    s = snapshot();
+    expect(s.statistics?.maximum.value).toBeCloseTo(173.205, 2);
+
+    // What the build does not derive is refused by name, and the refusal is on screen.
+    expect(await engineState.derive("stress6", "invariants")).toBe(false);
+    expect(snapshot().refusal).toContain("二乗");
+
+    // The thread goes on with the cube.
+    expect(await engineState.loadDataset("case:1", cubePath)).toBe(true);
+    await engineState.refresh();
+    s = snapshot();
+    expect(s.refusal).toBeNull();
+    expect(s.derived).toEqual({});
     expect(s.imageUrl).toMatch(/^blob:/);
   });
 });

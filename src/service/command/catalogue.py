@@ -208,7 +208,7 @@ PARAMETERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "history.list": (frozenset(['workspaceId']), frozenset(['workspaceId'])),
     "dataset.probe": (frozenset(['datasetId', 'fieldName', 'pointM', 'resultPosition']), frozenset(['datasetId', 'fieldName', 'pointM', 'resultPosition'])),
     "dataset.parts": (frozenset(['datasetId']), frozenset(['datasetId'])),
-    "field.derive": (frozenset(['datasetId', 'fieldName', 'frameId', 'quantity']), frozenset(['datasetId', 'fieldName', 'quantity'])),
+    "field.derive": (frozenset(['asTensor', 'component', 'datasetId', 'fieldName', 'frameId', 'quantity']), frozenset(['datasetId', 'fieldName', 'quantity'])),
     "field.setDisplayUnit": (frozenset(['quantity', 'unitSymbol', 'workspaceId']), frozenset(['quantity', 'unitSymbol', 'workspaceId'])),
     "frame.declare": (frozenset(['axis', 'kind', 'name', 'origin', 'workspaceId']), frozenset(['axis', 'kind', 'name', 'origin', 'workspaceId'])),
     "measurement.import": (frozenset(['caseId', 'source', 'values']), frozenset(['caseId', 'source', 'values'])),
@@ -283,7 +283,7 @@ RESULT_FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "history.list": (frozenset(['entries', 'historyLimit', 'omitted', 'undoDropped', 'undoLimit']), frozenset(['entries'])),
     "dataset.probe": (frozenset(['association', 'value']), frozenset(['value'])),
     "dataset.parts": (frozenset(['parts']), frozenset(['parts'])),
-    "field.derive": (frozenset(['conventions', 'fieldName', 'formula', 'frameId']), frozenset(['conventions', 'fieldName', 'formula'])),
+    "field.derive": (frozenset(['association', 'conventions', 'fieldName', 'fieldNames', 'formula', 'frameId', 'unit']), frozenset(['association', 'conventions', 'fieldName', 'formula', 'unit'])),
     "field.setDisplayUnit": (frozenset([]), frozenset([])),
     "frame.declare": (frozenset(['id']), frozenset(['id'])),
     "measurement.import": (frozenset(['importedIds', 'undeclared']), frozenset(['importedIds'])),
@@ -387,7 +387,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
 
 #: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below
 #: the engine's floor is refused politely rather than answered in a shape it cannot read.
-PROTOCOL_VERSION = "3.8.0"
+PROTOCOL_VERSION = "3.9.0"
 
 #: The wire's own names, from CT-003's `$defs.transport` (XC-258). The interface generates
 #: the same values from the same place; neither side is derived from the other (XC-252).

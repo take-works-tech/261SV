@@ -38,6 +38,18 @@ export interface FieldSummary {
   readonly name: string;
   readonly association: "point" | "cell" | "integrationPoint" | "field";
   readonly unit: string | null;
+  /** How many numbers each entry is: 1 a scalar, 3 a vector, 6 a symmetric tensor (E-073). A
+   *  field of several is coloured and summarised only through a derived quantity (XC-282). */
+  readonly components?: number;
+}
+
+/** What a derived field was made by: the formula and the conventions the engine answered with
+ *  `field.derive`, shown beside the field wherever it appears (INV-020). */
+export interface Derivation {
+  readonly source: string;
+  readonly quantity: string;
+  readonly formula: string;
+  readonly conventions: readonly string[];
 }
 
 /** A number the engine reported, carried whole. Never unpacked into a bare value: a value without
@@ -154,6 +166,8 @@ export interface EngineState {
   readonly supportLevel: string | null;
   readonly gaps: readonly string[];
   readonly fields: readonly FieldSummary[];
+  /** The derived fields of this dataset, by name, with what they were made by (XC-282). */
+  readonly derived: Readonly<Record<string, Derivation>>;
   readonly fieldName: string | null;
   readonly colourMap: string;
   readonly viewId: string | null;
@@ -257,6 +271,7 @@ const EMPTY: EngineState = {
   supportLevel: null,
   gaps: [],
   fields: [],
+  derived: {},
   fieldName: null,
   colourMap: "viridis",
   viewId: null,
@@ -490,6 +505,7 @@ export const engineState = {
       datasetId: null,
       sourceName: null,
       fields: [],
+      derived: {},
       fieldName: null,
       viewId: null,
       partial: false,
@@ -539,6 +555,7 @@ export const engineState = {
       supportLevel: loaded.supportLevel,
       gaps: loaded.gaps ?? [],
       fields,
+      derived: {},
       fieldName: fields[0]?.name ?? null,
       viewId: null,
       savedCamera: null,
@@ -660,6 +677,37 @@ export const engineState = {
     // The legend and every reported number carry the unit now, so both are asked for again rather
     // than edited here: this layer never computes, and a relabelled copy would be a second answer.
     await engineState.refresh();
+    return true;
+  },
+
+  /** A catalogue quantity of a field, made by the engine from canonical data and listed beside the
+   *  file's own fields with its formula and conventions (INV-020, XC-282). The derived field is
+   *  chosen, so the picture and the numbers move to it. A read: nothing enters the document. */
+  async derive(fieldName: string, quantity: string, component?: string): Promise<boolean> {
+    if (!state.datasetId) return false;
+    setState({ refusal: null });
+    const made = await ask("field.derive", {
+      datasetId: state.datasetId,
+      fieldName,
+      quantity,
+      ...(component ? { component } : {}),
+    });
+    if (!made) return false;
+    const names = made.fieldNames ?? [made.fieldName];
+    const association = made.association as FieldSummary["association"];
+    const fresh = names
+      .filter((name) => !state.fields.some((one) => one.name === name))
+      .map((name) => ({ name, association, unit: made.unit ?? null, components: 1 }));
+    setState({
+      fields: [...state.fields, ...fresh],
+      derived: {
+        ...state.derived,
+        ...Object.fromEntries(
+          names.map((name) => [name, { source: fieldName, quantity, formula: made.formula, conventions: made.conventions }]),
+        ),
+      },
+    });
+    await engineState.chooseField(made.fieldName);
     return true;
   },
 
