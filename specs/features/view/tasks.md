@@ -385,5 +385,5 @@ updated: 2026-09-20
 - done: 2026-09-20 (XC-270). `view.render` and `view.pick` take `camera`, referenced from CT-004 rather
   than copied; the store draws from the turntable and writes the definition only when a field, a
   colour map or a kept look changes. Found as a contradiction in the store's own header, which said
-  class 1 while every orbit went as a write. The 「この向きを保存」 control that calls `keepCamera` is
-  the interface's next change
+  class 1 while every orbit went as a write. The connected rail's 「この向きをビューに保存」 calls
+  `keepCamera`, the one explicit write

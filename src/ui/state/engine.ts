@@ -67,6 +67,9 @@ export interface SavedView {
   readonly datasetId?: string;
 }
 
+/** The document's lock as `workspace.open` answered it (XC-241, XC-269). */
+export type Lock = NonNullable<Results["workspace.open"]["lock"]>;
+
 /** What `dataset.inspect` said about a file that is not loaded yet (ingest/AC-032). */
 export type Inspection = Results["dataset.inspect"] & { readonly path: string };
 
@@ -89,6 +92,13 @@ export interface EngineState {
    *  the caps dropped said in numbers (LIM-014, LIM-015). Null until asked. */
   readonly history: Results["history.list"] | null;
   readonly workspaceId: string | null;
+  /** Whether the document may not be written back - somebody else holds its lock - and what the
+   *  lock said. Read-only is drawn at the save: the window works in memory (XC-269). */
+  readonly readOnly: boolean;
+  readonly lock: Lock | null;
+  /** What the engine's last answer warned about, in its own words, until dismissed. Dropped until
+   *  2026-09-20, which is how a document lifted, a dataset closed or a lock held went unsaid. */
+  readonly warnings: readonly string[];
   readonly unresolvedCases: readonly string[];
   readonly caseId: string | null;
   readonly datasetId: string | null;
@@ -164,6 +174,9 @@ const EMPTY: EngineState = {
   savedAt: null,
   history: null,
   workspaceId: null,
+  readOnly: false,
+  lock: null,
+  warnings: [],
   unresolvedCases: [],
   caseId: null,
   datasetId: null,
@@ -242,6 +255,14 @@ async function ask<O extends Operation>(
     setState({ refusal: reasonText(answer.reason) || `'${operation}' は行えませんでした` });
     return null;
   }
+  // What the engine had to say beside its answer is shown, not dropped: a document lifted to a
+  // new version, a dataset closed by an open, a lock somebody else holds (XC-001).
+  if (answer.warnings && answer.warnings.length > 0) {
+    // Kept beside earlier ones until dismissed, not replaced by the next answer's: an open that found
+    // a lock held is followed at once by a load and a render, and the lock is still held.
+    const fresh = answer.warnings.filter((one) => !state.warnings.includes(one));
+    setState({ warnings: [...state.warnings, ...fresh].slice(-20) });
+  }
   if (answer.status === "applied" && !NOT_UNSAVED_WORK.has(operation)) {
     setState({
       journal: [
@@ -316,6 +337,23 @@ export const engineState = {
     setState({ lost: null });
   },
 
+  clearWarnings() {
+    setState({ warnings: [] });
+  },
+
+  /** Take over a stale or unreadable lock on a person's word (XC-241, XC-269): the document is
+   *  reopened with the take-over asked for, then the case and the file are read again, as recovery
+   *  does. A live holder's lock is never taken over; the engine says so and this returns false. */
+  async takeOverLock(): Promise<boolean> {
+    const opened = state.opened;
+    if (!opened) return false;
+    if (!(await engineState.openWorkspace(opened.workspacePath, { takeOverStaleLock: true }))) return false;
+    if (opened.caseId && opened.filePath) {
+      if (await engineState.loadDataset(opened.caseId, opened.filePath)) await engineState.refresh();
+    }
+    return !state.readOnly;
+  },
+
   /** Class 3: write the document back. The journal empties because the document on disk now holds
    *  what it held; the previous version is kept beside it by the engine (XC-055). */
   async save(): Promise<boolean> {
@@ -339,10 +377,12 @@ export const engineState = {
     return engine !== null && state.reachability.kind === "reachable";
   },
 
-  /** Class 3: open a workspace. Everything loaded from the previous one goes with it. */
-  async openWorkspace(path: string): Promise<boolean> {
-    setState({ refusal: null });
-    const opened = await ask("workspace.open", { path });
+  /** Class 3: open a workspace. Everything loaded from the previous one goes with it. The lock is
+   *  taken for this session, or found held and the document opened read-only (XC-269); a stale or
+   *  unreadable lock is taken over only when the caller says so - a person's word, never a default. */
+  async openWorkspace(path: string, options: { takeOverStaleLock?: boolean } = {}): Promise<boolean> {
+    setState({ refusal: null, warnings: [] });
+    const opened = await ask("workspace.open", options.takeOverStaleLock ? { path, takeOverStaleLock: true } : { path });
     if (!opened) return false;
     setImage(null, null);
     setState({
@@ -351,6 +391,8 @@ export const engineState = {
       journal: [],
       savedAt: null,
       workspaceId: opened.workspaceId,
+      readOnly: opened.readOnly ?? false,
+      lock: opened.lock ?? null,
       unresolvedCases: opened.unresolvedCases ?? [],
       caseId: null,
       datasetId: null,

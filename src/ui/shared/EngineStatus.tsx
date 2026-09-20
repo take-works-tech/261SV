@@ -9,11 +9,12 @@
  * topbar, in words, always - not by a coloured dot, which says "something" and not "what".
  */
 import { useEffect, useState } from "react";
-import type { AppliedWrite, Reachability } from "../state/engine";
+import type { AppliedWrite, Lock, Reachability } from "../state/engine";
 import { shellApi, type Orphan } from "../client/shell";
 import type { RecordedTime } from "../client/generated";
 import { formatBytes } from "../logic/format";
 import { describeRecorded } from "../logic/time";
+import { canTakeOver, describeLock } from "../logic/lock";
 
 export function EngineStatus(props: {
   reachability: Reachability;
@@ -26,6 +27,11 @@ export function EngineStatus(props: {
   onSave?: () => void;
   /** When the document was last written back, or null; shown once nothing is unsaved. */
   savedAt?: RecordedTime | null;
+  /** Whether the document may not be written back, and what the lock said (XC-241, XC-269). */
+  readOnly?: boolean;
+  lock?: Lock | null;
+  /** Offered only where the lock is stale or unreadable: a person's call, never a default. */
+  onTakeOver?: () => void;
 }) {
   const { reachability } = props;
   const label =
@@ -48,10 +54,31 @@ export function EngineStatus(props: {
           再起動
         </button>
       ) : null}
-      {reachability.kind === "reachable" && (props.unsaved ?? 0) > 0 && props.onSave ? (
-        <button type="button" className="btn ghost" onClick={props.onSave} title="文書に書き戻します。直前の版は隣に残ります">
-          未保存 {props.unsaved} 件 - 保存
+      {reachability.kind === "reachable" && props.readOnly && props.lock ? (
+        <span className="engine-readonly" title={describeLock(props.lock)}>
+          読み取り専用{props.lock.holder ? `：${props.lock.holder.host} の ${props.lock.holder.user}` : ""}
+        </span>
+      ) : null}
+      {reachability.kind === "reachable" && props.readOnly && props.lock && canTakeOver(props.lock) && props.onTakeOver ? (
+        <button
+          type="button"
+          className="btn ghost"
+          onClick={props.onTakeOver}
+          title="持ち主のプロセスが見つからないか、ロックを読めません。引き継ぐかどうかは人の判断で、生きているロックは壊しません（XC-241）"
+        >
+          ロックを引き継ぐ
         </button>
+      ) : null}
+      {reachability.kind === "reachable" && (props.unsaved ?? 0) > 0 && props.onSave ? (
+        props.readOnly ? (
+          <span className="type-caption" style={{ color: "var(--state-warn)" }} title="読み取り専用のため、この作業は文書に書き戻せません">
+            未保存 {props.unsaved} 件・読み取り専用のため保存できません
+          </span>
+        ) : (
+          <button type="button" className="btn ghost" onClick={props.onSave} title="文書に書き戻します。直前の版は隣に残ります">
+            未保存 {props.unsaved} 件 - 保存
+          </button>
+        )
       ) : null}
       {reachability.kind === "reachable" && (props.unsaved ?? 0) === 0 && props.savedAt ? (
         <span className="type-caption" style={{ color: "var(--ink-faint)" }} title="この文書を最後に書き戻した時刻。読み手のゾーンで表示し、記録時のゾーンが違えば添えます（XC-142）">
@@ -80,6 +107,29 @@ export function EngineLost(props: { lost: readonly AppliedWrite[] | null; onDism
                 {group.count > 1 ? ` ×${group.count}` : ""}、最後は {describeRecorded(group.lastAt)}）
               </small>
             </li>
+          ))}
+        </ul>
+      </div>
+      {props.onDismiss ? (
+        <button type="button" className="btn ghost" onClick={props.onDismiss}>
+          閉じる
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/** What the engine warned about beside an answer, in its own words, until dismissed (XC-001). A
+ *  warning dropped is a document lifted, a dataset closed or a lock held that nobody was told of. */
+export function EngineWarnings(props: { warnings: readonly string[]; onDismiss?: () => void }) {
+  if (props.warnings.length === 0) return null;
+  return (
+    <div className="notice warn" role="status">
+      <div>
+        <b>エンジンからの注意：{props.warnings.length} 件</b>
+        <ul className="lost-list">
+          {props.warnings.map((one, index) => (
+            <li key={`${index}:${one.slice(0, 24)}`}>{one}</li>
           ))}
         </ul>
       </div>
