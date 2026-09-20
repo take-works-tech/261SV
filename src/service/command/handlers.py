@@ -869,13 +869,32 @@ def field_declare_unit(session: Session, parameters: Mapping[str, Any]) -> Effec
 
 
 def field_statistics(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
+    """A field's minimum, maximum and mean over the case, or over one named part (INV-017).
+
+    `region` is a part's name as `dataset.parts` lists it (GL-029, INV-019). The scope is written
+    into the answer either way, so a number never travels without saying what it covered
+    (view/AC-035); a part the file named and the reader could not fill has no numbers and says so.
+    """
     loaded = session.loaded(str(parameters["datasetId"]))
     if isinstance(loaded, Result):
         return loaded
     name = str(parameters["fieldName"])
-    if parameters.get("region"):
-        return refused("領域を限った統計はこの版では扱いません。ケース全体で求めます")
-    holders = loaded.holders(name)
+    region = parameters.get("region")
+    if region:
+        try:
+            part = loaded.case.part(str(region))
+        except KeyError:
+            return refused(
+                f"'{region}' というパートはこのデータセットにありません。"
+                f"あるのは {[one.label for one in loaded.case.parts]} です（dataset.parts の名前で指定します）"
+            )
+        if part.dataset is None:
+            return refused(f"パート '{part.label}' は読めていません（{part.reason or '理由不明'}）。数はありません")
+        if name not in part.dataset.fields:
+            return refused(f"'{name}' というフィールドはパート '{part.label}' にありません")
+        holders = [part]
+    else:
+        holders = loaded.holders(name)
     if not holders:
         return refused(f"'{name}' というフィールドはこのデータセットにありません")
     fields = [part.dataset.fields[name] for part in holders if part.dataset is not None]
@@ -890,9 +909,17 @@ def field_statistics(session: Session, parameters: Mapping[str, Any]) -> Effect 
     caveats: frozenset[Caveat] = frozenset()
     if loaded.case.is_partial:
         caveats = caveats | {Caveat.PARTIAL_DATASET}
-    scope = f"ケース全体（{len(holders)} パート）"
+    scope = f"パート {holders[0].label}" if region else f"ケース全体（{len(holders)} パート）"
 
-    maximum = loaded.case.maximum(name)
+    if region:
+        # One part's own extremum, located in that part's words and named for it (INV-019).
+        maximum = holders[0].dataset.maximum(name) if holders[0].dataset is not None else loaded.case.maximum(name)
+        if maximum.location:
+            maximum = replace(maximum, location=f"{holders[0].label}：{maximum.location}")
+        if caveats:
+            maximum = maximum.with_caveat(Caveat.PARTIAL_DATASET)
+    else:
+        maximum = loaded.case.maximum(name)
     minimum = as_reported(
         summarise(
             values, reduction=Reduction.MIN, association=association, scope=scope,

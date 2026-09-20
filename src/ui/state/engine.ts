@@ -180,6 +180,9 @@ export interface EngineState {
   readonly probe: Reported | null;
   readonly probeLocation: string | null;
   readonly statistics: Results["field.statistics"] | null;
+  /** The selected part's statistics for the field on screen, asked by the part's name and answered
+   *  with the scope stated (XC-280). Null where no present part is selected. */
+  readonly partStatistics: Results["field.statistics"] | null;
   readonly bounds: readonly [number[], number[]] | null;
   readonly turntable: Turntable;
   /** What the engine last refused, in its own words. Shown rather than swallowed (XC-001). */
@@ -268,6 +271,7 @@ const EMPTY: EngineState = {
   probe: null,
   probeLocation: null,
   statistics: null,
+  partStatistics: null,
   bounds: null,
   turntable: { ...START },
   refusal: null,
@@ -496,6 +500,7 @@ export const engineState = {
       probe: null,
       probeLocation: null,
       statistics: null,
+      partStatistics: null,
     });
     return true;
   },
@@ -548,6 +553,7 @@ export const engineState = {
       probe: null,
       probeLocation: null,
       statistics: null,
+      partStatistics: null,
       turntable: { ...START },
     });
     const described = await ask("dataset.describe", { datasetId: loaded.datasetId });
@@ -609,11 +615,29 @@ export const engineState = {
       // (view/AC-055). A pixel on nothing changes no selection: nothing was chosen there.
       selectedPart: answer?.part ?? state.selectedPart,
     });
+    await engineState.refreshPartStatistics();
   },
 
-  /** Class 1: choose a row - a part or a block - in the outliner or by picking. Nothing is written. */
-  selectPart(name: string | null): void {
+  /** Class 1: choose a row - a part or a block - in the outliner or by picking. Nothing is written;
+   *  the part's statistics are read, because the Object section shows them (XC-280). */
+  async selectPart(name: string | null): Promise<void> {
     setState({ selectedPart: name });
+    await engineState.refreshPartStatistics();
+  },
+
+  /** The selected part's numbers for the field on screen, by the part's name (XC-280). A read; the
+   *  answer carries the scope, and a row that is no present part has none. */
+  async refreshPartStatistics(): Promise<void> {
+    const part = state.parts?.find((one) => one.name === state.selectedPart && one.type !== "absent");
+    if (!part || !state.datasetId || !state.fieldName) {
+      setState({ partStatistics: null });
+      return;
+    }
+    const before = state.refusal;
+    const answered = await ask("field.statistics", { datasetId: state.datasetId, fieldName: state.fieldName, region: part.name });
+    // A refusal here is the section's to show beside the part, not the window's.
+    if (!answered) setState({ refusal: before });
+    setState({ partStatistics: answered });
   },
 
   /** Class 2, and a document write: which parts the view shows (CT-004 `partVisibility`, INV-019).
@@ -728,6 +752,7 @@ export const engineState = {
       fieldName: state.fieldName,
     });
     setState({ statistics });
+    await engineState.refreshPartStatistics();
   },
 
   /** Draw the view from the live camera. The picture, not the document: the camera goes as a

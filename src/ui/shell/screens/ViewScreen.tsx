@@ -19,7 +19,8 @@ import { ProbeReadout } from "../../shared/ProbeReadout";
 import { Outliner, type OutlinerNode } from "../../shared/Outliner";
 import { absentParts, isShown, outlinerTree, visibilityAfter } from "../../logic/parts";
 import { reducedNote, viewFooter } from "../../logic/showing";
-import { probeRows } from "../../logic/copy";
+import { probeRows, statisticsRows } from "../../logic/copy";
+import { CopyValues } from "../../shared/CopyValues";
 import { COPY_LABELS } from "../../shared/primitives";
 import { UnresolvedList } from "../../shared/UnresolvedList";
 import { WorkspaceItemList } from "../../shared/WorkspaceItemList";
@@ -1658,6 +1659,41 @@ function LivePartSection() {
           />
         </div>
       </section>
+      {present && e.fieldName ? (
+        <section className="prop-section">
+          <h3>統計（{e.fieldName}・このパートだけ）</h3>
+          {e.partStatistics ? (
+            <>
+              <div className="prop-row"><label>範囲</label><span>{e.partStatistics.scope}</span></div>
+              {(["maximum", "minimum", "mean"] as const).map((key) => {
+                const one = e.partStatistics?.[key];
+                if (!one) return null;
+                const word = key === "maximum" ? "最大" : key === "minimum" ? "最小" : "平均";
+                return (
+                  <div className="prop-row" key={key}>
+                    <label>{word}</label>
+                    <span>
+                      {one.value === null ? `値なし（${one.missingBecause ?? "理由不明"}）` : `${formatValue(one.value, one.digits)} ${one.unit ?? UNDECLARED}`}
+                      {one.location ? <small className="type-caption" style={{ color: "var(--ink-muted)" }}>（{one.location}）</small> : null}
+                    </span>
+                  </div>
+                );
+              })}
+              <div className="prop-row"><label>欠損数</label><span>{e.partStatistics.missingCount.toLocaleString("en-US")} 件</span></div>
+              <div className="prop-row">
+                <label>値を写す</label>
+                <CopyValues
+                  rows={statisticsRows(e.fieldName, e.partStatistics, COPY_LABELS)}
+                  title="このパートだけの最大・最小・平均・欠損数を、範囲・単位・有効桁・来歴つきのタブ区切りで写します（XC-279, XC-280）"
+                />
+              </div>
+              <p className="prop-note">全体の数値はレールの「エンジン」節にあります。このパートの数値はエンジンがパート名で計算したもので、全体から切り出したものではありません（INV-001, INV-019）。</p>
+            </>
+          ) : (
+            <p className="prop-note">{e.refusal ? `このパートの統計はありません：${e.refusal}` : "このパートの統計をエンジンに問い合わせています…"}</p>
+          )}
+        </section>
+      ) : null}
       <section className="prop-section">
         <p className="prop-note" style={{ margin: 0 }}>表示定義（partVisibility）だけを編集します。元のデータセット、解析値、単位、来歴は変更しません（AC-067）。</p>
       </section>

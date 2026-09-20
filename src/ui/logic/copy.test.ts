@@ -43,7 +43,9 @@ describe("the tables", () => {
 
     expect(rows[0]).toEqual([...HEADER]);
     expect(rows.map((row) => row[0])).toEqual(["項目", "temperature（最大）", "temperature（最小）", "temperature（平均）", "temperature（欠損数）"]);
-    expect(rows[3]).toEqual(["temperature（平均）", "4.5", "K", "6", "計算", "", "不完全なケース；式：volume-weighted mean"]);
+    // Every row says what it covered, so a pasted number is never a part's taken for the model's (INV-017).
+    expect(rows[1]?.[6]).toBe("範囲：whole model・重み：dualVolume・点の上");
+    expect(rows[3]).toEqual(["temperature（平均）", "4.5", "K", "6", "計算", "", "不完全なケース；式：volume-weighted mean；範囲：whole model・重み：dualVolume・点の上"]);
     expect(rows[4]).toEqual(["temperature（欠損数）", "0", "件", "整数", "計算", "", "範囲：whole model・重み：dualVolume・点の上"]);
   });
 

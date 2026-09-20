@@ -154,7 +154,7 @@ no identifier to report.
 | `dataset.load` | write | case id, file paths | dataset id, fields with association, support level, gaps |
 | `dataset.describe` | read | dataset id | point and cell counts, bounds in metres, time steps, partial flag |
 | `field.declareUnit` | write | dataset id, field name, unit symbol | - |
-| `field.statistics` | read | dataset id, field name, region? | min, max, mean, missing count, the association used |
+| `field.statistics` | read | dataset id, field name, region? - a part's name as `dataset.parts` lists it | min, max, mean, missing count, the association used, and the scope: the whole case or the one part (INV-017, INV-019) |
 | `variable.declare` | write | workspace id or case id, name, value, unit? | variable id |
 | `variable.set` | write | variable id, value | ids of every place that changed |
 | `variable.detach` | write | case id, variable id | the value it kept - the variable stops following the parent (XC-117) |

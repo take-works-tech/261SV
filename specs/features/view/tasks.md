@@ -184,6 +184,10 @@ updated: 2026-09-20
 - satisfies: AC-035
 - depends_on: TASK-029
 - done_when: every summary states whether it covered one part or the model
+- done: 2026-09-20 (XC-280). `field.statistics` answers `scope` as the whole case with its part
+  count, or the one part named by `region`; the selected part's Object section shows its numbers
+  with the scope and copies them with it. The Exodus fixture of two blocks shows a part's maximum
+  differing from the model's
 
 ### TASK-031 - Background kinds, chosen while building them
 - satisfies: AC-036

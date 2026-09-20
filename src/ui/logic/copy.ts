@@ -15,9 +15,14 @@ export interface CopyLabels {
 
 export const HEADER: readonly string[] = ["項目", "値", "単位", "有効桁", "来歴", "位置", "注記"];
 
-/** One reported value as a row. The value is written at its own digits, as the screen shows it. */
-export function reportedRow(label: string, reported: Reported, labels: CopyLabels): string[] {
-  const notes = [...(reported.caveats ?? []), ...(reported.formula ? [`式：${reported.formula}`] : [])];
+/** One reported value as a row. The value is written at its own digits, as the screen shows it;
+ *  `scope` - what the number covered - goes into the notes where the caller has one (INV-017). */
+export function reportedRow(label: string, reported: Reported, labels: CopyLabels, scope?: string): string[] {
+  const notes = [
+    ...(reported.caveats ?? []),
+    ...(reported.formula ? [`式：${reported.formula}`] : []),
+    ...(scope ? [`範囲：${scope}`] : []),
+  ];
   return [
     label,
     reported.value === null ? `値なし（${reported.missingBecause ?? "理由不明"}）` : formatValue(reported.value, reported.digits),
@@ -33,13 +38,13 @@ const ASSOCIATION_WORD: Record<string, string> = { point: "点", cell: "要素" 
 
 /** The field's statistics as rows: the three values, and the missing count as the integer it is. */
 export function statisticsRows(fieldName: string, statistics: Results["field.statistics"], labels: CopyLabels): string[][] {
-  const scope = `範囲：${statistics.scope}・重み：${statistics.weighting}・${ASSOCIATION_WORD[statistics.association] ?? statistics.association}の上`;
+  const scope = `${statistics.scope}・重み：${statistics.weighting}・${ASSOCIATION_WORD[statistics.association] ?? statistics.association}の上`;
   return [
     [...HEADER],
-    reportedRow(`${fieldName}（最大）`, statistics.maximum, labels),
-    reportedRow(`${fieldName}（最小）`, statistics.minimum, labels),
-    reportedRow(`${fieldName}（平均）`, statistics.mean, labels),
-    [`${fieldName}（欠損数）`, String(statistics.missingCount), "件", "整数", labels.provenance["computed"] ?? "computed", "", scope],
+    reportedRow(`${fieldName}（最大）`, statistics.maximum, labels, scope),
+    reportedRow(`${fieldName}（最小）`, statistics.minimum, labels, scope),
+    reportedRow(`${fieldName}（平均）`, statistics.mean, labels, scope),
+    [`${fieldName}（欠損数）`, String(statistics.missingCount), "件", "整数", labels.provenance["computed"] ?? "computed", "", `範囲：${scope}`],
   ];
 }
 

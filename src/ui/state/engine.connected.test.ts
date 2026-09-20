@@ -226,6 +226,12 @@ describe("the prototype thread from the interface's side", () => {
     expect(s.probeLocation).toContain("節点");
     // The part under the pixel is the selection now (view/AC-055): the outliner follows the viewport.
     expect(s.selectedPart).toBe("cube");
+    // And the part's own statistics were read by its name, with the scope on the answer (XC-280):
+    // the one part of a flat file has the model's numbers, and says which it covered.
+    expect(s.partStatistics?.scope).toBe("パート cube");
+    expect(s.partStatistics?.maximum.value).toBe(8);
+    expect(s.partStatistics?.maximum.location).toContain("cube：");
+    expect(s.statistics?.scope).toBe("ケース全体（1 パート）");
     // The probed value copied: the same number the readout shows, with its unit and the location.
     if (!s.probe) throw new Error("the probe was not read");
     const row = probeRows("temperature", s.probe, s.probeLocation, { undeclared: "単位未宣言", provenance: { dataset: "データ" } })[1];
