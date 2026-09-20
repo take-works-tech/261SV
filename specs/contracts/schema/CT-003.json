@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "3.4.0",
+  "version": "3.5.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -35,6 +35,7 @@
         "variable.detach",
         "view.create",
         "view.update",
+        "view.get",
         "view.duplicate",
         "view.rename",
         "view.delete",
@@ -1587,6 +1588,19 @@
                 "type": "string"
               },
               "description": "取り除く実行の識別子"
+            }
+          }
+        },
+        "view.get": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "viewId"
+          ],
+          "properties": {
+            "viewId": {
+              "type": "string",
+              "description": "ビュー の識別子（CT-001）"
             }
           }
         }
@@ -3265,6 +3279,7 @@
                 "required": [
                   "cellCount",
                   "name",
+                  "path",
                   "pointCount",
                   "type"
                 ],
@@ -3276,6 +3291,18 @@
                   "type": {
                     "type": "string",
                     "description": "パートの種類"
+                  },
+                  "path": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "description": "ファイルが付けた名前の経路。ルートが先で、最後がこのパートの名前（INV-019）。name はこれを一行にしたもの"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "欠けている理由。読み手の言葉で、type が absent のときだけ載る（XC-272）"
                   },
                   "pointCount": {
                     "type": "integer",
@@ -3289,7 +3316,7 @@
                   },
                   "parentId": {
                     "type": "string",
-                    "description": "親。ファイルに階層があれば"
+                    "description": "親。path から最後の一歩を除いたものを一行にした名前で、ルートには載らない"
                   },
                   "boundsM": {
                     "type": "object",
@@ -4150,6 +4177,10 @@
             "association": {
               "type": "string",
               "description": "節点の値か要素の値か（INV-003）"
+            },
+            "part": {
+              "type": "string",
+              "description": "値を答えたパートの名前（経路を一行にしたもの）。画素の先に何もなければ載らない（view/AC-055）"
             }
           }
         },
@@ -4310,6 +4341,30 @@
                 "type": "string"
               },
               "description": "残す実行の記録（XC-046）"
+            }
+          }
+        },
+        "view.get": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "revision",
+            "definition"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "対象"
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "文書が今持っている版"
+            },
+            "definition": {
+              "type": "object",
+              "description": "CT-004。文書が今持っている定義そのもの：書く前に読むためのもの（XC-274）"
             }
           }
         }

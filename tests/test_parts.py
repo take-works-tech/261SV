@@ -190,6 +190,16 @@ class TestTheCaseWideExtremumSaysWhereItIs:
         assert value.value == 92.0
         assert value.location == "asm / gasket：node 3"
 
+    def test_a_present_part_carries_no_reason_to_be_absent(self) -> None:
+        with pytest.raises(ValueError):
+            Part("a", ("a",), mesh(1.0, 2.0, 3.0), "要素なし")
+        absent = Part("washer", ("asm", "washer"), None, "要素なし")
+
+        assert absent.absence == "asm / washer（要素なし）"
+        assert absent.parent_label == "asm"
+        assert Part("asm", ("asm",), None).absence == "asm"
+        assert Part("asm", ("asm",), None).parent_label is None
+
     def test_a_part_that_cannot_report_is_named_in_the_reason(self) -> None:
         holed = LoadedCase(
             parts=(Part("a", ("a",), mesh(1.0, np.nan, 3.0)),),

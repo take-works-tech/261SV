@@ -42,7 +42,8 @@ from service.workspace import items  # noqa: E402
 from service.workspace.document import FORMAT_VERSION  # noqa: E402
 from domain_core.recorded_time import STORED_FORMAT, record as record_time  # noqa: E402
 from test_reader import write_grid  # noqa: E402
-from demo_case import write_cube  # noqa: E402, F401 - re-exported for the tests that import it from here
+from demo_case import write_cube, write_two_blocks  # noqa: E402, F401 - re-exported for the tests that import it from here
+from test_render import decode  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 ZONE = timezone(timedelta(hours=9))
@@ -107,13 +108,13 @@ class TestWhatThisBuildRegisters:
 
         assert registered == {
             "workspace.open", "dataset.load", "dataset.describe", "dataset.parts",
-            "field.declareUnit", "field.statistics", "view.create", "view.update", "view.render",
+            "field.declareUnit", "field.statistics", "view.create", "view.update", "view.get", "view.render",
             "dataset.probe", "view.pick", "report.create", "report.export", "report.provenance",
             "workspace.save", "dataset.inspect", "history.list",
             "system.capabilities", "system.protocols", "system.audit",
             "output.list", "output.plan", "output.prune",
         }
-        assert len(surface.unimplemented()) == len(OPERATIONS) - 23
+        assert len(surface.unimplemented()) == len(OPERATIONS) - 24
 
     def test_an_unimplemented_operation_is_refused_and_named_as_such(self) -> None:
         surface, _ = a_surface()
@@ -345,7 +346,7 @@ class TestLoadingADataset:
         assert described.value["resultAxis"]["unit"] is None
         assert parts.status is Status.ANSWERED
         assert parts.value["parts"] == [{
-            "name": "case", "type": "part", "pointCount": 4, "cellCount": 2,
+            "name": "case", "type": "part", "path": ["case"], "pointCount": 4, "cellCount": 2,
             "boundsM": {"minM": [0.0, 0.0, 0.0], "maxM": [1.0, 1.0, 0.0]},
         }]
 
@@ -599,6 +600,146 @@ class TestProbingAPoint:
         from service.command.catalogue import PARAMETERS
 
         assert "fieldName" in PARAMETERS["dataset.probe"][1]
+
+
+class TestReadingAViewBack:
+    """`view.get` (CT-003 3.5.0): the definition the document holds now, with its revision - what an
+    interface reads before it writes, so a saved camera or a hidden part survives the next redraw."""
+
+    def test_get_answers_the_definition_the_document_holds_and_its_revision(self, tmp_path: Path) -> None:
+        surface, _, _ = opened(tmp_path)
+        view_id = surface.submit(Command("view.create", {"workspaceId": "ws:1", "definition": {
+            "name": "応力", "representation": "surface",
+        }})).value["id"]
+
+        first = surface.submit(Command("view.get", {"viewId": view_id}))
+        surface.submit(Command("view.update", {"viewId": view_id, "definition": {
+            "name": "応力", "representation": "surface", "partVisibility": {"gasket": False},
+        }}))
+        second = surface.submit(Command("view.get", {"viewId": view_id}))
+
+        assert first.status is Status.ANSWERED, first.reason
+        assert first.value["id"] == view_id and first.value["revision"] == 1
+        assert first.value["definition"]["name"] == "応力"
+        assert "partVisibility" not in first.value["definition"]
+        assert second.value["revision"] == 2
+        assert second.value["definition"]["partVisibility"] == {"gasket": False}
+
+    def test_a_view_the_document_does_not_hold_is_refused(self, tmp_path: Path) -> None:
+        surface, _, _ = opened(tmp_path)
+
+        result = surface.submit(Command("view.get", {"viewId": "view:none"}))
+
+        assert result.status is Status.REFUSED
+        assert "view:none" in (result.reason or "")
+
+
+@needs_offscreen
+class TestPartVisibility:
+    """What the outliner's visibility toggle means to the engine (CT-004 `partVisibility`, INV-019,
+    XC-274): a hidden part is not drawn, not picked and not exported; a definition that hides every
+    part, or names one that is not there, is refused rather than drawn past."""
+
+    @staticmethod
+    def _two(tmp_path: Path) -> tuple[Surface, Session, str, list[str]]:
+        surface, session, dataset_id = loaded(tmp_path, write=write_two_blocks, name="two.ex2")
+        parts = surface.submit(Command("dataset.parts", {"datasetId": dataset_id})).value["parts"]
+        return surface, session, dataset_id, [one["name"] for one in parts]
+
+    @staticmethod
+    def _view(surface: Surface, dataset_id: str, visibility: dict | None = None) -> str:
+        definition: dict = {
+            "name": f"全体図 {json.dumps(visibility, ensure_ascii=False, sort_keys=True)}", "datasetId": dataset_id, "representation": "surface",
+            "colouring": {"fieldName": "stress", "association": "point", "colourMap": "viridis"},
+            # One fixed look for every view here. Without it the renderer fits the camera to what is
+            # shown, and a frame with a part hidden covers *more* pixels, not fewer - measured on
+            # 2026-09-20, and the reason the interface always draws with a camera of its own.
+            "camera": {"position_m": [1.0, 0.5, 6.0], "focalPoint_m": [1.0, 0.5, 0.0], "viewUp": [0.0, 1.0, 0.0], "projection": "perspective"},
+        }
+        if visibility is not None:
+            definition["partVisibility"] = visibility
+        return surface.submit(Command("view.create", {"workspaceId": "ws:1", "definition": definition})).value["id"]
+
+    @staticmethod
+    def _drawn(session: Session, surface: Surface, view_id: str) -> int:
+        """How many pixels the model covers in a frame: those not the background's colour."""
+        answer = surface.submit(Command("view.render", {
+            "viewId": view_id, "width": 200, "height": 200, "format": "png", "legend": False,
+        }))
+        assert answer.status is Status.ANSWERED, answer.reason
+        frame = decode(session.handles.fetch(answer.value["handle"]))
+        return int((frame != frame[0, 0]).any(axis=2).sum())
+
+    def test_the_parts_come_with_the_file_s_own_hierarchy(self, tmp_path: Path) -> None:
+        surface, _, dataset_id, names = self._two(tmp_path)
+
+        parts = surface.submit(Command("dataset.parts", {"datasetId": dataset_id})).value["parts"]
+
+        assert len(parts) == 2 and len(set(names)) == 2
+        for one in parts:
+            assert one["path"][:2] == ["two", "Element Blocks"] and len(one["path"]) == 3
+            assert one["parentId"] == "two / Element Blocks"
+            assert one["name"] == " / ".join(one["path"])
+            assert one["type"] == "part" and one["cellCount"] > 0
+
+    def test_a_hidden_part_is_not_drawn(self, tmp_path: Path) -> None:
+        surface, session, dataset_id, names = self._two(tmp_path)
+
+        everything = self._drawn(session, surface, self._view(surface, dataset_id))
+        without_one = self._drawn(session, surface, self._view(surface, dataset_id, {names[1]: False}))
+
+        assert 0 < without_one < everything
+
+    def test_hiding_every_part_is_refused_rather_than_drawn_empty(self, tmp_path: Path) -> None:
+        surface, _, dataset_id, names = self._two(tmp_path)
+        view_id = self._view(surface, dataset_id, {name: False for name in names})
+
+        result = surface.submit(Command("view.render", {"viewId": view_id, "width": 200, "height": 200, "format": "png"}))
+
+        assert result.status is Status.REFUSED
+        assert "非表示" in (result.reason or "")
+
+    def test_a_name_the_dataset_does_not_have_is_refused(self, tmp_path: Path) -> None:
+        surface, _, dataset_id, names = self._two(tmp_path)
+        view_id = self._view(surface, dataset_id, {names[0]: True, "two / Element Blocks / ghost": False})
+
+        result = surface.submit(Command("view.render", {"viewId": view_id, "width": 200, "height": 200, "format": "png"}))
+
+        assert result.status is Status.REFUSED
+        assert "ghost" in (result.reason or "") and names[0] in (result.reason or "")
+
+    def test_the_pick_names_the_part_that_answered_and_never_a_hidden_one(self, tmp_path: Path) -> None:
+        surface, _, dataset_id, names = self._two(tmp_path)
+        pixel = {"width": 200, "height": 200, "x": 150, "y": 100}
+
+        shown = surface.submit(Command("view.pick", {"viewId": self._view(surface, dataset_id), **pixel}))
+        assert shown.status is Status.ANSWERED, shown.reason
+        answered = shown.value.get("part")
+        assert answered in names, "the pixel is on the model, and the part that answered is named"
+        hidden = surface.submit(Command("view.pick", {"viewId": self._view(surface, dataset_id, {answered: False}), **pixel}))
+
+        assert hidden.status is Status.ANSWERED, hidden.reason
+        assert hidden.value.get("part") != answered, "a hidden part is not in the picture, so it cannot answer"
+
+    def test_the_document_s_figure_shows_what_the_view_shows(self, tmp_path: Path) -> None:
+        surface, _, dataset_id, names = self._two(tmp_path)
+
+        def figure(view_id: str) -> bytes:
+            report_id = surface.submit(Command("report.create", {"workspaceId": "ws:1", "definition": {
+                "name": f"図 {view_id}", "targets": ["html"],
+                "blocks": [{"kind": "view", "viewId": view_id, "form": "still"}],
+            }})).value["id"]
+            target = tmp_path / f"{view_id.replace(':', '-')}.html"
+            result = surface.submit(Command("report.export", {"reportId": report_id, "path": str(target)}))
+            assert result.status is Status.APPLIED, result.reason
+            document = target.read_text(encoding="utf-8")
+            start = document.index("data:image/png;base64,") + len("data:image/png;base64,")
+            return base64.b64decode(document[start : document.index('"', start)])
+
+        everything = figure(self._view(surface, dataset_id))
+        without_one = figure(self._view(surface, dataset_id, {names[0]: False}))
+
+        assert without_one != everything
 
 
 @needs_offscreen

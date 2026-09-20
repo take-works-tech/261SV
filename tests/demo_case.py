@@ -56,6 +56,32 @@ def write_cube(path: Path) -> None:
     writer.Write()
 
 
+def write_two_blocks(path: Path) -> None:
+    """Two triangles and a quad in an Exodus file: the toolkit's writer puts each cell type in its
+    own element block, and the reader returns them as two parts under `Element Blocks` - a case
+    with a hierarchy and two parts to show or hide (INV-019). Measured here on 2026-09-20 rather
+    than assumed; the block names are the writer's, and a test reads them back rather than
+    spelling them."""
+    from vtkmodules.vtkCommonDataModel import VTK_QUAD, VTK_TRIANGLE
+    from vtkmodules.vtkIOExodus import vtkExodusIIWriter
+
+    points = vtkPoints()
+    for x, y in ((0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0), (2.0, 0.0), (2.0, 1.0)):
+        points.InsertNextPoint(x, y, 0.0)
+    grid = vtkUnstructuredGrid()
+    grid.SetPoints(points)
+    for triangle in ([0, 1, 2], [1, 3, 2]):
+        grid.InsertNextCell(VTK_TRIANGLE, 3, triangle)
+    grid.InsertNextCell(VTK_QUAD, 4, [1, 4, 5, 3])
+    field = numpy_to_vtk(np.array([10.0, 20.0, 90.0, 40.0, 50.0, 60.0]), deep=True)
+    field.SetName("stress")
+    grid.GetPointData().AddArray(field)
+    writer = vtkExodusIIWriter()
+    writer.SetFileName(str(path))
+    writer.SetInputData(grid)
+    writer.Write()
+
+
 def write_workspace(path: Path) -> Path:
     """A workspace document with one case and nothing in it yet."""
     path.write_text(

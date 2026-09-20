@@ -16,6 +16,7 @@ Specification: ingest/REQ-010, REQ-011, REQ-013, ingest/TASK-001, TASK-002.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Callable
 from pathlib import Path
@@ -42,7 +43,7 @@ from vtkmodules.vtkIOXML import (
     vtkXMLUnstructuredGridReader,
 )
 
-from domain_core.case_contents import CaseContents
+from domain_core.case_contents import CaseContents, ResultAxis
 from domain_core.dataset import Association, Dataset, Field, SourceFrame
 from domain_core.frame import (
     CANONICAL_SCALE,
@@ -290,9 +291,16 @@ def _block_name(parent: vtkCompositeDataSet, index: int, fallback: str) -> str:
     return fallback
 
 
-def _walk(node: vtkDataObject, path: tuple[str, ...], found: list[Part], absent: list[str],
-          partitions: list[int], source: SourceFrame | None = None) -> None:
-    """Collect the leaves of a composite as parts, keeping absent ones as absences.
+#: The reader's reason for a part it returned without geometry (XC-272, E-210).
+NO_CELLS = "要素なし"
+
+
+def _walk(node: vtkDataObject, path: tuple[str, ...], parts: list[Part], partitions: list[int],
+          source: SourceFrame | None = None) -> None:
+    """Collect the leaves of a composite as parts - present, or absent with the reason.
+
+    One list for both, because an absence is a part the file named (INV-019): where it sits in the
+    hierarchy is as much a fact about it as the name, and a second list of strings lost it.
 
     An empty leaf is a named `None` (E-133's measurement companion): the file said there was a part
     there and there is not, which is exactly what AC-027 asks be reported rather than skipped.
@@ -303,9 +311,9 @@ def _walk(node: vtkDataObject, path: tuple[str, ...], found: list[Part], absent:
         present = [piece for piece in pieces if piece is not None]
         partitions.append(max(len(present), 1))
         if not present:
-            absent.append(" / ".join(path) or "unnamed partitioned dataset")
+            parts.append(Part(name=path[-1], path=path, dataset=None))
             return
-        found.append(Part(name=path[-1], path=path, dataset=_combine(present, source)))
+        parts.append(Part(name=path[-1], path=path, dataset=_combine(present, source)))
         return
 
     if isinstance(node, vtkCompositeDataSet):
@@ -322,9 +330,9 @@ def _walk(node: vtkDataObject, path: tuple[str, ...], found: list[Part], absent:
             )
             name = _block_name(node, index, f"block {index}")
             if child is None:
-                absent.append(" / ".join(path + (name,)))
+                parts.append(Part(name=name, path=path + (name,), dataset=None))
                 continue
-            _walk(child, path + (name,), found, absent, partitions, source)
+            _walk(child, path + (name,), parts, partitions, source)
         return
 
     # From here on the disposition is CT-012's, read from the contract rather than restated.
@@ -337,17 +345,17 @@ def _walk(node: vtkDataObject, path: tuple[str, ...], found: list[Part], absent:
             # zone it could not read looks like from outside: points allocated from the declared
             # size, no cells, and an error on the toolkit's log that reaches nobody (E-210). An
             # absence, said as one, never a part of nothing counted as present (AC-027, XC-272).
-            absent.append(f"{where}（要素なし）")
+            parts.append(Part(name=path[-1], path=path, dataset=None, reason=NO_CELLS))
             return
-        found.append(Part(name=path[-1], path=path, dataset=_as_dataset(node, source=source)))
+        parts.append(Part(name=path[-1], path=path, dataset=_as_dataset(node, source=source)))
         return
 
     if row.disposition is Disposition.CONVERT:
         converted, record = to_unstructured(node)
         if converted.GetNumberOfCells() == 0:
-            absent.append(f"{where}（要素なし）")
+            parts.append(Part(name=path[-1], path=path, dataset=None, reason=NO_CELLS))
             return
-        found.append(Part(
+        parts.append(Part(
             name=path[-1], path=path, dataset=_as_dataset(converted, source=source, conversion=record),
         ))
         return
@@ -498,8 +506,7 @@ def read_case(path: str | Path) -> LoadedCase:
     if data is None:
         raise UnreadableFileError(f"{location.name} was read by {choice.factory.__name__} and is empty")
 
-    found: list[Part] = []
-    absent: list[str] = []
+    parts: list[Part] = []
     partitions: list[int] = []
     # The frame is resolved once for the file and carried onto every part, exactly as `read` carries
     # it onto its one dataset: a part that arrived through a composite is no less converted, and a
@@ -508,26 +515,35 @@ def read_case(path: str | Path) -> LoadedCase:
     source = SourceFrame(
         *resolve_frame(_declared_frame(location, data)), reader=choice.factory.__name__
     )
-    _walk(data, (location.stem,), found, absent, partitions, source)
+    _walk(data, (location.stem,), parts, partitions, source)
 
-    if not found:
+    if not any(part.is_present for part in parts):
         raise UnreadableFileError(
-            f"{location.name} named {len(absent)} part(s) and none of them is there"
-            if absent
+            f"{location.name} named {len(parts)} part(s) and none of them is there"
+            if parts
             else f"{location.name} holds no part this build can read"
         )
     # The sequence the file declared, read from the pipeline rather than from any one reader's method,
     # and its **kind left undeclared**: no reader in this build surfaces a statement of what the values
     # mean, and one of them will guess if asked (E-138, XC-240).
-    axis = axis_of(reader)
+    return assemble(parts, axis=axis_of(reader), partitions=partitions)
+
+
+def assemble(parts: Sequence[Part], *, axis: ResultAxis, partitions: Sequence[int]) -> LoadedCase:
+    """The case from its parts, present and absent (AC-027).
+
+    The counts are of what is here; the absences are listed by name with the reader's reason. One
+    place, so that a composite walked in memory and a file read from disk say the same about
+    themselves.
+    """
     return LoadedCase(
-        parts=tuple(found),
+        parts=tuple(parts),
         contents=CaseContents(
             steps=len(axis.positions) if axis.positions else 1,
-            parts=len(found),
+            parts=sum(1 for part in parts if part.is_present),
             axis=axis,
-            missing_parts=tuple(absent),
-            partitions=max(partitions or [1]),
+            missing_parts=tuple(part.absence for part in parts if not part.is_present),
+            partitions=max(list(partitions) or [1]),
         ),
     )
 

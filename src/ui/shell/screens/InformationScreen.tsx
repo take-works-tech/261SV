@@ -653,7 +653,7 @@ function LiveInformation({ view, caseId }: { view: InformationView; caseId: stri
                   {view.parts.map((part) => (
                     <tr key={part.name}>
                       <td><span className="in-mono">{part.name}</span></td>
-                      <td>{part.present ? "あり" : "欠け"}</td>
+                      <td>{part.present ? "あり" : `欠け${part.reason ? `（${part.reason}）` : ""}`}</td>
                       <NumberCell value={part.present ? group(part.points) : null} missingBecause={part.present ? undefined : "読めなかったパートに数はありません"} />
                       <NumberCell value={part.present ? group(part.cells) : null} missingBecause={part.present ? undefined : "読めなかったパートに数はありません"} />
                     </tr>

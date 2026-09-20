@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "3.4.0";
+export const PROTOCOL_VERSION = "3.5.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -83,6 +83,7 @@ export type Operation =
   | "dataset.inspect"
   | "output.list"
   | "output.plan"
+  | "view.get"
   ;
 
 export const OPERATIONS: readonly Operation[] = [
@@ -151,6 +152,7 @@ export const OPERATIONS: readonly Operation[] = [
   "dataset.inspect",
   "output.list",
   "output.plan",
+  "view.get",
 ];
 
 /** What each operation takes. From CT-003's $defs.operationParameters. */
@@ -437,6 +439,9 @@ export interface Parameters {
   "output.plan": {
     workspaceId: string;
     runsToRemove: readonly (string)[];
+  };
+  "view.get": {
+    viewId: string;
   };
 }
 
@@ -738,6 +743,8 @@ export interface Results {
     parts: readonly ({
       name: string;
       type: string;
+      path: readonly (string)[];
+      reason?: string;
       pointCount: number;
       cellCount: number;
       parentId?: string;
@@ -899,6 +906,7 @@ export interface Results {
       location?: string;
     };
     association?: string;
+    part?: string;
   };
   "dataset.inspect": {
     format: string;
@@ -928,6 +936,11 @@ export interface Results {
     files: readonly (string)[];
     freedBytes: number;
     keptRecords: readonly (string)[];
+  };
+  "view.get": {
+    id: string;
+    revision: number;
+    definition: Record<string, unknown>;
   };
 }
 

@@ -1,7 +1,8 @@
 /* The right sidebar (MOD-009): an icon rail and one property section for the current item or
  * selection - the rail's tab set belongs to the screen, and a selection-scoped tab appears below a
  * divider (11_ui.md). The section content is each screen's own; the shell provides the frame. */
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useEngine } from "../state/engine";
 import { session, useSession, type ScreenId } from "../state/session";
 
 export type RailTab = { id: string; label: string; glyph: string; scope?: "selection" };
@@ -77,6 +78,12 @@ export function RightSidebar(props: { render: (tab: string) => ReactNode }) {
     ? s.variant
     : (VARIANT_TAB[s.variant] ?? null);
   const [active, setActive] = useState<string | null>(null);
+  const selectedPart = useEngine().selectedPart;
+  useEffect(() => {
+    // Selection drives the rail (view/AC-068): a row chosen in the outliner or by picking lands on
+    // its own tab, once per selection - a person can leave it afterwards.
+    if (selectedPart && TABS[s.screen]?.some((tab) => tab.id === "objects")) setActive("objects");
+  }, [selectedPart, s.screen]);
   // The variant chooses the tab until a person does; after that the person's choice holds, because
   // a rail that jumped back on every re-render would be a rail nobody could use.
   const chosen = active ?? wanted ?? tabs[0]?.id ?? "overall";

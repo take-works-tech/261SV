@@ -2,20 +2,16 @@
  * selection. It shows what the file holds and never invents hierarchy where the file has none -
  * a flat file reads flat (mockup 1's outliner-flat state is the rule, not an edge case). */
 import { useState } from "react";
+import type { OutlinerNode, ToggleModifiers } from "../logic/parts";
 
-export type OutlinerNode = {
-  id: string;
-  name: string;
-  kind: string;
-  visible?: boolean;
-  children?: OutlinerNode[];
-};
+export type { OutlinerNode } from "../logic/parts";
 
 export function Outliner(props: {
   roots: OutlinerNode[];
   selectedId: string | null;
   onSelect: (id: string) => void;
-  onToggleVisible?: (id: string) => void;
+  /** The row's visibility control, with the keys held: Ctrl isolates the branch (view/AC-055). */
+  onToggleVisible?: (id: string, modifiers: ToggleModifiers) => void;
   emptyText?: string;
 }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -52,16 +48,21 @@ export function Outliner(props: {
           <span className="label">{node.name}</span>
           <span className="meta">{node.kind}</span>
         </button>
-        {props.onToggleVisible ? (
+        {props.onToggleVisible && node.toggle !== "none" ? (
           <button
             className="icon-button"
             style={{ width: 22, height: 22 }}
             aria-pressed={node.visible !== false}
             aria-label={node.visible !== false ? "表示中" : "非表示"}
-            onClick={() => props.onToggleVisible?.(node.id)}
+            title={node.toggle === "branch" ? "この枝の部品を表示 / 非表示（Ctrl でこの枝だけを表示）" : "表示 / 非表示（Ctrl でこの部品だけを表示）"}
+            onClick={(event) =>
+              props.onToggleVisible?.(node.id, { shift: event.shiftKey, ctrl: event.ctrlKey || event.metaKey })
+            }
           >
             {node.visible !== false ? "●" : "○"}
           </button>
+        ) : node.toggle === "none" && props.onToggleVisible ? (
+          <span style={{ width: 22 }} aria-hidden title="読めなかったパートに表示の切替はありません" />
         ) : null}
       </div>
       {!collapsed[node.id] ? (node.children ?? []).map((child) => renderNode(child, depth + 1)) : null}

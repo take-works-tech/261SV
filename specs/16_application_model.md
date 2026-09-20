@@ -261,6 +261,12 @@ previewed before a large recursive change. Selection is shared with the viewport
 (view/AC-068), and the row is the same object the property rail edits. r1 does not rename, reparent or
 delete source elements here.
 
+In the production interface the rows are `dataset.parts` - each part's `path` from the file, an
+absent part with the reader's reason and no control - and the visibility control writes the view's
+`partVisibility`, which the engine honours when it draws, picks and exports (XC-274). A block's
+control is its descendants', so `Shift` is a plain click here; `Ctrl` isolates. The header's search
+and filters, and the preview before a large recursive change, are not yet built.
+
 The complete product adds a second display mode, chosen in the header the way E-120's seven modes are:
 **source structure** (the @Dataset as authored) and **View objects** (what this @View draws, including
 derived objects that have no source row - a scalar field, a trajectory, an annotation). One tree cannot

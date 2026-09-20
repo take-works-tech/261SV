@@ -5868,3 +5868,45 @@ model or the prompt, never in a description that quietly went stale.
 - affects: MOD-009, CT-003
 - decidedness: Fixed
 - reversal_trigger: none foreseen; a fact added to CT-003 moves from the not-answered list to its section
+
+### XC-274 - The outliner reads the engine: the file's hierarchy, the view's visibility, a shared selection
+- decided: 2026-09-20
+- status: active
+- decision: with an engine connected, the `outliner` region shows the loaded dataset's parts as
+  `dataset.parts` lists them - a block for every step of the path the file gave a part, the part as
+  a leaf under it, an absent part where the file put it with the reader's reason and no control -
+  and never a fixture or an inferred hierarchy (view/AC-056). A row's visibility control writes the
+  view's `partVisibility` (CT-004) through `view.update`: a document write, unsaved work, carried in
+  the definition on every refresh. The engine draws, picks and exports only the parts the map
+  shows, and refuses by name a map that hides every part or names a part the dataset does not have.
+  Selection is interface state shared with the viewport in both directions (view/AC-055): a row
+  chosen in the outliner is the active object of the property rail, and `view.pick` names the part
+  it read so a pick selects it. Before a view is written the interface reads it back with
+  `view.get`; the camera a person kept, the parts they hid and the colour map they chose are the
+  document's, and the first redraw of a session no longer replaces them with what the window had
+- decided_by: engineering judgement, from #279's condition, INV-019 and XC-001
+- rationale: what is loaded is only knowable here (#279), and a tree drawn from a fixture beside a
+  live picture is the failure XC-001 names. The hierarchy is the file's: carrying it as a path from
+  the engine, rather than as a string an interface splits on a separator it did not choose, is what
+  keeps a name with a slash in it a name (INV-019). Visibility is a fact about the view and belongs
+  in its definition, where a report renders it, which is why the export honours the same map: a part
+  hidden on screen and drawn in the deliverable would be two pictures under one name. A map that
+  hides everything is refused rather than drawn as an empty frame with a legend, because that frame
+  is a picture of nothing presented as a picture of something. The read-back is the fix for a defect
+  the outliner made unavoidable: the store rebuilt the whole definition from window state on every
+  refresh, so a hidden part - and, since 2026-09-20, a kept camera - was overwritten by the next
+  session's first redraw. `items.edit` replaces a definition whole (workspace/AC-031), and nothing in CT-003
+  gave a definition back, so the interface could not have written what it never held
+- alternatives: **ignoring an unknown name in `partVisibility`** - silent, and a definition saying
+  something about nothing would render as if it said nothing. **Drawing an empty frame when every
+  part is hidden** - the picture that looks like a rendering and is not. **Carrying the definition
+  in `workspace.open`'s item list** instead of `view.get` - every definition on every open, for a
+  read that is needed once per view. **Selection through a `Shift`-reached descendant rule of its
+  own** - a block has no visibility of its own, so its control already reaches its descendants and
+  `Shift` adds nothing here; `Ctrl` isolates, as the model says
+- basis: E-001 (T1)
+- affects: MOD-009, CT-003, view/REQ-012, view/REQ-022
+- decidedness: Fixed
+- reversal_trigger: a part whose visibility a block should own separately from its descendants - a
+  block-level object with its own presentation - at which point the map gains block entries and the
+  descendant rule is written rather than implied

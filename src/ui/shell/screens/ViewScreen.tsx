@@ -17,6 +17,7 @@ import { SplitLayout } from "../../shared/SplitLayout";
 import { ViewportPlaceholder } from "../../shared/ViewportPlaceholder";
 import { ProbeReadout } from "../../shared/ProbeReadout";
 import { Outliner, type OutlinerNode } from "../../shared/Outliner";
+import { absentParts, isShown, outlinerTree, visibilityAfter } from "../../logic/parts";
 import { UnresolvedList } from "../../shared/UnresolvedList";
 import { WorkspaceItemList } from "../../shared/WorkspaceItemList";
 import { ConversationDrawer } from "../../shared/ConversationDrawer";
@@ -305,8 +306,8 @@ function ViewCanvas({ variant }: { variant: string }) {
         reduced: e.reduced && !e.reduced.startsWith("全三角形") ? e.reduced : null,
         // The case's own incompleteness, from the engine: the file named these and they are not there.
         partialNote: e.partial
-          ? e.absentParts.length > 0
-            ? `欠け ${e.absentParts.length} 件：${e.absentParts.join("、")}`
+          ? absentParts(e.parts).length > 0
+            ? `欠け ${absentParts(e.parts).length} 件：${absentParts(e.parts).join("、")}`
             : "ファイルが名前を挙げた部分の一部が読めていません"
           : null,
         // A drag turns the model and a click reads the value under it. Both go to the engine as
@@ -908,6 +909,8 @@ function OverallTab({ variant }: { variant: string }) {
   const kind = objectKindOf(variant);
   const [selectedNode, setSelectedNode] = useState<string | null>(kind ? `object-${kind}` : null);
   const spec = comparisonSpec(variant);
+  const e = useEngine();
+  const live = e.reachability.kind === "reachable";
   return (
     <div>
       <section className="prop-section">
@@ -926,16 +929,22 @@ function OverallTab({ variant }: { variant: string }) {
 
       <section className="prop-section">
         <h3>構成（アウトライナー）</h3>
-        {variant === "outliner-flat" ? (
-          <p className="prop-note" style={{ marginTop: 0 }}>元ファイルに親子関係がありません。推測せず、データセット直下の兄弟として表示します。</p>
-        ) : null}
-        <Outliner
-          roots={outlinerRoots(variant)}
-          selectedId={selectedNode}
-          onSelect={setSelectedNode}
-          onToggleVisible={(id) => submit({ operation: "view.update", parameters: { viewId: "view:current", definition: { partVisibility: { [id]: false } } } })}
-          emptyText="データセット未読込です。読み込むと元ファイルの構成をここに表示します。サンプル構造は作りません"
-        />
+        {live ? (
+          <LiveOutliner />
+        ) : (
+          <>
+            {variant === "outliner-flat" ? (
+              <p className="prop-note" style={{ marginTop: 0 }}>元ファイルに親子関係がありません。推測せず、データセット直下の兄弟として表示します。</p>
+            ) : null}
+            <Outliner
+              roots={outlinerRoots(variant)}
+              selectedId={selectedNode}
+              onSelect={setSelectedNode}
+              onToggleVisible={(id) => submit({ operation: "view.update", parameters: { viewId: "view:current", definition: { partVisibility: { [id]: false } } } })}
+              emptyText="データセット未読込です。読み込むと元ファイルの構成をここに表示します。サンプル構造は作りません"
+            />
+          </>
+        )}
       </section>
 
       <section className="prop-section">
@@ -948,6 +957,43 @@ function OverallTab({ variant }: { variant: string }) {
         <p className="prop-note">ガイドは表示状態です。解析値と正規データは変更しません。</p>
       </section>
     </div>
+  );
+}
+
+/* ---- the outliner with an engine: the file's own parts, the view's own visibility (XC-274) ---- */
+
+function LiveOutliner() {
+  const e = useEngine();
+  const parts = e.parts ?? [];
+  const flat = parts.length > 0 && parts.every((one) => one.path.length === 1);
+  return (
+    <>
+      {e.datasetId && flat ? (
+        <p className="prop-note" style={{ marginTop: 0 }}>元ファイルに親子関係がありません。推測せず、そのまま並べます（AC-056）。</p>
+      ) : null}
+      {e.partial ? (
+        <p className="prop-note" style={{ marginTop: 0 }}>読めなかったパートは「欠け」として、ファイルが置いた場所に並びます。推測した階層はありません（AC-056）。</p>
+      ) : null}
+      <Outliner
+        roots={outlinerTree(parts, e.partVisibility)}
+        selectedId={e.selectedPart}
+        onSelect={(id) => engineState.selectPart(id)}
+        onToggleVisible={(id, modifiers) =>
+          void engineState.setPartVisibility(visibilityAfter(parts, e.partVisibility, id, modifiers.ctrl ? "isolate" : "toggle"))
+        }
+        emptyText={
+          e.datasetId
+            ? "エンジンはこのデータセットにパートを挙げませんでした"
+            : "データセット未読込です。読み込むと元ファイルの構成をここに表示します。サンプル構造は作りません"
+        }
+      />
+      {e.datasetId ? (
+        <p className="prop-note">
+          表示の切替はビュー定義（partVisibility）への書き込みで、未保存の作業になります。Ctrl を押しながらで、その枝だけを表示します。
+          すべてを隠した定義は、空の絵の代わりに拒まれます。
+        </p>
+      ) : null}
+    </>
   );
 }
 
@@ -1512,17 +1558,92 @@ function OutputTab({ variant }: { variant: string }) {
 
 /* ---- selection tabs: objects / text / materials -------------------------------------------- */
 
-function ObjectsTab({ variant }: { variant: string }) {
-  const kind = objectKindOf(variant);
-  if (kind === null) {
+function NothingSelected() {
+  return (
+    <div className="prop-section">
+      <p className="prop-note" style={{ margin: 0 }}>
+        オブジェクトが選択されていません。画面かアウトライナー（ビュータブ）で選ぶと、種類ごとの項目をここに表示します。
+      </p>
+    </div>
+  );
+}
+
+/* ---- the selected part with an engine: the same row the outliner shows (view/AC-067) ---------- */
+
+function LivePartSection() {
+  const e = useEngine();
+  const parts = e.parts ?? [];
+  const selected = e.selectedPart ?? "";
+  const part = parts.find((one) => one.name === selected);
+  if (!part) {
+    // A block: a step of the file's hierarchy with parts under it, and nothing of its own to edit.
+    const under = parts.filter((one) => one.name.startsWith(`${selected} / `));
     return (
-      <div className="prop-section">
-        <p className="prop-note" style={{ margin: 0 }}>
-          オブジェクトが選択されていません。画面かアウトライナー（ビュータブ）で選ぶと、種類ごとの項目をここに表示します。
-        </p>
+      <div>
+        <div className="vi-selection">
+          <small>アクティブオブジェクト</small>
+          <b title={selected}>{selected.split(" / ").pop() ?? selected}</b>
+          <em>ブロック（元ファイルの階層）</em>
+        </div>
+        <section className="prop-section">
+          <div className="prop-row"><label>経路</label><span>{selected}</span></div>
+          <div className="prop-row"><label>含む部品</label><span>{under.length}</span></div>
+          <p className="prop-note" style={{ margin: 0 }}>ブロック自体に編集できる項目はありません。表示の切替はアウトライナーの行で、下の部品にまとめて効きます。</p>
+        </section>
       </div>
     );
   }
+  const present = part.type !== "absent";
+  const shown = isShown(e.partVisibility, part.name);
+  const bounds = part.boundsM;
+  return (
+    <div>
+      <div className="vi-selection">
+        <small>アクティブオブジェクト</small>
+        <b title={part.name}>{part.path[part.path.length - 1] ?? part.name}</b>
+        <em>{present ? "部品（元ファイルのパート）" : `欠け${part.reason ? `（${part.reason}）` : ""}`}</em>
+      </div>
+      <section className="prop-section">
+        <h3>パート</h3>
+        <div className="prop-row"><label>経路</label><span>{part.name}</span></div>
+        <div className="prop-row"><label>節点数</label><span>{present ? part.pointCount.toLocaleString("en-US") : "—"}</span></div>
+        <div className="prop-row"><label>要素数</label><span>{present ? part.cellCount.toLocaleString("en-US") : "—"}</span></div>
+        {bounds ? (
+          <div className="prop-row">
+            <label>範囲 (m)</label>
+            <span>{["X", "Y", "Z"].map((axis, index) => `${axis} ${formatValue(bounds.minM[index] ?? Number.NaN, 4)} … ${formatValue(bounds.maxM[index] ?? Number.NaN, 4)}`).join("　")}</span>
+          </div>
+        ) : null}
+        <div className="prop-row"><label>表示形式</label><span>surface（この版はこれだけ）</span></div>
+        <div className="prop-row">
+          <label htmlFor="live-part-visible">表示</label>
+          <input
+            id="live-part-visible"
+            type="checkbox"
+            checked={present && shown}
+            disabled={!present}
+            title={present ? "アウトライナーの同じ行の切替と同じ、ビュー定義への書き込みです" : "読めなかったパートに表示の切替はありません"}
+            style={{ justifySelf: "start" }}
+            onChange={() => void engineState.setPartVisibility(visibilityAfter(parts, e.partVisibility, part.name, "toggle"))}
+          />
+        </div>
+      </section>
+      <section className="prop-section">
+        <p className="prop-note" style={{ margin: 0 }}>表示定義（partVisibility）だけを編集します。元のデータセット、解析値、単位、来歴は変更しません（AC-067）。</p>
+      </section>
+    </div>
+  );
+}
+
+function ObjectsTab({ variant }: { variant: string }) {
+  const e = useEngine();
+  if (e.reachability.kind === "reachable") {
+    // With an engine the active object is the selected row, or nothing - never a fixture's object
+    // beside a live picture (XC-001, XC-274).
+    return e.selectedPart ? <LivePartSection /> : <NothingSelected />;
+  }
+  const kind = objectKindOf(variant);
+  if (kind === null) return <NothingSelected />;
   const meta = OBJECT_META[kind];
   return (
     <div>
