@@ -3,7 +3,7 @@
 A desktop product that reads CAE result files and produces a self-contained, presentable deliverable -
 geometry, the numbers with their units, graphs, commentary and a verdict in one file a recipient opens
 with nothing installed. Desktop first and offline by default; a hosted service reaches the same core
-over a different transport.
+over a different transport, and is outside the first release (XC-271).
 
 **The product's claim is trustworthy numbers.** A wrong value shown confidently is worse here than a
 missing feature, and most of the rules below exist for that reason.

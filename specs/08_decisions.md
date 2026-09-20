@@ -5785,3 +5785,31 @@ model or the prompt, never in a description that quietly went stale.
 - affects: CT-003, MOD-012
 - decidedness: Fixed
 - reversal_trigger: none foreseen
+
+### XC-271 - The hosted edition is outside the first release
+- decided: 2026-09-20
+- status: active
+- decision: the hosted edition - the same core reached over a different transport (XC-032) - is
+  outside r1. r1 ships the desktop product alone: nothing in the first release is hosted, no
+  environment but the user's machine exists (XC-053), and no path a person walks in r1 crosses a
+  network for the product's own sake (INV-007). What r1 keeps for it is the shape, not the delivery:
+  the command surface is transport-neutral (CT-002, CT-003), the headless requirements are fixed
+  (XC-128), and the engine binds to loopback with a per-session token (XC-258) so that a hosted host
+  changes the host and the certificate and not the surface. Building it starts when this vertical has
+  a paying customer who cannot install, which is XC-257's rule for anything off the first path
+- decided_by: the product's own statements, gathered into one decision; #320 asked that it be one
+- rationale: the position was implied in four places - "later" in 10_delivery.md and 09_technology.md,
+  "not exercised by any path" in 17_user_scenarios.md, and XC-257's "built only where that path
+  needs them" - and stated as a decision nowhere. An implication in four files is read four ways; a
+  buyer asking "is there a web version" and an engineer asking "do I keep this transport-neutral"
+  need the same one sentence. The order itself is XC-032's: the buyers who cannot send geometry
+  outside their network are the ones this product is for, and they are unreachable from a hosted tool
+- alternatives: **a hosted preview beside r1** - a second environment, a second set of obligations
+  (XC-053) and a customer-data boundary to defend, for a buyer XC-032 says is not the first one.
+  **Dropping the hosted edition from the product description** - the transport neutrality it
+  justifies is cheap to keep and expensive to retrofit, which is XC-128's argument
+- basis: E-001 (T1)
+- affects: XC-032, XC-053, MOD-018
+- decidedness: Fixed
+- reversal_trigger: a paying customer of the desktop product who cannot install it, at which point
+  the hosted edition becomes a release with its own environments and its own scope statement
