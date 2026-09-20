@@ -7,19 +7,16 @@
  */
 import { useState } from "react";
 import { engineState, useEngine } from "../state/engine";
-import { shellApi } from "../client/shell";
 import { COLOUR_MAPS } from "./ColourMapControl";
+import { ReportExport } from "./ReportExport";
 import { formatValue } from "../logic/format";
 import { UNDECLARED } from "./primitives";
 
 export function EngineField() {
   const e = useEngine();
   const [unit, setUnit] = useState("");
-  const [path, setPath] = useState("");
-  const [written, setWritten] = useState<string | null>(null);
 
   if (e.reachability.kind !== "reachable" || !e.datasetId) return null;
-  const shell = shellApi();
   const chosen = e.fields.find((one) => one.name === e.fieldName);
   const maximum = e.statistics?.maximum;
   const minimum = e.statistics?.minimum;
@@ -106,41 +103,7 @@ export function EngineField() {
           この向きをビューに保存
         </button>
       </div>
-      <div className="prop-row">
-        <label htmlFor="engine-export">書き出し先</label>
-        <input
-          id="engine-export"
-          className="field-input"
-          value={path}
-          placeholder="…/report.html"
-          onChange={(event) => setPath(event.target.value)}
-        />
-        {shell ? (
-          <button
-            type="button"
-            className="btn"
-            onClick={() =>
-              void shell.dialog
-                .saveReport(`${(e.sourceName ?? "report").replace(/\.[^.]+$/, "")}.html`)
-                .then((chosenPath) => chosenPath && setPath(chosenPath))
-            }
-          >
-            保存先を選ぶ…
-          </button>
-        ) : null}
-        <button
-          type="button"
-          className="btn primary"
-          disabled={!path || e.busy}
-          onClick={async () => {
-            const done = await engineState.exportReport(path);
-            setWritten(done ? `${done.path}（${done.bytes} バイト）` : null);
-          }}
-        >
-          書き出す
-        </button>
-      </div>
-      {written ? <p className="prop-note">書き出しました：{written}</p> : null}
+      <ReportExport />
     </section>
   );
 }

@@ -314,6 +314,14 @@ Generated commentary is reviewed before it enters the document: each passage car
 kinds it is and its source, and the omissions the standard produced are listed with their reason
 (XC-104).
 
+In the production interface the area is the document's report, read back with `report.get` and
+written with `report.update` (XC-275): `レポート` shows the name, format and language and the state of
+each mandatory item from `report.provenance` - or the refusal in its place, as the item that blocks
+the export; `内容` edits the block list; `出力` writes the HTML and shows what the engine said it wrote.
+The canvas shows only engine answers - the frame on screen, the statistics of the field on screen -
+and says of the rest that it is drawn or computed at export. `執筆` and `スタイル`, templates,
+renaming and the preflight are design states and say so.
+
 ### 7.6 `pipeline`
 
 | Section | Elements | Bound to | Unresolved |

@@ -71,6 +71,7 @@ READS = frozenset({
     "view.render",
     "view.pick",
     "graph.data",
+    "report.get",
     "system.capabilities",
     "system.protocols",
     "history.list",
@@ -120,6 +121,7 @@ OPERATIONS = (
     "diff.create",
     "report.create",
     "report.update",
+    "report.get",
     "report.duplicate",
     "report.rename",
     "report.delete",
@@ -192,6 +194,7 @@ PARAMETERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "diff.create": (frozenset(['basisCaseId', 'caseIdA', 'caseIdB']), frozenset(['basisCaseId', 'caseIdA', 'caseIdB'])),
     "report.create": (frozenset(['definition', 'sourceTemplateId', 'sourceTemplateRevision', 'workspaceId']), frozenset(['definition', 'workspaceId'])),
     "report.update": (frozenset(['definition', 'reportId']), frozenset(['definition', 'reportId'])),
+    "report.get": (frozenset(['reportId']), frozenset(['reportId'])),
     "report.duplicate": (frozenset(['newName', 'reportId']), frozenset(['newName', 'reportId'])),
     "report.rename": (frozenset(['newName', 'reportId']), frozenset(['newName', 'reportId'])),
     "report.delete": (frozenset(['reportId']), frozenset(['reportId'])),
@@ -265,6 +268,7 @@ RESULT_FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "diff.create": (frozenset(['diffId', 'disclosure', 'outsideCount', 'outsideFraction', 'roundTripError']), frozenset(['diffId', 'disclosure', 'outsideCount', 'outsideFraction', 'roundTripError'])),
     "report.create": (frozenset(['id', 'revision']), frozenset(['id', 'revision'])),
     "report.update": (frozenset(['id', 'revision']), frozenset(['id', 'revision'])),
+    "report.get": (frozenset(['definition', 'id', 'revision']), frozenset(['definition', 'id', 'revision'])),
     "report.duplicate": (frozenset(['id']), frozenset(['id'])),
     "report.rename": (frozenset(['id', 'revision']), frozenset(['id', 'revision'])),
     "report.delete": (frozenset(['deletedId', 'unresolvedUnitIds']), frozenset(['deletedId', 'unresolvedUnitIds'])),
@@ -339,6 +343,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
     "diff.create": {'roundTripError': frozenset(['digits', 'provenance', 'unit', 'value'])},
     "report.create": {},
     "report.update": {},
+    "report.get": {},
     "report.duplicate": {},
     "report.rename": {},
     "report.delete": {},
@@ -377,7 +382,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
 
 #: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below
 #: the engine's floor is refused politely rather than answered in a shape it cannot read.
-PROTOCOL_VERSION = "3.5.0"
+PROTOCOL_VERSION = "3.6.0"
 
 #: The wire's own names, from CT-003's `$defs.transport` (XC-258). The interface generates
 #: the same values from the same place; neither side is derived from the other (XC-252).

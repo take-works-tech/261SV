@@ -16,8 +16,12 @@
  * Numbers are illustrative (OPEN-022) but honest: digits via formatValue (INV-014), units declared
  * or marked undeclared (XC-003), provenance beside the value (INV-013), absence stated (XC-001).
  */
-import { useState, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { session, useSession } from "../../state/session";
+import { engineState, useEngine, type ReportBlock, type ReportDefinition } from "../../state/engine";
+import { BLOCK_LABEL, blockRows, moveBlock, removeBlock, replaceBlock, trustFacts, trustReadiness } from "../../logic/report";
+import { ReportExport } from "../../shared/ReportExport";
+import { UNDECLARED } from "../../shared/primitives";
 import { submit } from "../../client/operations";
 import { formatValue, formatBytes, disabledBecause } from "../../logic/format";
 import { QuantityChip } from "../../shared/QuantityChip";
@@ -688,7 +692,437 @@ function PreflightCanvas() {
   );
 }
 
+/* ============================================================================================= */
+/* With an engine: the document's report, read back and written whole (XC-275)                   */
+/* ============================================================================================= */
+
+function useReportSubject() {
+  // The report is read when the area opens and whenever its subject moves: what the document holds
+  // is the engine's to say, and a copy kept here would be the copy that stopped agreeing.
+  const e = useEngine();
+  useEffect(() => {
+    if (e.workspaceId) void engineState.refreshReport();
+  }, [e.workspaceId, e.reportId, e.datasetId, e.fieldName, e.viewId]);
+  return e;
+}
+
+function LiveReportCanvas() {
+  const e = useReportSubject();
+  if (!e.workspaceId) {
+    return (
+      <div className="re-canvas">
+        <p className="re-note">ワークスペースが開いていません。ホームで開くと、文書が持つレポートをここに表示します。</p>
+      </div>
+    );
+  }
+  const report = e.report;
+  if (!e.reportId || !report) {
+    return (
+      <div className="re-canvas">
+        <div className="re-choices">
+          <h2>レポートを作成</h2>
+          <p>
+            この文書にはまだこのデータセットのレポートがありません。作ると、画面に出ているビューの静止画と、いまの場の数値表を持つ定義が文書に書かれます（未保存の作業になります）。
+            必須情報（来歴・宣言単位・制約・製品版）は書き出し時に必ず含まれます（AC-007・AC-031）。テンプレートはこの版では扱いません。
+          </p>
+          <div className="re-actions">
+            <button
+              type="button"
+              className="btn primary"
+              disabled={e.busy || !e.datasetId}
+              title={e.datasetId ? "文書に report.create を一回書きます" : "先にデータセットを読み込んでください"}
+              onClick={() => void engineState.ensureReport()}
+            >
+              レポートを作る
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  const readiness = trustReadiness(e.provenance, e.provenanceRefusal);
+  return (
+    <div className="re-canvas">
+      <p className="re-note">
+        エンジンの答えだけを示します。図と値は書き出し時に、文書が持つ定義から同じ経路で描かれ・計算されます（INV-001・AC-022）。
+      </p>
+      <article className="re-page" aria-label="レポート（文書の定義）">
+        <div>
+          <span className="re-eyebrow">{e.workspaceId}・改訂 {e.reportRevision ?? "?"}</span>
+          <h1>{report.name ?? "（無題）"}</h1>
+        </div>
+        {report.blocks.length === 0 ? <p className="re-note">ブロックがありません。右の「内容」タブで追加します。</p> : null}
+        {report.blocks.map((block, index) => (
+          <LiveBlock key={`${index}:${block.kind}`} block={block} index={index} />
+        ))}
+        <footer className="re-page-foot">
+          <span>{report.name ?? ""}</span>
+          <span>{e.reportId}</span>
+        </footer>
+      </article>
+      <article className="re-page re-page--second" aria-label="必須情報（エンジンの答え）">
+        <section className="re-block" aria-label="必須情報">
+          <div className="re-block-chrome">
+            <span className="re-chip re-chip--lock" title="必須情報のため削除できません（AC-007・AC-031）">省略不可</span>
+          </div>
+          <h2>付録：必須情報</h2>
+          {e.provenance ? (
+            <LiveTrust />
+          ) : (
+            <div className="notice warn">
+              <b>来歴を作れません</b>
+              <span className="why">{readiness.because}。この項目が作れない間、書き出しは拒まれ、その理由が示されます（16_application_model §7.5）。</span>
+            </div>
+          )}
+        </section>
+        <footer className="re-page-foot"><span>{report.name ?? ""}</span><span>必須情報</span></footer>
+      </article>
+    </div>
+  );
+}
+
+function LiveBlock({ block, index }: { block: ReportBlock; index: number }) {
+  const e = useEngine();
+  const label = BLOCK_LABEL[block.kind];
+  switch (block.kind) {
+    case "view": {
+      const saved = e.savedViews.find((one) => one.id === block.viewId);
+      const onScreen = block.viewId !== undefined && block.viewId === e.viewId && e.imageUrl !== null;
+      const still = block.form === undefined || block.form === "still";
+      return (
+        <section className="re-block" aria-label={`${label}ブロック ${index + 1}`}>
+          <div className="re-block-chrome">
+            <span className="re-chip">{label}（{block.form === "video" ? "動画" : block.form === "interactive" ? "インタラクティブ 3D" : "静止画"}）</span>
+            <span className="re-chip">参照：{saved ? `「${saved.name}」` : block.viewId ?? "（未指定）"}</span>
+          </div>
+          {onScreen && still ? (
+            <div className="re-figure">
+              <div className="re-fig-canvas">
+                <img src={e.imageUrl ?? undefined} alt={`ビュー ${saved?.name ?? block.viewId ?? ""} の現在のフレーム`} />
+                {e.reduced ? <span className="re-fig-stamp">{e.reduced}</span> : null}
+              </div>
+              <p className="re-fig-caption">画面と同じ定義で描いた現在のフレーム。文書の図は書き出し時に同じ定義から、保存した向きで描かれます（AC-022・XC-270）。</p>
+            </div>
+          ) : (
+            <p className="re-fig-caption">
+              {still
+                ? "図は書き出し時に文書へ描かれます（このビューは画面に出ていません）。"
+                : "この版の文書は静止画だけを運びます。この形は書き出し時に、運べなかったものとして名指しされます（AC-014）。"}
+            </p>
+          )}
+        </section>
+      );
+    }
+    case "valueTable": {
+      const fields = block.fields ?? [];
+      return (
+        <section className="re-block" aria-label={`${label}ブロック ${index + 1}`}>
+          <div className="re-block-chrome">
+            <span className="re-chip">{label}</span>
+            <span className="re-chip">場：{fields.join("、") || "（未指定）"}</span>
+          </div>
+          <div className="re-doc-table">
+            <table>
+              <thead><tr><th scope="col">項目</th><th scope="col">値</th><th scope="col">来歴</th><th scope="col">備考</th></tr></thead>
+              <tbody>
+                {fields.map((field) => {
+                  const current = field === e.fieldName ? e.statistics : null;
+                  const declared = e.fields.find((one) => one.name === field)?.unit ?? null;
+                  if (!current) {
+                    return (
+                      <tr key={field}>
+                        <th scope="row">{field}</th>
+                        <td colSpan={3} className="re-doc-na">値は書き出し時に完全データから計算します（INV-001）。画面に出ている場の値だけをここに示します</td>
+                      </tr>
+                    );
+                  }
+                  return (["maximum", "minimum", "mean"] as const).map((key) => {
+                    const one = current[key];
+                    const word = key === "maximum" ? "最大" : key === "minimum" ? "最小" : "平均";
+                    return (
+                      <tr key={`${field}:${key}`}>
+                        <th scope="row">{field}（{word}）</th>
+                        {one.value === null ? (
+                          <NumberCell value={null} missingBecause={one.missingBecause ?? "値なし"} />
+                        ) : (
+                          <td className="number-cell">
+                            <QuantityChip value={formatValue(one.value, one.digits)} unit={one.unit ?? declared} title={`有効 ${one.digits} 桁（INV-014）`} />
+                          </td>
+                        )}
+                        <td><ProvenanceBadge origin={one.provenance} /></td>
+                        <td>{one.location ?? ((one.caveats ?? []).join("、") || "—")}</td>
+                      </tr>
+                    );
+                  });
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="re-fig-caption">桁は元データが支える有効桁のみ（INV-014）。単位は宣言されたもの、なければ{UNDECLARED}（XC-003）。</p>
+        </section>
+      );
+    }
+    case "text":
+      return (
+        <section className="re-block" aria-label={`${label}ブロック ${index + 1}`}>
+          <div className="re-block-chrome"><span className="re-chip">{label}（{block.authorship === "generated" ? "生成" : "人"}）</span></div>
+          <p>{block.text || "（空）"}</p>
+        </section>
+      );
+    case "graph":
+      return (
+        <section className="re-block" aria-label={`${label}ブロック ${index + 1}`}>
+          <div className="re-block-chrome"><span className="re-chip">{label}</span><span className="re-chip">参照：{block.graphId ?? "（未指定）"}</span></div>
+          <p className="re-fig-caption">この版はグラフを描きません。書き出し時に、運べなかったものとして名指しされます（AC-014）。</p>
+        </section>
+      );
+    default:
+      return <hr aria-label="改ページ" />;
+  }
+}
+
+function LiveTrust() {
+  const e = useEngine();
+  if (!e.provenance) return null;
+  const facts = trustFacts(e.provenance);
+  const undeclared = e.fields.filter((one) => one.unit === null).map((one) => one.name);
+  return (
+    <div className="re-trust">
+      <section aria-label="来歴">
+        <header><h3>来歴</h3><span className="re-chip re-chip--lock">省略不可</span></header>
+        <dl className="re-kv">
+          <dt>ワークスペース</dt><dd>{facts.workspace}</dd>
+          <dt>ケース</dt><dd>{facts.cases}</dd>
+          {facts.sources.map((one) => (
+            <Fragment key={one.path}><dt>入力ファイル</dt><dd>{one.path}（更新 {one.modified}）</dd></Fragment>
+          ))}
+          <dt>作成</dt><dd>{facts.produced}</dd>
+        </dl>
+      </section>
+      <section aria-label="宣言単位">
+        <header><h3>宣言単位</h3><span className="re-chip re-chip--lock">省略不可</span></header>
+        <div className="re-doc-table">
+          <table>
+            <thead><tr><th scope="col">物理量</th><th scope="col">単位</th><th scope="col">宣言</th></tr></thead>
+            <tbody>
+              {facts.declaredUnits.map((one) => (
+                <tr key={one.quantity}><td>{one.quantity}</td><td><UnitLabel unit={one.unit} /></td><td>利用者宣言</td></tr>
+              ))}
+              {undeclared.map((name) => (
+                <tr key={name}><td>{name}</td><td><UnitLabel unit={null} /></td><td>宣言されるまで換算しない（XC-003）</td></tr>
+              ))}
+              {facts.declaredUnits.length === 0 && undeclared.length === 0 ? <tr><td colSpan={3}>場がありません</td></tr> : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section aria-label="制約">
+        <header><h3>制約</h3><span className="re-chip re-chip--lock">省略不可</span></header>
+        <p className="re-fig-caption" style={{ margin: 0 }}>制約の本文は書き出し時に文書へ記録されます。いま分かっているもの：</p>
+        <ul>
+          {e.partial ? <li>読み込んだケースは不完全で、文書の数値にその印が付く（AC-027）。</li> : null}
+          {undeclared.length > 0 ? <li>単位未宣言の場（{undeclared.join("、")}）は換算せず未宣言のまま示す（XC-003）。</li> : null}
+          {!e.partial && undeclared.length === 0 ? <li>エンジンの答えから分かる制約はありません。</li> : null}
+        </ul>
+      </section>
+      <section aria-label="製品版">
+        <header><h3>製品版</h3><span className="re-chip re-chip--lock">省略不可</span></header>
+        <dl className="re-kv"><dt>製品</dt><dd>{facts.productVersion}</dd></dl>
+      </section>
+    </div>
+  );
+}
+
+function LiveReportRail({ tab, variant }: { tab: string; variant: string }) {
+  const e = useReportSubject();
+  const report = e.report;
+  if (!e.reportId || !report) {
+    return (
+      <div className="prop-section">
+        <h3>レポート</h3>
+        <p className="prop-note">
+          {e.workspaceId ? "この文書にはまだこのデータセットのレポートがありません。中央の「レポートを作る」で作ります。" : "ワークスペースが開いていません。"}
+        </p>
+      </div>
+    );
+  }
+  switch (tab) {
+    case "contents": return <LiveContents report={report} />;
+    case "output": return <LiveOutput />;
+    case "drafting":
+    case "style":
+      return (
+        <div>
+          <div className="prop-section">
+            <p className="prop-note">このタブの項目はこの版ではエンジンに届きません。下は設計状態です。</p>
+          </div>
+          {tab === "drafting" ? <RailDrafting variant={variant} /> : <RailStyle />}
+        </div>
+      );
+    default: return <LiveOverall report={report} />;
+  }
+}
+
+function LiveOverall({ report }: { report: ReportDefinition }) {
+  const e = useEngine();
+  const readiness = trustReadiness(e.provenance, e.provenanceRefusal);
+  const declared = e.provenance ? Object.keys(e.provenance.declaredUnits).length : 0;
+  const undeclared = e.fields.filter((one) => one.unit === null).length;
+  return (
+    <div>
+      <div className="prop-section">
+        <h3>レポート</h3>
+        <div className="prop-row"><label>名前</label><span>{report.name ?? "（無題）"}</span></div>
+        <div className="prop-row"><label>識別子</label><span>{e.reportId}・改訂 {e.reportRevision ?? "?"}</span></div>
+        <div className="prop-row"><label>出力形式</label><span>{report.targets.join("、")}</span></div>
+        <div className="prop-row">
+          <label htmlFor="re-live-lang">言語</label>
+          <select
+            id="re-live-lang"
+            className="field-input"
+            value={report.locale ?? "ja"}
+            disabled={e.busy}
+            onChange={(event) => void engineState.updateReport({ ...report, locale: event.target.value })}
+          >
+            <option value="ja">日本語</option>
+            <option value="en">English</option>
+          </select>
+        </div>
+        <p className="prop-note">名前の変更（report.rename）はこの版では接続していません。</p>
+      </div>
+      <div className="prop-section">
+        <h3>必須情報（省略不可）</h3>
+        <div className="prop-row"><label>来歴</label><span>{e.provenance ? "作れます" : "作れません"}</span></div>
+        <div className="prop-row"><label>宣言単位</label><span>{e.provenance ? `${declared} 件宣言・${undeclared} 件未宣言` : "—"}</span></div>
+        <div className="prop-row"><label>制約</label><span>書き出し時に記録</span></div>
+        <div className="prop-row"><label>製品版</label><span>{e.provenance?.productVersion ?? "—"}</span></div>
+        <p className={readiness.ready ? "prop-note" : "notice warn"}>{readiness.because}</p>
+      </div>
+      <div className="prop-section">
+        <h3>状態</h3>
+        <div className="prop-row"><label>最終出力</label><span>{e.exported ? `${e.exported.path}（${e.exported.bytes.toLocaleString("en-US")} バイト）` : "未出力"}</span></div>
+      </div>
+    </div>
+  );
+}
+
+function LiveContents({ report }: { report: ReportDefinition }) {
+  const e = useEngine();
+  const rows = blockRows(report, e.savedViews, e.viewId);
+  const [draft, setDraft] = useState<{ index: number; text: string } | null>(null);
+  const write = (blocks: readonly ReportBlock[]) => void engineState.updateReport({ ...report, blocks });
+  return (
+    <div>
+      <div className="prop-section">
+        <h3>参照範囲</h3>
+        <div className="prop-row"><label>ワークスペース</label><span>{e.workspaceId}</span></div>
+        <div className="prop-row"><label>ケース</label><span>{e.caseId ?? "（未読込）"}</span></div>
+        <div className="prop-row"><label>データセット</label><span>{e.sourceName ?? "（未読込）"}</span></div>
+      </div>
+      <div className="prop-section">
+        <h3>収録項目（順序どおり）</h3>
+        <div className="re-rail-blocks" aria-label="レポートブロック">
+          {rows.map((row) => (
+            <div className="re-rail-block" key={`${row.index}:${row.kind}`}>
+              <span>
+                <b>{row.name}</b>
+                <small>{row.detail}</small>
+                {row.unresolved ? <small style={{ display: "block", color: "var(--ink-muted)" }}>未解決：{row.unresolved}</small> : null}
+              </span>
+              <span className="re-rail-tools">
+                <button
+                  type="button"
+                  aria-label={`${row.name}を上へ移動`}
+                  onClick={() => write(moveBlock(report.blocks, row.index, -1))}
+                  {...(row.index === 0 ? disabledBecause("先頭のため上へ移動できません") : e.busy ? disabledBecause("エンジンが応答中です") : {})}
+                >↑</button>
+                <button
+                  type="button"
+                  aria-label={`${row.name}を下へ移動`}
+                  onClick={() => write(moveBlock(report.blocks, row.index, 1))}
+                  {...(row.index === rows.length - 1 ? disabledBecause("末尾のため下へ移動できません") : e.busy ? disabledBecause("エンジンが応答中です") : {})}
+                >↓</button>
+              </span>
+              <span className="re-rail-tools">
+                {row.kind === "text" ? (
+                  <button type="button" aria-label={`${row.name}を編集`} onClick={() => setDraft({ index: row.index, text: report.blocks[row.index]?.text ?? "" })}>✎</button>
+                ) : null}
+                <button type="button" aria-label={`${row.name}を削除`} disabled={e.busy} onClick={() => write(removeBlock(report.blocks, row.index))}>✕</button>
+              </span>
+            </div>
+          ))}
+          <div className="re-rail-block">
+            <span><b>必須情報</b><small>来歴・宣言単位・制約・製品版</small></span>
+            <span className="re-lock" title="必須のため削除できません（AC-031）。ブロックではなく、書き出しが必ず付けます">必須</span>
+          </div>
+        </div>
+        {draft ? (
+          <div className="prop-row" style={{ marginTop: 8 }}>
+            <label htmlFor="re-live-text">本文</label>
+            <textarea id="re-live-text" className="field-input" rows={4} value={draft.text} onChange={(event) => setDraft({ ...draft, text: event.target.value })} />
+            <button
+              type="button"
+              className="btn primary"
+              disabled={e.busy}
+              onClick={() => {
+                write(replaceBlock(report.blocks, draft.index, { ...(report.blocks[draft.index] ?? {}), kind: "text", text: draft.text, authorship: "person" }));
+                setDraft(null);
+              }}
+            >
+              書き込む
+            </button>
+            <button type="button" className="btn ghost" onClick={() => setDraft(null)}>やめる</button>
+          </div>
+        ) : null}
+        <div className="prop-row" style={{ marginTop: 8 }}>
+          <label htmlFor="re-live-add">追加</label>
+          <select
+            id="re-live-add"
+            className="field-input"
+            value="choose"
+            disabled={e.busy}
+            onChange={(event) => {
+              const kind = event.target.value;
+              if (kind === "view" && e.viewId) write([...report.blocks, { kind: "view", viewId: e.viewId, form: "still" }]);
+              if (kind === "valueTable" && e.fieldName) write([...report.blocks, { kind: "valueTable", fields: [e.fieldName] }]);
+              if (kind === "text") write([...report.blocks, { kind: "text", text: "", authorship: "person" }]);
+              if (kind === "pageBreak") write([...report.blocks, { kind: "pageBreak" }]);
+            }}
+          >
+            <option value="choose">ブロックを選択…</option>
+            <option value="view" disabled={!e.viewId}>ビュー（画面のビュー・静止画）</option>
+            <option value="valueTable" disabled={!e.fieldName}>数値表（画面の場）</option>
+            <option value="text">本文</option>
+            <option value="pageBreak">改ページ</option>
+          </select>
+        </div>
+        <p className="prop-note">並べ替え・削除・追加はそれぞれ一回の report.update で、取り消し 1 段・未保存 1 件です。参照先が文書にないブロックは落とさず、未解決として残します。</p>
+      </div>
+    </div>
+  );
+}
+
+function LiveOutput() {
+  return (
+    <div>
+      <div className="prop-section">
+        <h3>出力</h3>
+        <div className="prop-row"><label>形式</label><span>HTML（一つのファイル・オフライン完結）</span></div>
+        <div className="prop-row"><label>既存出力</label><span>上書きしない（既にあれば拒まれます）</span></div>
+        <ReportExport />
+      </div>
+      <div className="prop-section">
+        <p className="prop-note">この版の文書は静止画だけを運び、運べなかったものは答えと文書の両方に名指しされます（AC-014）。事前検査（出力前チェック）はこの版では接続していません。</p>
+      </div>
+    </div>
+  );
+}
+
 export function ReportScreen(props: { variant: string }) {
+  const e = useEngine();
+  // With an engine the area is the document's report, whatever the deep link says: a fixture beside
+  // a live engine is the failure XC-001 names. Without one, the design states it has always been.
+  if (e.reachability.kind === "reachable") return <LiveReportCanvas />;
   switch (props.variant) {
     case "blank": return <TemplateChoices />;
     case "drafting": return <DraftingCanvas />;
@@ -1205,6 +1639,8 @@ function RailOutput(props: { variant: string }) {
 }
 
 export function ReportRail(props: { tab: string; variant: string }) {
+  const e = useEngine();
+  if (e.reachability.kind === "reachable") return <LiveReportRail tab={props.tab} variant={props.variant} />;
   if (props.variant === "blank") {
     return (
       <div className="prop-section">

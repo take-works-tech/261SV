@@ -10,7 +10,11 @@ updated: 2026-09-20
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 3.5.0
+- version: 3.6.0
+- correction: 2026-09-20, version 3.5.0 to 3.6.0. `report.get` is added, the report's counterpart of
+  `view.get`: the definition the document holds now, with its revision, read by the report area
+  before it writes a block list back (XC-275). `report.update` had been in the catalogue since
+  1.x with nothing answering it. Additive
 - correction: 2026-09-20, version 3.4.0 to 3.5.0. `dataset.parts` carries each part's `path` - the
   file's own hierarchy, root first - with `parentId` filled from it and, for an absent part, the
   reader's `reason` as its own member: the name had carried the reason as a suffix since XC-272,
@@ -167,6 +171,7 @@ no identifier to report.
 | `diff.create` | write | case id a, case id b, basis case id | diff id, outside-point count and proportion, round-trip error |
 | `report.create` | write | workspace id, definition (CT-006), source template id and revision? | workspace report id and revision (XC-109) |
 | `report.update` | write | report id, definition | new report revision |
+| `report.get` | read | report id | the definition the document holds now, and its revision (XC-275) |
 | `report.duplicate` | write | report id, new name | new independent workspace report id |
 | `report.rename` | write | report id, new name | new revision; stored id references unchanged |
 | `report.delete` | write | report id | deleted id; dependent pipeline units retained as unresolved |

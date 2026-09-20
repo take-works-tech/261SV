@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "3.5.0";
+export const PROTOCOL_VERSION = "3.6.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -84,6 +84,7 @@ export type Operation =
   | "output.list"
   | "output.plan"
   | "view.get"
+  | "report.get"
   ;
 
 export const OPERATIONS: readonly Operation[] = [
@@ -153,6 +154,7 @@ export const OPERATIONS: readonly Operation[] = [
   "output.list",
   "output.plan",
   "view.get",
+  "report.get",
 ];
 
 /** What each operation takes. From CT-003's $defs.operationParameters. */
@@ -442,6 +444,9 @@ export interface Parameters {
   };
   "view.get": {
     viewId: string;
+  };
+  "report.get": {
+    reportId: string;
   };
 }
 
@@ -938,6 +943,11 @@ export interface Results {
     keptRecords: readonly (string)[];
   };
   "view.get": {
+    id: string;
+    revision: number;
+    definition: Record<string, unknown>;
+  };
+  "report.get": {
     id: string;
     revision: number;
     definition: Record<string, unknown>;

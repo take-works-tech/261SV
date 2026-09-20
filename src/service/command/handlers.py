@@ -419,6 +419,8 @@ def handlers(session: Session) -> tuple[Handler, ...]:
         Handler("dataset.probe", lambda p, t: dataset_probe(session, p)),
         Handler("view.pick", lambda p, t: view_pick(session, p)),
         Handler("report.create", lambda p, t: item_create(session, "reports", p)),
+        Handler("report.update", lambda p, t: item_update(session, "reports", "reportId", p)),
+        Handler("report.get", lambda p, t: item_get(session, "reports", "reportId", p)),
         Handler("report.export", lambda p, t: report_export(session, p)),
         Handler("report.provenance", lambda p, t: report_provenance(session, p)),
         Handler("system.capabilities", lambda p, t: system_capabilities(session)),
