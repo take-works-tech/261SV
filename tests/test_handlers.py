@@ -38,6 +38,7 @@ from service.command.catalogue import OPERATIONS, PROTOCOL_VERSION  # noqa: E402
 from service.command.handlers import HandleExpired, HandleStore, Session, build_surface  # noqa: E402
 from service.command.surface import Command, Permission, Status, Surface  # noqa: E402
 from service.egress.gate import Outcome, Permission as EgressPermission, SearchRequest  # noqa: E402
+from service.workspace import items  # noqa: E402
 from service.workspace.document import FORMAT_VERSION  # noqa: E402
 from domain_core.recorded_time import STORED_FORMAT, record as record_time  # noqa: E402
 from test_reader import write_grid  # noqa: E402
@@ -843,6 +844,30 @@ class TestRenderingAView:
 
         assert first.status is Status.ANSWERED and second.status is Status.ANSWERED
         assert session.handles.fetch(first.value["handle"]) != session.handles.fetch(second.value["handle"])
+
+    def test_a_camera_given_to_the_render_is_used_and_the_definition_is_not_touched(self, tmp_path: Path) -> None:
+        """XC-270: a camera move is drawn, not written. The same view drawn from a given camera is
+        another picture; the definition's camera is as it was, and the history holds no write."""
+        surface, session, dataset_id = loaded(tmp_path)
+        view_id = self._view(surface, dataset_id)
+        size = {"width": 160, "height": 120, "format": "png"}
+        turned = {
+            "position_m": [3.0, -3.0, 4.0], "focalPoint_m": [0.5, 0.5, 0.0], "viewUp": [0.0, 0.0, 1.0],
+            "projection": "orthographic", "parallelScale_m": 1.2,
+        }
+
+        plain = surface.submit(Command("view.render", {"viewId": view_id, **size}))
+        given = surface.submit(Command("view.render", {"viewId": view_id, **size, "camera": turned}))
+
+        assert plain.status is Status.ANSWERED and given.status is Status.ANSWERED, given.reason
+        assert session.handles.fetch(plain.value["handle"]) != session.handles.fetch(given.value["handle"])
+        assert session.workspace is not None
+        stored = items.find(session.workspace.raw, "views", view_id)["definition"]
+        assert "camera" not in stored, "the definition's camera is what it was: absent"
+        operations = [one.operation for one in surface.history()[-2:]]
+        assert operations == ["view.render", "view.render"]
+        picked = surface.submit(Command("view.pick", {"viewId": view_id, "width": 160, "height": 120, "x": 80, "y": 60, "camera": turned}))
+        assert picked.status is Status.ANSWERED, picked.reason
 
     def test_a_format_this_build_cannot_write_is_refused_by_name(self, tmp_path: Path) -> None:
         surface, _, dataset_id = loaded(tmp_path)

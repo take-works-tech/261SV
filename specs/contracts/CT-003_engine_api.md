@@ -10,7 +10,12 @@ updated: 2026-09-20
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 3.3.0
+- version: 3.4.0
+- correction: 2026-09-20, version 3.3.0 to 3.4.0. `view.render` and `view.pick` take `camera` - the
+  CT-004 camera shape, referenced rather than copied. A camera move is a class-1 transition
+  (XC-270): it reaches the engine as the camera the picture is drawn and picked with, and never
+  as a change to the view's definition, which until this change was rewritten by every orbit and
+  entered the undo history and the unsaved work each time. Additive
 - correction: 2026-09-20, version 3.2.0 to 3.3.0. `workspace.open` answers `readOnly` and `lock` -
   what was found, who holds it and where the lock file is - and takes `takeOverStaleLock` for a
   person who has read that a lock is stale or unreadable and says to take it over. Until this
@@ -141,8 +146,8 @@ no identifier to report.
 | `view.duplicate` | write | view id, new name | new independent workspace view id |
 | `view.rename` | write | view id, new name | new revision; stored id references unchanged |
 | `view.delete` | write | view id | deleted id; dependent pipeline units retained as unresolved |
-| `view.render` | read | view id, width, height, format, legend (default true) | image bytes or a handle to them |
-| `view.pick` | read | view id, width, height, pixel x and y | the value under that pixel with its unit, digits, provenance and location, and which point or cell it is - or nothing, where the pixel is off the model (view/AC-027, view/AC-029) |
+| `view.render` | read | view id, width, height, format, legend (default true), camera? | image bytes or a handle to them; a camera given draws the picture from there and leaves the definition's camera as it is (XC-270) |
+| `view.pick` | read | view id, width, height, pixel x and y, camera? | the value under that pixel with its unit, digits, provenance and location, and which point or cell it is - or nothing, where the pixel is off the model (view/AC-027, view/AC-029) |
 | `graph.create` | write | workspace id, definition (CT-005), source template id and revision? | workspace graph id and revision (XC-109) |
 | `graph.update` | write | graph id, definition | new graph revision |
 | `graph.duplicate` | write | graph id, new name | new independent workspace graph id |

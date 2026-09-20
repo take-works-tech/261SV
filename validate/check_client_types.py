@@ -36,7 +36,23 @@ PRIMITIVES = {"string": "string", "number": "number", "integer": "number", "bool
 #: A shape defined once in another contract and referenced from CT-003 (XC-266): named here, and
 #: generated below from the definition it points at. Anything else referenced becomes `unknown`,
 #: which fails the build at the first use rather than passing as `any`.
-REFERENCED = {"CT-001.json#/$defs/recordedTime": "RecordedTime"}
+REFERENCED = {
+    "CT-001.json#/$defs/recordedTime": "RecordedTime",
+    "CT-004.json#/properties/camera": "CameraDefinition",
+}
+
+#: What each referenced type means, written above it in the generated file.
+REFERENCED_DOC = {
+    "RecordedTime": (
+        "/** A time this product recorded: the UTC instant, and the offset of the zone it was recorded",
+        "  * in - or null where a record written before the offset was kept has none (XC-142, XC-266).",
+        "  * Defined once, in CT-001's $defs.recordedTime, and referenced by every contract. */",
+    ),
+    "CameraDefinition": (
+        "/** Where a picture is looked at from: CT-004's camera, referenced by view.render and view.pick",
+        "  * so a camera move can be drawn without becoming a change to the view's definition (XC-270). */",
+    ),
+}
 
 
 def schema() -> dict:
@@ -45,6 +61,15 @@ def schema() -> dict:
 
 def document_schema() -> dict:
     return json.loads(DOCUMENT_SCHEMA.read_text(encoding="utf-8"))
+
+
+def resolve(reference: str) -> dict:
+    """The node a `<file>#<pointer>` reference names, read from the contract that defines it."""
+    file_name, _, pointer = reference.partition("#")
+    node: object = json.loads((SCHEMA.parent / file_name).read_text(encoding="utf-8"))
+    for part in pointer.strip("/").split("/"):
+        node = node[part]  # type: ignore[index]
+    return node  # type: ignore[return-value]
 
 
 def protocol_version() -> str:
@@ -151,12 +176,9 @@ def render() -> str:
         "  * reader assumed (XC-003, XC-253). */",
         "export type ReportedValue = " + type_of(document["$defs"]["reportedValue"], 0) + ";",
         "",
-        "/** A time this product recorded: the UTC instant, and the offset of the zone it was recorded",
-        "  * in - or null where a record written before the offset was kept has none (XC-142, XC-266).",
-        "  * Defined once, in CT-001's $defs.recordedTime, and referenced by every contract. */",
-        "export type RecordedTime = " + type_of(document_schema()["$defs"]["recordedTime"], 0) + ";",
-        "",
     ]
+    for reference, name in REFERENCED.items():
+        lines += [*REFERENCED_DOC[name], f"export type {name} = " + type_of(resolve(reference), 0) + ";", ""]
     return NEWLINE.join(lines)
 
 

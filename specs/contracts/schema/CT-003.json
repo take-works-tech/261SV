@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -624,6 +624,10 @@
             "legend": {
               "type": "boolean",
               "description": "色帯を絵の中に描くか。既定は true（文書は自己完結でなければならない）。画面は false を渡し、凡例は単位を載せられるクロームが持つ（E-192）"
+            },
+            "camera": {
+              "$ref": "CT-004.json#/properties/camera",
+              "description": "この絵を描くカメラ。与えれば定義のカメラの代わりに使い、定義は変えない（XC-270）。省くと定義のカメラ"
             }
           }
         },
@@ -1532,6 +1536,10 @@
               "type": "integer",
               "minimum": 0,
               "description": "上からのピクセル"
+            },
+            "camera": {
+              "$ref": "CT-004.json#/properties/camera",
+              "description": "絵を描いたカメラ。view.render に与えたものと同じでなければ、別の絵のピクセルを読むことになる（XC-270）"
             }
           }
         },

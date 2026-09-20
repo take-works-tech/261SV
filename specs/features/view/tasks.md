@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-25
+updated: 2026-09-20
 ---
 
 # Tasks: view
@@ -376,3 +376,14 @@ updated: 2026-08-25
   one shared save action revalidates before creating a revision; restricted expressions preserve
   unrepresented nodes, live failures become diagnostic
   magenta and no PBR/result kind selector or second graph copy exists
+
+### TASK-063 - A camera move is drawn, never written
+- satisfies: AC-090
+- depends_on: TASK-001
+- done_when: an orbit sends the camera to `view.render` and `view.pick` and nothing to the document;
+  keeping a look is one explicit `view.update`
+- done: 2026-09-20 (XC-270). `view.render` and `view.pick` take `camera`, referenced from CT-004 rather
+  than copied; the store draws from the turntable and writes the definition only when a field, a
+  colour map or a kept look changes. Found as a contradiction in the store's own header, which said
+  class 1 while every orbit went as a write. The 「この向きを保存」 control that calls `keepCamera` is
+  the interface's next change
