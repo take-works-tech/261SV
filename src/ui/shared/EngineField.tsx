@@ -87,11 +87,29 @@ export function EngineField() {
 
       {minimum && maximum ? (
         <p className="prop-note">
+          {e.statistics?.averaging === "unaveraged" ? "要素値（平均なし）：" : null}
           最小 {minimum.value === null ? "値なし" : formatValue(minimum.value, minimum.digits)}・最大{" "}
           {maximum.value === null ? "値なし" : formatValue(maximum.value, maximum.digits)}{" "}
           {maximum.unit ?? UNDECLARED}
           {maximum.location ? `（${maximum.location}）` : null}
         </p>
+      ) : null}
+      {e.statistics?.averaged ? (
+        /* The second number, never offered as the number: the averaged peak with the spread it was
+         * averaged from, which is the only discretisation indicator one solve can give (INV-032, INV-033). */
+        <p className="prop-note">
+          節点平均：最小 {e.statistics.averaged.minimum.value === null ? "値なし" : formatValue(e.statistics.averaged.minimum.value, e.statistics.averaged.minimum.digits)}・最大{" "}
+          {e.statistics.averaged.maximum.value === null ? "値なし" : formatValue(e.statistics.averaged.maximum.value, e.statistics.averaged.maximum.digits)}{" "}
+          {e.statistics.averaged.maximum.unit ?? UNDECLARED}
+          {e.statistics.averaged.maximum.location ? `（${e.statistics.averaged.maximum.location}）` : null}
+          。その節点でのばらつき{" "}
+          {e.statistics.averaged.spreadAtMaximum.value === null ? "値なし" : formatValue(e.statistics.averaged.spreadAtMaximum.value, e.statistics.averaged.spreadAtMaximum.digits)}{" "}
+          {e.statistics.averaged.spreadAtMaximum.unit ?? UNDECLARED}
+          {e.statistics.averaged.spreadFraction.value === null ? null : `（平均比 ${Math.round(e.statistics.averaged.spreadFraction.value * 100)}%）`}
+          — メッシュ細分の目安であって、精度の保証ではありません。{e.statistics.averaged.disagreement}
+        </p>
+      ) : e.statistics?.averagingRefused ? (
+        <p className="prop-note">節点平均は求められませんでした：{e.statistics.averagingRefused}</p>
       ) : null}
       {e.statistics && e.fieldName ? (
         <div className="prop-row">

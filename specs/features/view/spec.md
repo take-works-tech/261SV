@@ -265,6 +265,10 @@ updated: 2026-09-20
     it and shall name what is missing
   - AC-047: If cell values are converted to point values, then the system shall not average across a
     @Part or material boundary and shall label the result as averaged (INV-022)
+  - AC-093: When a cell field's extremum is reported - in statistics, on a screen or in a document -
+    the system shall report both the element value, labelled as unaveraged, and the nodal-averaged
+    value, labelled as averaged and carrying the spread at its node, and shall never offer one as
+    the number without saying which it is (INV-032, XC-247, XC-281)
 
 ### REQ-017 - Deformation is drawn at true scale, and the factor is in the picture
 - priority: MUST

@@ -6094,3 +6094,33 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: `find` in r2, at which point `region` also names a saved selection and the scope
   says which kind it was
+
+### XC-281 - A cell field's statistics carry both numbers, and the report states both
+- decided: 2026-09-20
+- status: active
+- decision: `field.statistics` on a cell field answers the element values labelled as such
+  (`averaging: unaveraged`) and, beside them, the nodal-averaged maximum and minimum - averaged
+  part by part and never across parts (INV-022), each carrying the averaged caveat and located by
+  part and node - with the spread at the maximum's node, its fraction of the average, and the
+  sentence that says how far the two maxima disagree. Where the averaging cannot be done, the
+  reason stands in its place. The report's value table states both for a cell field: the element
+  maximum labelled, the averaged maximum with its caveat, and the spread as its own row. The
+  interface shows both wherever it shows statistics, and copies both, each labelled
+- decided_by: engineering judgement, from #208's condition, INV-032, INV-033 and XC-247
+- rationale: measured here, the averaged maximum of a concentration inside a body is 110 MPa
+  against 200 - 55 per cent (E-144) - and the contract carried one number with no label, which is
+  that under-report waiting to be read as the answer. `engine/analysis/nodal.py` had produced both
+  numbers with the spread since 2026-08-25 and nothing called it: a rule the engine kept and no
+  screen or document could show. The spread is the one discretisation indicator a post-processor can
+  compute from one solve (INV-033), and the smoothed peak shown without it is the combination that
+  looks converged; so it is a row of the document, not a footnote
+- alternatives: **a display option to average** - the one thing INV-032 forbids: a figure and a
+  table on one page that disagree. **The averaged figure alone, marked** - the marked one is still
+  the wrong answer to "what is the peak". **Averaging across parts at shared faces** - the toolkit's
+  default (E-074) and INV-022's prohibition
+- basis: E-144 (T1), E-145 (T1)
+- affects: MOD-004, MOD-009, CT-003, view/REQ-016, report/REQ-001
+- decidedness: Fixed
+- reversal_trigger: none foreseen; a material field inside a part would let the averaging stop at
+  material boundaries too (INV-022), which is a refinement of where it stops, not of whether both
+  numbers travel

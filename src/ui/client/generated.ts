@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "3.7.0";
+export const PROTOCOL_VERSION = "3.8.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -180,7 +180,7 @@ export const OPERATION_FACTS: Readonly<Record<Operation, OperationFacts>> = {
   "dataset.load": { writes: true, required: ["caseId", "filePaths"], optional: [], answers: ["datasetId", "fields", "supportLevel", "gaps"] },
   "dataset.describe": { writes: false, required: ["datasetId"], optional: [], answers: ["pointCount", "cellCount", "boundsM", "partial", "resultAxis"] },
   "field.declareUnit": { writes: true, required: ["datasetId", "fieldName", "unitSymbol"], optional: [], answers: [] },
-  "field.statistics": { writes: false, required: ["datasetId", "fieldName"], optional: ["region"], answers: ["minimum", "maximum", "mean", "missingCount", "association", "reduction", "weighting", "scope"] },
+  "field.statistics": { writes: false, required: ["datasetId", "fieldName"], optional: ["region"], answers: ["minimum", "maximum", "mean", "missingCount", "association", "reduction", "weighting", "scope", "averaging", "averaged", "averagingRefused"] },
   "variable.declare": { writes: true, required: ["name", "value"], optional: ["workspaceId", "caseId", "unit"], answers: ["id"] },
   "variable.set": { writes: true, required: ["value", "variableId"], optional: [], answers: ["changedIds"] },
   "variable.detach": { writes: true, required: ["caseId", "variableId"], optional: [], answers: ["keptValue"] },
@@ -645,6 +645,15 @@ export interface Results {
     reduction: string;
     weighting: "volume" | "dualVolume" | "area" | "none";
     scope: string;
+    averaging?: "unaveraged";
+    averaged?: {
+      maximum: ReportedValue;
+      minimum: ReportedValue;
+      spreadAtMaximum: ReportedValue;
+      spreadFraction: ReportedValue;
+      disagreement: string;
+    };
+    averagingRefused?: string;
   };
   "variable.declare": {
     id: string;

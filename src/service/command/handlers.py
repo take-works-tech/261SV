@@ -34,11 +34,13 @@ import numpy as np
 from domain_core.association import Association
 from domain_core.locale_format import bytes_as_text
 from domain_core.dataset import Dataset, Field
+from domain_core.identifiers import location_of
 from domain_core.parts import LoadedCase, Part
 from domain_core.recorded_time import STORED_FORMAT, RecordedTime, from_stored, record as record_time, record_instant
-from domain_core.reported_value import Caveat, Provenance, ReportedValue
+from domain_core.reported_value import DIMENSIONLESS, Caveat, Provenance, ReportedValue
 from domain_core.units import UndeclaredUnitError, unit as known_unit
 from engine import reader
+from engine.analysis import nodal
 from engine.analysis import weights as field_weights
 from engine.analysis.summary import Reduction, Summary, SummaryError, Weighting, summarise
 from engine.limits import MachineClass
@@ -929,18 +931,109 @@ def field_statistics(session: Session, parameters: Mapping[str, Any]) -> Effect 
     )
     mean, weighting = weighted_mean(holders, name, values, association, scope, unit, digits, caveats)
 
-    return Effect(
-        f"'{name}' の統計です",
-        value={
-            "minimum": reported(minimum),
-            "maximum": reported(maximum),
-            "mean": reported(mean),
-            "missingCount": int(np.count_nonzero(np.isnan(values))),
-            "association": ASSOCIATION_WORD[association],
-            "reduction": "min / max / mean",
-            "weighting": weighting.value,
-            "scope": scope,
-        },
+    answer: dict[str, Any] = {
+        "minimum": reported(minimum),
+        "maximum": reported(maximum),
+        "mean": reported(mean),
+        "missingCount": int(np.count_nonzero(np.isnan(values))),
+        "association": ASSOCIATION_WORD[association],
+        "reduction": "min / max / mean",
+        "weighting": weighting.value,
+        "scope": scope,
+    }
+    if association is Association.CELL:
+        # A value at a shared node is several values: the numbers above are the element values,
+        # said so, and the averaged ones travel beside them with the spread (INV-032, XC-247).
+        answer["averaging"] = "unaveraged"
+        try:
+            both = averaged_extrema(holders, name, unit=unit, digits=digits, caveats=caveats)
+        except nodal.NodalError as error:
+            answer["averagingRefused"] = str(error)
+        else:
+            answer["averaged"] = {
+                "maximum": reported(both.maximum),
+                "minimum": reported(both.minimum),
+                "spreadAtMaximum": reported(both.spread),
+                "spreadFraction": reported(both.fraction),
+                "disagreement": nodal.disagreement(
+                    nodal.Extremum(float(maximum.value), nodal.Averaging.UNAVERAGED, 0, unit)
+                    if maximum.value is not None else nodal.Extremum(float(both.maximum.value or 0.0), nodal.Averaging.UNAVERAGED, 0, unit),
+                    nodal.Extremum(float(both.maximum.value or 0.0), nodal.Averaging.AVERAGED, 0, unit),
+                ),
+            }
+    return Effect(f"'{name}' の統計です", value=answer)
+
+
+@dataclass(frozen=True, slots=True)
+class AveragedExtrema:
+    """The nodal-averaged maximum and minimum of a cell field over the parts, each located, and the
+    spread at the maximum's node - the three numbers INV-032 says travel together."""
+
+    maximum: ReportedValue
+    minimum: ReportedValue
+    spread: ReportedValue
+    #: The spread over the absolute average at the same node: dimensionless, unit 1, and a stated
+    #: absence where the average is zero (a fraction of nothing is not perfect agreement).
+    fraction: ReportedValue
+
+
+def averaged_extrema(
+    holders: list[Part], name: str, *, unit: str | None, digits: int, caveats: frozenset[Caveat],
+) -> AveragedExtrema:
+    """Average a cell field onto the nodes **part by part** and take the extrema across the parts.
+
+    Never across parts: two parts sharing a face keep their own values at the shared nodes
+    (INV-022). The location names the part and then the node in the source's own words
+    (INV-023), and every value carries the averaged caveat so the label travels with the number.
+    """
+    found: list[tuple[Part, nodal.Extremum, nodal.Extremum]] = []
+    for part in holders:
+        if part.dataset is None:
+            continue
+        field = part.dataset.fields[name]
+        found.append((
+            part,
+            nodal.extremum(part.dataset, field, averaging=nodal.Averaging.AVERAGED, largest=True),
+            nodal.extremum(part.dataset, field, averaging=nodal.Averaging.AVERAGED, largest=False),
+        ))
+    if not found:
+        raise nodal.NodalError(f"'{name}' を持つパートがありません")
+    top_part, top, _ = max(found, key=lambda one: one[1].value)
+    bottom_part, _, bottom = min(found, key=lambda one: one[2].value)
+    marked = caveats | {Caveat.AVERAGED} | (frozenset({Caveat.UNDECLARED_UNIT}) if unit is None else frozenset())
+
+    def where(part: Part, at: int) -> str:
+        assert part.dataset is not None
+        return f"{part.label}：{location_of(part.dataset.identifiers.get(Association.POINT), at, Association.POINT)}"
+
+    ratio_formula = f"spread / |nodal-average({name})| at the node of max(nodal-average({name}))"
+    fraction = (
+        ReportedValue(
+            value=float(top.fraction), unit=DIMENSIONLESS, digits=digits, provenance=Provenance.COMPUTED,
+            caveats=caveats, formula=ratio_formula, location=where(top_part, top.at),
+        )
+        if top.fraction is not None and np.isfinite(top.fraction)
+        else ReportedValue.unavailable(
+            "平均が 0 の節点では、ばらつきの比は定まりません", unit=DIMENSIONLESS, digits=digits,
+            provenance=Provenance.COMPUTED, caveats=caveats, formula=ratio_formula,
+        )
+    )
+    return AveragedExtrema(
+        maximum=ReportedValue(
+            value=top.value, unit=unit, digits=digits, provenance=Provenance.COMPUTED, caveats=marked,
+            formula=f"max(nodal-average({name}))", location=where(top_part, top.at),
+        ),
+        minimum=ReportedValue(
+            value=bottom.value, unit=unit, digits=digits, provenance=Provenance.COMPUTED, caveats=marked,
+            formula=f"min(nodal-average({name}))", location=where(bottom_part, bottom.at),
+        ),
+        spread=ReportedValue(
+            value=top.spread, unit=unit, digits=digits, provenance=Provenance.COMPUTED,
+            caveats=caveats | (frozenset({Caveat.UNDECLARED_UNIT}) if unit is None else frozenset()),
+            formula=f"max(contributing {name}) - min(contributing {name}) at the node of max(nodal-average({name}))",
+            location=where(top_part, top.at),
+        ),
+        fraction=fraction,
     )
 
 
@@ -1346,10 +1439,39 @@ def rows_for_report(session: Session, definition: Mapping[str, Any]) -> tuple[di
         if loaded not in involved:
             involved.append(loaded)
         key = str(block.get("viewId") or block.get("graphId") or index)
-        rows[key] = [
-            ValueRow(label=f"{name} の最大", value=loaded.case.maximum(name)) for name in names
-        ]
+        rows[key] = [row for name in names for row in value_rows(loaded, name)]
     return rows, involved
+
+
+def value_rows(loaded: Loaded, name: str) -> list[ValueRow]:
+    """A field's maximum as a document states it - and for a cell field, both numbers with the spread.
+
+    A report that gives one without saying which has answered neither (INV-032): the element value
+    is labelled as such, the averaged one carries its caveat, and the spread at its node follows.
+    """
+    maximum = loaded.case.maximum(name)
+    holders = loaded.holders(name)
+    cell = bool(holders) and all(
+        part.dataset is not None and part.dataset.fields[name].association is Association.CELL for part in holders
+    )
+    if not cell:
+        return [ValueRow(label=f"{name} の最大", value=maximum)]
+    rows = [ValueRow(label=f"{name} の最大（要素値・平均なし）", value=maximum)]
+    unit = maximum.unit
+    digits = maximum.digits
+    caveats = frozenset({Caveat.PARTIAL_DATASET}) if loaded.case.is_partial else frozenset()
+    try:
+        both = averaged_extrema(holders, name, unit=unit, digits=digits, caveats=caveats)
+    except nodal.NodalError as error:
+        rows.append(ValueRow(
+            label=f"{name} の最大（節点平均）",
+            value=ReportedValue.unavailable(str(error), unit=unit, digits=digits, provenance=Provenance.COMPUTED,
+                                            caveats=caveats, formula=f"max(nodal-average({name}))"),
+        ))
+        return rows
+    rows.append(ValueRow(label=f"{name} の最大（節点平均）", value=both.maximum))
+    rows.append(ValueRow(label=f"{name} の節点平均の最大でのばらつき（メッシュ細分の目安）", value=both.spread))
+    return rows
 
 
 #: How large a still is drawn for a deliverable, and how far it is cut down when the document would

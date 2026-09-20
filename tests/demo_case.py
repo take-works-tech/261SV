@@ -56,6 +56,44 @@ def write_cube(path: Path) -> None:
     writer.Write()
 
 
+def write_bar(path: Path) -> None:
+    """E-144's measurement as a file: five hexahedra in a row carrying element values 10, 20, 200,
+    20, 10 - a concentration inside the body. Averaged onto the shared nodes its maximum is 110
+    against 200, and the spread at that node is 180 (INV-032)."""
+    cell_values = (10.0, 20.0, 200.0, 20.0, 10.0)
+    count = len(cell_values)
+    coordinates = np.array(
+        [[float(index), y, z] for index in range(count + 1) for y in (0.0, 1.0) for z in (0.0, 1.0)],
+        dtype=np.float64,
+    )
+    points = vtkPoints()
+    points.SetData(numpy_to_vtk(coordinates, deep=True))
+
+    def node(index: int, y: int, z: int) -> int:
+        return index * 4 + y * 2 + z
+
+    cells = vtkCellArray()
+    for index in range(count):
+        cells.InsertNextCell(8)
+        for corner in (
+            node(index, 0, 0), node(index + 1, 0, 0), node(index + 1, 1, 0), node(index, 1, 0),
+            node(index, 0, 1), node(index + 1, 0, 1), node(index + 1, 1, 1), node(index, 1, 1),
+        ):
+            cells.InsertCellPoint(corner)
+    grid = vtkUnstructuredGrid()
+    grid.SetPoints(points)
+    grid.SetCells(VTK_HEXAHEDRON, cells)
+    field = vtkFloatArray()
+    field.SetName("stress")
+    for value in cell_values:
+        field.InsertNextValue(value)
+    grid.GetCellData().AddArray(field)
+    writer = vtkXMLUnstructuredGridWriter()
+    writer.SetFileName(str(path))
+    writer.SetInputData(grid)
+    writer.Write()
+
+
 def write_two_blocks(path: Path) -> None:
     """Two triangles and a quad in an Exodus file: the toolkit's writer puts each cell type in its
     own element block, and the reader returns them as two parts under `Element Blocks` - a case
@@ -132,7 +170,11 @@ def main(argv: list[str]) -> int:
         return 2
     workspace, cube = write_demo_case(Path(argv[0]))
     partial = write_partial_case(Path(argv[0]))
-    print(json.dumps({"workspace": str(workspace), "cube": str(cube), "partial": str(partial) if partial else None}))
+    bar = Path(argv[0]) / "bar.vtu"
+    write_bar(bar)
+    print(json.dumps({
+        "workspace": str(workspace), "cube": str(cube), "partial": str(partial) if partial else None, "bar": str(bar),
+    }))
     return 0
 
 

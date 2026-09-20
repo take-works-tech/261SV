@@ -49,6 +49,34 @@ describe("the tables", () => {
     expect(rows[4]).toEqual(["temperature（欠損数）", "0", "件", "整数", "計算", "", "範囲：whole model・重み：dualVolume・点の上"]);
   });
 
+  test("a cell field's statistics carry both numbers, each labelled, and the spread with the disagreement", () => {
+    const cell: Results["field.statistics"] = {
+      ...STATISTICS,
+      association: "cell",
+      averaging: "unaveraged",
+      maximum: { value: 200, unit: "MPa", digits: 6, provenance: "computed", formula: "extremum(stress)", location: "bar：cell 3" },
+      averaged: {
+        maximum: { value: 110, unit: "MPa", digits: 6, provenance: "computed", formula: "max(nodal-average(stress))", caveats: ["averaged"], location: "bar：point 12" },
+        minimum: { value: 10, unit: "MPa", digits: 6, provenance: "computed", formula: "min(nodal-average(stress))", caveats: ["averaged"], location: "bar：point 0" },
+        spreadAtMaximum: { value: 180, unit: "MPa", digits: 6, provenance: "computed", formula: "max - min at the node", location: "bar：point 12" },
+        spreadFraction: { value: 180 / 110, unit: "1", digits: 6, provenance: "computed", formula: "spread / |average|" },
+        disagreement: "節点平均と要素値で 90 MPa 違います（大きいほうの 45%）。どちらも正しく、答えている問いが違います",
+      },
+    };
+    const rows = statisticsRows("stress", cell, LABELS);
+
+    expect(rows.map((row) => row[0])).toEqual([
+      "項目", "stress（最大・要素値（平均なし））", "stress（最小・要素値（平均なし））", "stress（平均・要素値（平均なし））", "stress（欠損数）",
+      "stress（最大・節点平均）", "stress（最小・節点平均）", "stress（節点平均の最大でのばらつき・メッシュ細分の目安）",
+    ]);
+    expect(rows[1]?.[1]).toBe("200");
+    expect(rows[5]?.slice(1, 3)).toEqual(["110", "MPa"]);
+    expect(rows[5]?.[6]).toContain("averaged");
+    expect(rows[7]?.[1]).toBe("180");
+    expect(rows[7]?.[6]).toContain("平均比 164%");
+    expect(rows[7]?.[6]).toContain("90 MPa");
+  });
+
   test("probe: the readout's location fills in where the value carries none", () => {
     expect(probeRows("temperature", { ...EIGHT, location: undefined }, "節点（番号なし）", LABELS)[1]?.[5]).toBe("節点（番号なし）");
     expect(probeRows("temperature", EIGHT, "elsewhere", LABELS)[1]?.[5]).toBe("GlobalNodeId 7");

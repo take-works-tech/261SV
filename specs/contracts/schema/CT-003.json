@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "3.7.0",
+  "version": "3.8.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -2316,6 +2316,51 @@
             "scope": {
               "type": "string",
               "description": "計算した範囲（INV-017）"
+            },
+            "averaging": {
+              "type": "string",
+              "enum": [
+                "unaveraged"
+              ],
+              "description": "minimum・maximum・mean が要素値そのもの（平均なし）であること。要素場のときだけ載る（INV-032）"
+            },
+            "averaged": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "maximum",
+                "minimum",
+                "spreadAtMaximum",
+                "spreadFraction",
+                "disagreement"
+              ],
+              "description": "要素場を節点に平均したときの数。要素場のときだけ載り、平均した極値はその節点でのばらつきを伴う（INV-032, XC-247）",
+              "properties": {
+                "maximum": {
+                  "$ref": "#/$defs/reportedValue",
+                  "description": "節点平均の最大。caveats に averaged を持つ"
+                },
+                "minimum": {
+                  "$ref": "#/$defs/reportedValue",
+                  "description": "節点平均の最小。caveats に averaged を持つ"
+                },
+                "spreadAtMaximum": {
+                  "$ref": "#/$defs/reportedValue",
+                  "description": "平均の最大の節点で、寄与した要素値の最大と最小の差（E-145 の Nodal Difference）"
+                },
+                "spreadFraction": {
+                  "$ref": "#/$defs/reportedValue",
+                  "description": "そのばらつきを平均の絶対値で割った無次元の比。単位は 1（SI の無次元）で、平均が 0 なら値なしと理由（XC-003）"
+                },
+                "disagreement": {
+                  "type": "string",
+                  "description": "要素値の最大と節点平均の最大がどれだけ違うか、両方を示すときに言うべきこと"
+                }
+              }
+            },
+            "averagingRefused": {
+              "type": "string",
+              "description": "要素場なのに節点平均を求められなかった理由。averaged の代わりに載る"
             }
           }
         },

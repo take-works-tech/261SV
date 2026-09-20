@@ -836,12 +836,24 @@ function LiveBlock({ block, index }: { block: ReportBlock; index: number }) {
                       </tr>
                     );
                   }
-                  return (["maximum", "minimum", "mean"] as const).map((key) => {
-                    const one = current[key];
-                    const word = key === "maximum" ? "最大" : key === "minimum" ? "最小" : "平均";
+                  const element = current.averaging === "unaveraged" ? "・要素値（平均なし）" : "";
+                  const averaged = current.averaged
+                    ? [
+                        { key: "averaged-max", label: `${field}（最大・節点平均）`, one: current.averaged.maximum },
+                        { key: "averaged-spread", label: `${field}（節点平均の最大でのばらつき）`, one: current.averaged.spreadAtMaximum },
+                      ]
+                    : [];
+                  return [
+                    ...(["maximum", "minimum", "mean"] as const).map((key) => ({
+                      key,
+                      label: `${field}（${key === "maximum" ? "最大" : key === "minimum" ? "最小" : "平均"}${element}）`,
+                      one: current[key],
+                    })),
+                    ...averaged,
+                  ].map(({ key, label, one }) => {
                     return (
                       <tr key={`${field}:${key}`}>
-                        <th scope="row">{field}（{word}）</th>
+                        <th scope="row">{label}</th>
                         {one.value === null ? (
                           <NumberCell value={null} missingBecause={one.missingBecause ?? "値なし"} />
                         ) : (

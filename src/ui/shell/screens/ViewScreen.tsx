@@ -1680,6 +1680,28 @@ function LivePartSection() {
                 );
               })}
               <div className="prop-row"><label>欠損数</label><span>{e.partStatistics.missingCount.toLocaleString("en-US")} 件</span></div>
+              {e.partStatistics.averaging === "unaveraged" ? (
+                <p className="prop-note">上の三つは要素値そのもの（平均なし）です。</p>
+              ) : null}
+              {e.partStatistics.averaged ? (
+                <>
+                  <div className="prop-row">
+                    <label>最大（節点平均）</label>
+                    <span>
+                      {e.partStatistics.averaged.maximum.value === null ? "値なし" : `${formatValue(e.partStatistics.averaged.maximum.value, e.partStatistics.averaged.maximum.digits)} ${e.partStatistics.averaged.maximum.unit ?? UNDECLARED}`}
+                      {e.partStatistics.averaged.maximum.location ? <small className="type-caption" style={{ color: "var(--ink-muted)" }}>（{e.partStatistics.averaged.maximum.location}）</small> : null}
+                    </span>
+                  </div>
+                  <div className="prop-row">
+                    <label>ばらつき</label>
+                    <span>
+                      {e.partStatistics.averaged.spreadAtMaximum.value === null ? "値なし" : `${formatValue(e.partStatistics.averaged.spreadAtMaximum.value, e.partStatistics.averaged.spreadAtMaximum.digits)} ${e.partStatistics.averaged.spreadAtMaximum.unit ?? UNDECLARED}`}
+                      {e.partStatistics.averaged.spreadFraction.value === null ? null : <small className="type-caption" style={{ color: "var(--ink-muted)" }}>（平均比 {Math.round(e.partStatistics.averaged.spreadFraction.value * 100)}%・メッシュ細分の目安）</small>}
+                    </span>
+                  </div>
+                  <p className="prop-note">{e.partStatistics.averaged.disagreement}</p>
+                </>
+              ) : null}
               <div className="prop-row">
                 <label>値を写す</label>
                 <CopyValues

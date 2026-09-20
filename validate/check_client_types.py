@@ -91,7 +91,16 @@ def type_of(node: object, indent: int = 0) -> str:
         return "unknown"
     reference = node.get("$ref")
     if reference:
-        return REFERENCED.get(reference, "unknown")
+        if reference in REFERENCED:
+            return REFERENCED[reference]
+        # A reference into CT-003's own $defs: the reported value has its named type below, and any
+        # other local definition is written out where it is used, so nothing becomes `unknown` for
+        # being defined once and referenced twice.
+        if reference == "#/$defs/reportedValue":
+            return "ReportedValue"
+        if reference.startswith("#/$defs/"):
+            return type_of(schema()["$defs"][reference.rsplit("/", 1)[1]], indent)
+        return "unknown"
     if "enum" in node:
         return " | ".join(json.dumps(one, ensure_ascii=False) for one in node["enum"])
     kind = node.get("type")
