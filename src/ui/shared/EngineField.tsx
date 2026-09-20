@@ -96,6 +96,17 @@ export function EngineField() {
       ) : null}
 
       <div className="prop-row">
+        <button
+          type="button"
+          className="btn"
+          disabled={!e.viewId || e.busy}
+          onClick={() => void engineState.keepCamera()}
+          title="いまの向きをビューの定義に書きます：取り消し 1 段、未保存 1 件。回すだけでは定義は変わらず、レポートは保存した向きで描きます（XC-270）"
+        >
+          この向きをビューに保存
+        </button>
+      </div>
+      <div className="prop-row">
         <label htmlFor="engine-export">書き出し先</label>
         <input
           id="engine-export"

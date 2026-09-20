@@ -195,6 +195,9 @@ export function Topbar() {
           unsaved={e.journal.length}
           onSave={() => void engineState.save()}
           savedAt={e.savedAt}
+          readOnly={e.readOnly}
+          lock={e.lock}
+          onTakeOver={() => void engineState.takeOverLock()}
         />
         <button className="icon-button" aria-label="設定" title="設定" onClick={() => session.navigate("settings")}>
           ⚙

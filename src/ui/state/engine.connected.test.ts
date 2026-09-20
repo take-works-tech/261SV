@@ -326,6 +326,25 @@ describe("when the engine ends", () => {
     expect(s.refusal).toBeNull();
     expect(s.imageUrl).toMatch(/^blob:/);
 
+    // The lock the killed engine took is still there: the reopened document is read-only and says
+    // so (XC-241, XC-269), the engine's warning is on screen rather than dropped, and saving is
+    // refused naming what was found - until the person takes the lock over.
+    expect(s.readOnly).toBe(true);
+    expect(s.lock?.state).toBe("stale");
+    expect(s.warnings.some((one) => one.includes("自動では解除しません"))).toBe(true);
+    expect(await engineState.save()).toBe(false);
+    expect(snapshot().refusal).toContain("読み取り専用");
+    engineState.clearRefusal();
+
+    expect(await engineState.takeOverLock()).toBe(true);
+
+    s = snapshot();
+    expect(s.readOnly).toBe(false);
+    expect(s.lock?.state).toBe("free");
+    expect(s.sourceName).toBe("cube.vtu");
+    expect(s.imageUrl).toMatch(/^blob:/);
+    expect(await engineState.save()).toBe(true);
+
     engineState.dismissLost();
     expect(snapshot().lost).toBeNull();
   });

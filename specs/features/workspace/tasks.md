@@ -707,5 +707,7 @@ updated: 2026-09-20
 - done: 2026-09-20 (XC-269). Until this change nothing called the lock module: every open was an
   editor. Read-only is drawn at the save - the window works in memory, `workspace.save` and
   `output.prune` are refused naming the holder - and `takeOverStaleLock` is the person's word for a
-  stale or unreadable lock, never a live one. The interface's part, showing the state and offering
-  the take-over, is the next change
+  stale or unreadable lock, never a live one. The interface shows the state in the topbar, offers the
+  take-over only where the lock is stale or unreadable (`engineState.takeOverLock`), and shows the
+  engine's warnings beside its answers - which it had dropped until 2026-09-20, so a lock held, a
+  dataset closed or a document lifted had gone unsaid
