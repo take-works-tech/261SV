@@ -21,6 +21,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { PROTOCOL_VERSION, type Connection } from "../client/engine";
 import { informationOf } from "../logic/information";
 import { absentParts, visibilityAfter } from "../logic/parts";
+import { moveBlock } from "../logic/report";
 import { engineState, FRAME, snapshot } from "./engine";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
@@ -331,6 +332,37 @@ describe("the prototype thread from the interface's side", () => {
     expect(withoutData).not.toMatch(/https?:\/\//);
   });
 
+  test("report: the document's report is read back with its blocks and revision, a move is one write, the trust content is the engine's, and a second export writes the same report (XC-275)", async () => {
+    await engineState.refreshReport();
+    let s = snapshot();
+    expect(s.reportId).not.toBeNull();
+    expect(s.report?.blocks.map((one) => one.kind)).toEqual(["view", "valueTable"]);
+    expect(s.reportRevision).toBe(1);
+    expect(s.provenance?.sources[0]?.path.endsWith("cube.vtu")).toBe(true);
+    expect(s.provenance?.declaredUnits).toEqual({ temperature: "K" });
+    expect(s.provenance?.caseIds).toEqual(["case:1"]);
+    expect(s.provenanceRefusal).toBeNull();
+
+    const report = s.report;
+    if (!report) throw new Error("the report was not read back");
+    const before = s.journal.length;
+    expect(await engineState.updateReport({ ...report, blocks: moveBlock(report.blocks, 0, 1) })).toBe(true);
+    s = snapshot();
+    expect(s.journal.length).toBe(before + 1);
+    expect(s.journal.at(-1)?.operation).toBe("report.update");
+    expect(s.reportRevision).toBe(2);
+    expect(s.report?.blocks.map((one) => one.kind)).toEqual(["valueTable", "view"]);
+
+    // The same report again, at another path: until 2026-09-20 every export made a report under
+    // the dataset's name, and the second was refused as a name the document already held (AC-030).
+    const again = join(directory, "from-the-interface-again.html");
+    expect(await engineState.exportReport(again)).not.toBeNull();
+    expect(snapshot().exported?.path).toBe(again);
+    expect(snapshot().refusal).toBeNull();
+    // Saved, so that the restart below finds the report in the document rather than making one.
+    expect(await engineState.save()).toBe(true);
+  });
+
   test("a case the reader could only partly read opens as partial, keeps the mark and names what is missing (AC-027)", async () => {
     if (!partialPath) throw new Error("the partial fixture was not written: h5py is missing from the engine environment");
 
@@ -398,6 +430,11 @@ describe("when the engine ends", () => {
     // the view (XC-274) - until 2026-09-20 this window's turntable overwrote it here.
     expect(s.savedCamera).toEqual(kept);
     expect(s.partVisibility).toEqual({});
+    // The report the document holds is adopted by its name and read back, blocks in the order
+    // they were written - not made again (AC-030, XC-275).
+    await engineState.refreshReport();
+    expect(snapshot().report?.blocks.map((one) => one.kind)).toEqual(["valueTable", "view"]);
+    expect(snapshot().savedReports.map((one) => one.name)).toContain("cube.vtu");
     expect(s.lost?.map((one) => one.operation)).toContain("field.declareUnit");
     expect(s.refusal).toBeNull();
     expect(s.imageUrl).toMatch(/^blob:/);

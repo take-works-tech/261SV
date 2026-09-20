@@ -5910,3 +5910,43 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a part whose visibility a block should own separately from its descendants - a
   block-level object with its own presentation - at which point the map gains block entries and the
   descendant rule is written rather than implied
+
+### XC-275 - The report area edits the document's report and shows its trust content from the engine
+- decided: 2026-09-20
+- status: active
+- decision: with an engine connected, the `report` area is the document's report - one per dataset
+  name, adopted where the document holds it and made once where it does not (workspace/AC-030) - read back
+  with `report.get` before every write and written whole with `report.update`: the block list a
+  person reorders, removes from and adds to, and the deliverable's language. The canvas shows only
+  what the engine has answered: the current frame where a view block names the view on screen, the
+  statistics of the field on screen where a value table names it, the text of a text block - and
+  says of everything else that it is drawn or computed at export from the same definition (INV-001,
+  report/AC-022). The mandatory content is `report.provenance`'s answer, shown as the document will
+  carry it; where the engine refuses it, the refusal is shown in its place as the item that blocks
+  the export (16_application_model §7.5, report/AC-031), and not as the window's refusal. The export
+  is one control, shared by the View screen's rail and the area's output tab, and what it wrote -
+  path, size, reductions, the elements the document could not carry - is shown from the answer
+  (report/AC-014). Drafting, style, templates, renaming and the preflight stay design states and say
+  so; `report.get` is added to CT-003 (3.6.0)
+- decided_by: engineering judgement, from #282's condition, INV-001 and XC-001
+- rationale: the deliverable is where the product's claim reaches a reader, and a preview that
+  showed a fixture's numbers beside a live engine would be the claim's opposite (XC-001). A preview
+  is honest only when every value on it is an answer already held, so what is not yet computed is
+  said to be computed at export rather than estimated. The block list must live in the document,
+  because a list kept in the window is a list the export never sees - which is how the design-state
+  reorder reached nothing (#282). Reading the definition back before writing it is the same rule
+  XC-274 fixed for views: `items.edit` replaces a definition whole (workspace/AC-031), so a window
+  that rebuilt one from memory overwrote what it never held. One report per dataset name is what
+  the naming rule leaves possible: every export used to create a report, and the second export of
+  a session was refused as a name the document already held
+- alternatives: **computing the value table in the preview from the frame or the store** - a second
+  code path for a number (INV-001). **Raising a provenance refusal as the window's refusal** - a
+  banner on every visit to the area with nothing loaded, in place of the item that names itself.
+  **Reports carried in `workspace.open`'s item list with their definitions** - every definition on
+  every open for a read needed once; `report.get` mirrors `view.get`
+- basis: E-001 (T1)
+- affects: MOD-009, CT-003, report/REQ-003, report/REQ-011
+- decidedness: Fixed
+- reversal_trigger: a second report per dataset in one document - a comparison report beside the
+  dataset's own - at which point the area lists the document's reports and the name is chosen rather
+  than derived

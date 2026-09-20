@@ -67,6 +67,29 @@ export interface SavedView {
   readonly datasetId?: string;
 }
 
+/** A block of the document's report, as CT-006 has it. */
+export interface ReportBlock {
+  readonly kind: "view" | "graph" | "valueTable" | "text" | "pageBreak";
+  readonly viewId?: string;
+  readonly form?: "still" | "video" | "interactive";
+  readonly graphId?: string;
+  readonly fields?: readonly string[];
+  readonly text?: string;
+  readonly authorship?: "person" | "generated";
+  readonly derivedFrom?: readonly string[];
+}
+
+/** The report's definition as the document holds it (CT-006): read back with `report.get`, written
+ *  whole with `report.update` (XC-275). Members this build does not edit round-trip untouched. */
+export interface ReportDefinition {
+  readonly id: string;
+  readonly name?: string;
+  readonly targets: readonly string[];
+  readonly blocks: readonly ReportBlock[];
+  readonly locale?: string;
+  readonly [member: string]: unknown;
+}
+
 /** The document's lock as `workspace.open` answered it (XC-241, XC-269). */
 export type Lock = NonNullable<Results["workspace.open"]["lock"]>;
 
@@ -81,6 +104,20 @@ export interface EngineState {
   /** What the document held when it was opened. A working view is updated when one of these has
    *  its name, because the document refuses a second view under a name it holds (AC-030). */
   readonly savedViews: readonly SavedView[];
+  /** The reports the document held when it was opened; the working report is adopted when one has
+   *  its name (AC-030), as views are. */
+  readonly savedReports: readonly SavedView[];
+  /** The document's report this session works on: its id, its definition as last read back, and
+   *  the revision the document holds (XC-275). Null until a report is made or adopted. */
+  readonly reportId: string | null;
+  readonly report: ReportDefinition | null;
+  readonly reportRevision: number | null;
+  /** The trust content as `report.provenance` answered it, or why it could not: the item that
+   *  cannot be produced blocks the export and names itself (report/AC-007, AC-031). */
+  readonly provenance: Results["report.provenance"] | null;
+  readonly provenanceRefusal: string | null;
+  /** What the last export wrote, as the engine answered it (report/AC-014). */
+  readonly exported: Results["report.export"] | null;
   /** Applied writes since the last save. Cleared by a save, by opening a workspace, and by an exit -
    *  into `lost`. */
   readonly journal: readonly AppliedWrite[];
@@ -183,6 +220,13 @@ const EMPTY: EngineState = {
   opened: null,
   inspection: null,
   savedViews: [],
+  savedReports: [],
+  reportId: null,
+  report: null,
+  reportRevision: null,
+  provenance: null,
+  provenanceRefusal: null,
+  exported: null,
   journal: [],
   lost: null,
   savedAt: null,
@@ -291,6 +335,12 @@ async function ask<O extends Operation>(
     });
   }
   return (answer.result ?? null) as Results[O] | null;
+}
+
+/** The name the session's report has in the document: the dataset's, so that a person finds it by
+ *  the file it reports on, and so the same report is found again next session (AC-030). */
+function reportName(): string {
+  return state.sourceName ?? "レポート";
 }
 
 /** Applied writes that are not unsaved work: opening and saving reset the journal, and loading a
@@ -407,6 +457,13 @@ export const engineState = {
     setState({
       opened: { workspacePath: path, caseId: null, filePath: null },
       savedViews: (opened.items?.views ?? []) as readonly SavedView[],
+      savedReports: (opened.items?.reports ?? []) as readonly SavedView[],
+      reportId: null,
+      report: null,
+      reportRevision: null,
+      provenance: null,
+      provenanceRefusal: null,
+      exported: null,
       journal: [],
       savedAt: null,
       workspaceId: opened.workspaceId,
@@ -472,6 +529,9 @@ export const engineState = {
       partVisibility: {},
       selectedPart: null,
       described: null,
+      // The trust content is of what is loaded: read again for the new dataset (XC-275).
+      provenance: null,
+      provenanceRefusal: null,
       parts: null,
       probe: null,
       probeLocation: null,
@@ -698,23 +758,73 @@ export const engineState = {
     });
   },
 
-  /** Write the deliverable: the values, and the picture where one was drawn. */
-  async exportReport(path: string): Promise<Results["report.export"] | null> {
-    if (!state.workspaceId || !state.fieldName) return null;
-    const blocks: Record<string, unknown>[] = [];
+  /** The report this session works on: the document's report under this dataset's name, adopted
+   *  where the document holds one (AC-030) and made where it does not - with the picture where one
+   *  is drawn and the values of the field on screen. Made once: until 2026-09-20 every export made
+   *  a report, and the second was refused as a name the document already held. */
+  async ensureReport(): Promise<string | null> {
+    if (state.reportId) return state.reportId;
+    if (!state.workspaceId) return null;
+    const name = reportName();
+    const saved = state.savedReports.find((one) => one.name === name);
+    if (saved) {
+      setState({ reportId: saved.id });
+      await engineState.refreshReport();
+      return saved.id;
+    }
+    const blocks: ReportBlock[] = [];
     if (state.viewId) blocks.push({ kind: "view", viewId: state.viewId, form: "still" });
-    blocks.push({ kind: "valueTable", fields: [state.fieldName] });
-    const report = await ask("report.create", {
+    if (state.fieldName) blocks.push({ kind: "valueTable", fields: [state.fieldName] });
+    const created = await ask("report.create", {
       workspaceId: state.workspaceId,
-      definition: {
-        id: "report:pending",
-        name: state.sourceName ?? "レポート",
-        targets: ["html"],
-        blocks,
-      },
+      definition: { id: "report:pending", name, targets: ["html"], blocks },
     });
-    if (!report) return null;
-    return ask("report.export", { reportId: report.id, path });
+    if (!created) return null;
+    setState({ reportId: created.id, savedReports: [...state.savedReports, { id: created.id, name }] });
+    await engineState.refreshReport();
+    return created.id;
+  },
+
+  /** What the document holds for the report, and its trust content, read rather than remembered
+   *  (XC-275). A refusal of the trust content is kept beside it - it is the item that blocks the
+   *  export, and the area shows it there - and is not raised as this window's refusal. */
+  async refreshReport(): Promise<void> {
+    let reportId = state.reportId;
+    if (!reportId) {
+      const saved = state.savedReports.find((one) => one.name === reportName());
+      if (!saved) return;
+      reportId = saved.id;
+      setState({ reportId });
+    }
+    const held = await ask("report.get", { reportId });
+    if (held) setState({ report: held.definition as unknown as ReportDefinition, reportRevision: held.revision });
+    const before = state.refusal;
+    const provenance = await ask("report.provenance", { reportId });
+    if (provenance) setState({ provenance, provenanceRefusal: null });
+    else setState({ provenance: null, provenanceRefusal: state.refusal, refusal: before });
+  },
+
+  /** Class 2, and a document write: the report's definition, whole (CT-006), then read back. */
+  async updateReport(definition: ReportDefinition): Promise<boolean> {
+    if (!state.reportId) return false;
+    setState({ refusal: null });
+    const done = await ask("report.update", {
+      reportId: state.reportId,
+      definition: definition as unknown as Record<string, unknown>,
+    });
+    if (!done) return false;
+    await engineState.refreshReport();
+    return true;
+  },
+
+  /** Write the deliverable: what the document's report says, with its trust content. */
+  async exportReport(path: string): Promise<Results["report.export"] | null> {
+    const reportId = await engineState.ensureReport();
+    if (!reportId) return null;
+    setState({ refusal: null });
+    const done = await ask("report.export", { reportId, path });
+    setState({ exported: done });
+    return done;
   },
 
   /** What this build can do and where it keeps its log (system.capabilities). A read. */

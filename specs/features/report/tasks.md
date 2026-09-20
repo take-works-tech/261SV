@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-25
+updated: 2026-09-20
 ---
 
 # Tasks: report generation
@@ -179,6 +179,10 @@ updated: 2026-08-25
 - satisfies: AC-022
 - depends_on: TASK-002
 - done_when: a block naming a view renders through the same definition the interface uses
+- done: 2026-09-20 (XC-274, XC-275). `report.export` draws a view block from the definition the
+  document holds - the one the interface writes, camera and `partVisibility` included - and the
+  area's preview shows the frame the screen drew from it, saying the document's figure is drawn
+  at export from the same definition
 
 ### TASK-023 - Video blocks
 - satisfies: AC-023
@@ -290,3 +294,16 @@ updated: 2026-08-25
 - satisfies: AC-044
 - depends_on: TASK-043
 - done_when: a changed input lets the product name the deliverable as produced from changed data
+
+### TASK-045 - The report area edits the document's report
+- satisfies: AC-007, AC-022
+- depends_on: TASK-002, TASK-022
+- done_when: with an engine connected the area reads the document's report back before it writes
+  it, the block list a person edits reaches the document, the mandatory content is shown from
+  `report.provenance` or its refusal is shown as the item that blocks the export, and the export is
+  one control whose answer is shown
+- done: 2026-09-20 (XC-275, CT-003 3.6.0). `report.update` and `report.get` are registered; the
+  store keeps the document's report, adopts it by the dataset's name and makes it once - every
+  export used to create one and the second was refused as a name already held. What is not built:
+  drafting, style, templates, renaming, the preflight; the canvas shows engine answers only and
+  says the rest is computed at export

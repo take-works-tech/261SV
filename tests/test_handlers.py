@@ -109,12 +109,13 @@ class TestWhatThisBuildRegisters:
         assert registered == {
             "workspace.open", "dataset.load", "dataset.describe", "dataset.parts",
             "field.declareUnit", "field.statistics", "view.create", "view.update", "view.get", "view.render",
-            "dataset.probe", "view.pick", "report.create", "report.export", "report.provenance",
+            "dataset.probe", "view.pick", "report.create", "report.update", "report.get",
+            "report.export", "report.provenance",
             "workspace.save", "dataset.inspect", "history.list",
             "system.capabilities", "system.protocols", "system.audit",
             "output.list", "output.plan", "output.prune",
         }
-        assert len(surface.unimplemented()) == len(OPERATIONS) - 24
+        assert len(surface.unimplemented()) == len(OPERATIONS) - 26
 
     def test_an_unimplemented_operation_is_refused_and_named_as_such(self) -> None:
         surface, _ = a_surface()
@@ -600,6 +601,40 @@ class TestProbingAPoint:
         from service.command.catalogue import PARAMETERS
 
         assert "fieldName" in PARAMETERS["dataset.probe"][1]
+
+
+class TestEditingAReport:
+    """`report.update` and `report.get` (CT-003 3.6.0): the block list an interface edits reaches the
+    document, and is read back from it with the revision rather than remembered (XC-275)."""
+
+    def test_the_block_list_is_written_and_read_back_with_its_revision(self, tmp_path: Path) -> None:
+        surface, _, _ = opened(tmp_path)
+        report_id = surface.submit(Command("report.create", {"workspaceId": "ws:1", "definition": {
+            "name": "梁", "targets": ["html"], "blocks": [{"kind": "text", "text": "一。"}],
+        }})).value["id"]
+        first = surface.submit(Command("report.get", {"reportId": report_id}))
+
+        updated = surface.submit(Command("report.update", {"reportId": report_id, "definition": {
+            "id": report_id, "name": "梁", "targets": ["html"],
+            "blocks": [{"kind": "pageBreak"}, {"kind": "text", "text": "一。"}],
+        }}))
+        second = surface.submit(Command("report.get", {"reportId": report_id}))
+
+        assert first.status is Status.ANSWERED, first.reason
+        assert first.value["revision"] == 1
+        assert [one["kind"] for one in first.value["definition"]["blocks"]] == ["text"]
+        assert updated.status is Status.APPLIED, updated.reason
+        assert updated.value == {"id": report_id, "revision": 2}
+        assert second.value["revision"] == 2
+        assert [one["kind"] for one in second.value["definition"]["blocks"]] == ["pageBreak", "text"]
+
+    def test_a_report_the_document_does_not_hold_is_refused(self, tmp_path: Path) -> None:
+        surface, _, _ = opened(tmp_path)
+
+        result = surface.submit(Command("report.get", {"reportId": "report:none"}))
+
+        assert result.status is Status.REFUSED
+        assert "report:none" in (result.reason or "")
 
 
 class TestReadingAViewBack:

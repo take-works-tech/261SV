@@ -83,7 +83,7 @@ honestly is better than an automated check that passes while the proposal is use
 | report/AC-004 | integration (planned) | - | `fixtures/case_series_partitioned` minus one part | as ingest | exact | coverage statement present in the document |
 | report/AC-005 | integration (planned) | - | `fixtures/case_small` | as above | exact | PowerPoint values equal HTML values field by field |
 | report/AC-006 | integration (planned) | - | `fixtures/case_small` | as above | exact | substitution stated where a format cannot carry an element |
-| report/AC-007 | integration (planned) | - | `fixtures/ws_full` | as workspace | exact | provenance block lists sources, times, units, version |
+| report/AC-007 | integration | tests/test_handlers.py::TestExportingADeliverable and src/ui/state/engine.connected.test.ts against a real engine | the demo workspace with one loaded case and a declared unit | generated in the test | exact | `report.provenance` names the workspace, the case, the source file with its modification time, the declared unit and the product version; the exported document names the source; the area shows the same facts and, where the engine refuses them, the refusal as the item that blocks the export |
 | report/AC-008 | integration (planned) | - | `fixtures/case_small` | as above | exact | undeclared field carries the marker, no guessed unit |
 | report/AC-009 | manual | - | two art styles authored for the test | authored here | - | exported document visually follows the selected style |
 | report/AC-010 | integration (planned) | - | art style with a removed asset | authored here | exact | default used and the missing asset named |
@@ -184,7 +184,7 @@ honestly is better than an automated check that passes while the proposal is use
 | report/AC-019 | integration (planned) | - | a budget set below the need | authored here | exact | stops and reports what was produced |
 | report/AC-020 | integration (planned) | - | a cited document | authored here | exact | document named, statement marked as from reference material |
 | report/AC-021 | integration (planned) | - | a document contradicting the data | authored here | exact | the data value is carried, the disagreement stated |
-| report/AC-022 | integration (planned) | - | a saved view | authored here | exact | the block renders through the same definition as the screen |
+| report/AC-022 | integration | tests/test_handlers.py::TestPartVisibility::test_the_document_s_figure_shows_what_the_view_shows, tests/test_handlers.py::TestExportingADeliverable::test_a_document_s_figure_keeps_its_bar_whatever_the_screen_asked and src/ui/state/engine.connected.test.ts | a view the interface wrote, with a part hidden | generated in the test | exact | the document's figure is drawn from the definition the document holds, a hidden part left out, and the interface's own frame comes from the same definition |
 | report/AC-023 | integration (planned) | - | a time-varying case | as ingest | exact | video produced from a camera path with the time mapping stated |
 
 ## Pipeline
