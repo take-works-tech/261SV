@@ -181,8 +181,9 @@ describe("the prototype thread from the interface's side", () => {
     expect(s.probe?.missingBecause).toContain("モデル");
   });
 
-  test("orbit: a drag is a new camera and a new frame", async () => {
+  test("orbit: a drag is a new camera and a new frame, and not a document write (XC-270)", async () => {
     const before = snapshot().imageUrl;
+    const writes = snapshot().journal.length;
 
     await engineState.orbit(35, 10);
 
@@ -191,11 +192,21 @@ describe("the prototype thread from the interface's side", () => {
     expect(s.imageUrl).toMatch(/^blob:/);
     expect(s.imageUrl).not.toBe(before);
     expect(s.turntable.azimuthDegrees).toBe(30 + 35);
+    // Class 1: the picture changed and the document did not - no undo step, no unsaved work.
+    expect(s.journal.length).toBe(writes);
+    const listed = await engineState.history();
+    expect(listed?.entries.at(-1)?.operation).toBe("view.render");
+
+    // Keeping the look is the one explicit write.
+    expect(await engineState.keepCamera()).toBe(true);
+    expect(snapshot().journal.length).toBe(writes + 1);
+    expect(snapshot().journal.at(-1)?.operation).toBe("view.update");
+    expect(snapshot().savedCamera?.position_m).toHaveLength(3);
   });
 
   test("a write the engine applied is unsaved work until the document is saved", async () => {
     // K was declared above and never saved: it is in the journal - beside the view writes that
-    // orbiting and colouring made, which are document writes too.
+    // colouring and keeping a look made, which are document writes; orbiting is not (XC-270).
     const operations = snapshot().journal.map((one) => one.operation);
     expect(operations).toContain("field.declareUnit");
     expect(operations).toContain("view.update");

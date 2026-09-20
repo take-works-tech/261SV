@@ -1085,7 +1085,9 @@ def view_render(session: Session, parameters: Mapping[str, Any]) -> Effect | Res
     colouring = colouring_of(stated)
     if isinstance(colouring, Result):
         return colouring
-    camera = camera_of(definition.get("camera"))
+    # A camera given draws the picture from there and leaves the definition's camera as it is: a
+    # camera move is interface state, not a document change (XC-270, 16_application_model §6).
+    camera = camera_of(parameters.get("camera") or definition.get("camera"))
     if isinstance(camera, Result):
         return camera
     available, detail = session.offscreen()
@@ -1176,7 +1178,8 @@ def view_pick(session: Session, parameters: Mapping[str, Any]) -> Effect | Resul
     colouring = colouring_of(stated)
     if isinstance(colouring, Result):
         return colouring
-    camera = camera_of(definition.get("camera"))
+    # The camera the picture was drawn with, where the caller gave one (XC-270).
+    camera = camera_of(parameters.get("camera") or definition.get("camera"))
     if isinstance(camera, Result):
         return camera
     available, detail = session.offscreen()

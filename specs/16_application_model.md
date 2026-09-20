@@ -180,7 +180,8 @@ changes what every area shows; switching workspace changes the document.**
         └────── close ──────┴─────────────────────┘  └────────────┘
 ```
 
-**Class 1 - tool changes.** Screen switch, Area split, region show or hide, property section change.
+**Class 1 - tool changes.** Screen switch, Area split, region show or hide, property section change,
+a camera move (XC-270: drawn from the new camera, never written into the view's definition).
 These preserve the open @Workspace, the selected @Case, the open item per Area, the position on the
 @Result axis, the conversation with its draft, and the selection. They enter no undo history because
 they change no document.

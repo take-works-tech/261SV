@@ -5757,3 +5757,31 @@ model or the prompt, never in a description that quietly went stale.
 - affects: CT-003, MOD-007, MOD-012
 - decidedness: Fixed
 - reversal_trigger: as XC-241's
+
+### XC-270 - A camera move is a class-1 transition: drawn, never written
+- decided: 2026-09-20
+- status: active
+- decision: moving the camera by interaction - orbiting, zooming, framing - changes what the person
+  looks at and not the view's definition. It reaches the engine as the `camera` the picture is drawn
+  with (`view.render`) and read from (`view.pick`), enters no undo history and counts as no unsaved
+  work, and leaves the definition's camera as it was. The definition's camera - the one a report
+  renders (XC-012) - changes only by an explicit act, `view.update`, which is one undo step and one
+  unsaved write: "この向きをビューに保存". Where a view is first created, its definition takes the
+  pose the model is first seen from, so a report of a view nobody kept a look for is not blank
+- decided_by: engineering judgement, from a contradiction found in the interface's own file
+- rationale: 16_application_model §6 puts presentation changes in class 1, "they enter no undo
+  history because they change no document", and XC-061 explains why one-at-a-time undo of small
+  moves "is not undo, it is archaeology". The interface's store said a camera move was class 1 in its
+  header and sent every orbit as a `view.update` - one undo step, one unsaved write, and a definition
+  that drifted under any report of the view as the person turned it (#268). The camera the picture
+  is drawn with must also be the camera a pixel is read with, so `view.pick` takes it too: a pick
+  against the definition's camera while the screen shows another is a value read off another
+  picture. Keeping a look explicit is what makes a report reproducible: the definition holds the pose
+  somebody chose, not the one the mouse left
+- alternatives: **journaling every orbit** - what happened. **A `transient` flag on `view.update`** -
+  a write that is not a write, and the definition still drifting. **Coalescing orbits into one undo
+  step** - still unsaved work, and still a definition that changes without anybody choosing to
+- basis: E-001 (T1)
+- affects: CT-003, MOD-012
+- decidedness: Fixed
+- reversal_trigger: none foreseen

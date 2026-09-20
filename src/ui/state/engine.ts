@@ -11,12 +11,14 @@
  *
  * The transition classes of session.ts apply here too: loading a dataset is class 3 (it changes the
  * document), declaring a unit and choosing a field are class 2 (the subject changes and every
- * following area re-renders), and a camera move is class 1.
+ * following area re-renders), and a camera move is class 1: it reaches the engine as the camera the
+ * picture is drawn with (`view.render`, `view.pick`) and never as a change to the view's definition
+ * (XC-270). Until 2026-09-20 every orbit was a `view.update`, one undo step and one unsaved write.
  */
 import { useCallback, useSyncExternalStore } from "react";
 import { Engine, TransportFailure, reasonText } from "../client/engine";
 import type { Connection, Operation, Options, Parameters, Response, Results } from "../client/engine";
-import type { RecordedTime } from "../client/generated";
+import type { CameraDefinition, RecordedTime } from "../client/generated";
 import { recordNow } from "../client/time";
 
 /** Whether an engine is reachable, and what it said if it is not. */
@@ -97,6 +99,9 @@ export interface EngineState {
   readonly fieldName: string | null;
   readonly colourMap: string;
   readonly viewId: string | null;
+  /** The view's own camera - what a report renders - as this session last wrote it. The live camera
+   *  is the turntable and stays out of the document until `keepCamera` (XC-270). */
+  readonly savedCamera: CameraDefinition | null;
   /** An object URL for the rendered frame, or null. Revoked when it is replaced. */
   readonly imageUrl: string | null;
   readonly reduced: string | null;
@@ -127,7 +132,7 @@ export interface Turntable {
 
 const START: Turntable = { azimuthDegrees: 30, elevationDegrees: 20, distance: 2.2 };
 
-function cameraFrom(turntable: Turntable, bounds: readonly [number[], number[]] | null) {
+function cameraFrom(turntable: Turntable, bounds: readonly [number[], number[]] | null): CameraDefinition | undefined {
   if (!bounds) return undefined;
   const at = (side: readonly number[], index: number) => side[index] ?? 0;
   const [low, high] = bounds;
@@ -169,6 +174,7 @@ const EMPTY: EngineState = {
   fieldName: null,
   colourMap: "viridis",
   viewId: null,
+  savedCamera: null,
   imageUrl: null,
   reduced: null,
   probe: null,
@@ -395,6 +401,7 @@ export const engineState = {
       fields,
       fieldName: fields[0]?.name ?? null,
       viewId: null,
+      savedCamera: null,
       probe: null,
       probeLocation: null,
       statistics: null,
@@ -409,6 +416,8 @@ export const engineState = {
 
   /** Class 1: turn the model. The camera is a definition the view carries, so moving it is an
    *  update to that definition and a redraw - not a thing the interface does to a picture. */
+  /** Class 1: a new look at the same view. The picture is drawn again from the new camera; nothing
+   *  is written, so nothing enters the undo history or the unsaved work (XC-270). */
   async orbit(byAzimuth: number, byElevation: number): Promise<void> {
     setState({
       turntable: {
@@ -417,7 +426,17 @@ export const engineState = {
         elevationDegrees: state.turntable.elevationDegrees + byElevation,
       },
     });
+    await engineState.draw();
+  },
+
+  /** Class 3, explicit: make the current look the view's own camera - what a report renders. One
+   *  `view.update`, one undo step, one unsaved write (XC-270). */
+  async keepCamera(): Promise<boolean> {
+    const camera = cameraFrom(state.turntable, state.bounds);
+    if (!camera || !state.viewId) return false;
+    setState({ savedCamera: camera });
     await engineState.refresh();
+    return true;
   },
 
   /** The value under one pixel of the frame on screen (CT-003 2.3.0). */
@@ -430,6 +449,8 @@ export const engineState = {
       height: FRAME.height,
       x: Math.round(x),
       y: Math.round(y),
+      // The camera the frame on screen was drawn with, or the pixel is read off another picture.
+      camera: cameraFrom(state.turntable, state.bounds),
     });
     setState({
       probe: answer?.value ?? null,
@@ -479,7 +500,10 @@ export const engineState = {
       representation: "surface",
       name: state.fieldName,
       colouring: { fieldName: state.fieldName, association, colourMap: state.colourMap },
-      camera: cameraFrom(state.turntable, state.bounds),
+      // The view's own camera, not the live one: the definition is what a report renders, and the
+      // turntable stays out of it until the person keeps a look (XC-270). The first definition
+      // takes the pose the model is first seen from, so a report of an unkept view is not blank.
+      camera: state.savedCamera ?? cameraFrom(state.turntable, state.bounds),
       // The screen's ground, not the document's. The viewport well is the darkest surface the
       // interface has (XC-256) and a white picture inside it fights the chrome it sits in; a
       // report asks for its own ground, and the view is what says which (CT-004).
@@ -506,9 +530,29 @@ export const engineState = {
       setState({ viewId });
     }
     if (!viewId) return;
+    if (!state.savedCamera && definition.camera) setState({ savedCamera: definition.camera });
+    await engineState.draw();
+    const statistics = await ask("field.statistics", {
+      datasetId: state.datasetId,
+      fieldName: state.fieldName,
+    });
+    setState({ statistics });
+  },
+
+  /** Draw the view from the live camera. The picture, not the document: the camera goes as a
+   *  parameter of `view.render` and the definition is not touched (XC-270). */
+  async draw(): Promise<void> {
+    const viewId = state.viewId;
+    if (!viewId || !engine) return;
     // No bar inside the picture: the rail's legend carries the range with its unit, which the
     // bar cannot (E-192), and two scales for one image is one too many. A document asks for it.
-const rendered = await ask("view.render", { viewId, ...FRAME, format: "png", legend: false });
+    const rendered = await ask("view.render", {
+      viewId,
+      ...FRAME,
+      format: "png",
+      legend: false,
+      camera: cameraFrom(state.turntable, state.bounds),
+    });
     if (rendered?.handle) {
       try {
         const blob = await engine.handle(rendered.handle);
@@ -517,11 +561,6 @@ const rendered = await ask("view.render", { viewId, ...FRAME, format: "png", leg
         setState({ refusal: failure instanceof TransportFailure ? failure.message : String(failure) });
       }
     }
-    const statistics = await ask("field.statistics", {
-      datasetId: state.datasetId,
-      fieldName: state.fieldName,
-    });
-    setState({ statistics });
   },
 
   /** Read the value at a point, in the source's own words. */

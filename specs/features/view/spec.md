@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-22
+updated: 2026-09-20
 ---
 
 # Feature: view
@@ -44,6 +44,9 @@ updated: 2026-08-22
     one is active
   - AC-004: If a @View references a field the @Case does not have, then the system shall show the view
     without that element and list it as unresolved rather than substituting another field
+  - AC-090: When the camera is moved by interaction, the system shall draw the view from the new
+    camera without changing the view's definition, entering an undo step or counting unsaved work;
+    the definition's camera shall change only by an explicit act, which is one undo step (XC-270)
 
 ### REQ-002 - Renderer choice changes the picture, never the numbers
 - priority: MUST

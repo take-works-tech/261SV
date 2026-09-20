@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "3.3.0";
+export const PROTOCOL_VERSION = "3.4.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -241,6 +241,7 @@ export interface Parameters {
     height: number;
     format: "png" | "jpeg" | "webp";
     legend?: boolean;
+    camera?: CameraDefinition;
   };
   "graph.create": {
     workspaceId: string;
@@ -425,6 +426,7 @@ export interface Parameters {
     height: number;
     x: number;
     y: number;
+    camera?: CameraDefinition;
   };
   "dataset.inspect": {
     path: string;
@@ -949,4 +951,14 @@ export type ReportedValue = {
 export type RecordedTime = {
   utc: string;
   offsetMinutes: number | null;
+};
+
+/** Where a picture is looked at from: CT-004's camera, referenced by view.render and view.pick
+  * so a camera move can be drawn without becoming a change to the view's definition (XC-270). */
+export type CameraDefinition = {
+  position_m?: readonly (number)[];
+  focalPoint_m?: readonly (number)[];
+  viewUp?: readonly (number)[];
+  parallelScale_m?: number;
+  projection?: "perspective" | "orthographic";
 };
