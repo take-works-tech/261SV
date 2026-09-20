@@ -158,7 +158,7 @@ OPERATIONS = (
 #: schemas, so a handler is checked against the **contract** rather than against its own
 #: declaration - which is what CT-002 promises when it says an unknown parameter is rejected.
 PARAMETERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
-    "workspace.open": (frozenset(['path']), frozenset(['path'])),
+    "workspace.open": (frozenset(['path', 'takeOverStaleLock']), frozenset(['path'])),
     "workspace.save": (frozenset(['path', 'workspaceId']), frozenset(['workspaceId'])),
     "workspace.close": (frozenset(['workspaceId']), frozenset(['workspaceId'])),
     "case.create": (frozenset(['name', 'parentCaseId', 'workspaceId']), frozenset(['name', 'workspaceId'])),
@@ -230,7 +230,7 @@ PARAMETERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
 #: against PARAMETERS: the contract states the answer, so a build cannot return a value the
 #: caller has no type for, nor omit a unit the contract requires beside a number (XC-003).
 RESULT_FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
-    "workspace.open": (frozenset(['formatVersion', 'items', 'unresolvedCases', 'workspaceId']), frozenset(['formatVersion', 'unresolvedCases', 'workspaceId'])),
+    "workspace.open": (frozenset(['formatVersion', 'items', 'lock', 'readOnly', 'unresolvedCases', 'workspaceId']), frozenset(['formatVersion', 'lock', 'readOnly', 'unresolvedCases', 'workspaceId'])),
     "workspace.save": (frozenset(['path', 'previousKept']), frozenset(['path'])),
     "workspace.close": (frozenset([]), frozenset([])),
     "case.create": (frozenset(['id']), frozenset(['id'])),
@@ -372,7 +372,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
 
 #: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below
 #: the engine's floor is refused politely rather than answered in a shape it cannot read.
-PROTOCOL_VERSION = "3.2.0"
+PROTOCOL_VERSION = "3.3.0"
 
 #: The wire's own names, from CT-003's `$defs.transport` (XC-258). The interface generates
 #: the same values from the same place; neither side is derived from the other (XC-252).

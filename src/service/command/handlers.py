@@ -19,7 +19,9 @@ module comes back as a failure, because that is the difference the two words mar
 
 from __future__ import annotations
 
+import getpass
 import os
+import platform
 import secrets
 from dataclasses import dataclass, field as dataclass_field, replace
 from datetime import datetime, timezone
@@ -57,6 +59,8 @@ from service.command.surface import Effect, Handler, LogEntry, Permission, Resul
 from service.egress import diagnostics
 from service.egress.gate import Gate
 from service.workspace import items, output, sources
+from service.workspace import lock as workspace_lock
+from service.workspace.lock import LockState, LockStatus
 from service.workspace.document import FORMAT_VERSION, WorkspaceDocument, WorkspaceFileError, load as load_workspace
 from service.workspace.document import WorkspaceVersionError, save as save_document
 from service.workspace.hierarchy import find as find_case, walk as walk_cases
@@ -214,6 +218,21 @@ def native_offscreen_available() -> tuple[bool, str]:
     return probe_offscreen()
 
 
+def _this_host() -> str:
+    # The machine's own name, without a socket: nothing outside MOD-014 imports a network client.
+    return os.environ.get("COMPUTERNAME") or platform.node()
+
+
+def _this_user() -> str:
+    for name in ("USERNAME", "USER"):
+        if os.environ.get(name):
+            return os.environ[name]
+    try:
+        return getpass.getuser()
+    except (KeyError, OSError):
+        return "unknown"
+
+
 @dataclass(slots=True)
 class Session:
     """What one engine process holds between commands. The authority is the workspace (MOD-007);
@@ -237,6 +256,13 @@ class Session:
     #: leave and every attempt is a refusal in the audit; `system.capabilities` says so and
     #: `system.audit` shows it, which is how a person checks it rather than believes it (#317).
     gate: Gate = dataclass_field(default=None)  # type: ignore[assignment]
+    #: Who this session is for the workspace lock (XC-241, XC-269): the host and the user the lock
+    #: names, so a second window can be told whose it is.
+    host: str = dataclass_field(default_factory=_this_host)
+    user: str = dataclass_field(default_factory=_this_user)
+    #: The lock on the open document and the document it is for; None until one is open.
+    lock: LockStatus | None = None
+    lock_path: Path | None = None
 
     _offscreen: tuple[bool, str] | None = None
 
@@ -278,6 +304,42 @@ class Session:
             if entry is not None and isinstance(entry.get("modified"), Mapping):
                 return from_stored(entry["modified"])
         return modified_time(one.path, self.clock())
+
+    @property
+    def read_only(self) -> bool:
+        """Whether the open document may not be written back: somebody else holds its lock (XC-241)."""
+        return self.lock is not None and not self.lock.may_edit
+
+    def take_workspace(self, path: Path, *, take_over: bool = False) -> LockStatus:
+        """Take the document's lock for this session, or learn who has it (XC-269).
+
+        A lock this process already holds is ours - a second open of the same document in one session
+        is one editor, not two. Any lock held on another document is released first. A stale or
+        unreadable lock is taken over only when asked (`take_over`), and a live holder's never.
+        """
+        if self.lock_path is not None and self.lock_path != path:
+            self.release_workspace()
+        who = {"process_id": os.getpid(), "host": self.host, "user": self.user, "at": record_time(self.clock())}
+        status = workspace_lock.take(path, **who)
+        ours = (
+            status.state is LockState.HELD
+            and status.holder is not None
+            and status.holder.process_id == os.getpid()
+            and status.holder.host == self.host
+        )
+        if ours:
+            status = LockStatus(LockState.FREE, holder=status.holder)
+        elif take_over and status.state in (LockState.STALE, LockState.UNREADABLE):
+            status = workspace_lock.take_over(path, **who)
+        self.lock, self.lock_path = status, path
+        return status
+
+    def release_workspace(self) -> None:
+        """Give the lock back if it was ours: when another document is opened, and when the engine
+        stops. A crash leaves it, and the next open finds it stale and says so (XC-241)."""
+        if self.lock_path is not None and self.lock is not None and self.lock.may_edit:
+            workspace_lock.release(self.lock_path, process_id=os.getpid(), host=self.host)
+        self.lock, self.lock_path = None, None
 
     def provenance_of(self, involved: list[Loaded]) -> ReportProvenance:
         """The trust content of a deliverable, from what this session knows first-hand."""
@@ -403,6 +465,18 @@ def workspace_open(session: Session, parameters: Mapping[str, Any]) -> Effect | 
             f"{FORMAT_VERSION} で書かれます（CT-001）",
         )
 
+    # The document's lock, taken for this session (XC-241, XC-269). Held by somebody else, the document
+    # opens read-only: the window works in memory and saving is refused naming the holder. A stale or
+    # unreadable lock is taken over only when the caller says so, and a live holder's never.
+    take_over = bool(parameters.get("takeOverStaleLock"))
+    status = session.take_workspace(location, take_over=take_over)
+    if not status.may_edit:
+        warnings += (status.describe(),)
+        if take_over and status.state is LockState.HELD:
+            warnings += (
+                "ロックを引き継ぎませんでした：持ち主のプロセスは生きている可能性があります。生きているものは決して壊しません（XC-241）",
+            )
+
     # A dataset belongs to a case of a workspace; the one that was open is no longer, so neither are
     # they. They are **not** kept for undo: an undo closure holding every dataset of every workspace
     # a session has opened is the memory #315 is about (LIM-001 per case, times the history). The
@@ -423,6 +497,11 @@ def workspace_open(session: Session, parameters: Mapping[str, Any]) -> Effect | 
     def undo() -> None:
         session.workspace, session.workspace_path, session.revisions = before
         session.datasets = {}
+        # The previous document's lock goes with it: retaken, or found held and said.
+        if session.workspace_path is not None:
+            session.take_workspace(session.workspace_path)
+        else:
+            session.release_workspace()
 
     if dropped_datasets:
         warnings += (
@@ -436,6 +515,8 @@ def workspace_open(session: Session, parameters: Mapping[str, Any]) -> Effect | 
             "formatVersion": loaded.format_version,
             "unresolvedCases": unresolved,
             "items": items_of(loaded),
+            "readOnly": not status.may_edit,
+            "lock": status.as_stored(workspace_lock.lock_for(location)),
         },
         warnings=warnings,
         undo=undo,
@@ -503,6 +584,11 @@ def workspace_save(session: Session, parameters: Mapping[str, Any]) -> Effect | 
     workspace = session.open_workspace(str(parameters["workspaceId"]))
     if isinstance(workspace, Result):
         return workspace
+    if session.read_only and session.lock is not None:
+        return refused(
+            f"読み取り専用で開いています：{session.lock.describe()}。保存しません。"
+            "編集するには、もう一方の窓を閉じるか、そのプロセスが終了していれば takeOverStaleLock を付けて開き直してください（XC-241、XC-269）"
+        )
     target = Path(str(parameters["path"])) if parameters.get("path") else session.workspace_path
     if target is None:
         return refused("保存先がありません：path を指定してください")
@@ -1412,6 +1498,11 @@ def output_prune(session: Session, parameters: Mapping[str, Any]) -> Effect | Re
     go; a folder that changed since the plan is refused with nothing deleted, because a list a person
     confirmed is the only list this may act on. No undo: a deleted artefact is regenerated from its
     record (XC-046), not brought back from memory."""
+    if session.read_only and session.lock is not None:
+        return refused(
+            f"読み取り専用で開いています：{session.lock.describe()}。"
+            "もう一方の窓が使っているかもしれない成果物は消しません（XC-241）"
+        )
     made = _planned(session, parameters)
     if isinstance(made, Result):
         return made

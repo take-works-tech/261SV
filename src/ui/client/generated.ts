@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "3.2.0";
+export const PROTOCOL_VERSION = "3.3.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -157,6 +157,7 @@ export const OPERATIONS: readonly Operation[] = [
 export interface Parameters {
   "workspace.open": {
     path: string;
+    takeOverStaleLock?: boolean;
   };
   "workspace.save": {
     workspaceId: string;
@@ -459,6 +460,18 @@ export interface Results {
         name: string;
         datasetId?: string;
       })[];
+    };
+    readOnly: boolean;
+    lock: {
+      state: "free" | "held" | "stale" | "unreadable";
+      lockFile: string;
+      holder?: {
+        processId: number;
+        host: string;
+        user: string;
+        takenAt: RecordedTime;
+      };
+      detail?: string;
     };
   };
   "workspace.save": {
