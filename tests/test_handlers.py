@@ -35,8 +35,8 @@ needs_offscreen = pytest.mark.skipif(
 from engine.limits import MAX_WORKSPACE_ITEMS  # noqa: E402
 from service.command.catalogue import OPERATIONS, PROTOCOL_VERSION  # noqa: E402
 from service.command.handlers import HandleExpired, HandleStore, Session, build_surface  # noqa: E402
-from service.command.surface import Command, Status, Surface  # noqa: E402
-from service.egress.gate import Outcome, Permission, SearchRequest  # noqa: E402
+from service.command.surface import Command, Permission, Status, Surface  # noqa: E402
+from service.egress.gate import Outcome, Permission as EgressPermission, SearchRequest  # noqa: E402
 from service.workspace.document import FORMAT_VERSION  # noqa: E402
 from domain_core.recorded_time import STORED_FORMAT, record as record_time  # noqa: E402
 from test_reader import write_grid  # noqa: E402
@@ -109,8 +109,9 @@ class TestWhatThisBuildRegisters:
             "dataset.probe", "view.pick", "report.create", "report.export", "report.provenance",
             "workspace.save", "dataset.inspect", "history.list",
             "system.capabilities", "system.protocols", "system.audit",
+            "output.list", "output.plan", "output.prune",
         }
-        assert len(surface.unimplemented()) == len(OPERATIONS) - 20
+        assert len(surface.unimplemented()) == len(OPERATIONS) - 23
 
     def test_an_unimplemented_operation_is_refused_and_named_as_such(self) -> None:
         surface, _ = a_surface()
@@ -1197,7 +1198,7 @@ class TestNothingHasLeftAndItSaysSo:
 
     def test_a_refused_request_is_in_the_audit_with_its_host_content_and_time(self) -> None:
         surface, session = a_surface()
-        session.gate.permit("ws:1", Permission(search=True, hosts=frozenset({self.HOST}), without_asking=True))
+        session.gate.permit("ws:1", EgressPermission(search=True, hosts=frozenset({self.HOST}), without_asking=True))
         attempted = session.gate.search(SearchRequest("疲労限度", self.HOST), workspace_id="ws:1", confirmed=True)
         assert attempted.outcome is Outcome.REFUSED, "no transport: refused, never pretended"
 
@@ -1213,7 +1214,7 @@ class TestNothingHasLeftAndItSaysSo:
 
     def test_since_narrows_the_record_and_a_folded_offset_is_refused(self) -> None:
         surface, session = a_surface()
-        session.gate.permit("ws:1", Permission(search=True, hosts=frozenset({self.HOST}), without_asking=True))
+        session.gate.permit("ws:1", EgressPermission(search=True, hosts=frozenset({self.HOST}), without_asking=True))
         session.gate.search(SearchRequest("一", self.HOST), workspace_id="ws:1", confirmed=True)
         moment = record_time(at(9)()).utc
 
@@ -1222,3 +1223,111 @@ class TestNothingHasLeftAndItSaysSo:
         assert surface.submit(Command("system.audit", {"since": later})).value["entries"] == []
         refused_ = surface.submit(Command("system.audit", {"since": "2026-09-18T09:00:00+09:00"}))
         assert refused_.status is Status.REFUSED and "UTC" in (refused_.reason or "")
+
+class TestOutputIsListedPlannedAndPrunedByName:
+    """XC-141's three refusals, across the wire (#314, XC-268): what pruning would delete is shown as a
+    plan, the act names the files it expects and needs the caller's say-so, and a folder that changed
+    in between - or a run holding an input - is refused with nothing deleted."""
+
+    OLD = "report-a/2026-09-01T00-00-00"
+    NEW = "report-a/2026-09-02T00-00-00"
+
+    def runs(self, tmp_path: Path) -> Path:
+        root = tmp_path / "output"
+        old = root / self.OLD
+        (old / "case-1").mkdir(parents=True)
+        (old / "run.json").write_text(json.dumps({
+            "pipelineId": "pipeline:1", "started": {"utc": "2026-09-01T00:00:00Z", "offsetMinutes": 540},
+            "cases": [], "outcomes": [],
+        }), encoding="utf-8")
+        (old / "case-1" / "figure.png").write_bytes(b"x" * 300)
+        (old / "case-1" / "table.csv").write_bytes(b"y" * 200)
+        new = root / self.NEW
+        new.mkdir(parents=True)
+        (new / "figure.png").write_bytes(b"z" * 100)
+        return root
+
+    def test_the_runs_are_listed_with_their_sizes_and_where_their_times_came_from(self, tmp_path: Path) -> None:
+        surface, _, _ = opened(tmp_path)
+        self.runs(tmp_path)
+
+        result = surface.submit(Command("output.list", {"workspaceId": "ws:1"}))
+
+        assert result.status is Status.ANSWERED, result.reason
+        runs = {one["id"]: one for one in result.value["runs"]}
+        assert set(runs) == {self.OLD, self.NEW}
+        assert runs[self.OLD]["started"] == {"utc": "2026-09-01T00:00:00Z", "offsetMinutes": 540}
+        assert runs[self.OLD]["startedFrom"] == "record" and runs[self.OLD]["hasRecord"] is True
+        assert runs[self.OLD]["artefactFiles"] == 2 and runs[self.OLD]["artefactBytes"] == 500
+        assert runs[self.NEW]["startedFrom"] == "folder" and runs[self.NEW]["hasRecord"] is False
+        assert runs[self.NEW]["started"]["offsetMinutes"] == 540, "the folder's time carries this session's offset"
+        assert result.value["totalBytes"] == 600 and result.value["overLimit"] is False
+        assert result.value["suggestedRunIds"] == [], "under the limit nothing is suggested"
+
+    def test_the_plan_names_every_file_and_the_record_it_keeps(self, tmp_path: Path) -> None:
+        surface, _, _ = opened(tmp_path)
+        self.runs(tmp_path)
+
+        result = surface.submit(Command("output.plan", {"workspaceId": "ws:1", "runsToRemove": [self.OLD]}))
+
+        assert result.status is Status.ANSWERED, result.reason
+        assert result.value["files"] == [f"{self.OLD}/case-1/figure.png", f"{self.OLD}/case-1/table.csv"]
+        assert result.value["freedBytes"] == 500
+        assert result.value["keptRecords"] == [f"{self.OLD}/run.json"]
+
+    def test_pruning_needs_authorisation_and_deletes_exactly_the_plan(self, tmp_path: Path) -> None:
+        surface, _, _ = opened(tmp_path)
+        root = self.runs(tmp_path)
+        chosen = {"workspaceId": "ws:1", "runsToRemove": [self.OLD]}
+        plan = surface.submit(Command("output.plan", chosen)).value
+
+        unauthorised = surface.submit(Command("output.prune", {**chosen, "expectedFiles": plan["files"]}))
+        assert unauthorised.status is Status.REFUSED and "allowDestructive" in (unauthorised.reason or "")
+        assert (root / self.OLD / "case-1" / "figure.png").exists(), "a refusal changes nothing"
+
+        pruned = surface.submit(Command(
+            "output.prune", {**chosen, "expectedFiles": plan["files"]}, allowed=frozenset({Permission.DESTRUCTIVE}),
+        ))
+
+        assert pruned.status is Status.APPLIED, pruned.reason
+        assert pruned.value == {"removedRunIds": [self.OLD], "freedBytes": 500, "deletedFiles": plan["files"]}
+        assert not (root / self.OLD / "case-1" / "figure.png").exists()
+        assert (root / self.OLD / "run.json").exists(), "the record survives its artefacts (XC-046)"
+        assert (root / self.NEW / "figure.png").exists(), "a run not chosen is not touched"
+        assert pruned.undo_id is None, "a deleted artefact is regenerated from its record, not undone"
+        assert any("取り消せません" in one for one in pruned.warnings)
+        listed = surface.submit(Command("history.list", {"workspaceId": "ws:1"})).value["entries"]
+        entry = next(one for one in reversed(listed) if one["operation"] == "output.prune")
+        assert "undoId" not in entry and entry["undoable"] is False
+
+    def test_a_folder_that_changed_since_the_plan_is_refused_and_nothing_goes(self, tmp_path: Path) -> None:
+        surface, _, _ = opened(tmp_path)
+        root = self.runs(tmp_path)
+        chosen = {"workspaceId": "ws:1", "runsToRemove": [self.OLD]}
+        plan = surface.submit(Command("output.plan", chosen)).value
+        (root / self.OLD / "case-1" / "just-exported.png").write_bytes(b"n")
+
+        pruned = surface.submit(Command(
+            "output.prune", {**chosen, "expectedFiles": plan["files"]}, allowed=frozenset({Permission.DESTRUCTIVE}),
+        ))
+
+        assert pruned.status is Status.REFUSED and "変わって" in (pruned.reason or "")
+        assert (root / self.OLD / "case-1" / "figure.png").exists()
+        assert (root / self.OLD / "case-1" / "just-exported.png").exists()
+
+    def test_an_unknown_run_and_a_run_holding_an_input_are_refused(self, tmp_path: Path) -> None:
+        surface, session, _ = opened(tmp_path)
+        self.runs(tmp_path)
+
+        unknown = surface.submit(Command("output.plan", {"workspaceId": "ws:1", "runsToRemove": ["report-a/nope"]}))
+        assert unknown.status is Status.REFUSED and "report-a/nope" in (unknown.reason or "")
+
+        # A file a case records as a source is input data, whatever folder it sits in.
+        assert session.workspace is not None
+        session.workspace.raw["cases"][0]["sources"] = [{
+            "pathRelative": f"output/{self.OLD}/case-1/table.csv", "sizeBytes": 200,
+            "modified": {"utc": "2026-09-01T00:00:00Z", "offsetMinutes": 540},
+        }]
+        guarded = surface.submit(Command("output.plan", {"workspaceId": "ws:1", "runsToRemove": [self.OLD]}))
+        assert guarded.status is Status.REFUSED
+        assert "入力" in (guarded.reason or "") and "table.csv" in (guarded.reason or "")

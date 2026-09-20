@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-25
+updated: 2026-09-20
 ---
 
 # Contract: command surface
@@ -10,7 +10,13 @@ updated: 2026-08-25
   and @Headless agent mode all go through it. Exchanged between the product and any external caller
   driving it
 - schema: schema/CT-002.json
-- version: 1.0.0
+- version: 1.1.0
+- correction: 2026-09-20, version 1.0.0 to 1.1.0. A write is undoable, or it is destructive and was
+  authorised as such. The surface had refused every write that returned no way back, which is
+  right for the document and wrong for a file beyond it: XC-061 draws undo's boundary at the
+  document, and deleting a regenerable artefact on a person's say-so (`allowDestructive`) has no
+  undo but its record. Such an answer says so and its history entry carries no undo id (XC-268).
+  Additive: no operation's shape changes
 - strictness: unknown fields are **rejected**
 - compatibility: a command name and its parameters, once shipped, keep their meaning; a changed
   meaning is a new command name
@@ -56,6 +62,10 @@ the dry run each need to be built only once.
   reference application, where operators called from Python skip the undo stack by default (XC-102)
 - **One instruction, one undo.** A group of commands submitted together undoes together
   (assistant/AC-002)
+- **A write is undoable, or it is destructive and was authorised as such.** The surface refuses a
+  write that returns no way back - except one whose handler declares destruction and that the
+  caller authorised with `allowDestructive`: files beyond the document are not undone (XC-061), the
+  answer says the change cannot be undone, and the history entry carries no undo id
 - **Refusal beats assumption.** An unknown command, a malformed parameter, or an operation needing
   confirmation without authorisation is refused with a named reason, changing nothing
   (assistant/AC-012). Since 2026-08-25 that refusal is measured against **CT-003's per-operation

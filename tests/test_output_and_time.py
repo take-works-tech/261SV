@@ -21,9 +21,12 @@ from domain_core.recorded_time import RecordedTime, from_stored, record, record_
 from engine.limits import MAX_OUTPUT_BYTES
 from service.workspace.output import (
     RECORD_NAMES,
+    OutputError,
     Run,
+    plan_for,
     plan_pruning,
     prune,
+    runs_of,
     size_of,
 )
 
@@ -34,7 +37,7 @@ def a_run(root: Path, identifier: str, at: str, *, artefacts: int, size: int = 1
     (directory / "run.json").write_text('{"how": "it was made"}', encoding="utf-8")
     for number in range(artefacts):
         (directory / f"figure-{number}.png").write_bytes(b"x" * size)
-    return Run(identifier, at, directory)
+    return Run(identifier, RecordedTime(at, 540), directory)
 
 
 class TestHowMuchSpaceIsInUse:
@@ -233,3 +236,76 @@ class TestATimeWhoseZoneWasNeverKeptSaysSo:
         stored = record(datetime(2026, 8, 24, 21, 0, tzinfo=timezone(timedelta(hours=9))))
 
         assert stored.describe_where_recorded() == "2026-08-24 21:00（UTC+09:00）"
+
+class TestRunsAreFoundWhereTheyAreWritten:
+    """XC-113's layout, read back: `output/<name>/<run timestamp>/`, each run timed from its record where
+    it has one and from its folder where it has not - and saying which (XC-266)."""
+
+    def test_the_layout_is_read_and_each_time_says_where_it_came_from(self, tmp_path: Path) -> None:
+        recorded = tmp_path / "output" / "report-a" / "2026-09-01T00-00-00"
+        recorded.mkdir(parents=True)
+        (recorded / "run.json").write_text(
+            '{"started": {"utc": "2026-09-01T00:00:00Z", "offsetMinutes": 540}}', encoding="utf-8",
+        )
+        bare = tmp_path / "output" / "report-a" / "2026-09-02T00-00-00"
+        bare.mkdir(parents=True)
+        (tmp_path / "output" / "stray.txt").write_text("not a run", encoding="utf-8")
+        osaka = datetime(2026, 9, 20, 12, 0, tzinfo=timezone(timedelta(hours=9)))
+
+        runs = {run.identifier: run for run in runs_of(tmp_path / "output", where=osaka)}
+
+        assert set(runs) == {"report-a/2026-09-01T00-00-00", "report-a/2026-09-02T00-00-00"}
+        assert runs["report-a/2026-09-01T00-00-00"].at == RecordedTime("2026-09-01T00:00:00Z", 540)
+        assert runs["report-a/2026-09-01T00-00-00"].started_from == "record"
+        assert runs["report-a/2026-09-02T00-00-00"].started_from == "folder"
+        assert runs["report-a/2026-09-02T00-00-00"].at.offset_minutes == 540
+
+    def test_a_record_that_cannot_be_read_does_not_hide_the_run(self, tmp_path: Path) -> None:
+        broken = tmp_path / "output" / "report-a" / "2026-09-01T00-00-00"
+        broken.mkdir(parents=True)
+        (broken / "run.json").write_text("{not json", encoding="utf-8")
+        osaka = datetime(2026, 9, 20, 12, 0, tzinfo=timezone(timedelta(hours=9)))
+
+        [run] = runs_of(tmp_path / "output", where=osaka)
+
+        assert run.started_from == "folder" and run.record_path() is not None
+
+    def test_no_output_folder_is_no_runs(self, tmp_path: Path) -> None:
+        osaka = datetime(2026, 9, 20, 12, 0, tzinfo=timezone(timedelta(hours=9)))
+        assert runs_of(tmp_path / "output", where=osaka) == []
+
+
+class TestAPlanForChosenRunsIsRefusedRatherThanNarrowed:
+    def test_an_unknown_run_is_named(self, tmp_path: Path) -> None:
+        runs = [a_run(tmp_path, "run-1", "2026-08-01T00:00:00Z", artefacts=1)]
+
+        with pytest.raises(OutputError) as refusal:
+            plan_for(runs, ["run-1", "run-9"])
+
+        assert "run-9" in str(refusal.value)
+
+    def test_a_run_holding_an_input_refuses_the_whole_plan(self, tmp_path: Path) -> None:
+        """Input data is never this product's to delete, whatever folder it sits in (AC-053)."""
+        runs = [
+            a_run(tmp_path, "run-1", "2026-08-01T00:00:00Z", artefacts=2),
+            a_run(tmp_path, "run-2", "2026-08-02T00:00:00Z", artefacts=1),
+        ]
+
+        with pytest.raises(OutputError) as refusal:
+            plan_for(runs, ["run-1", "run-2"], protected=[tmp_path / "run-2" / "figure-0.png"])
+
+        assert "run-2" in str(refusal.value) and "入力" in str(refusal.value)
+        assert plan_for(runs, ["run-1"], protected=[tmp_path / "run-2" / "figure-0.png"]).files
+
+    def test_the_plan_is_the_chosen_runs_files_and_their_records(self, tmp_path: Path) -> None:
+        runs = [
+            a_run(tmp_path, "run-1", "2026-08-01T00:00:00Z", artefacts=2),
+            a_run(tmp_path, "run-2", "2026-08-02T00:00:00Z", artefacts=1),
+        ]
+
+        plan = plan_for(runs, ["run-2", "run-2"])
+
+        assert [run.identifier for run in plan.runs] == ["run-2"], "chosen twice is chosen once"
+        assert plan.as_stored(tmp_path) == {
+            "runIds": ["run-2"], "files": ["run-2/figure-0.png"], "freedBytes": 100, "keptRecords": ["run-2/run.json"],
+        }

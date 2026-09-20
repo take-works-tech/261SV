@@ -10,7 +10,13 @@ updated: 2026-09-20
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 3.1.0
+- version: 3.2.0
+- correction: 2026-09-20, version 3.1.0 to 3.2.0. `output.list` and `output.plan` are added and
+  `output.prune` gains `expectedFiles`. The prune had been in the contract since 2.x with nothing
+  answering it and nothing to show a person what it would take: the list says what is there,
+  the plan names every file that would go for the runs a person chose, and the act names the
+  files it expects so that a folder changed in between is refused rather than pruned (XC-268,
+  #314). Additive
 - correction: 2026-09-20, version 3.0.0 to 3.1.0. `system.capabilities` answers `egress`: whether this
   build has a way out at all, the open workspace's permission (search, language model, update
   check, the allow-list, per-search confirmation, workspace content) and how many audit entries
@@ -172,7 +178,9 @@ no identifier to report.
 | `system.audit` | read | since? | outbound requests with host, time and what was sent (XC-106) |
 | `system.supportBundle` | write | path, consent | the manifest, then the bundle - listed before it is written (operations/AC-008) |
 | `workspace.pack` | write | workspace id, path, include data? | path written, size, what it contains, and what could not be included (XC-140) |
-| `output.prune` | write | workspace id, runs to remove | space recovered, artefacts removed - run records are kept, so what was made stays reproducible (XC-141) |
+| `output.list` | read | workspace id | the runs under the output folder with their sizes and times - and where each time came from - the total against LIM-012, and which runs pruning oldest-first would take (XC-141) |
+| `output.plan` | read | workspace id, runs to remove | every file that would go, by path, the records that stay and the bytes freed - shown before anything is deleted (workspace/AC-053) |
+| `output.prune` | write | workspace id, runs to remove, expected files? | space recovered, artefacts removed by name - run records are kept, so what was made stays reproducible (XC-141); refused with nothing deleted where the folder no longer matches the plan (XC-268) |
 
 The catalogue grew from twenty-five to forty-five when the features were compared against it: a feature
 that specifies behaviour with no operation to invoke it cannot satisfy INV-006, because the interface
