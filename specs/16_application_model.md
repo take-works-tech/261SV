@@ -113,7 +113,7 @@ that column against `mockups/ui/lib/screen-catalog.json` in both directions.
 | `information` | what the loaded @Dataset actually contains: fields, associations, ranges, counts, frames | main, header, footer | yes | `information` |
 | `find` | a data selection built as a query, and what it resolved to | main, header, footer | **no** | - |
 | `library` | the Asset organiser: import, metadata, revisions, scope, bulk management | main, header, navigator, properties, footer | named as future in 11_ui.md | - |
-| `script` | the Python surface of [13_scripting.md](13_scripting.md): editor, console, and the log of what was just done | main, header, footer | a copyable popover only | - |
+| `script` | the Python surface of [13_scripting.md](13_scripting.md): editor, console, and the log of what was just done | main, header, footer | a copyable popover, and a command palette that runs one operation by name (XC-278) | - |
 | `log` | notifications, run records and the communication audit, kept after dismissal | main, header, footer | popovers only | - |
 | `chat` | the full-height rendering of the one conversation (XC-150) | main, header, navigator | yes | `chat` |
 | `simulation` | one @Simulation flow: conditions for external solver executions | main, header, properties, composer, footer | yes, definition only (XC-091) | `simulation` |
@@ -417,6 +417,10 @@ refer to the same one rather than each carrying a copy of the condition.
 | `library` | navigator of scopes - sample, workspace original, shared original (@Library scope) - and categories; per @Asset: rendered thumbnail or a named missing-thumbnail state, name, kind, revision list, dependencies, tags, licence, origin, import and export; bulk operations; where used |
 | `script` | a Python editor over `sv.data`, `sv.context`, `sv.ops`, `sv.pipeline`, `sv.units`; a console; the log of what the interface just did, as the same commands, copyable; run, and run selection; one script is one undo step (XC-102) |
 | `log` | notifications kept after dismissal, with severity, area, subject and the action that dismissed them; @Pipeline run records; the communication audit of XC-106 with its export |
+
+In the production interface the console half of `script` is the command palette in the top bar
+(XC-278): every operation by name, run with parameters the interface holds, the answer shown as the
+engine gave it. The editor, and running a script, wait on the area.
 
 ### 7.13 `chat`, `simulation`, `settings`, `network`
 

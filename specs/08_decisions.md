@@ -6013,3 +6013,32 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a keymap the shell actually binds to operations, at which point the key column
   reads the shell's registry rather than saying キーなし
+
+### XC-278 - The command palette runs an operation by name, with parameters the interface holds
+- decided: 2026-09-20
+- status: active
+- decision: the top bar carries a command palette: every operation of CT-003 by name, searchable,
+  and for each whether this screen can run it now. An operation runs when the engine answers it
+  (`system.operations`) and every required parameter is one the interface holds - workspace, case,
+  dataset, view, report, field - filled from that and never typed or guessed; an operation needing
+  any other parameter, one this build does not answer, or the destructive one is shown with the
+  reason and does not run. A write is marked as one before it runs and enters the journal like any
+  other; the answer is shown as the engine gave it, and a refusal as its reason beside the command
+  rather than as the window's refusal. No key opens it or runs anything. It is the console half of
+  the `script` area, as a popover, until the editor exists (16_application_model §7.12)
+- decided_by: engineering judgement, from #310's condition, XC-046 and INV-006
+- rationale: every interface action has a written form and it is the same command surface a script
+  uses (XC-046); a palette that runs that form is the shortest route from a name to the engine, and
+  the first surface where a person can ask the engine something no screen asks yet. Filling
+  parameters from the context is what keeps it honest: a typed identifier is a guess, and a value
+  this layer composed would be a value nobody declared. The destructive operation stays behind the
+  confirmation that names what it deletes (CT-002, XC-268); the palette cannot show that
+- alternatives: **free-form parameters** - a script surface, which is the `script` area's editor and
+  waits on it. **Running writes from the palette without marking them** - a write the journal holds
+  that the person did not know they made. **Binding Ctrl+K** - a key the design gives to the
+  instruction bar, and a key this build does not bind anywhere (XC-277)
+- basis: E-001 (T1)
+- affects: MOD-009, operations/REQ-004
+- decidedness: Fixed
+- reversal_trigger: the `script` editor, at which point the palette is its command line rather than
+  a popover of its own
