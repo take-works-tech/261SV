@@ -175,7 +175,7 @@ PARAMETERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "dataset.load": (frozenset(['caseId', 'filePaths']), frozenset(['caseId', 'filePaths'])),
     "dataset.describe": (frozenset(['datasetId']), frozenset(['datasetId'])),
     "field.declareUnit": (frozenset(['datasetId', 'fieldName', 'unitSymbol']), frozenset(['datasetId', 'fieldName', 'unitSymbol'])),
-    "field.statistics": (frozenset(['datasetId', 'fieldName', 'region']), frozenset(['datasetId', 'fieldName'])),
+    "field.statistics": (frozenset(['datasetId', 'fieldName', 'region', 'resultPosition']), frozenset(['datasetId', 'fieldName'])),
     "variable.declare": (frozenset(['caseId', 'name', 'unit', 'value', 'workspaceId']), frozenset(['name', 'value'])),
     "variable.set": (frozenset(['value', 'variableId']), frozenset(['value', 'variableId'])),
     "variable.detach": (frozenset(['caseId', 'variableId']), frozenset(['caseId', 'variableId'])),
@@ -250,7 +250,7 @@ RESULT_FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "dataset.load": (frozenset(['datasetId', 'fields', 'gaps', 'supportLevel']), frozenset(['datasetId', 'fields', 'gaps', 'supportLevel'])),
     "dataset.describe": (frozenset(['boundsM', 'cellCount', 'partial', 'pointCount', 'resultAxis']), frozenset(['boundsM', 'cellCount', 'partial', 'pointCount'])),
     "field.declareUnit": (frozenset([]), frozenset([])),
-    "field.statistics": (frozenset(['association', 'averaged', 'averaging', 'averagingRefused', 'maximum', 'mean', 'minimum', 'missingCount', 'reduction', 'scope', 'weighting']), frozenset(['association', 'maximum', 'mean', 'minimum', 'missingCount', 'reduction', 'scope', 'weighting'])),
+    "field.statistics": (frozenset(['association', 'averaged', 'averaging', 'averagingRefused', 'maximum', 'mean', 'minimum', 'missingCount', 'reduction', 'resultPosition', 'scope', 'weighting']), frozenset(['association', 'maximum', 'mean', 'minimum', 'missingCount', 'reduction', 'resultPosition', 'scope', 'weighting'])),
     "variable.declare": (frozenset(['id']), frozenset(['id'])),
     "variable.set": (frozenset(['changedIds']), frozenset(['changedIds'])),
     "variable.detach": (frozenset(['keptValue']), frozenset(['keptValue'])),
@@ -260,8 +260,8 @@ RESULT_FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "view.duplicate": (frozenset(['id']), frozenset(['id'])),
     "view.rename": (frozenset(['id', 'revision']), frozenset(['id', 'revision'])),
     "view.delete": (frozenset(['deletedId', 'unresolvedUnitIds']), frozenset(['deletedId', 'unresolvedUnitIds'])),
-    "view.render": (frozenset(['handle', 'reduced']), frozenset(['handle'])),
-    "view.pick": (frozenset(['association', 'part', 'value']), frozenset(['value'])),
+    "view.render": (frozenset(['handle', 'reduced', 'resultPosition']), frozenset(['handle', 'resultPosition'])),
+    "view.pick": (frozenset(['association', 'part', 'resultPosition', 'value']), frozenset(['resultPosition', 'value'])),
     "graph.create": (frozenset(['id', 'revision']), frozenset(['id', 'revision'])),
     "graph.update": (frozenset(['id', 'revision']), frozenset(['id', 'revision'])),
     "graph.duplicate": (frozenset(['id']), frozenset(['id'])),
@@ -281,7 +281,7 @@ RESULT_FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "system.operations": (frozenset(['registered', 'unimplemented']), frozenset(['registered', 'unimplemented'])),
     "history.undo": (frozenset(['restoredIds']), frozenset(['restoredIds'])),
     "history.list": (frozenset(['entries', 'historyLimit', 'omitted', 'undoDropped', 'undoLimit']), frozenset(['entries'])),
-    "dataset.probe": (frozenset(['association', 'value']), frozenset(['value'])),
+    "dataset.probe": (frozenset(['association', 'resultPosition', 'value']), frozenset(['resultPosition', 'value'])),
     "dataset.parts": (frozenset(['parts']), frozenset(['parts'])),
     "field.derive": (frozenset(['association', 'conventions', 'fieldName', 'fieldNames', 'formula', 'frameId', 'unit']), frozenset(['association', 'conventions', 'fieldName', 'formula', 'unit'])),
     "field.setDisplayUnit": (frozenset([]), frozenset([])),
@@ -387,7 +387,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
 
 #: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below
 #: the engine's floor is refused politely rather than answered in a shape it cannot read.
-PROTOCOL_VERSION = "3.9.0"
+PROTOCOL_VERSION = "3.10.0"
 
 #: The wire's own names, from CT-003's `$defs.transport` (XC-258). The interface generates
 #: the same values from the same place; neither side is derived from the other (XC-252).

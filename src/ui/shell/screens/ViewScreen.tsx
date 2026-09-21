@@ -19,6 +19,7 @@ import { ProbeReadout } from "../../shared/ProbeReadout";
 import { Outliner, type OutlinerNode } from "../../shared/Outliner";
 import { absentParts, isShown, outlinerTree, visibilityAfter } from "../../logic/parts";
 import { reducedNote, viewFooter } from "../../logic/showing";
+import { axisSteps, currentStep, describeStep, endReason, hasSteps, type AxisSteps } from "../../logic/resultPosition";
 import { probeRows, statisticsRows } from "../../logic/copy";
 import { CopyValues } from "../../shared/CopyValues";
 import { COPY_LABELS } from "../../shared/primitives";
@@ -357,6 +358,8 @@ function ViewCanvas({ variant }: { variant: string }) {
 
   const spec = comparisonSpec(variant);
   const paneCount = forcedPaneCount(variant) ?? s.paneCount;
+  // The steps the loaded file declared, from the engine's description (XC-283).
+  const liveSteps = axisSteps(e.described);
   const overlayAxis: AxisId | null =
     variant === "temporal-axis" ? axisId
       : variant === "axis-error" ? "mode"
@@ -389,8 +392,8 @@ function ViewCanvas({ variant }: { variant: string }) {
           value={e.probe.value === null ? "値なし" : formatValue(e.probe.value, e.probe.digits)}
           unit={e.probe.unit}
           origin={e.probe.provenance}
-          location={e.probeLocation ?? ""}
-          copyRows={probeRows(e.fieldName ?? "", e.probe, e.probeLocation, COPY_LABELS)}
+          location={probeWhere(e.probeLocation, e.probePosition)}
+          copyRows={probeRows(e.fieldName ?? "", e.probe, probeWhere(e.probeLocation, e.probePosition), COPY_LABELS)}
         />
       ) : variant === "probe" ? (
         <ProbeReadout
@@ -410,6 +413,8 @@ function ViewCanvas({ variant }: { variant: string }) {
           onSwitch={setAxisId}
           markers={variant === "result-bookmarks" ? bookmarkMarkers() : []}
         />
+      ) : live && hasSteps(liveSteps) ? (
+        <LivePlayback steps={liveSteps} step={e.step} caption={currentStep(e) ?? describeStep(liveSteps, e.step)} />
       ) : null}
 
       {variant === "result-bookmarks" ? <BookmarkPanel caseName={caseName} /> : null}
@@ -607,6 +612,62 @@ function TemplateResolution() {
         ]}
       />
     </>
+  );
+}
+
+/** Where a probed value is, and which step it is of, in one line (view/AC-032). The step is the
+ *  engine's own sentence from the answer beside the value, not what the interface asked for. */
+function probeWhere(location: string | null, position: ReturnType<typeof useEngine>["probePosition"]): string {
+  const where = location ?? "";
+  if (!position || position.count <= 1) return where;
+  return where ? `${where}・${position.stated}` : position.stated;
+}
+
+/* The result axis with an engine: the steps the file declared, as `dataset.describe` listed them,
+ * and the step the view is at. Moving is a write to the view's `resultPosition` and a redraw, so
+ * the picture, the numbers and the probe are all of the step shown, and each says so (XC-283).
+ * Nothing between two steps exists to move to, and the ends say why they stop (view/AC-033). */
+function LivePlayback({ steps, step, caption }: { steps: AxisSteps; step: number; caption: string }) {
+  const last = steps.count - 1;
+  const back = endReason(steps, step, -1);
+  const forward = endReason(steps, step, 1);
+  const go = (to: number) => {
+    void engineState.moveToStep(to);
+  };
+  return (
+    <div className="playback-overlay" role="toolbar" aria-label="結果軸（ファイルが宣言したステップ）">
+      <button className="icon-button" aria-label="先頭のステップへ" {...(back ? disabledBecause(back) : { title: "先頭のステップへ" })} onClick={() => go(0)}>«</button>
+      <button className="icon-button" aria-label="1 つ前のステップへ" {...(back ? disabledBecause(back) : { title: "1 つ前のステップへ" })} onClick={() => go(step - 1)}>‹</button>
+      <button className="icon-button" aria-label="1 つ先のステップへ" {...(forward ? disabledBecause(forward) : { title: "1 つ先のステップへ" })} onClick={() => go(step + 1)}>›</button>
+      <button className="icon-button" aria-label="末尾のステップへ" {...(forward ? disabledBecause(forward) : { title: "末尾のステップへ" })} onClick={() => go(last)}>»</button>
+      <div
+        className="axis"
+        role="slider"
+        tabIndex={0}
+        aria-label="ステップ"
+        aria-valuemin={1}
+        aria-valuemax={steps.count}
+        aria-valuenow={step + 1}
+        aria-valuetext={caption}
+        title="目盛りがファイルの宣言したステップです。目盛りの間に位置はありません（view/AC-033）"
+        onClick={(event) => {
+          const bounds = event.currentTarget.getBoundingClientRect();
+          go(Math.round(((event.clientX - bounds.left) / bounds.width) * last));
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowLeft" && back === null) go(step - 1);
+          if (event.key === "ArrowRight" && forward === null) go(step + 1);
+        }}
+      >
+        {Array.from({ length: steps.count }, (_, index) => (
+          <span key={index} className="vi-mark" style={{ left: `${(index / last) * 100}%` }} title={describeStep(steps, index)} />
+        ))}
+        <span className="pos" style={{ left: `${(step / last) * 100}%` }} />
+      </div>
+      <span className="type-caption" style={{ color: "var(--ink-strong)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+        {caption}
+      </span>
+    </div>
   );
 }
 

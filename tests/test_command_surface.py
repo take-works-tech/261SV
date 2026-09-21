@@ -165,7 +165,7 @@ class TestRegistrationIsAgainstTheCatalogue:
         assert "newName" in handler.required
 
     def test_every_operation_in_the_catalogue_has_its_parameters_stated(self) -> None:
-        """153 parameters over 68 operations, so a handler for any of them is checkable.
+        """154 parameters over 68 operations, so a handler for any of them is checkable.
 
         The count is pinned rather than recomputed: it is a contract change, and a contract change
         that nothing notices is one nobody read. It went from 134 to 135 on 2026-09-18 when CT-003
@@ -174,7 +174,7 @@ class TestRegistrationIsAgainstTheCatalogue:
         from service.command.catalogue import OPERATIONS, PARAMETERS
 
         assert set(PARAMETERS) == set(OPERATIONS)
-        assert sum(len(accepted) for accepted, _ in PARAMETERS.values()) == 153
+        assert sum(len(accepted) for accepted, _ in PARAMETERS.values()) == 154
 
     def test_what_is_not_implemented_is_reportable(self) -> None:
         """A build that answers "unimplemented" for most of the catalogue should be able to say which,
@@ -597,8 +597,12 @@ class TestAReportedValueIsHeldToItsShape:
 
     @staticmethod
     def _probe(value: object) -> Surface:
+        # Since CT-003 3.10.0 every probe answer says which step it is of; these tests are about the
+        # reported value's own shape, so the steady case's position is supplied beside it.
+        position = {"step": 0, "count": 1, "kind": "none", "value": None, "unit": None, "stated": "定常（結果軸なし・ステップ 1/1）"}
+        answer = {"resultPosition": position, **value} if isinstance(value, dict) else value
         surface = Surface(clock=at(9))
-        surface.register(Handler("dataset.probe", lambda p, t: Effect("読みました", value=value)))
+        surface.register(Handler("dataset.probe", lambda p, t: Effect("読みました", value=answer)))
         return surface
 
     @staticmethod

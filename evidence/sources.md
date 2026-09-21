@@ -2140,3 +2140,18 @@ Recorded so that nothing silently depends on them:
   reading mesh coordinates node :H5Gopen:open of a node group failed" to the toolkit's output window
   and nowhere a product reads. Before XC-272 the case counted 2 parts and reported itself complete
 - justifies: XC-272
+
+### E-211 - What the toolkit does with a result position it was not given, measured here
+- tier: T1
+- url: tests/test_cgns.py::TestReadingAnotherStep, from a probe run on the development machine on
+  2026-09-21 (VTK 9.5.2, h5py 3.16.0) against the transient CGNS fixture of tests/cgns_fixture.py
+- verified: 2026-09-21
+- says: on a CGNS/HDF5 file declaring `TimeValues` of 0.0, 0.5 and 2.0, `vtkCGNSReader.UpdateTimeStep(0.5)`
+  hands over the second solution's values and `UpdateTimeStep(0.0)` the first again; the declared
+  sequence is on the pipeline's `TIME_STEPS` key after `UpdateInformation()` alone, before any data is
+  read. Asked for 0.25, a value the file did not declare, the reader delivers the values at 0.5; asked
+  for 7.0 it delivers those at 2.0 and for -1.0 those at 0.0 - silently in every case. The delivered
+  position is written on the output's `DATA_TIME_STEP` key by every `UpdateTimeStep`, and by the
+  plain first `Update()` not at all. Not measured: the Exodus reader on a file of several steps, for
+  which no fixture exists here; it publishes the same pipeline keys
+- justifies: XC-283

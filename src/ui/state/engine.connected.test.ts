@@ -40,6 +40,7 @@ let cubePath: string;
 let partialPath: string | null = null;
 let barPath: string;
 let fieldsPath: string;
+let transientPath: string | null = null;
 let engineOutput = "";
 
 async function until(what: () => boolean, ms: number, name: string): Promise<void> {
@@ -60,12 +61,15 @@ beforeAll(async () => {
     env: { ...process.env, PYTHONIOENCODING: "utf-8" },
   });
   if (written.status !== 0) throw new Error(`demo case not written:\n${written.stderr}`);
-  const paths = JSON.parse(written.stdout.trim()) as { workspace: string; cube: string; partial: string | null; bar: string; fields: string };
+  const paths = JSON.parse(written.stdout.trim()) as {
+    workspace: string; cube: string; partial: string | null; bar: string; fields: string; transient: string | null;
+  };
   workspacePath = paths.workspace;
   cubePath = paths.cube;
   partialPath = paths.partial;
   barPath = paths.bar;
   fieldsPath = paths.fields;
+  transientPath = paths.transient;
 
   // The engine, started the way a shell starts it: loopback, a port the OS chooses, the token in a
   // file the shell reads and nowhere else (XC-258).
@@ -532,6 +536,54 @@ describe("the prototype thread from the interface's side", () => {
     expect(s.refusal).toBeNull();
     expect(s.derived).toEqual({});
     expect(s.imageUrl).toMatch(/^blob:/);
+  });
+
+  test("result position: the second step's numbers are the second step's, every answer says which step, and a step the file lacks is refused (XC-283)", async () => {
+    if (!transientPath) throw new Error("the transient fixture was not written: h5py is missing from the engine environment");
+    expect(await engineState.loadDataset("case:1", transientPath)).toBe(true);
+    await engineState.refresh();
+    let s = snapshot();
+    expect(s.refusal).toBeNull();
+    expect(s.described?.resultAxis).toMatchObject({ kind: "undeclared", positions: [0, 0.5], count: 2 });
+    expect(s.step).toBe(0);
+    expect(s.statistics?.maximum.value).toBe(90);
+    expect(s.statistics?.resultPosition).toEqual({
+      step: 0, count: 2, kind: "undeclared", value: 0, unit: null, stated: "ステップ 1/2（位置 0・軸の種類は宣言なし）",
+    });
+    expect(viewFooter(s, "単位未宣言")?.showing).toContain("・ステップ 1/2（位置 0・軸の種類は宣言なし）・");
+
+    expect(await engineState.moveToStep(1)).toBe(true);
+    s = snapshot();
+    expect(s.refusal).toBeNull();
+    expect(s.step).toBe(1);
+    expect(s.statistics?.maximum.value).toBe(91);
+    expect(s.statistics?.scope).toBe("ケース全体（1 パート）・ステップ 2/2（位置 0.5・軸の種類は宣言なし）");
+    expect(s.statistics?.resultPosition.step).toBe(1);
+    expect(s.imageUrl).toMatch(/^blob:/);
+    expect(viewFooter(s, "単位未宣言")?.showing).toContain("ステップ 2/2（位置 0.5・軸の種類は宣言なし）");
+    await engineState.probe([0, 1, 0]);
+    s = snapshot();
+    expect(s.probe?.value).toBe(91);
+    expect(s.probePosition).toMatchObject({ step: 1, count: 2, kind: "undeclared", value: 0.5, unit: null });
+
+    // A step that is not there is refused by name, nothing nearer is shown, and the view stays
+    // where it was (view/AC-033).
+    expect(await engineState.moveToStep(2)).toBe(false);
+    s = snapshot();
+    expect(s.refusal).toContain("ステップ番号 2");
+    expect(s.step).toBe(1);
+    expect(s.statistics?.maximum.value).toBe(91);
+
+    // The thread goes on with the cube: steady, one step, nothing to move along.
+    expect(await engineState.loadDataset("case:1", cubePath)).toBe(true);
+    await engineState.refresh();
+    s = snapshot();
+    expect(s.refusal).toBeNull();
+    expect(s.step).toBe(0);
+    expect(s.statistics?.resultPosition).toEqual({
+      step: 0, count: 1, kind: "none", value: null, unit: null, stated: "定常（結果軸なし・ステップ 1/1）",
+    });
+    expect(viewFooter(s, "単位未宣言")?.showing).not.toContain("ステップ");
   });
 });
 

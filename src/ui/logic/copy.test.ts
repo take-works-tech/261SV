@@ -21,6 +21,7 @@ const STATISTICS: Results["field.statistics"] = {
   reduction: "none",
   weighting: "dualVolume",
   scope: "whole model",
+  resultPosition: { step: 0, count: 1, kind: "none", value: null, unit: null, stated: "定常（結果軸なし・ステップ 1/1）" },
 };
 
 describe("one value as a row", () => {

@@ -55,6 +55,8 @@ export interface Derivation {
 /** A number the engine reported, carried whole. Never unpacked into a bare value: a value without
  *  its unit, digits and provenance is a value in whatever unit the reader assumed (XC-003). */
 export type Reported = Results["dataset.probe"]["value"];
+/** Which step a number is of, as the engine states it beside every number (CT-003 3.10.0). */
+export type StatedPosition = Results["field.statistics"]["resultPosition"];
 
 /** One write the engine applied since the document was last saved. What a crash loses is exactly
  *  this list, so it is kept as the engine answers it - operation and the engine's own summary - and
@@ -193,6 +195,12 @@ export interface EngineState {
   readonly parts: Results["dataset.parts"]["parts"] | null;
   readonly probe: Reported | null;
   readonly probeLocation: string | null;
+  /** Which step the probed or picked value is of, as the engine said it (view/AC-032). */
+  readonly probePosition: StatedPosition | null;
+  /** The step the view is at on the case's result axis, as the view definition holds it (CT-004
+   *  `resultPosition.step`): class-2 state, and a document write when moved (XC-283). Which step
+   *  each shown number is of comes back with the number; this is what the next request asks for. */
+  readonly step: number;
   readonly statistics: Results["field.statistics"] | null;
   /** The selected part's statistics for the field on screen, asked by the part's name and answered
    *  with the scope stated (XC-280). Null where no present part is selected. */
@@ -243,6 +251,13 @@ function cameraFrom(turntable: Turntable, bounds: readonly [number[], number[]] 
   };
 }
 
+/** How many steps the described case has: the engine's count, or the length of its positions, or
+ *  one. What `moveToStep` checks a request against before the definition is written. */
+function stepCount(described: Results["dataset.describe"] | null): number {
+  const axis = described?.resultAxis;
+  return Math.max(1, axis?.count ?? axis?.positions?.length ?? 1);
+}
+
 const EMPTY: EngineState = {
   reachability: { kind: "unknown" },
   opened: null,
@@ -285,6 +300,8 @@ const EMPTY: EngineState = {
   parts: null,
   probe: null,
   probeLocation: null,
+  probePosition: null,
+  step: 0,
   statistics: null,
   partStatistics: null,
   bounds: null,
@@ -515,6 +532,8 @@ export const engineState = {
       parts: null,
       probe: null,
       probeLocation: null,
+      probePosition: null,
+      step: 0,
       statistics: null,
       partStatistics: null,
     });
@@ -569,6 +588,8 @@ export const engineState = {
       parts: null,
       probe: null,
       probeLocation: null,
+      probePosition: null,
+      step: 0,
       statistics: null,
       partStatistics: null,
       turntable: { ...START },
@@ -628,6 +649,7 @@ export const engineState = {
     setState({
       probe: answer?.value ?? null,
       probeLocation: (answer?.value as { location?: string } | undefined)?.location ?? null,
+      probePosition: answer?.resultPosition ?? null,
       // The part under the pixel is the selection now, so the outliner follows the viewport
       // (view/AC-055). A pixel on nothing changes no selection: nothing was chosen there.
       selectedPart: answer?.part ?? state.selectedPart,
@@ -651,7 +673,12 @@ export const engineState = {
       return;
     }
     const before = state.refusal;
-    const answered = await ask("field.statistics", { datasetId: state.datasetId, fieldName: state.fieldName, region: part.name });
+    const answered = await ask("field.statistics", {
+      datasetId: state.datasetId,
+      fieldName: state.fieldName,
+      region: part.name,
+      resultPosition: state.step,
+    });
     // A refusal here is the section's to show beside the part, not the window's.
     if (!answered) setState({ refusal: before });
     setState({ partStatistics: answered });
@@ -713,7 +740,7 @@ export const engineState = {
 
   /** Class 2: choose which field the colours mean. */
   async chooseField(fieldName: string): Promise<void> {
-    setState({ fieldName, probe: null, probeLocation: null });
+    setState({ fieldName, probe: null, probeLocation: null, probePosition: null });
     await engineState.refresh();
   },
 
@@ -747,12 +774,15 @@ export const engineState = {
           camera?: CameraDefinition;
           partVisibility?: Record<string, boolean>;
           colouring?: { colourMap?: string };
+          resultPosition?: { step?: number };
         };
         setState({
           viewId,
           savedCamera: kept.camera ?? null,
           partVisibility: kept.partVisibility ?? {},
           colourMap: kept.colouring?.colourMap ?? state.colourMap,
+          // The step the document kept the view at (CT-004), read before it is written (XC-283).
+          step: kept.resultPosition?.step ?? 0,
         });
       }
     }
@@ -764,6 +794,9 @@ export const engineState = {
       colouring: { fieldName: state.fieldName, association, colourMap: state.colourMap },
       // Which parts the picture shows, as the outliner last set it (CT-004, XC-274).
       partVisibility: { ...state.partVisibility },
+      // The step the view is at, by its ordinal along the sequence the file declared - the one
+      // member an axis of undeclared kind can take (CT-004 3.2.0, XC-240, XC-283).
+      resultPosition: { step: state.step },
       // The view's own camera, not the live one: the definition is what a report renders, and the
       // turntable stays out of it until the person keeps a look (XC-270). The first definition
       // takes the pose the model is first seen from, so a report of an unkept view is not blank.
@@ -798,9 +831,28 @@ export const engineState = {
     const statistics = await ask("field.statistics", {
       datasetId: state.datasetId,
       fieldName: state.fieldName,
+      resultPosition: state.step,
     });
     setState({ statistics });
     await engineState.refreshPartStatistics();
+  },
+
+  /** Class 2: move along the result axis (16_application_model §6). The step is the view
+   *  definition's (CT-004 `resultPosition.step`), so the picture, the numbers and the probe are all
+   *  of it, and every answer says which step it is of (view/AC-032). A step the case does not have
+   *  is refused before the definition is written - by the count the engine described - and nothing
+   *  nearer is shown instead (view/AC-033, XC-283). */
+  async moveToStep(step: number): Promise<boolean> {
+    const count = stepCount(state.described);
+    if (!Number.isInteger(step) || step < 0 || step >= count) {
+      setState({
+        refusal: `ステップ番号 ${step}（0 始まり）はこの結果にありません（あるのは 0〜${count - 1} の ${count} ステップ）。最も近いステップで代用はしません（view/AC-033）`,
+      });
+      return false;
+    }
+    setState({ step, probe: null, probeLocation: null, probePosition: null });
+    await engineState.refresh();
+    return state.refusal === null;
   },
 
   /** Draw the view from the live camera. The picture, not the document: the camera goes as a
@@ -835,11 +887,12 @@ export const engineState = {
       datasetId: state.datasetId,
       fieldName: state.fieldName,
       pointM: [...pointM],
-      resultPosition: 0,
+      resultPosition: state.step,
     });
     setState({
       probe: answer?.value ?? null,
       probeLocation: (answer?.value as { location?: string } | undefined)?.location ?? null,
+      probePosition: answer?.resultPosition ?? null,
     });
   },
 

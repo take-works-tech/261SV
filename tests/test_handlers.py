@@ -20,7 +20,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
-from conftest import REQUIRE_VTK, offscreen_rendering_available, requires_vtk
+from conftest import REQUIRE_VTK, offscreen_rendering_available, requires_h5py, requires_vtk
 
 requires_vtk()
 
@@ -748,7 +748,8 @@ class TestProbingAPoint:
         assert "外" in value["missingBecause"]
         assert value["unit"] is None and value["digits"] == 6
 
-    def test_a_result_position_this_build_cannot_reach_is_refused_by_name(self, tmp_path: Path) -> None:
+    def test_a_step_a_steady_case_does_not_have_is_refused_by_name(self, tmp_path: Path) -> None:
+        """view/AC-033: a steady case has one step; asking for a fourth is refused, not read as the first."""
         surface, _, dataset_id = loaded(tmp_path)
 
         result = surface.submit(Command("dataset.probe", {
@@ -756,7 +757,7 @@ class TestProbingAPoint:
         }))
 
         assert result.status is Status.REFUSED
-        assert "resultPosition=3" in (result.reason or "")
+        assert "ステップ番号 3" in (result.reason or "") and "定常" in (result.reason or "")
 
     def test_an_unknown_field_is_refused(self, tmp_path: Path) -> None:
         surface, _, dataset_id = loaded(tmp_path)
@@ -1797,3 +1798,155 @@ class TestASecondOpenIsReadOnlyThroughTheAPI:
         session.release_workspace()
         assert not (tmp_path / "other.svw.lock").exists()
         assert session.lock is None
+
+
+class TestTheResultPosition:
+    """XC-283, view/AC-031 to AC-033: the numbers, the picture and the probe are of the step asked
+    for, every answer says which step it is of, and a step the case lacks is refused by name."""
+
+    @staticmethod
+    def _transient(tmp_path: Path) -> tuple[Surface, Session, str]:
+        requires_h5py()
+        from cgns_fixture import write_transient_cgns
+
+        return loaded(tmp_path, write=write_transient_cgns, name="t.cgns")
+
+    @staticmethod
+    def _view(surface: Surface, dataset_id: str, position: dict) -> str:
+        return surface.submit(Command("view.create", {"workspaceId": "ws:1", "definition": {
+            "name": "遷移", "datasetId": dataset_id, "representation": "surface",
+            "colouring": {"fieldName": "stress", "association": "point", "colourMap": "viridis"},
+            "resultPosition": position,
+        }})).value["id"]
+
+    def test_statistics_are_of_the_step_asked_for_and_say_which(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = self._transient(tmp_path)
+
+        first = surface.submit(Command("field.statistics", {"datasetId": dataset_id, "fieldName": "stress"}))
+        second = surface.submit(Command("field.statistics", {"datasetId": dataset_id, "fieldName": "stress", "resultPosition": 1}))
+
+        assert first.status is Status.ANSWERED and second.status is Status.ANSWERED, (first.reason, second.reason)
+        assert first.value["maximum"]["value"] == 90.0 and second.value["maximum"]["value"] == 91.0
+        assert first.value["resultPosition"] == {
+            "step": 0, "count": 2, "kind": "undeclared", "value": 0.0, "unit": None,
+            "stated": "ステップ 1/2（位置 0・軸の種類は宣言なし）",
+        }
+        assert second.value["resultPosition"]["stated"] == "ステップ 2/2（位置 0.5・軸の種類は宣言なし）"
+        assert second.value["scope"] == "ケース全体（1 パート）・ステップ 2/2（位置 0.5・軸の種類は宣言なし）"
+
+    def test_a_steady_case_says_it_has_one_step_and_no_axis(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path)
+
+        result = surface.submit(Command("field.statistics", {"datasetId": dataset_id, "fieldName": "stress"}))
+
+        assert result.value["resultPosition"] == {
+            "step": 0, "count": 1, "kind": "none", "value": None, "unit": None, "stated": "定常（結果軸なし・ステップ 1/1）",
+        }
+        assert "ステップ" not in result.value["scope"]
+
+    def test_a_step_the_case_lacks_is_refused_and_nothing_nearer_is_answered(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = self._transient(tmp_path)
+
+        statistics = surface.submit(Command("field.statistics", {"datasetId": dataset_id, "fieldName": "stress", "resultPosition": 2}))
+        probe = surface.submit(Command("dataset.probe", {
+            "datasetId": dataset_id, "fieldName": "stress", "pointM": [0.0, 1.0, 0.0], "resultPosition": 5,
+        }))
+
+        assert statistics.status is Status.REFUSED and "ステップ番号 2" in (statistics.reason or "")
+        assert "0〜1" in (statistics.reason or "") and "代用はしません" in (statistics.reason or "")
+        assert probe.status is Status.REFUSED and "ステップ番号 5" in (probe.reason or "")
+
+    def test_the_probe_reads_the_step_asked_for(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = self._transient(tmp_path)
+        point = {"datasetId": dataset_id, "fieldName": "stress", "pointM": [0.0, 1.0, 0.0]}
+
+        at_first = surface.submit(Command("dataset.probe", {**point, "resultPosition": 0}))
+        at_second = surface.submit(Command("dataset.probe", {**point, "resultPosition": 1}))
+
+        assert at_first.status is Status.ANSWERED and at_second.status is Status.ANSWERED, (at_first.reason, at_second.reason)
+        assert at_first.value["value"]["value"] == 90.0 and at_second.value["value"]["value"] == 91.0
+        assert at_second.value["resultPosition"]["step"] == 1
+
+    def test_a_declared_unit_reaches_every_step(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = self._transient(tmp_path)
+        surface.submit(Command("field.declareUnit", {"datasetId": dataset_id, "fieldName": "stress", "unitSymbol": "MPa"}))
+
+        second = surface.submit(Command("field.statistics", {"datasetId": dataset_id, "fieldName": "stress", "resultPosition": 1}))
+
+        assert second.status is Status.ANSWERED, second.reason
+        assert second.value["maximum"]["unit"] == "MPa"
+
+    def test_a_derivation_is_made_again_on_a_step_read_later(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A derived field is a rule of the dataset, not a column of its first step (XC-282, XC-283).
+        The transient fixture carries one scalar, so a vector is put on each step as it is read."""
+        import math
+
+        import numpy as np
+        from domain_core.association import Association
+        from domain_core.dataset import Field
+        from engine import reader as reader_module
+
+        surface, session, dataset_id = self._transient(tmp_path)
+
+        def vector(offset: float) -> Field:
+            values = np.array([[3.0, 4.0, 0.0], [0.0, 0.0, 0.0], [1.0, 2.0, 2.0], [2.0, 3.0, 6.0]], dtype=np.float32)
+            return Field("displacement", Association.POINT, values + np.float32(offset))
+
+        session.datasets[dataset_id].case.present[0].dataset.fields["displacement"] = vector(0.0)
+        real = reader_module.read_case
+
+        def read_with_vector(path, *, step=0):
+            case = real(path, step=step)
+            case.present[0].dataset.fields["displacement"] = vector(float(step))
+            return case
+
+        monkeypatch.setattr(reader_module, "read_case", read_with_vector)
+        made = surface.submit(Command("field.derive", {"datasetId": dataset_id, "fieldName": "displacement", "quantity": "magnitude"}))
+        assert made.status is Status.ANSWERED, made.reason
+
+        at_first = surface.submit(Command("field.statistics", {"datasetId": dataset_id, "fieldName": "displacement.magnitude"}))
+        at_second = surface.submit(Command("field.statistics", {"datasetId": dataset_id, "fieldName": "displacement.magnitude", "resultPosition": 1}))
+
+        assert at_first.status is Status.ANSWERED and at_second.status is Status.ANSWERED, (at_first.reason, at_second.reason)
+        assert at_first.value["maximum"]["value"] == pytest.approx(7.0)
+        assert at_second.value["maximum"]["value"] == pytest.approx(math.sqrt(9.0 + 16.0 + 49.0))
+
+    def test_a_member_that_names_the_kind_is_refused_on_an_undeclared_axis(self, tmp_path: Path) -> None:
+        """XC-240: calling the second of "0, 0.5" a time step labels a value the file did not label."""
+        surface, _, dataset_id = self._transient(tmp_path)
+        view_id = self._view(surface, dataset_id, {"timeStep": 1})
+
+        drawn = surface.submit(Command("view.render", {"viewId": view_id, "width": 300, "height": 300, "format": "png"}))
+
+        assert drawn.status is Status.REFUSED
+        assert "timeStep" in (drawn.reason or "") and "宣言なし" in (drawn.reason or "") and "step" in (drawn.reason or "")
+
+    @needs_offscreen
+    def test_the_picture_and_the_pick_are_of_the_view_s_step(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = self._transient(tmp_path)
+        view_id = self._view(surface, dataset_id, {"step": 1})
+
+        drawn = surface.submit(Command("view.render", {"viewId": view_id, "width": 300, "height": 300, "format": "png"}))
+        picked = surface.submit(Command("view.pick", {"viewId": view_id, "width": 300, "height": 300, "x": 150, "y": 150}))
+
+        assert drawn.status is Status.ANSWERED, drawn.reason
+        assert drawn.value["resultPosition"]["step"] == 1
+        assert picked.status is Status.ANSWERED, picked.reason
+        assert picked.value["resultPosition"]["stated"] == "ステップ 2/2（位置 0.5・軸の種類は宣言なし）"
+        assert picked.value["value"]["value"] in {11.0, 21.0, 91.0, 41.0}, "a value the second step holds"
+
+    def test_the_report_s_table_is_of_the_view_s_step_and_each_row_says_so(self, tmp_path: Path) -> None:
+        from service.command.handlers import rows_for_report
+
+        surface, session, dataset_id = self._transient(tmp_path)
+        view_id = self._view(surface, dataset_id, {"step": 1})
+
+        rows, _ = rows_for_report(session, {"blocks": [
+            {"kind": "valueTable", "fields": ["stress"], "viewId": view_id},
+            {"kind": "valueTable", "fields": ["stress"]},
+        ]})
+
+        assert rows[view_id][0].label == "stress の最大・ステップ 2/2（位置 0.5・軸の種類は宣言なし）"
+        assert rows[view_id][0].value.value == 91.0
+        assert rows["1"][0].label == "stress の最大・ステップ 1/2（位置 0・軸の種類は宣言なし）"
+        assert rows["1"][0].value.value == 90.0

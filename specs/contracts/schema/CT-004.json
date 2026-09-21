@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-004 view definition",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "type": "object",
   "additionalProperties": true,
   "required": [
@@ -139,45 +139,108 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["bindingId", "objectId", "target", "materialRef", "inputBindings"],
+        "required": [
+          "bindingId",
+          "objectId",
+          "target",
+          "materialRef",
+          "inputBindings"
+        ],
         "properties": {
-          "bindingId": { "type": "string", "minLength": 1 },
-          "objectId": { "type": "string", "minLength": 1 },
+          "bindingId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "objectId": {
+            "type": "string",
+            "minLength": 1
+          },
           "objectType": {
             "type": "string",
-            "enum": ["analysisMesh", "referenceMesh", "scalarField", "vectorField", "trajectory", "pointCloud", "annotation", "effect"]
+            "enum": [
+              "analysisMesh",
+              "referenceMesh",
+              "scalarField",
+              "vectorField",
+              "trajectory",
+              "pointCloud",
+              "annotation",
+              "effect"
+            ]
           },
           "target": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["kind"],
+            "required": [
+              "kind"
+            ],
             "properties": {
-              "kind": { "type": "string", "enum": ["wholeObject", "part", "elementSet"] },
-              "selectionId": { "type": "string", "minLength": 1 }
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "wholeObject",
+                  "part",
+                  "elementSet"
+                ]
+              },
+              "selectionId": {
+                "type": "string",
+                "minLength": 1
+              }
             },
             "allOf": [
               {
-                "if": { "properties": { "kind": { "enum": ["part", "elementSet"] } } },
-                "then": { "required": ["selectionId"] }
+                "if": {
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "part",
+                        "elementSet"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "selectionId"
+                  ]
+                }
               }
             ]
           },
           "materialRef": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["entryId", "revision"],
+            "required": [
+              "entryId",
+              "revision"
+            ],
             "properties": {
-              "entryId": { "type": "string", "minLength": 1 },
-              "revision": { "type": "integer", "minimum": 1 }
+              "entryId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 1
+              }
             }
           },
-          "variant": { "type": "string", "minLength": 1 },
+          "variant": {
+            "type": "string",
+            "minLength": 1
+          },
           "inputBindings": {
             "type": "object",
             "description": "MaterialX published-input name to a typed instance binding. solviaResult binds identifiers and rules, never copies result arrays into the View.",
-            "additionalProperties": { "$ref": "#/$defs/materialInputBinding" }
+            "additionalProperties": {
+              "$ref": "#/$defs/materialInputBinding"
+            }
           },
-          "enabled": { "type": "boolean", "default": true }
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          }
         }
       }
     },
@@ -259,14 +322,31 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["objectId", "representation", "visible", "displayOpacity"],
+        "required": [
+          "objectId",
+          "representation",
+          "visible",
+          "displayOpacity"
+        ],
         "properties": {
-          "objectId": { "type": "string", "minLength": 1 },
+          "objectId": {
+            "type": "string",
+            "minLength": 1
+          },
           "representation": {
             "type": "string",
-            "enum": ["surface", "surfaceWithEdges", "wireframe", "points", "contour", "slice"]
+            "enum": [
+              "surface",
+              "surfaceWithEdges",
+              "wireframe",
+              "points",
+              "contour",
+              "slice"
+            ]
           },
-          "visible": { "type": "boolean" },
+          "visible": {
+            "type": "boolean"
+          },
           "displayOpacity": {
             "type": "number",
             "minimum": 0,
@@ -276,26 +356,54 @@
           "edgeSettings": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["colourSrgb", "widthPx", "opacity"],
+            "required": [
+              "colourSrgb",
+              "widthPx",
+              "opacity"
+            ],
             "properties": {
               "colourSrgb": {
                 "type": "array",
                 "minItems": 3,
                 "maxItems": 3,
-                "items": { "type": "number", "minimum": 0, "maximum": 1 }
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
               },
-              "widthPx": { "type": "number", "exclusiveMinimum": 0 },
-              "opacity": { "type": "number", "minimum": 0, "maximum": 1 }
+              "widthPx": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "opacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
             }
           }
         },
         "allOf": [
           {
             "if": {
-              "properties": { "representation": { "enum": ["surfaceWithEdges", "wireframe"] } },
-              "required": ["representation"]
+              "properties": {
+                "representation": {
+                  "enum": [
+                    "surfaceWithEdges",
+                    "wireframe"
+                  ]
+                }
+              },
+              "required": [
+                "representation"
+              ]
             },
-            "then": { "required": ["edgeSettings"] }
+            "then": {
+              "required": [
+                "edgeSettings"
+              ]
+            }
           }
         ]
       }
@@ -479,8 +587,13 @@
     "resultPosition": {
       "type": "object",
       "additionalProperties": false,
-      "description": "position on the case's result axis (XC-131). Which member is present follows the axis kind",
+      "description": "position on the case's result axis (XC-131). `step` is the ordinal along the sequence the file declared, from 0, and the one member an axis of undeclared kind can take; `timeStep`, `modeNumber` and `frequencyHz` each say what the sequence is, and are accepted only where the file said so (XC-240, XC-283). Absent: the first step",
       "properties": {
+        "step": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "the ordinal along the declared sequence, from 0. How a position is addressed on an axis whose kind the file did not state: calling the second of \"0, 0.5\" a time step labels a value the file did not label (XC-240, XC-283)"
+        },
         "timeStep": {
           "type": "integer",
           "minimum": 0
@@ -600,11 +713,24 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "useViewPosition": { "type": "boolean", "const": true },
-        "timeStep": { "type": "integer", "minimum": 0 },
-        "modeNumber": { "type": "integer", "minimum": 1 },
-        "frequencyHz": { "type": "number" },
-        "phaseDegrees": { "type": "number" }
+        "useViewPosition": {
+          "type": "boolean",
+          "const": true
+        },
+        "timeStep": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "modeNumber": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "frequencyHz": {
+          "type": "number"
+        },
+        "phaseDegrees": {
+          "type": "number"
+        }
       },
       "minProperties": 1
     },
@@ -613,36 +739,83 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "value"],
+          "required": [
+            "kind",
+            "value"
+          ],
           "properties": {
-            "kind": { "const": "literal" },
+            "kind": {
+              "const": "literal"
+            },
             "value": {},
-            "unit": { "type": "string" }
+            "unit": {
+              "type": "string"
+            }
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "fieldId", "association", "resultPosition"],
+          "required": [
+            "kind",
+            "fieldId",
+            "association",
+            "resultPosition"
+          ],
           "properties": {
-            "kind": { "const": "solviaResult" },
+            "kind": {
+              "const": "solviaResult"
+            },
             "datasetId": {
               "type": "string",
               "description": "Optional explicit Case/Dataset binding; absence resolves against the View's Case in scope"
             },
-            "fieldId": { "type": "string", "minLength": 1 },
-            "component": { "type": "string", "minLength": 1 },
-            "association": { "type": "string", "enum": ["point", "cell"] },
-            "resultPosition": { "$ref": "#/$defs/resultPositionBinding" },
-            "declaredUnit": { "type": ["string", "null"] },
+            "fieldId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "component": {
+              "type": "string",
+              "minLength": 1
+            },
+            "association": {
+              "type": "string",
+              "enum": [
+                "point",
+                "cell"
+              ]
+            },
+            "resultPosition": {
+              "$ref": "#/$defs/resultPositionBinding"
+            },
+            "declaredUnit": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "range": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["mode"],
+              "required": [
+                "mode"
+              ],
               "properties": {
-                "mode": { "type": "string", "enum": ["explicit", "dataRange", "dataRangeOverTime", "symmetric"] },
-                "min": { "type": "number" },
-                "max": { "type": "number" }
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "explicit",
+                    "dataRange",
+                    "dataRangeOverTime",
+                    "symmetric"
+                  ]
+                },
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                }
               }
             }
           }
@@ -650,21 +823,43 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "entryId", "revision"],
+          "required": [
+            "kind",
+            "entryId",
+            "revision"
+          ],
           "properties": {
-            "kind": { "const": "materialReference" },
-            "entryId": { "type": "string", "minLength": 1 },
-            "revision": { "type": "integer", "minimum": 1 },
-            "variant": { "type": "string" }
+            "kind": {
+              "const": "materialReference"
+            },
+            "entryId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "variant": {
+              "type": "string"
+            }
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "name"],
+          "required": [
+            "kind",
+            "name"
+          ],
           "properties": {
-            "kind": { "const": "geometryProperty" },
-            "name": { "type": "string", "minLength": 1 }
+            "kind": {
+              "const": "geometryProperty"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         }
       ]

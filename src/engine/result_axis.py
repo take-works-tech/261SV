@@ -20,11 +20,17 @@ units. Where the declaration becomes reachable, the kind is read; until then it 
 because "0, 0.5" labelled seconds when they are mode indices is a number that is wrong about the physics
 while looking entirely right.
 
-Specification: GL-036, ingest/AC-041, AC-043, XC-240. Evidence: E-138 (T1).
+**Reading another step** goes through the same pipeline: `UpdateTimeStep(value)` with a value the
+file declared, and the delivered step read back from the output (E-211, XC-283). Never a value the
+file did not declare: the toolkit snaps one to the next declared position and clamps one past the
+end to the last, silently in both directions - measured here.
+
+Specification: GL-036, ingest/AC-041, AC-043, XC-240, XC-283. Evidence: E-138 (T1), E-211 (T1).
 """
 
 from __future__ import annotations
 
+from vtkmodules.vtkCommonDataModel import vtkDataObject
 from vtkmodules.vtkCommonExecutionModel import vtkStreamingDemandDrivenPipeline as Pipeline
 
 from domain_core.case_contents import AxisKind, ResultAxis
@@ -43,6 +49,21 @@ def declared_positions(reader: object) -> tuple[float, ...] | None:
     if count < 1:
         return None
     return tuple(float(information.Get(Pipeline.TIME_STEPS(), index)) for index in range(count))
+
+
+def delivered_position(data: object) -> float | None:
+    """The position the reader says the data it handed over is at, or None where it said nothing.
+
+    Written on the output's own information as `DATA_TIME_STEP` by any `UpdateTimeStep`, and by the
+    plain first `Update()` not at all (E-211). It is the one statement the toolkit makes about
+    **which** step came back - and it is what says, when a value between two declared positions is
+    asked for, that the next declared one was delivered instead. The reader checks it against what
+    it asked for, because a value from the wrong step is wrong in a way that looks right.
+    """
+    information = data.GetInformation()  # type: ignore[attr-defined]
+    if not information.Has(vtkDataObject.DATA_TIME_STEP()):
+        return None
+    return float(information.Get(vtkDataObject.DATA_TIME_STEP()))
 
 
 #: A sequence of exactly this is the reader's placeholder, not the file's statement. Measured: a CGNS

@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from domain_core.case_contents import AxisKind, CaseContents, ResultAxis
+from domain_core.case_contents import AxisKind, CaseContents, PositionError, ResultAxis, ResultPosition
 from engine.survey import survey
 
 
@@ -180,3 +180,38 @@ class TestContentsRefusesToBeInconsistent:
     def test_a_case_that_loaded_has_at_least_one_step_and_part(self) -> None:
         with pytest.raises(ValueError):
             CaseContents(steps=0, parts=1, axis=ResultAxis(AxisKind.NONE))
+
+
+class TestAPositionOnTheAxis:
+    """XC-283, view/AC-032, AC-033: a step is an ordinal along the declared sequence, the sentence
+    says which step of how many and what the file declared there, and a step that is not there is
+    refused by name - never the nearest one."""
+
+    def test_a_step_names_the_declared_value_and_the_undeclared_kind(self) -> None:
+        axis = ResultAxis(AxisKind.UNDECLARED, (0.0, 0.5))
+
+        assert axis.count == 2
+        assert axis.at(1) == ResultPosition(step=1, count=2, kind=AxisKind.UNDECLARED, value=0.5)
+        assert axis.at(1).describe() == "ステップ 2/2（位置 0.5・軸の種類は宣言なし）"
+        assert axis.at(0).describe() == "ステップ 1/2（位置 0・軸の種類は宣言なし）"
+
+    def test_a_step_past_the_sequence_is_refused_with_what_there_is(self) -> None:
+        axis = ResultAxis(AxisKind.UNDECLARED, (0.0, 0.5))
+
+        with pytest.raises(PositionError, match="ステップ番号 2（0 始まり）") as caught:
+            axis.at(2)
+        assert "0〜1" in str(caught.value) and "代用はしません" in str(caught.value)
+        with pytest.raises(PositionError):
+            axis.at(-1)
+
+    def test_a_steady_result_has_one_step_and_no_value(self) -> None:
+        axis = ResultAxis(AxisKind.NONE)
+
+        assert axis.count == 1
+        assert axis.at(0) == ResultPosition(step=0, count=1, kind=AxisKind.NONE, value=None)
+        assert axis.at(0).describe() == "定常（結果軸なし・ステップ 1/1）"
+        with pytest.raises(PositionError, match="定常"):
+            axis.at(1)
+
+    def test_a_declared_kind_is_named_in_the_sentence(self) -> None:
+        assert ResultAxis(AxisKind.TIME, (0.0, 1.0, 2.0)).at(2).describe() == "ステップ 3/3（位置 2・時刻）"

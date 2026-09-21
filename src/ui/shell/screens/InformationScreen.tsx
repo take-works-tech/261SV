@@ -706,6 +706,12 @@ function LiveInformation({ view, caseId }: { view: InformationView; caseId: stri
                     <span className="in-v"><QuantityChip value={`${formatValue(view.axis.first, 3)} … ${formatValue(view.axis.last, 3)}`} unit={view.axis.unit} /></span>
                   </div>
                 ) : null}
+                {view.axis.current ? (
+                  <div className="in-kv">
+                    <span className="in-k">現在の位置</span>
+                    <span className="in-v" title="ビュー定義の resultPosition.step。View 画面の結果軸で動かします（XC-283）">{view.axis.current}</span>
+                  </div>
+                ) : null}
               </>
             ) : (
               <p className="in-note">結果軸はエンジンの答えにありませんでした。</p>

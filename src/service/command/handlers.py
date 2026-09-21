@@ -32,6 +32,7 @@ from typing import Any, Callable, Mapping
 import numpy as np
 
 from domain_core.association import Association
+from domain_core.case_contents import AxisKind, PositionError, ResultAxis, ResultPosition, axis_word
 from domain_core.locale_format import bytes_as_text
 from domain_core.dataset import Dataset, Field
 from domain_core.identifiers import location_of
@@ -153,9 +154,28 @@ def bounds_m(datasets: list[Dataset]) -> dict[str, list[float]]:
 # -- what the engine holds ---------------------------------------------------------------------
 
 
+@dataclass(frozen=True, slots=True)
+class Derivation:
+    """One derived field's rule: what it was made from and how (XC-282). A rule, so that it is made
+    again on every step of the case read after it (XC-283)."""
+
+    source: str
+    quantity: derived.Quantity
+    component: str | None
+    as_tensor: bool
+
+
 @dataclass(slots=True)
 class Loaded:
-    """One loaded dataset: the case as read, where it came from, and what a person declared since."""
+    """One loaded dataset: the case as read, where it came from, and what a person declared since.
+
+    `case` is the file's first step, what `dataset.load` read. Another step is read from the file
+    when a position asks for it (`at`), with this dataset's declared units and derived fields made
+    again on it, and **the last step asked for is kept beside the first** - a timeline is scrubbed
+    one step at a time, and keeping every step visited would grow without a bound LIM-001 sets
+    (XC-283). A declaration or a derivation drops the kept step, so it is read again with the rule
+    applied rather than patched.
+    """
 
     case: LoadedCase
     path: Path
@@ -163,15 +183,59 @@ class Loaded:
     support_level: str
     gaps: tuple[str, ...]
     declared_units: dict[str, str] = dataclass_field(default_factory=dict)
+    derivations: list[Derivation] = dataclass_field(default_factory=list)
+    _other: tuple[int, LoadedCase] | None = None
 
-    def holders(self, field_name: str) -> list[Part]:
+    @property
+    def axis(self) -> ResultAxis:
+        return self.case.contents.axis
+
+    def holders(self, field_name: str, case: LoadedCase | None = None) -> list[Part]:
         return [
-            part for part in self.case.present
+            part for part in (case or self.case).present
             if part.dataset is not None and field_name in part.dataset.fields
         ]
 
-    def datasets(self) -> list[Dataset]:
-        return [part.dataset for part in self.case.present if part.dataset is not None]
+    def datasets(self, case: LoadedCase | None = None) -> list[Dataset]:
+        return [part.dataset for part in (case or self.case).present if part.dataset is not None]
+
+    def at(self, position: ResultPosition) -> LoadedCase:
+        """The case at `position`: the first step as loaded, or another read from the file now."""
+        if position.step == 0:
+            return self.case
+        if self._other is not None and self._other[0] == position.step:
+            return self._other[1]
+        case = reader.read_case(self.path, step=position.step)
+        for name, symbol in self.declared_units.items():
+            for part in self.holders(name, case):
+                assert part.dataset is not None
+                part.dataset.fields[name] = part.dataset.fields[name].declared(symbol)
+        for rule in self.derivations:
+            derive_into(self, case, rule)
+        self._other = (position.step, case)
+        return case
+
+    def forget_other(self) -> None:
+        self._other = None
+
+
+def derive_into(loaded: Loaded, case: LoadedCase, rule: Derivation) -> list[derived.Derived]:
+    """Make a derived field on every part of `case` that carries the source, at the source's
+    precision and with its unit (XC-282). Raises `DerivedError` where the source is the wrong shape."""
+    made: list[derived.Derived] = []
+    for part in loaded.holders(rule.source, case):
+        assert part.dataset is not None
+        field = part.dataset.fields[rule.source]
+        results = derived.derive(field, rule.quantity, component=rule.component, as_tensor=rule.as_tensor)
+        precision = field.values.dtype if np.issubdtype(field.values.dtype, np.floating) else np.dtype(np.float64)
+        for one in results:
+            part.dataset.fields[one.name] = Field(
+                name=one.name, association=field.association, values=one.values.astype(precision), unit=field.unit,
+            )
+            if field.unit is not None:
+                loaded.declared_units[one.name] = field.unit
+        made = list(results)
+    return made
 
 
 class HandleExpired(Exception):
@@ -799,7 +863,7 @@ def dataset_parts(session: Session, parameters: Mapping[str, Any]) -> Effect | R
     return Effect("パートの一覧です", value={"parts": parts})
 
 
-def parts_shown(loaded: Loaded, definition: Mapping[str, Any]) -> list[Part] | Result:
+def parts_shown(loaded: Loaded, definition: Mapping[str, Any], case: LoadedCase | None = None) -> list[Part] | Result:
     """The present parts a view shows, after its `partVisibility` (CT-004, INV-019, XC-274).
 
     A name the dataset does not have is refused rather than skipped: a visibility written for a
@@ -807,20 +871,76 @@ def parts_shown(loaded: Loaded, definition: Mapping[str, Any]) -> list[Part] | R
     past it would look right. Every part hidden is refused too - an empty frame with a legend is
     a picture of nothing presented as a picture of something (XC-001).
     """
+    case = case or loaded.case
     stated = definition.get("partVisibility") or {}
     if not isinstance(stated, Mapping):
         return refused(f"partVisibility はパート名から真偽値への対応です（{type(stated).__name__} が書かれています）")
-    known = {part.label for part in loaded.case.parts}
+    known = {part.label for part in case.parts}
     unknown = sorted(str(name) for name in stated if str(name) not in known)
     if unknown:
         return refused(
             f"partVisibility が名指したパートはこのデータセットにありません：{unknown}。"
             f"あるのは {sorted(known)} です"
         )
-    shown = [part for part in loaded.case.present if stated.get(part.label, True) is not False]
+    shown = [part for part in case.present if stated.get(part.label, True) is not False]
     if not shown:
         return refused("すべてのパートが非表示です：描くものがありません。何も描かない絵を返す代わりに拒みます")
     return shown
+
+
+#: The definition members that say what a sequence *is*, and the axis kind each one presumes.
+KIND_MEMBERS = {"timeStep": AxisKind.TIME, "modeNumber": AxisKind.MODE, "frequencyHz": AxisKind.FREQUENCY}
+
+
+def position_of(loaded: Loaded, definition: Mapping[str, Any]) -> ResultPosition | Result:
+    """The step a view definition's `resultPosition` names on this dataset's axis (CT-004, XC-283).
+
+    `step` is the ordinal along the declared sequence, from 0, and the one member an axis of
+    undeclared kind can take. `timeStep`, `modeNumber` and `frequencyHz` each say what the
+    sequence **is**, and are accepted only where the file said so - which no reader in this build
+    surfaces (XC-240) - because a definition that calls the second of "0, 0.5" a time step has
+    labelled a value the file did not label. A definition naming no position is at the first step.
+    """
+    stated = definition.get("resultPosition") or {}
+    if not isinstance(stated, Mapping):
+        return refused(f"resultPosition はオブジェクトです（{type(stated).__name__} が書かれています）")
+    axis = loaded.axis
+    step = int(stated["step"]) if "step" in stated else 0
+    for member, presumed in KIND_MEMBERS.items():
+        if member not in stated:
+            continue
+        if axis.kind is not presumed:
+            return refused(
+                f"resultPosition.{member} は結果軸の種類が「{axis_word(presumed)}」であると言うことになりますが、"
+                f"このデータセットの軸の種類は「{axis_word(axis.kind)}」です。"
+                "ステップ番号（step）で位置を指定してください（XC-240, XC-283）"
+            )
+        if member == "frequencyHz":
+            return refused("この版に周波数軸の結果を読む読み手がありません（XC-240）")
+        step = int(stated[member]) - (1 if member == "modeNumber" else 0)
+    if "phaseDegrees" in stated or "sweeping" in stated:
+        return refused("この版に周波数軸の結果を読む読み手がなく、位相は指定できません（XC-240）")
+    try:
+        return axis.at(step)
+    except PositionError as error:
+        return refused(str(error))
+
+
+def stated_position(position: ResultPosition) -> dict[str, Any]:
+    """CT-003's `resultPosition` answer: which step a value came from (view/AC-032). The unit is
+    null because the file does not say what its positions are (XC-003, XC-240)."""
+    return {
+        "step": position.step, "count": position.count, "kind": position.kind.value,
+        "value": position.value, "unit": None, "stated": position.describe(),
+    }
+
+
+def case_at(loaded: Loaded, position: ResultPosition) -> LoadedCase | Result:
+    """The dataset at a position, or the refusal that says why it could not be read there."""
+    try:
+        return loaded.at(position)
+    except (PositionError, reader.UnreadableFileError, derived.DerivedError) as error:
+        return refused(str(error))
 
 
 def field_declare_unit(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
@@ -844,6 +964,7 @@ def field_declare_unit(session: Session, parameters: Mapping[str, Any]) -> Effec
         assert part.dataset is not None
         part.dataset.fields[name] = part.dataset.fields[name].declared(symbol)
     loaded.declared_units[name] = symbol
+    loaded.forget_other()
 
     # Into the document, so that the declaration survives the session once the document is saved
     # (CT-001 `declaredUnits`, #306). In memory alone it was lost on every exit.
@@ -867,6 +988,7 @@ def field_declare_unit(session: Session, parameters: Mapping[str, Any]) -> Effec
             loaded.declared_units.pop(name, None)
         else:
             loaded.declared_units[name] = previous
+        loaded.forget_other()
         if source_entry is not None:
             sources.forget_unit(source_entry, name, recorded_previous)
 
@@ -909,25 +1031,15 @@ def field_derive(session: Session, parameters: Mapping[str, Any]) -> Effect | Re
     if not holders:
         return refused(f"'{name}' というフィールドはこのデータセットにありません")
     component = parameters.get("component")
-    as_tensor = bool(parameters.get("asTensor", False))
-    made: list[derived.Derived] = []
-    for part in holders:
-        assert part.dataset is not None
-        field = part.dataset.fields[name]
-        try:
-            results = derived.derive(
-                field, quantity, component=str(component) if component is not None else None, as_tensor=as_tensor,
-            )
-        except derived.DerivedError as error:
-            return refused(str(error))
-        precision = field.values.dtype if np.issubdtype(field.values.dtype, np.floating) else np.dtype(np.float64)
-        for one in results:
-            part.dataset.fields[one.name] = Field(
-                name=one.name, association=field.association, values=one.values.astype(precision), unit=field.unit,
-            )
-            if field.unit is not None:
-                loaded.declared_units[one.name] = field.unit
-        made = list(results)
+    rule = Derivation(name, quantity, str(component) if component is not None else None, bool(parameters.get("asTensor", False)))
+    try:
+        made = derive_into(loaded, loaded.case, rule)
+    except derived.DerivedError as error:
+        return refused(str(error))
+    # A derivation is a rule of this dataset: made again on every step read from now on, and the
+    # step kept beside the first is dropped so it is read with the rule applied (XC-283).
+    loaded.derivations.append(rule)
+    loaded.forget_other()
     source = holders[0].dataset.fields[name] if holders[0].dataset is not None else None
     first = made[0]
     return Effect(
@@ -954,14 +1066,23 @@ def field_statistics(session: Session, parameters: Mapping[str, Any]) -> Effect 
     if isinstance(loaded, Result):
         return loaded
     name = str(parameters["fieldName"])
+    # Which step the numbers are of: the one asked for, or the first, and the answer says which
+    # either way (view/AC-032). A step the case does not have is refused, not rounded (AC-033).
+    try:
+        position = loaded.axis.at(int(parameters.get("resultPosition", 0)))
+    except PositionError as error:
+        return refused(str(error))
+    case = case_at(loaded, position)
+    if isinstance(case, Result):
+        return case
     region = parameters.get("region")
     if region:
         try:
-            part = loaded.case.part(str(region))
+            part = case.part(str(region))
         except KeyError:
             return refused(
                 f"'{region}' というパートはこのデータセットにありません。"
-                f"あるのは {[one.label for one in loaded.case.parts]} です（dataset.parts の名前で指定します）"
+                f"あるのは {[one.label for one in case.parts]} です（dataset.parts の名前で指定します）"
             )
         if part.dataset is None:
             return refused(f"パート '{part.label}' は読めていません（{part.reason or '理由不明'}）。数はありません")
@@ -969,7 +1090,7 @@ def field_statistics(session: Session, parameters: Mapping[str, Any]) -> Effect 
             return refused(f"'{name}' というフィールドはパート '{part.label}' にありません")
         holders = [part]
     else:
-        holders = loaded.holders(name)
+        holders = loaded.holders(name, case)
     if not holders:
         return refused(f"'{name}' というフィールドはこのデータセットにありません")
     fields = [part.dataset.fields[name] for part in holders if part.dataset is not None]
@@ -987,19 +1108,21 @@ def field_statistics(session: Session, parameters: Mapping[str, Any]) -> Effect 
     digits = min(field.significant_digits for field in fields)
     values = np.concatenate([field.values for field in fields])
     caveats: frozenset[Caveat] = frozenset()
-    if loaded.case.is_partial:
+    if case.is_partial:
         caveats = caveats | {Caveat.PARTIAL_DATASET}
     scope = f"パート {holders[0].label}" if region else f"ケース全体（{len(holders)} パート）"
+    if position.count > 1:
+        scope += f"・{position.describe()}"
 
     if region:
         # One part's own extremum, located in that part's words and named for it (INV-019).
-        maximum = holders[0].dataset.maximum(name) if holders[0].dataset is not None else loaded.case.maximum(name)
+        maximum = holders[0].dataset.maximum(name) if holders[0].dataset is not None else case.maximum(name)
         if maximum.location:
             maximum = replace(maximum, location=f"{holders[0].label}：{maximum.location}")
         if caveats:
             maximum = maximum.with_caveat(Caveat.PARTIAL_DATASET)
     else:
-        maximum = loaded.case.maximum(name)
+        maximum = case.maximum(name)
     minimum = as_reported(
         summarise(
             values, reduction=Reduction.MIN, association=association, scope=scope,
@@ -1018,6 +1141,7 @@ def field_statistics(session: Session, parameters: Mapping[str, Any]) -> Effect 
         "reduction": "min / max / mean",
         "weighting": weighting.value,
         "scope": scope,
+        "resultPosition": stated_position(position),
     }
     if association is Association.CELL:
         # A value at a shared node is several values: the numbers above are the element values,
@@ -1342,7 +1466,15 @@ def view_render(session: Session, parameters: Mapping[str, Any]) -> Effect | Res
     colouring = colouring_of(stated)
     if isinstance(colouring, Result):
         return colouring
-    shown = parts_shown(loaded, definition)
+    # The step the definition is at (CT-004 `resultPosition`, XC-283): the picture is of that step,
+    # and the answer says which (view/AC-032).
+    position = position_of(loaded, definition)
+    if isinstance(position, Result):
+        return position
+    case = case_at(loaded, position)
+    if isinstance(case, Result):
+        return case
+    shown = parts_shown(loaded, definition, case)
     if isinstance(shown, Result):
         return shown
     # A camera given draws the picture from there and leaves the definition's camera as it is: a
@@ -1369,7 +1501,7 @@ def view_render(session: Session, parameters: Mapping[str, Any]) -> Effect | Res
     handle = session.handles.issue(rendered.png)
     return Effect(
         f"{rendered.width}x{rendered.height} の画像を描きました（{handle['bytes']} バイト）",
-        value={"handle": handle["id"], "reduced": rendered.reduced},
+        value={"handle": handle["id"], "reduced": rendered.reduced, "resultPosition": stated_position(position)},
     )
 
 
@@ -1384,13 +1516,15 @@ def dataset_probe(session: Session, parameters: Mapping[str, Any]) -> Effect | R
     loaded = session.loaded(str(parameters["datasetId"]))
     if isinstance(loaded, Result):
         return loaded
-    if int(parameters["resultPosition"]) != 0:
-        return refused(
-            f"resultPosition={parameters['resultPosition']} は読めません：この版は各ファイルの既定のステップ"
-            "だけを読みます（結果軸を辿るのは後の段）。位置 0 で問い合わせてください"
-        )
+    try:
+        position = loaded.axis.at(int(parameters["resultPosition"]))
+    except PositionError as error:
+        return refused(str(error))
+    case = case_at(loaded, position)
+    if isinstance(case, Result):
+        return case
     name = str(parameters["fieldName"])
-    holders = loaded.holders(name)
+    holders = loaded.holders(name, case)
     if not holders:
         return refused(f"'{name}' というフィールドはこのデータセットにありません")
     if any(part.dataset is not None and part.dataset.fields[name].components != 1 for part in holders):
@@ -1409,11 +1543,14 @@ def dataset_probe(session: Session, parameters: Mapping[str, Any]) -> Effect | R
     value = found.value
     if value.location and len(holders) > 1:
         value = replace(value, location=f"{part.label}：{value.location}")
-    if loaded.case.is_partial:
+    if case.is_partial:
         value = value.with_caveat(Caveat.PARTIAL_DATASET)
     return Effect(
         f"'{name}' の値を読みました" if not value.is_missing else f"'{name}' の値はそこにありません",
-        value={"value": reported(value), "association": ASSOCIATION_WORD[found.association]},
+        value={
+            "value": reported(value), "association": ASSOCIATION_WORD[found.association],
+            "resultPosition": stated_position(position),
+        },
     )
 
 
@@ -1452,9 +1589,15 @@ def view_pick(session: Session, parameters: Mapping[str, Any]) -> Effect | Resul
         # to be able to set one up at all (E-194).
         return refused(f"画素から座標を求められません：{detail}")
 
-    # The parts the picture shows: a hidden part is not in the frame, so a value read from it
-    # would be a value from a picture nobody is looking at (XC-274).
-    shown = parts_shown(loaded, definition)
+    # The step the picture is of, then the parts it shows: a hidden part is not in the frame, so a
+    # value read from it would be a value from a picture nobody is looking at (XC-274, XC-283).
+    position = position_of(loaded, definition)
+    if isinstance(position, Result):
+        return position
+    case = case_at(loaded, position)
+    if isinstance(case, Result):
+        return case
+    shown = parts_shown(loaded, definition, case)
     if isinstance(shown, Result):
         return shown
     width, height = int(parameters["width"]), int(parameters["height"])
@@ -1486,9 +1629,12 @@ def view_pick(session: Session, parameters: Mapping[str, Any]) -> Effect | Resul
     value = answer.value
     if value.location and len(found) > 1:
         value = replace(value, location=f"{part.label}：{value.location}")
-    if loaded.case.is_partial:
+    if case.is_partial:
         value = value.with_caveat(Caveat.PARTIAL_DATASET)
-    answered: dict[str, Any] = {"value": reported(value), "association": ASSOCIATION_WORD[answer.association]}
+    answered: dict[str, Any] = {
+        "value": reported(value), "association": ASSOCIATION_WORD[answer.association],
+        "resultPosition": stated_position(position),
+    }
     if hit:
         # Which part answered, so the outliner's selection can follow the viewport's (view/AC-055).
         # Nothing hit names no part: a name there would be the part the ray happened to be asked last.
@@ -1525,38 +1671,61 @@ def rows_for_report(session: Session, definition: Mapping[str, Any]) -> tuple[di
         if loaded not in involved:
             involved.append(loaded)
         key = str(block.get("viewId") or block.get("graphId") or index)
-        rows[key] = [row for name in names for row in value_rows(loaded, name)]
+        # The step the block's view is at, where it names one: the table beside a picture states
+        # the numbers of the step the picture shows, and each row says which (view/AC-032).
+        position = position_for_block(session, loaded, block)
+        if isinstance(position, Result):
+            raise ReportError(f"{key} 番目の値の表：{position.reason or '結果位置を決められません'}")
+        case = case_at(loaded, position)
+        if isinstance(case, Result):
+            raise ReportError(f"{key} 番目の値の表：{case.reason or '結果位置のデータを読めません'}")
+        rows[key] = [row for name in names for row in value_rows(loaded, name, case, position)]
     return rows, involved
 
 
-def value_rows(loaded: Loaded, name: str) -> list[ValueRow]:
+def position_for_block(session: Session, loaded: Loaded, block: Mapping[str, Any]) -> ResultPosition | Result:
+    """The position a report block's numbers are of: its view's, or the first step where it names
+    no view. A view the document does not hold is refused by name rather than read as the first step."""
+    view_id = block.get("viewId")
+    if not view_id or session.workspace is None:
+        return loaded.axis.at(0)
+    try:
+        item = items.find(session.workspace.raw, "views", str(view_id))
+    except ItemError as error:
+        return refused(str(error))
+    return position_of(loaded, item["definition"])
+
+
+def value_rows(loaded: Loaded, name: str, case: LoadedCase, position: ResultPosition) -> list[ValueRow]:
     """A field's maximum as a document states it - and for a cell field, both numbers with the spread.
 
     A report that gives one without saying which has answered neither (INV-032): the element value
     is labelled as such, the averaged one carries its caveat, and the spread at its node follows.
+    Where the case has more than one step, every label says which step the number is of (AC-032).
     """
-    maximum = loaded.case.maximum(name)
-    holders = loaded.holders(name)
+    at = f"・{position.describe()}" if position.count > 1 else ""
+    maximum = case.maximum(name)
+    holders = loaded.holders(name, case)
     cell = bool(holders) and all(
         part.dataset is not None and part.dataset.fields[name].association is Association.CELL for part in holders
     )
     if not cell:
-        return [ValueRow(label=f"{name} の最大", value=maximum)]
-    rows = [ValueRow(label=f"{name} の最大（要素値・平均なし）", value=maximum)]
+        return [ValueRow(label=f"{name} の最大{at}", value=maximum)]
+    rows = [ValueRow(label=f"{name} の最大（要素値・平均なし）{at}", value=maximum)]
     unit = maximum.unit
     digits = maximum.digits
-    caveats = frozenset({Caveat.PARTIAL_DATASET}) if loaded.case.is_partial else frozenset()
+    caveats = frozenset({Caveat.PARTIAL_DATASET}) if case.is_partial else frozenset()
     try:
         both = averaged_extrema(holders, name, unit=unit, digits=digits, caveats=caveats)
     except nodal.NodalError as error:
         rows.append(ValueRow(
-            label=f"{name} の最大（節点平均）",
+            label=f"{name} の最大（節点平均）{at}",
             value=ReportedValue.unavailable(str(error), unit=unit, digits=digits, provenance=Provenance.COMPUTED,
                                             caveats=caveats, formula=f"max(nodal-average({name}))"),
         ))
         return rows
-    rows.append(ValueRow(label=f"{name} の最大（節点平均）", value=both.maximum))
-    rows.append(ValueRow(label=f"{name} の節点平均の最大でのばらつき（メッシュ細分の目安）", value=both.spread))
+    rows.append(ValueRow(label=f"{name} の最大（節点平均）{at}", value=both.maximum))
+    rows.append(ValueRow(label=f"{name} の節点平均の最大でのばらつき（メッシュ細分の目安）{at}", value=both.spread))
     return rows
 
 
@@ -1601,9 +1770,15 @@ def figures_for_report(
         camera = camera_of(view.get("camera"))
         if isinstance(camera, Result):
             raise ReportError(camera.reason or "カメラを読めません")
-        # The document's figure shows the parts the view shows, and no more: a part hidden on
-        # screen and drawn in the deliverable would be two pictures under one name (XC-274).
-        shown = parts_shown(loaded, view)
+        # The step the view is at, and the parts it shows, and no more: a part hidden on screen
+        # and drawn in the deliverable would be two pictures under one name (XC-274, XC-283).
+        position = position_of(loaded, view)
+        if isinstance(position, Result):
+            raise ReportError(f"ビュー '{view_id}'：{position.reason or '結果位置を決められません'}")
+        case = case_at(loaded, position)
+        if isinstance(case, Result):
+            raise ReportError(f"ビュー '{view_id}'：{case.reason or '結果位置のデータを読めません'}")
+        shown = parts_shown(loaded, view, case)
         if isinstance(shown, Result):
             raise ReportError(f"ビュー '{view_id}'：{shown.reason or '表示するパートを決められません'}")
         available, detail = session.offscreen()
@@ -1631,7 +1806,8 @@ def figures_for_report(
                 colour_map=rendered.legend.colour_map,
                 uniform=rendered.legend.uniform,
             ),
-            description=str(item.get("name") or view_id),
+            # The step the picture is of, in the figure's own words (view/AC-032).
+            description=str(item.get("name") or view_id) + (f"（{position.describe()}）" if position.count > 1 else ""),
         )
     return figures, involved
 

@@ -200,6 +200,18 @@ def write_partial_case(directory: Path) -> Path | None:
     return path
 
 
+def write_transient_case(directory: Path) -> Path | None:
+    """`transient.cgns`: the transient fixture of `tests/cgns_fixture.py` - two steps the file declares
+    as `0.0` and `0.5` without saying what they are, `stress` one higher at the second (XC-240,
+    XC-283). None where h5py, which writes the fixture, is not here.
+    """
+    try:
+        from cgns_fixture import write_transient_cgns
+    except ImportError:
+        return None
+    return write_transient_cgns(directory / "transient.cgns")
+
+
 def main(argv: list[str]) -> int:
     if len(argv) != 1:
         print("usage: python tests/demo_case.py <directory>", file=sys.stderr)
@@ -210,9 +222,10 @@ def main(argv: list[str]) -> int:
     write_bar(bar)
     fields = Path(argv[0]) / "fields.vtu"
     write_fields(fields)
+    transient = write_transient_case(Path(argv[0]))
     print(json.dumps({
         "workspace": str(workspace), "cube": str(cube), "partial": str(partial) if partial else None,
-        "bar": str(bar), "fields": str(fields),
+        "bar": str(bar), "fields": str(fields), "transient": str(transient) if transient else None,
     }))
     return 0
 

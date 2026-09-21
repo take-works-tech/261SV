@@ -3,6 +3,7 @@
  * it computed here. No React and no transport. */
 import type { EngineState } from "../state/engine";
 import { absentParts } from "./parts";
+import { currentStep } from "./resultPosition";
 
 /** The engine's own word for a picture that left nothing out (engine/visualization/render.py). A
  *  `reduced` statement that starts otherwise names what the picture dropped (INV-001). */
@@ -36,6 +37,9 @@ export function viewFooter(state: EngineState, undeclared: string): Showing | nu
     const unit = state.fields.find((one) => one.name === state.fieldName)?.unit ?? null;
     showing.push(`場 ${state.fieldName}（${unit ?? undeclared}）・${state.colourMap}`);
   }
+  // Which step the picture and the numbers are of, where the case has more than one (view/AC-032).
+  const step = currentStep(state);
+  if (step) showing.push(step);
   if (state.viewId) showing.push(state.savedCamera ? "向き：保存済み" : "向き：未保存（回しただけ）");
 
   const incomplete: string[] = [];

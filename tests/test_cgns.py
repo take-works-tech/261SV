@@ -209,3 +209,53 @@ class TestAZoneTheReaderCannotReadIsAnAbsence:
             ("assembly / Base / Ghost", "要素なし", ["assembly", "Base", "Ghost"], "assembly / Base"),
         ]
         assert absent[0]["pointCount"] == 0 and absent[0]["cellCount"] == 0
+
+
+class TestReadingAnotherStep:
+    """XC-283, view/AC-033. The file declares two steps; asking for the second reads the second's
+    values, and asking for a third reads nothing and names what there is. E-211 is the measurement
+    behind the design, kept here so it is taken again on every run."""
+
+    def test_the_second_step_s_values_arrive_when_asked_for(self, tmp_path: Path) -> None:
+        path = write_transient_cgns(tmp_path / "t.cgns")
+
+        first = reader.read_case(path)
+        second = reader.read_case(path, step=1)
+
+        assert np.asarray(first.present[0].dataset.fields["stress"].values).tolist() == [10.0, 20.0, 90.0, 40.0]
+        assert np.asarray(second.present[0].dataset.fields["stress"].values).tolist() == [11.0, 21.0, 91.0, 41.0]
+        assert second.contents.axis == first.contents.axis, "the axis is the whole sequence at every step"
+        assert second.contents.steps == 2
+
+    def test_a_step_the_file_does_not_have_is_refused_and_nothing_nearer_is_read(self, tmp_path: Path) -> None:
+        from domain_core.case_contents import PositionError
+
+        path = write_transient_cgns(tmp_path / "t.cgns")
+
+        with pytest.raises(PositionError, match="ステップ番号 2"):
+            reader.read_case(path, step=2)
+        with pytest.raises(PositionError, match="定常"):
+            reader.read_case(write_minimal_cgns(tmp_path / "s.cgns"), step=1)
+
+    def test_the_toolkit_hands_over_the_next_declared_step_for_a_value_between_two(self, tmp_path: Path) -> None:
+        """E-211, measured: `UpdateTimeStep(0.25)` on a file declaring 0.0 and 0.5 hands over the
+        values at 0.5 and writes 0.5 on the output's `DATA_TIME_STEP`, while the plain first
+        `Update()` writes nothing there. Which is why a step is asked for by its ordinal, only a
+        declared value is ever requested, and the delivered one is checked (`reader.read_case`)."""
+        from engine.result_axis import delivered_position
+
+        path = write_transient_cgns(tmp_path / "t.cgns")
+        choice = reader._READERS[".cgns"]
+        toolkit = choice.factory()
+        toolkit.SetFileName(str(path))
+        assert choice.prepare is not None
+        choice.prepare(toolkit)
+        toolkit.Update()
+        assert delivered_position(toolkit.GetOutputDataObject(0)) is None
+
+        toolkit.UpdateTimeStep(0.25)
+
+        assert delivered_position(toolkit.GetOutputDataObject(0)) == 0.5
+        parts: list = []
+        reader._walk(toolkit.GetOutputDataObject(0), ("t",), parts, [])
+        assert np.asarray(parts[0].dataset.fields["stress"].values).tolist() == [11.0, 21.0, 91.0, 41.0]

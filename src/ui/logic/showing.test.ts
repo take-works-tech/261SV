@@ -23,6 +23,22 @@ const LOADED: EngineState = {
 };
 
 describe("what the area shows", () => {
+  test("a case of several steps says which one is shown; a steady one says nothing about steps", () => {
+    const described = {
+      pointCount: 4, cellCount: 2, boundsM: { minM: [0, 0, 0], maxM: [1, 1, 0] }, partial: false,
+      resultAxis: { kind: "undeclared" as const, positions: [0, 0.5], count: 2, unit: null },
+    };
+    // The engine's sentence where it answered for this step, and the ordinal alone where it has not.
+    expect(viewFooter({ ...LOADED, described, step: 1 }, "単位未宣言")?.showing).toContain("・ステップ 2/2・");
+    const stated = { step: 1, count: 2, kind: "undeclared" as const, value: 0.5, unit: null, stated: "ステップ 2/2（位置 0.5・軸の種類は宣言なし）" };
+    const statistics = { ...(LOADED.statistics as object), resultPosition: stated } as NonNullable<EngineState["statistics"]>;
+    expect(viewFooter({ ...LOADED, described, step: 1, statistics }, "単位未宣言")?.showing).toContain(
+      "・ステップ 2/2（位置 0.5・軸の種類は宣言なし）・",
+    );
+    const steady = { ...described, resultAxis: { kind: "none" as const, unit: null } };
+    expect(viewFooter({ ...LOADED, described: steady }, "単位未宣言")?.showing).not.toContain("ステップ");
+  });
+
   test("no engine is no footer: the design states keep their own mock label", () => {
     expect(viewFooter(snapshot(), "単位未宣言")).toBeNull();
   });

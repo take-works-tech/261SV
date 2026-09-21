@@ -65,6 +65,40 @@ class ResultAxis:
     def is_declared(self) -> bool:
         return self.kind not in (AxisKind.UNDECLARED, AxisKind.NONE)
 
+    @property
+    def count(self) -> int:
+        """How many steps there are to ask for: the declared positions, or the one result."""
+        return len(self.positions) if self.positions else 1
+
+    def at(self, step: int) -> ResultPosition:
+        """The position `step` names on this axis, or the refusal that says it is not there.
+
+        A step is an ordinal along the sequence the file declared, counted from 0 - the one way a
+        position can be addressed on an axis whose kind the file did not state (XC-240, XC-283). A
+        step outside the sequence is refused by name and **nothing is substituted**: the toolkit,
+        asked for a value between two declared ones, hands over the next one and says so only in a
+        pipeline key nobody reads (E-211), and a value from the wrong step is wrong in a way that
+        looks right (view/AC-033).
+        """
+        if self.kind is AxisKind.NONE or self.positions is None:
+            if step != 0:
+                raise PositionError(
+                    f"この結果に結果軸はありません（定常：ステップは 1 つだけ）。ステップ番号 {step}（0 始まり）は存在せず、"
+                    "代わりの位置は選びません（view/AC-033）"
+                )
+            return ResultPosition(step=0, count=1, kind=self.kind, value=None)
+        if not 0 <= step < len(self.positions):
+            raise PositionError(
+                f"ステップ番号 {step}（0 始まり）はこの結果にありません（あるのは 0〜{len(self.positions) - 1} の "
+                f"{len(self.positions)} ステップ、位置 {list(self.positions)}）。"
+                "最も近いステップで代用はしません（view/AC-033）"
+            )
+        return ResultPosition(step=step, count=len(self.positions), kind=self.kind, value=self.positions[step])
+
+
+class PositionError(Exception):
+    """A result position that is not on the axis. A refusal, never the nearest one (view/AC-033)."""
+
 
 _AXIS_WORD = {
     AxisKind.TIME: "時刻",
@@ -72,6 +106,46 @@ _AXIS_WORD = {
     AxisKind.FREQUENCY: "周波数",
     AxisKind.UNDECLARED: "宣言なし",
 }
+
+def axis_word(kind: AxisKind) -> str:
+    """The kind as a sentence names it; a steady result has no axis and says so."""
+    return _AXIS_WORD.get(kind, "なし（定常）")
+
+
+_POSITION_WORD = {
+    AxisKind.TIME: "時刻",
+    AxisKind.MODE: "モード番号",
+    AxisKind.FREQUENCY: "周波数",
+    AxisKind.UNDECLARED: "軸の種類は宣言なし",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class ResultPosition:
+    """One place on a @Case's result axis: which step, of how many, on what kind of axis, and the
+    value the file declared there - `None` for a steady result, which has one step and no value.
+
+    Every number shown or exported says which step it came from (view/AC-032); this is what it says.
+    """
+
+    step: int
+    count: int
+    kind: AxisKind
+    value: float | None
+
+    def describe(self) -> str:
+        """The step as a reader sees it - counted from 1 - with the declared value and what the axis is."""
+        if self.count <= 1 and self.value is None:
+            return "定常（結果軸なし・ステップ 1/1）"
+        value = f"位置 {_shortest(self.value)}" if self.value is not None else "位置の値なし"
+        return f"ステップ {self.step + 1}/{self.count}（{value}・{_POSITION_WORD.get(self.kind, self.kind.value)}）"
+
+
+def _shortest(value: float) -> str:
+    """The declared value as the file wrote it, shortest round trip, without a trailing `.0`: the
+    position is a declared number and carries no digits claim of its own (INV-014)."""
+    text = repr(float(value))
+    return text[:-2] if text.endswith(".0") else text
 
 
 def differing_axes(*axes: ResultAxis) -> str | None:

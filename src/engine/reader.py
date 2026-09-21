@@ -59,7 +59,7 @@ from domain_core.partitions import Partitioning
 from domain_core.parts import LoadedCase, Part
 from engine.conversion import to_unstructured
 from engine import cgns, exodus
-from engine.result_axis import axis_of
+from engine.result_axis import axis_of, delivered_position
 from engine.exodus import BLOCK_ID_ARRAY
 
 class UnsupportedFormatError(Exception):
@@ -479,12 +479,19 @@ def _combine(pieces: list[vtkDataSet], source: SourceFrame | None = None) -> Dat
     )
 
 
-def read_case(path: str | Path) -> LoadedCase:
+def read_case(path: str | Path, *, step: int = 0) -> LoadedCase:
     """Read a file as one @Case, however many parts it turns out to hold (ingest/AC-026, AC-027).
 
     A composite is taken apart into named parts; a single dataset is one part named after its file.
     Either way what comes back states how many parts were found, how many pieces they were cut into,
     and which named parts were not there.
+
+    `step` is the ordinal along the sequence the file declared, from 0 (XC-283). The values at that
+    step are what comes back; the axis is the whole sequence either way. A step the file does not
+    have raises `PositionError` before anything is read, and nothing nearer is read instead
+    (view/AC-033): the toolkit, asked for a value between two declared ones, delivers the next one
+    and says so only on a pipeline key (E-211), so the value asked for is always a declared one and
+    the one delivered is checked against it.
     """
     location = Path(path)
     choice = _READERS.get(location.suffix.lower())
@@ -499,12 +506,27 @@ def read_case(path: str | Path) -> LoadedCase:
     reader.SetFileName(str(location))
     if choice.prepare is not None:
         choice.prepare(reader)
-    reader.Update()
+    # The sequence the file declared is on the pipeline after the metadata pass alone (E-211), so the
+    # step is checked against it before the data is read: a step that is not there costs no read.
+    reader.UpdateInformation()
+    axis = axis_of(reader)
+    position = axis.at(step)
+    if position.value is None:
+        reader.Update()
+    else:
+        reader.UpdateTimeStep(position.value)
     data = reader.GetOutputDataObject(0)
     if choice.verify is not None:
         choice.verify(reader, data)
     if data is None:
         raise UnreadableFileError(f"{location.name} was read by {choice.factory.__name__} and is empty")
+    if position.value is not None:
+        delivered = delivered_position(data)
+        if delivered != position.value:
+            raise UnreadableFileError(
+                f"{location.name}: step {step} at position {position.value!r} was asked for and the reader "
+                f"delivered {delivered!r}. A value from another step is not reported as this one (view/AC-033)"
+            )
 
     parts: list[Part] = []
     partitions: list[int] = []
@@ -526,7 +548,7 @@ def read_case(path: str | Path) -> LoadedCase:
     # The sequence the file declared, read from the pipeline rather than from any one reader's method,
     # and its **kind left undeclared**: no reader in this build surfaces a statement of what the values
     # mean, and one of them will guess if asked (E-138, XC-240).
-    return assemble(parts, axis=axis_of(reader), partitions=partitions)
+    return assemble(parts, axis=axis, partitions=partitions)
 
 
 def assemble(parts: Sequence[Part], *, axis: ResultAxis, partitions: Sequence[int]) -> LoadedCase:

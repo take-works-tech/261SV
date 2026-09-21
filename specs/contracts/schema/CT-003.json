@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "3.9.0",
+  "version": "3.10.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -420,6 +420,11 @@
             "region": {
               "type": "string",
               "description": "対象範囲。省略時は全体で、その範囲は結果に記録される（INV-017）"
+            },
+            "resultPosition": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "結果軸上のステップ番号（0 始まり）。省略時は先頭のステップ。どちらでも答えの resultPosition がどのステップかを書く（view/AC-032）。ないステップは拒み、近いステップで代用しない（view/AC-033）"
             }
           }
         },
@@ -944,7 +949,7 @@
             "resultPosition": {
               "type": "integer",
               "minimum": 0,
-              "description": "結果軸上の位置。時間とは限らない（XC-131）"
+              "description": "結果軸上のステップ番号（0 始まり）：ファイルが宣言した位置列の何番目か。値ではなく番号で指す。時間とは限らない（XC-131, XC-240）。ないステップは拒み、近いステップで代用しない（view/AC-033）"
             }
           }
         },
@@ -2109,6 +2114,7 @@
             "minimum",
             "missingCount",
             "reduction",
+            "resultPosition",
             "scope",
             "weighting"
           ],
@@ -2374,6 +2380,10 @@
             "averagingRefused": {
               "type": "string",
               "description": "要素場なのに節点平均を求められなかった理由。averaged の代わりに載る"
+            },
+            "resultPosition": {
+              "$ref": "#/$defs/resultPosition",
+              "description": "統計がどのステップの数か。求めたステップ、または省略時の先頭ステップ"
             }
           }
         },
@@ -2573,7 +2583,8 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "handle"
+            "handle",
+            "resultPosition"
           ],
           "properties": {
             "handle": {
@@ -2583,6 +2594,10 @@
             "reduced": {
               "type": "string",
               "description": "簡略化したなら、どれだけか。数値は完全データから（AC-007）"
+            },
+            "resultPosition": {
+              "$ref": "#/$defs/resultPosition",
+              "description": "絵がどのステップのものか：ビュー定義の resultPosition（CT-004）が指すステップ"
             }
           }
         },
@@ -3272,6 +3287,7 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
+            "resultPosition",
             "value"
           ],
           "properties": {
@@ -3340,6 +3356,10 @@
             "association": {
               "type": "string",
               "description": "点とセルのどちらから来たか"
+            },
+            "resultPosition": {
+              "$ref": "#/$defs/resultPosition",
+              "description": "値がどのステップのものか"
             }
           }
         },
@@ -4214,6 +4234,7 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
+            "resultPosition",
             "value"
           ],
           "properties": {
@@ -4286,6 +4307,10 @@
             "part": {
               "type": "string",
               "description": "値を答えたパートの名前（経路を一行にしたもの）。画素の先に何もなければ載らない（view/AC-055）"
+            },
+            "resultPosition": {
+              "$ref": "#/$defs/resultPosition",
+              "description": "値がどのステップのものか：ビュー定義の resultPosition（CT-004）が指すステップ"
             }
           }
         },
@@ -4547,6 +4572,60 @@
         "connectionFile": {
           "const": "connection.json",
           "description": "the file the engine writes its host, port, token, protocol and pid to, in the directory the shell names (XC-258, XC-259)"
+        }
+      }
+    },
+    "resultPosition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "step",
+        "count",
+        "kind",
+        "value",
+        "unit",
+        "stated"
+      ],
+      "description": "値がどのステップから来たか（view/AC-032, XC-283）。ステップは、ファイルが宣言した位置列の何番目かで指す（0 始まり）。軸の種類が宣言されていない結果はそれでしか指せない（XC-240）",
+      "properties": {
+        "step": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "何番目のステップか（0 始まり）"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "ステップの数（整数。個数は整数のまま、INV-015）。定常なら 1"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "time",
+            "mode",
+            "frequency",
+            "undeclared",
+            "none"
+          ],
+          "description": "軸の種類。ファイルが宣言したものだけで、推定しない（XC-240）"
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "そのステップにファイルが宣言した位置の値。定常なら null"
+        },
+        "unit": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "value の単位。ファイルは単位を運ばないので宣言がなければ null（XC-003）"
+        },
+        "stated": {
+          "type": "string",
+          "description": "この位置を一文で：「ステップ 2/2（位置 0.5・軸の種類は宣言なし）」。表示用の文はエンジンが書き、同じ数が二通りに綴られない"
         }
       }
     }
