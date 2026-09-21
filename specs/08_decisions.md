@@ -6307,3 +6307,40 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: @Pipeline run records, which the area also names and which wait on the
   pipeline; and a support case where the log's level or limit was not enough to find what happened,
   at which point both become the popover's own controls with a range
+
+### XC-287 - The numbers are checked against the toolkit's own filters, and every difference carries its reason
+- decided: 2026-09-21
+- status: active
+- decision: the product's reported numbers are compared, on the same files and quantities, against
+  the VTK filters that ParaView's filters are - the integrator, the cell-to-point average, the
+  principal invariants and the calculator - and the comparison is a measurement that runs with the
+  tests (`spike/measure_cross_check.py`, `tests/test_cross_check.py`). Each quantity is in one of
+  three columns and cannot move without the test saying so: **agrees exactly**, **differs with a
+  recorded reason**, or **no reference**. Three differences are recorded today: a surface mesh's mean
+  is refused rather than area-averaged (INV-017), a nodal average stops at a part rather than crossing
+  a shared face (INV-022), and the dual-volume weighting of a point field is exact on parallelepipeds
+  and tetrahedra and not on skewed hexahedra, where the volume average of a linear field is 0.625
+  here against 0.714 exact - a defect of this product's own rule, recorded and issued (#402), not
+  explained away. ParaView itself is not run: the machine has none, and the record says so
+- decided_by: engineering judgement, from #321's condition and the measurement
+- rationale: the product's claim is trustworthy numbers, and a claim checked only against itself is
+  a claim. The toolkit's filters are an independent implementation of the same arithmetic that a
+  reviewer with ParaView can reproduce; where they agree to the last bit the claim has an outside
+  witness, and where they differ the reason is the specification's own rule or a defect - and a
+  defect found by a comparison is worth more than agreement, which is why the skewed-hexahedron
+  result is recorded as this product's error and not as the integrator's. A comparison run once and
+  remembered rots; run with the tests, a change that moves a quantity between columns is caught the
+  day it is made
+- alternatives: **installing ParaView and driving its GUI** - the kernels are the same classes, and
+  the application's presentation of a number is not what this checks; a person with ParaView can do
+  it from the record. **Comparing on a real solver case** - #322's condition, not this one; the
+  fixtures here have answers known by hand, which is what makes exact agreement checkable.
+  **Treating the skewed-hexahedron difference as the integrator's approximation** - the Gauss
+  quadrature of the trilinear interpolant is exact, and this product is the one further from it
+- basis: E-214 (T1)
+- affects: MOD-004
+- decidedness: Fixed
+- reversal_trigger: #402's fix, at which point the skewed-hexahedron row moves to the agreeing
+  column against the interpolant and the test is changed to say so; and a real case (#322) whose
+  numbers disagree with a reference for a reason none of the three columns has, which is a new row
+  and possibly a new invariant

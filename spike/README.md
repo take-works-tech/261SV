@@ -8,6 +8,7 @@ rather than believed.
 |---|---|---|
 | `measure_export.py` | what the free HTML export path costs and what it drops | E-051, LIM-004, LIM-006 |
 | `measure_workspace_document.py` | what a workspace document costs to save, load, list and add to as it grows (engine environment, no VTK) | E-209, LIM-016 |
+| `measure_cross_check.py` | this product's numbers against the toolkit's own filters - the kernels ParaView runs - on the same files and quantities: what agrees, what differs and why (engine environment) | E-214, XC-287, `cross_check.json` |
 
 Run with the spike environment, which is deliberately separate from anything the product will ship:
 
