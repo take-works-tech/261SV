@@ -41,7 +41,7 @@ from service.egress.gate import Outcome, Permission as EgressPermission, SearchR
 from service.workspace import items  # noqa: E402
 from service.workspace.document import FORMAT_VERSION  # noqa: E402
 from domain_core.recorded_time import STORED_FORMAT, record as record_time  # noqa: E402
-from test_reader import write_grid  # noqa: E402
+from test_reader import write_exodus, write_grid  # noqa: E402
 from demo_case import write_bar, write_cube, write_fields, write_two_blocks  # noqa: E402, F401 - re-exported for the tests that import it from here
 from test_render import decode  # noqa: E402
 
@@ -1895,8 +1895,8 @@ class TestTheResultPosition:
         session.datasets[dataset_id].case.present[0].dataset.fields["displacement"] = vector(0.0)
         real = reader_module.read_case
 
-        def read_with_vector(path, *, step=0):
-            case = real(path, step=step)
+        def read_with_vector(path, *, step=0, expected=None):
+            case = real(path, step=step, expected=expected)
             case.present[0].dataset.fields["displacement"] = vector(float(step))
             return case
 
@@ -1950,3 +1950,51 @@ class TestTheResultPosition:
         assert rows[view_id][0].value.value == 91.0
         assert rows["1"][0].label == "stress の最大・ステップ 1/2（位置 0・軸の種類は宣言なし）"
         assert rows["1"][0].value.value == 90.0
+
+
+class TestAFileThatIsNotAllThere:
+    """ingest/AC-022, AC-046, XC-284 (#263): a file cut short, or one that changes under the product,
+    is refused with the reason - a refusal, since the file is the problem - and never a dataset."""
+
+    def test_an_exodus_file_the_reader_would_zero_fill_is_refused_with_both_lengths(self, tmp_path: Path) -> None:
+        surface, _, workspace = opened(tmp_path)
+        write_exodus(workspace.parent / "whole.ex2")
+        body = (workspace.parent / "whole.ex2").read_bytes()
+        cut = workspace.parent / "cut.ex2"
+        cut.write_bytes(body[: int(len(body) * 0.95)])
+
+        result = surface.submit(Command("dataset.load", {"caseId": "case:1", "filePaths": [str(cut)]}))
+
+        assert result.status is Status.REFUSED, result.status
+        assert f"{len(body)} バイト" in (result.reason or "") and "cut.ex2" in (result.reason or "")
+
+    def test_a_file_whose_results_the_reader_dropped_is_refused_not_failed(self, tmp_path: Path) -> None:
+        """A 50 per cent cut leaves the header naming results the reader cannot find: that is the
+        file's problem, so it is refused with the reason rather than reported as this build's failure."""
+        surface, _, workspace = opened(tmp_path)
+        write_exodus(workspace.parent / "whole.ex2")
+        body = (workspace.parent / "whole.ex2").read_bytes()
+        cut = workspace.parent / "half.ex2"
+        cut.write_bytes(body[: len(body) // 2])
+
+        result = surface.submit(Command("dataset.load", {"caseId": "case:1", "filePaths": [str(cut)]}))
+
+        assert result.status is Status.REFUSED, result.status
+        assert result.reason
+
+    def test_another_step_is_not_read_from_a_file_that_changed_since_the_load(self, tmp_path: Path) -> None:
+        requires_h5py()
+        from cgns_fixture import write_transient_cgns
+
+        surface, session, dataset_id = loaded(tmp_path, write=write_transient_cgns, name="t.cgns")
+        path = session.datasets[dataset_id].path
+        with open(path, "ab") as handle:
+            handle.write(b"\0" * 16)
+
+        first = surface.submit(Command("field.statistics", {"datasetId": dataset_id, "fieldName": "stress"}))
+        second = surface.submit(Command("field.statistics", {"datasetId": dataset_id, "fieldName": "stress", "resultPosition": 1}))
+
+        assert first.status is Status.ANSWERED, "what was read stays what it was"
+        assert first.value["maximum"]["value"] == 90.0
+        assert second.status is Status.REFUSED
+        assert "読み込んだあとに変わりました" in (second.reason or "") and "t.cgns" in (second.reason or "")

@@ -42,6 +42,7 @@ from domain_core.reported_value import DIMENSIONLESS, Caveat, Provenance, Report
 from domain_core.units import UndeclaredUnitError, unit as known_unit
 from engine import reader
 from engine.analysis import derived, nodal
+from engine.completeness import FileIncomplete, ResultsLost
 from engine.analysis import weights as field_weights
 from engine.analysis.summary import Reduction, Summary, SummaryError, Weighting, summarise
 from engine.limits import MachineClass
@@ -184,6 +185,10 @@ class Loaded:
     gaps: tuple[str, ...]
     declared_units: dict[str, str] = dataclass_field(default_factory=dict)
     derivations: list[Derivation] = dataclass_field(default_factory=list)
+    #: The file as it was when the first step was read - size and modification time of every file
+    #: involved. Another step is read only from that same file; one that changed since is refused
+    #: rather than mixed with what is in memory (ingest/AC-045, XC-284).
+    fingerprint: reader.Fingerprint = dataclass_field(default_factory=dict)
     _other: tuple[int, LoadedCase] | None = None
 
     @property
@@ -205,7 +210,7 @@ class Loaded:
             return self.case
         if self._other is not None and self._other[0] == position.step:
             return self._other[1]
-        case = reader.read_case(self.path, step=position.step)
+        case = reader.read_case(self.path, step=position.step, expected=self.fingerprint or None)
         for name, symbol in self.declared_units.items():
             for part in self.holders(name, case):
                 assert part.dataset is not None
@@ -744,15 +749,19 @@ def dataset_load(session: Session, parameters: Mapping[str, Any]) -> Effect | Re
             "複数ファイルのケースは後の段で扱います"
         )
     path = paths[0]
+    # The file's own problems - a format nothing reads, a file cut short or still being written, a
+    # result the reader dropped - are refusals with the reason, never failures of this build and
+    # never a dataset of part of the file (ingest/AC-022, AC-045, XC-284).
     try:
-        case = reader.read_case(path)
-    except (reader.UnsupportedFormatError, reader.UnreadableFileError) as error:
+        fingerprint = reader.snapshot(path)
+        case = reader.read_case(path, expected=fingerprint)
+    except (reader.UnsupportedFormatError, reader.UnreadableFileError, ResultsLost, FileIncomplete) as error:
         return refused(str(error))
     level, gaps = reader.support_level(path)
     dataset_id = session.issue("dataset")
     loaded = Loaded(
         case=case, path=path, case_id=case_id, support_level=level,
-        gaps=tuple(gap for gap in gaps.split("; ") if gap),
+        gaps=tuple(gap for gap in gaps.split("; ") if gap), fingerprint=fingerprint,
     )
     session.datasets[dataset_id] = loaded
 
@@ -939,7 +948,7 @@ def case_at(loaded: Loaded, position: ResultPosition) -> LoadedCase | Result:
     """The dataset at a position, or the refusal that says why it could not be read there."""
     try:
         return loaded.at(position)
-    except (PositionError, reader.UnreadableFileError, derived.DerivedError) as error:
+    except (PositionError, reader.UnreadableFileError, ResultsLost, FileIncomplete, derived.DerivedError) as error:
         return refused(str(error))
 
 

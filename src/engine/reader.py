@@ -18,6 +18,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from xml.etree import ElementTree
 from typing import Callable
 from pathlib import Path
 
@@ -60,6 +62,7 @@ from domain_core.parts import LoadedCase, Part
 from engine.conversion import to_unstructured
 from engine import cgns, exodus
 from engine.result_axis import axis_of, delivered_position
+from engine.survey import _pieces as survey_pieces
 from engine.exodus import BLOCK_ID_ARRAY
 
 class UnsupportedFormatError(Exception):
@@ -68,6 +71,78 @@ class UnsupportedFormatError(Exception):
 
 class UnreadableFileError(Exception):
     """Raised when a supported format cannot be read: truncated, damaged, or empty of geometry."""
+
+
+class FileChanged(UnreadableFileError):
+    """A file that changed while it was being read, or since the dataset was loaded from it. What
+    was read may be from two versions of the file, so it is not a dataset (ingest/AC-045)."""
+
+
+#: What identifies a file's contents without reading them: its size and its modification time to the
+#: nanosecond, per file involved - a `.pvtu` involves its pieces. Two snapshots that differ mean the
+#: bytes read may be from two versions of the file, and no dataset is made of them (XC-284).
+Fingerprint = dict[str, tuple[int, int]]
+
+
+def _files_of(location: Path) -> list[Path]:
+    if location.suffix.lower() == ".pvtu":
+        # A manifest cut short is not XML: refused here by name rather than raised through the
+        # fingerprint as a parser's own exception, which is what a half-written one did until measured.
+        try:
+            present, _, _ = survey_pieces(location)
+        except ElementTree.ParseError as error:
+            raise UnreadableFileError(
+                f"{location.name} は XML として読めません（{error}）。書き込み途中か、切り詰められたマニフェストです"
+            ) from error
+        return [location, *(location.parent / piece for piece in present)]
+    return [location]
+
+
+def snapshot(path: str | Path) -> Fingerprint:
+    """The fingerprint of a file and of every file it names, taken now. Raises `UnreadableFileError`
+    where the file is not there."""
+    location = Path(path)
+    if not location.exists():
+        raise UnreadableFileError(f"{location} does not exist")
+    found: Fingerprint = {}
+    for one in _files_of(location):
+        stat = one.stat()
+        found[one.name] = (stat.st_size, stat.st_mtime_ns)
+    return found
+
+
+def _when(mtime_ns: int) -> str:
+    return datetime.fromtimestamp(mtime_ns / 1e9, tz=timezone.utc).isoformat(timespec="microseconds")
+
+
+def _changed(location: Path, before: Fingerprint, after: Fingerprint, *, during: bool) -> FileChanged:
+    """The refusal for a file that did not hold still, naming what moved (ingest/AC-045)."""
+    moved = []
+    for name in sorted(set(before) | set(after)):
+        if before.get(name) != after.get(name):
+            was, now = before.get(name), after.get(name)
+            moved.append(
+                f"{name}：{was[0] if was else '無し'}→{now[0] if now else '無し'} バイト、"
+                f"更新時刻 {_when(was[1]) if was else '無し'}→{_when(now[1]) if now else '無し'}"
+            )
+    detail = "；".join(moved)
+    if during:
+        message = (
+            f"{location.name} は読んでいる間に変わりました（{detail}）。ソルバが書いている最中のファイルかもしれません。"
+            "読めた分を結果として返す代わりに拒みます。書き終わってから読み直してください（ingest/AC-045）"
+        )
+    else:
+        message = (
+            f"{location.name} は読み込んだあとに変わりました（{detail}）。今ある数は読み込んだ時点のファイルのもので、"
+            "変わったファイルからは読みません。読み込み直してください（ingest/AC-045）"
+        )
+    return FileChanged(message)
+
+
+def _held_still(location: Path, before: Fingerprint) -> None:
+    after = snapshot(location)
+    if after != before:
+        raise _changed(location, before, after, during=True)
 
 
 def _declared_frame(path: Path, data: vtkDataObject | None) -> FrameDeclaration:
@@ -382,6 +457,7 @@ def read(path: str | Path) -> Dataset:
         )
     if not location.exists():
         raise UnreadableFileError(f"{location} does not exist")
+    before = snapshot(location)
 
     reader = choice.factory()
     reader.SetFileName(str(location))
@@ -391,6 +467,7 @@ def read(path: str | Path) -> Dataset:
     data = reader.GetOutput()
     if choice.verify is not None:
         choice.verify(reader, data)
+    _held_still(location, before)
 
     if data is not None and handling(data.GetClassName()).disposition is Disposition.DECOMPOSE:
         # Asked from the contract rather than by testing the class, so that what this refuses and what
@@ -479,12 +556,18 @@ def _combine(pieces: list[vtkDataSet], source: SourceFrame | None = None) -> Dat
     )
 
 
-def read_case(path: str | Path, *, step: int = 0) -> LoadedCase:
+def read_case(path: str | Path, *, step: int = 0, expected: Fingerprint | None = None) -> LoadedCase:
     """Read a file as one @Case, however many parts it turns out to hold (ingest/AC-026, AC-027).
 
     A composite is taken apart into named parts; a single dataset is one part named after its file.
     Either way what comes back states how many parts were found, how many pieces they were cut into,
     and which named parts were not there.
+
+    The file has to hold still: its fingerprint - size and modification time, of every file involved
+    - is taken before the read and again after it, and a difference is a refusal rather than a
+    dataset, because the bytes read may be from two versions of the file (ingest/AC-045, XC-284).
+    `expected` is the fingerprint the file had when the dataset was loaded; a read of another step
+    from a file that has changed since is refused the same way, naming the change.
 
     `step` is the ordinal along the sequence the file declared, from 0 (XC-283). The values at that
     step are what comes back; the axis is the whole sequence either way. A step the file does not
@@ -501,6 +584,9 @@ def read_case(path: str | Path, *, step: int = 0) -> LoadedCase:
         )
     if not location.exists():
         raise UnreadableFileError(f"{location} does not exist")
+    before = snapshot(location)
+    if expected is not None and before != expected:
+        raise _changed(location, expected, before, during=False)
 
     reader = choice.factory()
     reader.SetFileName(str(location))
@@ -545,6 +631,7 @@ def read_case(path: str | Path, *, step: int = 0) -> LoadedCase:
             if parts
             else f"{location.name} holds no part this build can read"
         )
+    _held_still(location, before)
     # The sequence the file declared, read from the pipeline rather than from any one reader's method,
     # and its **kind left undeclared**: no reader in this build surfaces a statement of what the values
     # mean, and one of them will guess if asked (E-138, XC-240).

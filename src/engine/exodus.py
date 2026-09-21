@@ -20,9 +20,11 @@ Specification: ingest/REQ-015, AC-032, XC-237. Evidence: E-136 (T1).
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from vtkmodules.vtkIOExodus import vtkExodusIIReader
 
-from engine.completeness import ResultsLost, check_nothing_was_dropped
+from engine.completeness import ResultsLost, check_file_is_whole, check_nothing_was_dropped
 
 #: Every array category `vtkExodusIIReader` exposes, as the stem of its count/name/status triple.
 #: Written out rather than discovered by reflection so that a reviewer can see the whole surface, and
@@ -78,8 +80,12 @@ def offered_results(reader: vtkExodusIIReader) -> set[str]:
 def enable_everything(reader: vtkExodusIIReader) -> None:
     """Switch on every array the file offers, and generate the identifiers the format can supply.
 
-    `UpdateInformation` first, because the counts are zero until the file has been looked at.
+    First, whether the file is as long as its own header says: this reader returns a cut file's
+    points, cells and field names in full with the values zeroed, silently (E-212), so the container
+    is checked before the reader is asked for anything. Then `UpdateInformation`, because the counts
+    are zero until the file has been looked at.
     """
+    check_file_is_whole(Path(reader.GetFileName()))
     reader.UpdateInformation()
     for category in CATEGORIES:
         triple = _triple(reader, category)
