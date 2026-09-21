@@ -2220,3 +2220,29 @@ Recorded so that nothing silently depends on them:
   the spread at an averaged peak (180 on the bar), which the toolkit does not compute. Not measured:
   ParaView itself, which is not installed on this machine; its filters are the classes above
 - justifies: XC-287
+- correction: 2026-09-21, same day. The skewed-hexahedron rows were re-measured after XC-288 replaced
+  the equal split with shape-function integrals (E-215): this product's volume average of f = x is now
+  **0.714286**, agreeing with the trilinear interpolant, and its volume **1.75** against the
+  integrator's 2.0 - the difference is the integrator's planar tetrahedra, and it is recorded as
+  such. The other rows are unchanged; `spike/cross_check.json` is the current record
+
+### E-215 - What shape-function shares change in a weighted mean, measured here
+- tier: T1
+- url: tests/test_summary_weights.py::TestASharesIsTheIntegralOfItsShapeFunction and
+  spike/measure_cross_check.py, from a probe run on the development machine on 2026-09-21 (VTK 9.5.2,
+  numpy) with the toolkit's own interpolation functions at two-point Gauss quadrature per direction
+- verified: 2026-09-21
+- says: on a unit box every corner's share is 0.125 and the mean of f = x is 0.5, as before - to one
+  ulp, since the quadrature points are irrational (4.5 arrives as 4.499999999999999). On the
+  hexahedron with one corner pulled to (2,2,2) the shares are 0.1667 to 0.2917 and sum to **1.75**, the
+  element's own volume, where the toolkit's size filter and integrator report 2.0 from planar
+  tetrahedra; the volume average of f = x is **0.714286** = 5/7, the trilinear interpolant's exact
+  value, against 0.625 from the equal split and 0.75 from the integrator. A tetrahedron of edges 2, 3,
+  4 gives each corner 1.0 (a quarter of 4); a right wedge of base 2 x 3 and height 4 gives each corner
+  2.0 (a sixth of 12) and keeps 12 under shear; a pyramid of base 2 x 2 and height 3 has volume
+  exactly 4 and its mean of f = x is its centroid's 1.0, so the toolkit's pyramid functions are
+  polynomial and the two-point rule is exact for them too. A hexahedron listed the other way round
+  has volume 1.0 here and **-1.0** from the toolkit's size filter. A voxel (VTK type 11) is refused
+  by name. Cost: a million unit hexahedra take 2.8 s for the point shares and 3.4 s for the cell
+  volumes, against 18.7 s for the toolkit's size filter, with the total volume and the mean exact
+- justifies: XC-288

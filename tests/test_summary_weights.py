@@ -26,7 +26,8 @@ from domain_core.association import Association  # noqa: E402
 from domain_core.dataset import Dataset, Field  # noqa: E402
 from domain_core.mesh import Cells  # noqa: E402
 from engine.analysis.summary import Reduction, Weighting, summarise  # noqa: E402
-from engine.analysis.weights import cell_volumes, point_weights  # noqa: E402
+from engine.analysis.weights import WeightingError, cell_volumes, point_weights, toolkit_cell_volumes  # noqa: E402
+from vtkmodules.vtkCommonDataModel import VTK_PYRAMID, VTK_TETRA, VTK_TRIANGLE, VTK_VOXEL, VTK_WEDGE  # noqa: E402
 
 
 def two_cubes(big: float = 1.0, small: float = 0.1) -> Dataset:
@@ -167,3 +168,97 @@ def test_the_hand_written_cell_type_is_the_toolkits_own() -> None:
     from vtkmodules.vtkCommonDataModel import VTK_HEXAHEDRON as FROM_TOOLKIT
 
     assert VTK_HEXAHEDRON == FROM_TOOLKIT
+
+
+def one_cell(kind: int, corners: np.ndarray) -> Dataset:
+    """One volume cell with a linear point field f = x, whose exact volume average is the centroid's x."""
+    count = corners.shape[0]
+    return Dataset(
+        points_m=corners,
+        cells=Cells(np.array([0, count]), np.arange(count), np.array([kind], dtype=np.uint8)),
+        fields={"f": Field("f", Association.POINT, corners[:, 0].copy())},
+    )
+
+
+def volume_mean(dataset: Dataset) -> float:
+    weights = point_weights(dataset)
+    return float(np.sum(weights * dataset.fields["f"].values) / np.sum(weights))
+
+
+BOX = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], dtype=np.float64)
+
+
+class TestASharesIsTheIntegralOfItsShapeFunction:
+    """XC-288, E-215: a point's share of a cell is the integral of its shape function, so the weighted
+    mean of a linear field is the exact volume average on every linear cell - and the equal split it
+    replaced was exact only on parallelepipeds and tetrahedra (E-214)."""
+
+    def test_a_box_still_gives_each_corner_an_eighth(self) -> None:
+        dataset = one_cell(VTK_HEXAHEDRON, BOX)
+
+        assert point_weights(dataset) == pytest.approx(np.full(8, 0.125))
+        assert cell_volumes(dataset) == pytest.approx([1.0])
+        assert volume_mean(dataset) == pytest.approx(0.5)
+
+    def test_a_skewed_hexahedron_reaches_the_interpolant_s_own_average_and_volume(self) -> None:
+        """One corner pulled from (1,1,1) to (2,2,2). The equal split gave 0.625 and the toolkit's
+        planar tetrahedra 0.75; the trilinear element's own average is 5/7 and its volume 7/4."""
+        skewed = BOX.copy()
+        skewed[6] = [2.0, 2.0, 2.0]
+        dataset = one_cell(VTK_HEXAHEDRON, skewed)
+
+        assert volume_mean(dataset) == pytest.approx(5.0 / 7.0)
+        assert cell_volumes(dataset) == pytest.approx([1.75])
+        assert float(np.sum(point_weights(dataset))) == pytest.approx(1.75)
+        assert toolkit_cell_volumes(dataset) == pytest.approx([2.0]), "the reference this replaced, kept for the record"
+
+    def test_a_cell_listed_the_other_way_round_has_the_same_volume(self) -> None:
+        """A reversed corner order is a negative Jacobian; the toolkit's size filter reports a negative
+        volume for it, and a weight is a volume."""
+        flipped = BOX[[4, 5, 6, 7, 0, 1, 2, 3]]
+        dataset = one_cell(VTK_HEXAHEDRON, flipped)
+
+        assert cell_volumes(dataset) == pytest.approx([1.0])
+        assert toolkit_cell_volumes(dataset) == pytest.approx([-1.0])
+        assert volume_mean(dataset) == pytest.approx(0.5)
+
+    def test_a_tetrahedron_gives_each_corner_a_quarter(self) -> None:
+        dataset = one_cell(VTK_TETRA, np.array([[0, 0, 0], [2, 0, 0], [0, 3, 0], [0, 0, 4]], dtype=np.float64))
+
+        assert point_weights(dataset) == pytest.approx(np.full(4, 1.0))
+        assert cell_volumes(dataset) == pytest.approx([4.0])
+        assert volume_mean(dataset) == pytest.approx(0.5)
+
+    def test_a_wedge_gives_each_corner_a_sixth_and_keeps_its_volume_under_shear(self) -> None:
+        right = np.array([[0, 0, 0], [2, 0, 0], [0, 3, 0], [0, 0, 4], [2, 0, 4], [0, 3, 4]], dtype=np.float64)
+        sheared = right.copy()
+        sheared[3:] += [1.0, 0.5, 0.0]
+
+        assert point_weights(one_cell(VTK_WEDGE, right)) == pytest.approx(np.full(6, 2.0))
+        assert volume_mean(one_cell(VTK_WEDGE, right)) == pytest.approx(2.0 / 3.0)
+        assert cell_volumes(one_cell(VTK_WEDGE, sheared)) == pytest.approx([12.0])
+
+    def test_a_pyramid_s_volume_is_exact_and_its_mean_is_its_centroid(self) -> None:
+        pyramid = np.array([[0, 0, 0], [2, 0, 0], [2, 2, 0], [0, 2, 0], [1, 1, 3]], dtype=np.float64)
+        dataset = one_cell(VTK_PYRAMID, pyramid)
+
+        assert cell_volumes(dataset) == pytest.approx([4.0]), "base 2 x 2, height 3"
+        assert float(np.sum(point_weights(dataset))) == pytest.approx(4.0)
+        assert volume_mean(dataset) == pytest.approx(1.0)
+
+    def test_a_cell_type_with_no_rule_is_refused_by_name(self) -> None:
+        """A voxel is a hexahedron in another corner order; approximating it with the hexahedron's rule
+        would be the wrong corners under the right formula."""
+        with pytest.raises(WeightingError, match="vtkVoxel"):
+            point_weights(one_cell(VTK_VOXEL, BOX))
+
+    def test_a_surface_cell_in_a_volume_mesh_weighs_nothing_and_is_not_refused(self) -> None:
+        corners = np.vstack([BOX, [[3.0, 0.0, 0.0], [4.0, 0.0, 0.0], [3.0, 1.0, 0.0]]])
+        dataset = Dataset(
+            points_m=corners,
+            cells=Cells(np.array([0, 8, 11]), np.arange(11), np.array([VTK_HEXAHEDRON, VTK_TRIANGLE], dtype=np.uint8)),
+            fields={"f": Field("f", Association.POINT, corners[:, 0].copy())},
+        )
+
+        assert cell_volumes(dataset) == pytest.approx([1.0, 0.0])
+        assert point_weights(dataset)[8:] == pytest.approx([0.0, 0.0, 0.0])

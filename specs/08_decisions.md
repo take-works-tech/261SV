@@ -6344,3 +6344,43 @@ model or the prompt, never in a description that quietly went stale.
   column against the interpolant and the test is changed to say so; and a real case (#322) whose
   numbers disagree with a reference for a reason none of the three columns has, which is a new row
   and possibly a new invariant
+- correction: 2026-09-21, same day. The first trigger fired: XC-288 replaced the equal split, the
+  skewed-hexahedron mean now agrees with the interpolant (0.714286), and the row that differs is the
+  one against the integrator, whose planar tetrahedra are now the approximation - recorded as the
+  integrator's difference, with the volume row (1.75 against 2.0) beside it. The decision's rule -
+  three columns, no silent moves - is what made the fix visible as a moved row rather than a changed
+  number
+
+### XC-288 - A point's share of a cell is the integral of its shape function, and a cell's volume the integral of its Jacobian
+- decided: 2026-09-21
+- status: active
+- decision: the weights INV-017 names - a cell's volume for cell data, a point's share of the volume
+  around it for point data - are integrals over the finite element: the Jacobian of the toolkit's own
+  parametric map for the volume, and each point's interpolation function times that Jacobian for the
+  share, taken by Gauss quadrature at two points per direction, which is exact for the polynomials
+  the linear hexahedron, wedge, pyramid and tetrahedron are. The shares of a cell sum to its volume
+  and the weights to the total, as before; what is new is that the weighted mean of a linear field is
+  the exact volume average on every linear cell, skewed or not. A cell with no volume weighs nothing
+  and is not refused; a volumetric cell type with no rule - a voxel, a quadratic cell, a polyhedron -
+  is refused by name, and the mean is then unavailable with that reason rather than approximated. A
+  cell listed the other way round has the same volume; a cell folded through itself is not detected
+- decided_by: engineering judgement, from #402's condition and the measurement
+- rationale: the equal split was exact where it was measured - boxes and tetrahedra - and 12 per cent
+  off on a hexahedron with one corner pulled out (E-214): a solver's mesh is skewed wherever the
+  geometry bends, and a reported average that drifts with the skew is wrong in a way that looks
+  right. The integral of the shape function is the definition the element itself uses for a nodal
+  quantity; it costs a numpy pass that is six times faster than the toolkit's size filter (E-215),
+  and it needs no rule of this product's own - the interpolation functions and their derivatives are
+  the toolkit's, asked at the quadrature points
+- alternatives: **keeping the equal split and stating the error** - a caveat on every mean of every
+  mesh, for a rule that is exact instead. **The toolkit's integrator as the weight** - its planar
+  tetrahedra are another approximation (0.75 where 0.714 is exact) and it is a filter over a copy of
+  the mesh. **A one-point rule** - not exact for the Jacobian of a trilinear map; two points are, and
+  cost the same pass
+- basis: E-215 (T1)
+- affects: MOD-004, INV-017, XC-287
+- decidedness: Fixed
+- reversal_trigger: a quadratic or polyhedral cell in a case a user brings (#322), at which point the
+  rule gains that type's quadrature rather than an approximation; and a measured cost of the pass on
+  a case at LIM-001's scale that a person waits for, at which point the shares are computed once per
+  dataset and kept

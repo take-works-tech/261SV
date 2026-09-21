@@ -1,5 +1,5 @@
 {
-  "measured_on": "2026-09-21T12:46:52+09:00",
+  "measured_on": "2026-09-21T13:03:04+09:00",
   "reference": "VTK filters, the kernels ParaView's filters are; ParaView itself was not run",
   "rows": [
     {
@@ -14,7 +14,7 @@
     {
       "case": "cube",
       "quantity": "mean(temperature), dual-volume weights",
-      "ours": 4.5,
+      "ours": 4.499999999999999,
       "reference": 4.5,
       "referenceBy": "IntegrateAttributes (Volume)",
       "verdict": "agrees",
@@ -23,7 +23,7 @@
     {
       "case": "cube",
       "quantity": "volume",
-      "ours": 0.9999999999999999,
+      "ours": 0.9999999999999998,
       "reference": 0.9999999999999999,
       "referenceBy": "IntegrateAttributes Volume",
       "verdict": "agrees",
@@ -194,7 +194,7 @@
     {
       "case": "box",
       "quantity": "volume",
-      "ours": 0.9999999999999999,
+      "ours": 0.9999999999999998,
       "reference": 0.9999999999999999,
       "referenceBy": "IntegrateAttributes Volume",
       "verdict": "agrees",
@@ -203,29 +203,29 @@
     {
       "case": "skewed hexahedron",
       "quantity": "mean(f = x), dual-volume weights, against the integrator",
-      "ours": 0.625,
+      "ours": 0.7142857142857143,
       "reference": 0.75,
       "referenceBy": "IntegrateAttributes (Volume)",
       "verdict": "differs",
-      "note": "V/8 per node is exact only where the cell is a parallelepiped; the integrator's tetrahedra are another approximation"
+      "note": "the integrator splits the cell into planar tetrahedra, and their volume average of a linear field is not the element's (E-215)"
     },
     {
       "case": "skewed hexahedron",
       "quantity": "mean(f = x), dual-volume weights, against the trilinear interpolant",
-      "ours": 0.625,
+      "ours": 0.7142857142857143,
       "reference": 0.7142857142857142,
       "referenceBy": "2x2x2 Gauss quadrature of the trilinear interpolant",
-      "verdict": "differs",
-      "note": "the exact volume average of the interpolant; neither this product nor the integrator reaches it on a skewed cell"
+      "verdict": "agrees",
+      "note": "the exact volume average of the trilinear interpolant, which the shape-function shares reach (XC-288)"
     },
     {
       "case": "skewed hexahedron",
       "quantity": "volume",
-      "ours": 2.0,
+      "ours": 1.75,
       "reference": 2.0,
       "referenceBy": "IntegrateAttributes Volume",
-      "verdict": "agrees",
-      "note": "both split the cell into planar tetrahedra; the trilinear cell's own volume is 1.750000"
+      "verdict": "differs",
+      "note": "this product integrates the element's Jacobian (1.750000); the integrator's planar tetrahedra enclose more"
     }
   ],
   "agrees": 20,

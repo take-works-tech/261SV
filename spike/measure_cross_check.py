@@ -313,11 +313,11 @@ def measure(directory: Path) -> dict[str, Any]:
         ours_mean, ours_volume = dual_volume_mean(dataset, values)
         exact_mean, exact_volume = trilinear_mean(corners, values)
         rows.append(_row(label, "mean(f = x), dual-volume weights, against the integrator", ours_mean, integral / volume, "IntegrateAttributes (Volume)",
-                         "" if label == "box" else "V/8 per node is exact only where the cell is a parallelepiped; the integrator's tetrahedra are another approximation"))
+                         "" if label == "box" else "the integrator splits the cell into planar tetrahedra, and their volume average of a linear field is not the element's (E-215)"))
         rows.append(_row(label, "mean(f = x), dual-volume weights, against the trilinear interpolant", ours_mean, exact_mean, "2x2x2 Gauss quadrature of the trilinear interpolant",
-                         "" if label == "box" else "the exact volume average of the interpolant; neither this product nor the integrator reaches it on a skewed cell"))
+                         "" if label == "box" else "the exact volume average of the trilinear interpolant, which the shape-function shares reach (XC-288)"))
         rows.append(_row(label, "volume", ours_volume, volume, "IntegrateAttributes Volume",
-                         "" if label == "box" else f"both split the cell into planar tetrahedra; the trilinear cell's own volume is {exact_volume:.6f}"))
+                         "" if label == "box" else f"this product integrates the element's Jacobian ({exact_volume:.6f}); the integrator's planar tetrahedra enclose more"))
 
     return {
         "measured_on": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
@@ -341,7 +341,7 @@ def main() -> int:
 
     with tempfile.TemporaryDirectory(prefix="solvia-cross-check-") as directory:
         record = measure(Path(directory))
-    OUTPUT.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    OUTPUT.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     for row in record["rows"]:
         print(f"{row['verdict']:12} {row['case']:18} {row['quantity']:60} ours={row['ours']!r} ref={row['reference']!r} [{row['referenceBy']}]")
     print(f"agrees {record['agrees']}, differs {record['differs']}, no reference {record['no_reference']} -> {OUTPUT}")

@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-26
+updated: 2026-09-21
 ---
 
 # Invariants
@@ -204,6 +204,14 @@ it. An invariant that cannot be judged is not an invariant - it is a wish.
   a single-precision volume arrives in the weighted mean
 - decidedness: Fixed
 - basis: E-001 (T1)
+- correction: 2026-09-21. "Dual-volume-weighted" had been computed as an equal split of each cell's
+  volume among its points, with the volume from the toolkit's tetrahedron split of the cell. Measured
+  against the toolkit's own integrator and against the trilinear interpolant (E-214), that rule is
+  exact on parallelepipeds and tetrahedra and not on a skewed hexahedron, where the volume average of
+  a linear field came out 0.625 against 0.714 exact. The statement stands; the rule behind it is now
+  the integral of each point's shape function over each cell, and a cell's volume the integral of its
+  Jacobian (XC-288, E-215) - exact on every linear cell, and the same numbers as before on the cells
+  where the split was exact
 
 ### INV-018 - Machine-readable output does not follow the locale
 - statement: numbers written to CSV, JSON, script text and any other machine-readable output use a
