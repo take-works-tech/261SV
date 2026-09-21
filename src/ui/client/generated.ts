@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "3.11.0";
+export const PROTOCOL_VERSION = "3.12.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -191,7 +191,7 @@ export const OPERATION_FACTS: Readonly<Record<Operation, OperationFacts>> = {
   "view.duplicate": { writes: true, required: ["newName", "viewId"], optional: [], answers: ["id"] },
   "view.rename": { writes: true, required: ["newName", "viewId"], optional: [], answers: ["id", "revision"] },
   "view.delete": { writes: true, required: ["viewId"], optional: [], answers: ["deletedId", "unresolvedUnitIds"] },
-  "view.render": { writes: false, required: ["format", "height", "viewId", "width"], optional: ["legend", "camera"], answers: ["handle", "reduced", "resultPosition"] },
+  "view.render": { writes: false, required: ["format", "height", "viewId", "width"], optional: ["legend", "camera", "cameraPath"], answers: ["handle", "reduced", "resultPosition", "cameraPath"] },
   "graph.create": { writes: true, required: ["definition", "workspaceId"], optional: ["sourceTemplateId", "sourceTemplateRevision"], answers: ["id", "revision"] },
   "graph.update": { writes: true, required: ["definition", "graphId"], optional: [], answers: ["id", "revision"] },
   "graph.duplicate": { writes: true, required: ["graphId", "newName"], optional: [], answers: ["id"] },
@@ -234,7 +234,7 @@ export const OPERATION_FACTS: Readonly<Record<Operation, OperationFacts>> = {
   "system.supportBundle": { writes: true, required: ["consent", "path"], optional: [], answers: ["path", "contents"] },
   "workspace.pack": { writes: true, required: ["includeData", "path", "workspaceId"], optional: [], answers: ["path", "bytes", "omitted"] },
   "output.prune": { writes: true, required: ["runsToRemove", "workspaceId"], optional: ["expectedFiles"], answers: ["removedRunIds", "freedBytes", "deletedFiles"] },
-  "view.pick": { writes: false, required: ["viewId", "width", "height", "x", "y"], optional: ["camera"], answers: ["value", "association", "part", "resultPosition"] },
+  "view.pick": { writes: false, required: ["viewId", "width", "height", "x", "y"], optional: ["camera", "cameraPath"], answers: ["value", "association", "part", "resultPosition", "cameraPath"] },
   "dataset.inspect": { writes: false, required: ["path"], optional: [], answers: ["format", "supportLevel", "gaps", "sizeBytes", "modified", "exists"] },
   "output.list": { writes: false, required: ["workspaceId"], optional: [], answers: ["outputDirectory", "runs", "totalBytes", "limitBytes", "overLimit", "suggestedRunIds"] },
   "output.plan": { writes: false, required: ["workspaceId", "runsToRemove"], optional: [], answers: ["runIds", "files", "freedBytes", "keptRecords"] },
@@ -333,6 +333,10 @@ export interface Parameters {
     format: "png" | "jpeg" | "webp";
     legend?: boolean;
     camera?: CameraDefinition;
+    cameraPath?: {
+      id: string;
+      at: number;
+    };
   };
   "graph.create": {
     workspaceId: string;
@@ -525,6 +529,10 @@ export interface Parameters {
     x: number;
     y: number;
     camera?: CameraDefinition;
+    cameraPath?: {
+      id: string;
+      at: number;
+    };
   };
   "dataset.inspect": {
     path: string;
@@ -722,6 +730,13 @@ export interface Results {
       value: number | null;
       unit: string | null;
       stated: string;
+    };
+    cameraPath?: {
+      id: string;
+      at: number;
+      interpolation: "linear" | "smooth";
+      rule: string;
+      camera: CameraDefinition;
     };
   };
   "graph.create": {
@@ -1065,6 +1080,13 @@ export interface Results {
       value: number | null;
       unit: string | null;
       stated: string;
+    };
+    cameraPath?: {
+      id: string;
+      at: number;
+      interpolation: "linear" | "smooth";
+      rule: string;
+      camera: CameraDefinition;
     };
   };
   "dataset.inspect": {

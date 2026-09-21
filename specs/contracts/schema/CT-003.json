@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "3.11.0",
+  "version": "3.12.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -637,6 +637,27 @@
             "camera": {
               "$ref": "CT-004.json#/properties/camera",
               "description": "この絵を描くカメラ。与えれば定義のカメラの代わりに使い、定義は変えない（XC-270）。省くと定義のカメラ"
+            },
+            "cameraPath": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "at"
+              ],
+              "description": "描く向きを、ビュー定義の cameraPaths の一本の上の位置で指す（XC-289）。camera と同時には指定できない",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "ビュー定義の cameraPaths にあるパスの id"
+                },
+                "at": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "description": "パスの媒介変数。キーフレームの範囲の外は拒み、端で代用しない"
+                }
+              }
             }
           }
         },
@@ -1583,6 +1604,27 @@
             "camera": {
               "$ref": "CT-004.json#/properties/camera",
               "description": "絵を描いたカメラ。view.render に与えたものと同じでなければ、別の絵のピクセルを読むことになる（XC-270）"
+            },
+            "cameraPath": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "at"
+              ],
+              "description": "描く向きを、ビュー定義の cameraPaths の一本の上の位置で指す（XC-289）。camera と同時には指定できない",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "ビュー定義の cameraPaths にあるパスの id"
+                },
+                "at": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "description": "パスの媒介変数。キーフレームの範囲の外は拒み、端で代用しない"
+                }
+              }
             }
           }
         },
@@ -2625,6 +2667,43 @@
             "resultPosition": {
               "$ref": "#/$defs/resultPosition",
               "description": "絵がどのステップのものか：ビュー定義の resultPosition（CT-004）が指すステップ"
+            },
+            "cameraPath": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "at",
+                "interpolation",
+                "rule",
+                "camera"
+              ],
+              "description": "cameraPath で描いたときだけ：どのパスのどこから、どの規則で補間した、どの姿勢か（INV-020）",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "at": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "interpolation": {
+                  "type": "string",
+                  "enum": [
+                    "linear",
+                    "smooth"
+                  ]
+                },
+                "rule": {
+                  "type": "string",
+                  "description": "補間の規則を一文で"
+                },
+                "camera": {
+                  "$ref": "CT-004.json#/properties/camera",
+                  "description": "補間で得た姿勢。そのまま camera として渡せば同じ絵になる"
+                }
+              }
             }
           }
         },
@@ -4433,6 +4512,43 @@
             "resultPosition": {
               "$ref": "#/$defs/resultPosition",
               "description": "値がどのステップのものか：ビュー定義の resultPosition（CT-004）が指すステップ"
+            },
+            "cameraPath": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "at",
+                "interpolation",
+                "rule",
+                "camera"
+              ],
+              "description": "cameraPath で描いたときだけ：どのパスのどこから、どの規則で補間した、どの姿勢か（INV-020）",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "at": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "interpolation": {
+                  "type": "string",
+                  "enum": [
+                    "linear",
+                    "smooth"
+                  ]
+                },
+                "rule": {
+                  "type": "string",
+                  "description": "補間の規則を一文で"
+                },
+                "camera": {
+                  "$ref": "CT-004.json#/properties/camera",
+                  "description": "補間で得た姿勢。そのまま camera として渡せば同じ絵になる"
+                }
+              }
             }
           }
         },

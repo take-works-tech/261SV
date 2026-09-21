@@ -15,7 +15,7 @@ hold values, pixels, or a resolved colour scale. That is what makes a saved work
 ### CT-004 - View definition
 - purpose: the reproducible description of one @View - what is shown, from where, in what style
 - schema: schema/CT-004.json
-- version: 3.2.0
+- version: 3.3.0
 - strictness: unknown fields are **preserved**, because a view authored by a newer build must survive
   being opened and saved by an older one (CT-001)
 - compatibility: a field added to the definition has a default that reproduces the previous appearance
@@ -95,6 +95,13 @@ Every sequence this build reads is of undeclared kind (XC-240), and the members 
 The engine accepts the kind-naming members where the file states that kind, which no reader yet
 surfaces, and refuses them otherwise by name; a definition naming no position is at the first step
 (XC-283). The same rule applies to `resultPositionBinding` when a material input binds a result.
+
+Version 3.3.0 adds `cameraPaths`: the view's named camera paths, each a list of keyframes - a camera
+pose at a parameter from 0 to 1 - and an interpolation rule, `linear` or `smooth`, that is part of the
+definition because a frame between two keyframes is a computed pose and carries the rule it was
+computed by (XC-289). The parameter is the path's own, not a result position: a @Timeline says when and
+carries no camera (XC-200), a path says from where, and a video names one of each. A keyframe states
+position, focal point and view-up; a default pose cannot be interpolated and is refused.
 
 Resolution state is derived and is not saved as if it were a user choice. An unresolved required input
 retains the binding, reports CT-010 detail and renders that target diagnostic magenta until repaired.

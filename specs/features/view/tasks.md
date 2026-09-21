@@ -228,6 +228,11 @@ updated: 2026-09-21
 - satisfies: AC-041
 - depends_on: TASK-001
 - done_when: path and playback speed are recorded on the output
+- partly done: recorded 2026-09-21 (XC-289, CT-004 3.3.0, CT-003 3.12.0). The path exists and can be
+  followed: a view holds named camera paths of keyframes with an interpolation rule, `view.render`
+  and `view.pick` take a position on one and answer the pose the rule gave with the rule, and the
+  interface adds keyframes from the live look and previews the path with a scrub. The video itself,
+  and the playback speed recorded on it, wait on the encoder decision (#276, view/AC-021)
 
 ### TASK-037 - Time mapping on video
 - satisfies: AC-042

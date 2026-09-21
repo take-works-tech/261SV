@@ -884,7 +884,7 @@ def test_view_object_properties_are_specific_to_all_first_release_object_types()
     assert '<label className="property-toggle"><span>エッジ</span>' not in object_type_editor
     presentations = view_schema["properties"]["objectPresentations"]
     presentation = presentations["items"]
-    assert view_schema["version"] == "3.2.0"  # 3.2.0 added resultPosition.step (XC-283); the presentations are unchanged
+    assert view_schema["version"] == "3.3.0"  # 3.2.0 added resultPosition.step (XC-283), 3.3.0 cameraPaths (XC-289); the presentations are unchanged
     assert set(presentation["required"]) == {"objectId", "representation", "visible", "displayOpacity"}
     assert presentation["properties"]["displayOpacity"]["minimum"] == 0
     assert presentation["properties"]["displayOpacity"]["maximum"] == 1
