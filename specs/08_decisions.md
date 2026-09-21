@@ -5477,6 +5477,9 @@ model or the prompt, never in a description that quietly went stale.
   unresponsive seconds #307 feared. That is still not a cold start on a machine that has never run
   it; the file cache on this machine had seen the files in the build. A true first launch stays
   unmeasured until there is an installer to install
+- correction: 2026-09-21. The frozen engine carries an application manifest
+  (`packaging/engine.manifest`) declaring `activeCodePage=UTF-8` and `longPathAware`, and answers
+  `--code-page-probe` so the freeze check can see the manifest took; measured in E-216 (XC-293)
 - alternatives: **a bundled interpreter** (python-build-standalone or a venv copied whole) - no hidden
   imports to chase, and the same size, with the module search happening on the customer's machine
   instead of at build time. It is the fallback if a reader or a renderer ever fails to freeze that
@@ -6526,3 +6529,37 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a pin that must survive the session - at which point the binding becomes an
   explicit case binding on the item, which 11_ui.md already names as the way to change which cases
   an item uses
+
+### XC-293 - A path is handed over as it is, a library that cannot take it is refused before it sees it, and the frozen engine runs in the UTF-8 code page
+- decided: 2026-09-21
+- status: active
+- decision: a path reaches every library as the UTF-8 string Python holds, with nothing renamed,
+  copied or shortened on the way, and every reader, every file the engine writes and the engine's
+  own directories are exercised at a path with Japanese, full-width forms, a space, punctuation and
+  a character beyond the Basic Multilingual Plane (ingest/AC-047, E-216). Where a library takes the
+  path as a narrow string and, on Windows outside the UTF-8 code page, ends the process on one it
+  cannot take - the Exodus family's netCDF is the measured case - the reader table says so
+  (`narrow_path`) and the read is **refused before the library sees the path**, naming the file, the
+  library, the offending characters and the two ways out; `dataset.inspect` answers the same
+  refusal (`refusal`, CT-003 3.16.0), so a drop is refused at the inspection and no load is tried
+  (XC-291). The frozen engine declares `activeCodePage=UTF-8` in its manifest
+  (`packaging/engine.manifest`, XC-261), under which the same library reads and writes there; the
+  freeze check asks the frozen engine its code page (`--code-page-probe`) and fails on Windows where
+  the manifest did not take, and the thread it walks loads an Exodus file at such a path. The guard
+  lifts itself in the UTF-8 code page, so the packaged engine reads what the development one
+  refuses, and each says which it is
+- decided_by: engineering judgement, from #253's condition and the measurement
+- rationale: a Japanese desktop names its folders in Japanese, and the failure measured is the worst
+  this product can have - not a wrong number but no engine, with no reason. A refusal that names the
+  cause is honest; a code page in which the library simply works is the fix at the cause, and the
+  manifest is the one place a process's code page is decided
+- alternatives: **the 8.3 short name** - measured: it keeps the Japanese characters on this machine
+  and is disabled on the data volume. **Copying the file to an ASCII path** - a result file is
+  gigabytes, and the copy is not the file the fingerprint was taken of (XC-284). **A hard link under
+  an ASCII name** - needs a writable ASCII directory on the same volume, which a share does not have.
+  **Reading Exodus through another library** - a second reader for one format, over the same netCDF
+- basis: E-216 (T1)
+- affects: MOD-002, CT-003, XC-261, ingest/REQ-010
+- decidedness: Fixed
+- reversal_trigger: a Windows the manifest does not reach (before 10 1903), where the refusal stays
+  the answer; or a toolkit whose Exodus reader takes the path as wide, which retires the guard

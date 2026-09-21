@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-20
+updated: 2026-09-21
 ---
 
 # Sources
@@ -2246,3 +2246,25 @@ Recorded so that nothing silently depends on them:
   by name. Cost: a million unit hexahedra take 2.8 s for the point shares and 3.4 s for the cell
   volumes, against 18.7 s for the toolkit's size filter, with the total volume and the mean exact
 - justifies: XC-288
+
+### E-216 - Paths outside ASCII through every reader, the document and the engine process, measured here
+- tier: T1
+- url: tests/test_non_ascii_paths.py, packaging/freeze_engine.py --check --thread, and a probe run on
+  the development machine on 2026-09-21: Japanese Windows 11 (active code page 932), Python 3.11.9,
+  VTK 9.5.2 with its bundled netCDF 4.9.2, under a directory named `解析 結果／ｒｕｎ－１ #1 (a&b) 📐`
+- verified: 2026-09-21
+- says: the VTK XML reader and writer, the CGNS reader over HDF5, the document with its lock and its
+  previous version, the report export, the output listing, the engine process's connection and log
+  directories, and the shell's and the interface's threads under such a directory all read and write
+  there as at any path. The Exodus family does not: the toolkit's writer creates nothing there
+  ("CreateNewExodusFile can't create"), and its reader, handed such a path, **ends the process with
+  0xC0000409** - for a Japanese-only name and for one with an emoji alike, on the system volume and on
+  a data volume - before Python sees an error. The 8.3 short name is no way round: on the system
+  volume the short names keep the Japanese characters (the OEM code page allows them) and the read
+  then fails as "no part"; the data volume has 8.3 names disabled. With `activeCodePage=UTF-8`
+  embedded in the interpreter's manifest (mt.exe on a copy of python.exe; `GetACP()` answers 65001)
+  the same reader reads the same file and the writer writes beside it, Japanese and emoji included.
+  The frozen engine built with `packaging/engine.manifest` answers `--code-page-probe` with 65001
+  and, walked over HTTP, loads `ケース.ex2` under `解析 結果 📐` with its three fields (freeze 31 s,
+  277.5 MB, connection file 1.0 s after start)
+- justifies: XC-293

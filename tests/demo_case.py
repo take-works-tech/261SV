@@ -56,6 +56,36 @@ def write_cube(path: Path) -> None:
     writer.Write()
 
 
+def write_exodus(path: Path, *, results: bool = True) -> None:
+    """A two-triangle Exodus file, written by the toolkit's own writer (XC-085). The writer takes
+    the path as a narrow string on Windows: at a path with Japanese in it, outside the UTF-8 code
+    page, it creates nothing (E-216) - write where it can and copy."""
+    from vtkmodules.vtkIOExodus import vtkExodusIIWriter
+
+    points = vtkPoints()
+    for x, y in ((0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)):
+        points.InsertNextPoint(x, y, 0.0)
+    grid = vtkUnstructuredGrid()
+    grid.SetPoints(points)
+    for triangle in ([0, 1, 2], [1, 3, 2]):
+        grid.InsertNextCell(VTK_TRIANGLE, 3, triangle)
+
+    if results:
+        for name, values in (("stress", [10.0, 20.0, 90.0, 40.0]), ("temp", [1.0, 2.0, 3.0, 4.0])):
+            array = numpy_to_vtk(np.array(values), deep=True)
+            array.SetName(name)
+            grid.GetPointData().AddArray(array)
+        cells = numpy_to_vtk(np.array([7.0, 8.0]), deep=True)
+        cells.SetName("elem_stress")
+        grid.GetCellData().AddArray(cells)
+
+    writer = vtkExodusIIWriter()
+    writer.SetFileName(str(path))
+    writer.SetInputData(grid)
+    writer.WriteAllTimeStepsOn()
+    writer.Write()
+
+
 def write_fields(path: Path) -> None:
     """`fields.vtu`: the two-triangle grid carrying a three-component displacement and a six-component
     symmetric stress, each row with a derived answer known by hand (15_derived_quantities): magnitudes

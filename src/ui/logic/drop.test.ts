@@ -38,6 +38,8 @@ describe("what the inspection allows", () => {
     expect(inspectionAllowsLoad({ exists: true, supportLevel: "Absent", format: "sim", gaps: [] }, "/runs/x.sim")).toContain("'.sim'");
     expect(inspectionAllowsLoad({ exists: false, supportLevel: "Verified", format: "vtu", gaps: [] }, "/runs/gone.vtu")).toContain("gone.vtu がありません");
     expect(inspectionAllowsLoad({ exists: true, supportLevel: "Verified", format: "vtu", gaps: [] }, "/runs/cube.vtu")).toBeNull();
+    // The engine's own refusal of a path its library cannot take is the drop's refusal (XC-293).
+    expect(inspectionAllowsLoad({ exists: true, supportLevel: "Verified", format: "ex2", gaps: [], refusal: "ケース.ex2 はこの経路からは読めません：…" }, "D:\\解析\\ケース.ex2")).toBe("ケース.ex2 はこの経路からは読めません：…");
   });
 
   test("the file name is the last segment on either separator", () => {

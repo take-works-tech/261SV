@@ -455,3 +455,16 @@ is either missing a requirement or is not work this specification asked for.
   which CT-001 now states. A vanished file said "does not exist" and a locked one "no part is there";
   each now names the fact. `tests/test_paths.py`; the UNC half skips, saying so, where no share is
   reachable - CI runs on Linux and cannot take this measurement
+### TASK-037 - Paths outside ASCII, every reader and every file written
+- satisfies: AC-047
+- depends_on: TASK-036
+- done_when: every reader, the document with its lock and previous version, the report export, the
+  output listing and the engine's own directories pass at a path with Japanese, full-width forms, a
+  space, punctuation and an emoji; a library that cannot take the path is refused before it sees it
+- done: 2026-09-21 (XC-293, #253). Measured first (E-216): everything passes except the Exodus
+  family, whose netCDF ends the process on such a path under the ANSI code page. The reader table
+  now marks that family `narrow_path`; `read`, `read_case` and `dataset.inspect` refuse such a path by
+  name before the library sees it; and the frozen engine's manifest puts it in the UTF-8 code page,
+  under which the same library reads and writes there - the freeze check asks the engine its code
+  page and loads an Exodus file at such a path. `tests/test_non_ascii_paths.py`; the two Node
+  threads run under `solvia-接続 (試験)-` and `solvia-シェル (試験)-`.

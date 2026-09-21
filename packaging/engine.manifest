@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- The frozen engine's application manifest (XC-261, XC-293).
+
+     activeCodePage=UTF-8 makes every narrow-string Windows call in this process take UTF-8, which is
+     what the toolkit's Exodus library hands the operating system: measured on a Japanese Windows 11
+     (E-216), with the ANSI code page that library ends the process at a path with Japanese in it, and
+     with this setting it reads and writes there. Windows 10 1903 and later honour it; earlier ones
+     ignore it, and the engine's own guard then refuses such a path by name instead (engine/reader.py).
+
+     longPathAware is what the development interpreter declares too; the 260-character limit (#254) is
+     a separate measurement and this line is not evidence for it. -->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <assemblyIdentity type="win32" name="tech.take-works.solvia.engine" version="0.1.0.0" processorArchitecture="amd64"/>
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <!-- Windows 10 and 11 -->
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
+    </application>
+  </compatibility>
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>
+      <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
+    </windowsSettings>
+  </application>
+</assembly>

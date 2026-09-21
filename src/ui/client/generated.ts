@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "3.15.0";
+export const PROTOCOL_VERSION = "3.16.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -238,7 +238,7 @@ export const OPERATION_FACTS: Readonly<Record<Operation, OperationFacts>> = {
   "workspace.pack": { writes: true, required: ["includeData", "path", "workspaceId"], optional: [], answers: ["path", "bytes", "omitted"] },
   "output.prune": { writes: true, required: ["runsToRemove", "workspaceId"], optional: ["expectedFiles"], answers: ["removedRunIds", "freedBytes", "deletedFiles"] },
   "view.pick": { writes: false, required: ["viewId", "width", "height", "x", "y"], optional: ["camera", "cameraPath"], answers: ["value", "association", "part", "resultPosition", "cameraPath"] },
-  "dataset.inspect": { writes: false, required: ["path"], optional: [], answers: ["format", "supportLevel", "gaps", "sizeBytes", "modified", "exists"] },
+  "dataset.inspect": { writes: false, required: ["path"], optional: [], answers: ["format", "supportLevel", "gaps", "sizeBytes", "modified", "exists", "refusal"] },
   "output.list": { writes: false, required: ["workspaceId"], optional: [], answers: ["outputDirectory", "runs", "totalBytes", "limitBytes", "overLimit", "suggestedRunIds"] },
   "output.plan": { writes: false, required: ["workspaceId", "runsToRemove"], optional: [], answers: ["runIds", "files", "freedBytes", "keptRecords"] },
   "view.get": { writes: false, required: ["viewId"], optional: [], answers: ["id", "revision", "definition"] },
@@ -1131,6 +1131,7 @@ export interface Results {
     sizeBytes: number;
     modified?: RecordedTime;
     exists: boolean;
+    refusal?: string;
   };
   "output.list": {
     outputDirectory: string;

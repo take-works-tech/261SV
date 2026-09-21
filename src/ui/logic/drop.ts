@@ -46,8 +46,10 @@ export function dropPlan(paths: readonly string[], context: { workspaceOpen: boo
 
 /** Whether an inspection lets a load proceed: the engine names the level; `Absent` is a format this
  *  build has no reader for, and a file that is not there is not a file (AC-021). */
-export function inspectionAllowsLoad(inspection: { exists: boolean; supportLevel: string; format: string; gaps: readonly string[] }, path: string): string | null {
+export function inspectionAllowsLoad(inspection: { exists: boolean; supportLevel: string; format: string; gaps: readonly string[]; refusal?: string }, path: string): string | null {
   if (!inspection.exists) return `${fileName(path)} がありません`;
+  // The engine already knows the load would be refused - a path its library cannot take (XC-293).
+  if (inspection.refusal) return inspection.refusal;
   if (inspection.supportLevel.toLowerCase() === "absent") {
     return `'.${inspection.format}' はこの版が読む形式ではありません（対応水準 ${inspection.supportLevel}）。部分的なケースは作りません（ingest/AC-021）`;
   }

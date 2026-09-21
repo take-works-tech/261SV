@@ -10,7 +10,11 @@ updated: 2026-09-21
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 3.15.0
+- version: 3.16.0
+- correction: 2026-09-21, version 3.15.0 to 3.16.0. `dataset.inspect` answers `refusal` where a
+  load of the file would be refused before anything is read: a path the format's library cannot
+  take (XC-293, E-216). A drop is then refused at the inspection, before any load (XC-291).
+  Additive
 - correction: 2026-09-21, version 3.14.0 to 3.15.0. `graph.data` takes `contextCaseIds` - the
   cases the asking area is showing: the tree's selection, or the case the area is pinned to
   (16_application_model §8.2, XC-292). A definition that names its own cases (`caseSelection`)
@@ -197,7 +201,7 @@ no identifier to report.
 | `case.delete` | write | case id | affected descendant ids |
 | `case.move` | write | case id, new parent id | - |
 | `case.tag` | write | case id, tags | - |
-| `dataset.inspect` | read | path | what can be said before the file is read: format, the support level this build promises for it, the reader's known gaps, size, modification time (ingest/AC-032) |
+| `dataset.inspect` | read | path | what can be said before the file is read: format, the support level this build promises for it, the reader's known gaps, size, modification time (ingest/AC-032), and the refusal a load would meet where one is known - a path the format's library cannot take (XC-293) |
 | `dataset.load` | write | case id, file paths | dataset id, fields with association and component count, support level, gaps |
 | `dataset.describe` | read | dataset id | point and cell counts, bounds in metres, time steps, partial flag |
 | `field.declareUnit` | write | dataset id, field name, unit symbol | - |
