@@ -2288,3 +2288,22 @@ Recorded so that nothing silently depends on them:
   prefixed path to a plain one (`relpath` and `relative_to` raise `ValueError` on the mixed pair),
   which is why the prefix is added at the operating-system boundary only and never enters a record
 - justifies: XC-294
+
+### E-218 - An exported document opened from a download mark and a share, measured here
+- tier: T1
+- url: tests/test_exported_document_opens.py, run on the development machine on 2026-09-21: Windows
+  11 (10.0.26200), Microsoft Edge 153.0.4234.48 and Google Chrome 153.0.8010.52, headless
+  (`--headless=new --dump-dom`, a fresh `--user-data-dir` each run), the administrative share
+  `\\localhost\C$`
+- verified: 2026-09-21
+- says: a probe page with an inline classic script, an inline module script, inline style and a 1x1
+  PNG as a data URI reports all four as run, applied and loaded in both browsers from a local file,
+  from the same file after `Zone.Identifier` with `ZoneId=3` was written beside it - the mark a
+  download and a saved mail attachment carry - and through the share; and the document this build
+  exports (title, the value table with its unit, the limitations and provenance sections, no script)
+  renders the identical DOM the three ways in both browsers. Started without a profile of its own,
+  Edge with a window open handed the request to the running browser and exited with code 789986 and
+  no output, which is why every run gets its own profile. Not measured, and said so: a mail client's
+  own preview pane, SmartScreen, opening by double-click from a folder, and browsers other than these
+  two - the browser range is #256's question
+- justifies: XC-295

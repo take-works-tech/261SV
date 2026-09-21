@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-20
+updated: 2026-09-21
 ---
 
 # Tasks: report generation
@@ -307,3 +307,15 @@ updated: 2026-09-20
   export used to create one and the second was refused as a name already held. What is not built:
   drafting, style, templates, renaming, the preflight; the canvas shows engine answers only and
   says the rest is computed at export
+### TASK-046 - The exported document opens where it arrives
+- satisfies: AC-036
+- depends_on: TASK-045
+- done_when: the exported document and a probe carrying every kind of inline dependency open the
+  same from a local file, from a file marked as downloaded and through a network share, in the
+  browsers present
+- done: 2026-09-21 (XC-295, #255). Measured with Edge 153.0.4234.48 and Chrome 153.0.8010.52 (E-218):
+  an inline classic script, an inline module script, inline style and a data-URI image run, apply
+  and load the three ways, and this build's document renders the identical DOM the three ways.
+  `tests/test_exported_document_opens.py` keeps it, skipping by name where no browser or share is
+  present and printing the versions it used. A mail client's preview pane, SmartScreen and a
+  double-click from a folder are not measured and are said so; the browser range is #256.

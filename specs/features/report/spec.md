@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-20
+updated: 2026-09-21
 ---
 
 # Feature: report generation
@@ -58,6 +58,10 @@ updated: 2026-08-20
     from the full data
   - AC-004: If any exported number came from a partial @Dataset, then the report shall state the
     coverage it was computed over
+  - AC-036: When an exported document is opened from a local file, from the same file marked as
+    downloaded (the Windows Internet-zone mark) or through a network share, in a supported
+    browser, the document shall render the same and its embedded style, images and script shall
+    apply and run, with no prompt (XC-295)
 
 ### REQ-002 - Office formats carry the same content
 - priority: MUST
