@@ -468,3 +468,16 @@ is either missing a requirement or is not work this specification asked for.
   under which the same library reads and writes there - the freeze check asks the engine its code
   page and loads an Exodus file at such a path. `tests/test_non_ascii_paths.py`; the two Node
   threads run under `solvia-接続 (試験)-` and `solvia-シェル (試験)-`.
+### TASK-038 - Paths past the classic limit, without a policy
+- satisfies: AC-048
+- depends_on: TASK-037
+- done_when: every reader, the document with its lock and sources, the report export, the output
+  listing and the engine's own directories pass at a path past 260 characters with the long-path
+  policy off, and no record or answer carries the extended prefix
+- done: 2026-09-21 (XC-294, #254). Measured first (E-217): the plain long path fails in Python,
+  HDF5 and the Exodus writer, and the extended form works everywhere. `domain_core/os_paths.py` holds
+  `for_os` and `for_people`; the handlers' path parameters, the transport's directories, the
+  readers' entry points and the source records take the one and carry the other.
+  `tests/test_long_paths.py` walks every reader, the document, the export and the engine process
+  through a 300-character directory, a long source beside a short document, and keeps the
+  measurement that the plain form fails where the policy is off.

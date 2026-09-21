@@ -52,6 +52,9 @@ updated: 2026-09-21
     reopen and write at it exactly as at an ASCII path, for every format it reads and every file it
     writes; where a library it depends on cannot take such a path, the system shall refuse the read
     by name before the library sees it, rather than end (XC-293)
+  - AC-048: When a path is longer than the platform's classic limit - MAX_PATH on Windows -
+    the system shall read, record, reopen and write at it exactly as at a short one, without
+    depending on a system setting, and shall record and answer the path in its plain form (XC-294)
 
 ### REQ-011 - What the file did not say is not invented
 - priority: MUST

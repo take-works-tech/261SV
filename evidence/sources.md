@@ -2268,3 +2268,23 @@ Recorded so that nothing silently depends on them:
   and, walked over HTTP, loads `ケース.ex2` under `解析 結果 📐` with its three fields (freeze 31 s,
   277.5 MB, connection file 1.0 s after start)
 - justifies: XC-293
+
+### E-217 - Paths past 260 characters through every library, with the long-path policy off, measured here
+- tier: T1
+- url: tests/test_long_paths.py and a probe run on the development machine on 2026-09-21: Windows 11
+  (10.0.26200) with `LongPathsEnabled` = 0 - the default - Python 3.11.9 whose interpreter declares
+  `longPathAware`, VTK 9.5.2 with its bundled HDF5 and netCDF 4.9.2, Node 22, at a directory whose
+  plain path is 302 characters. The 247-character bound below which a plain path is always safe is
+  Microsoft's documented limit for CreateDirectoryW (MAX_PATH less 12), a T2 source
+- verified: 2026-09-21
+- says: with the policy off, the **plain** long path fails in Python (`FileNotFoundError`, WinError 3,
+  for a directory that exists), in HDF5 (h5py cannot create there) and in the toolkit's Exodus writer
+  ("can't create"); the toolkit's XML writer alone writes there, and every reader was refused by this
+  product's own existence check before the toolkit saw the path. In the **extended-length** form
+  (`\\?\C:\...`) every one of them works: Python creates, writes and reads; the XML writer and
+  reader, the CGNS reader over HDF5 and the Exodus reader over netCDF read the same files and answer
+  the same numbers as at a short path. Node creates and writes at the plain long path on its own.
+  Python keeps the prefix through `resolve`, `parent` and `with_name`, and refuses to relate a
+  prefixed path to a plain one (`relpath` and `relative_to` raise `ValueError` on the mixed pair),
+  which is why the prefix is added at the operating-system boundary only and never enters a record
+- justifies: XC-294

@@ -6563,3 +6563,38 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a Windows the manifest does not reach (before 10 1903), where the refusal stays
   the answer; or a toolkit whose Exodus reader takes the path as wide, which retires the guard
+
+### XC-294 - A path longer than Windows allows is handed to the operating system in its extended form, and never becomes a name
+- decided: 2026-09-21
+- status: active
+- decision: on Windows the engine hands every path it opens, reads, writes or lists to the operating
+  system and to its libraries in the **extended-length form** (`\\?\C:\...`, `\\?\UNC\...`) when the
+  plain absolute path is longer than 247 characters - MAX_PATH less the twelve Windows reserves for a
+  name when a directory is made - and in the plain absolute form otherwise. The conversion is one
+  function at the boundary (`domain_core/os_paths.py`, `for_os`), applied where a path enters - the
+  command handlers' path parameters, the transport's directories, the readers' entry points, the
+  source records' file checks - and its inverse (`for_people`) is what every record and every answer
+  carries, so `\\?\` never appears in a document, a relative path or a reply. Measured (E-217): with
+  the `LongPathsEnabled` policy off, which is the default, Python, the toolkit's XML reader and
+  writer, HDF5 under CGNS and netCDF under Exodus all take the extended form and none but the XML
+  writer takes the plain one; Node takes the plain one. The product therefore depends on no policy
+  and no manifest for long paths; the manifest's `longPathAware` (XC-261) stays because the
+  development interpreter declares it, and is not evidence for this (ingest/AC-048)
+- decided_by: engineering judgement, from #254's condition and the measurement
+- rationale: a path on a Japanese desktop runs long - a user's name, a project, a study, a run, a
+  step - and 260 characters is reached with no wrongdoing. The policy that lifts the limit is off
+  by default and an administrator's to set; a product that fails until a registry key is changed
+  has failed on the first machine. The extended form is the documented way a program lifts the
+  limit for itself, and the one every library here was measured to take. Adding it at the boundary
+  and removing it before anything is recorded keeps one name for one file: a document that stored
+  the prefixed form would name a file by how one process once called it
+- alternatives: **relying on `LongPathsEnabled`** - off by default, and not this product's to set.
+  **Refusing long paths by name** - honest, and a refusal of a folder the person did not choose to
+  make long. **Converting every path, not only past the limit** - the same libraries would see the
+  prefix on every call, which was not measured and changes nothing for the paths that already work
+- basis: E-217 (T1)
+- affects: MOD-002, MOD-007, MOD-012, ingest/REQ-010
+- decidedness: Fixed
+- reversal_trigger: a library that takes the plain long path and not the extended one - none
+  measured - or a Windows that lifts the limit unconditionally, which `tests/test_long_paths.py`
+  notices by asserting that the plain form still fails where the policy is off
