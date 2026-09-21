@@ -27,6 +27,8 @@ import os
 from dataclasses import dataclass, field as dataclass_field
 from datetime import datetime
 from pathlib import Path
+
+from domain_core.os_paths import for_people
 from enum import Enum
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
@@ -257,7 +259,7 @@ class Log:
         """Where the log is and how it is kept - what a settings page shows (#312: reachable)."""
         files = sorted(self.directory.glob(LOG_FILE + "*")) if self.directory is not None else []
         return {
-            "logDirectory": str(self.directory) if self.directory is not None else None,
+            "logDirectory": str(for_people(self.directory)) if self.directory is not None else None,
             "level": self.level.value,
             "maxBytes": MAX_LOG_BYTES,
             "keepFiles": KEEP_ROTATED,

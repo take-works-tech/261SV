@@ -27,6 +27,8 @@ import os
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
+
+from domain_core.os_paths import for_os, for_people
 from typing import Any
 
 from domain_core.recorded_time import record_instant
@@ -74,7 +76,7 @@ def _modified_utc(path: Path) -> str:
     To the second because that is the resolution a recorded ISO string carries across the filesystems
     this product meets; comparing finer would report a change every time a file is copied.
     """
-    stamp = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+    stamp = datetime.fromtimestamp(for_os(path).stat().st_mtime, tz=timezone.utc)
     return stamp.replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
@@ -82,11 +84,14 @@ def record(path: Path, *, relative_to: Path, where: datetime) -> dict[str, Any]:
     """The reference CT-001 stores for a file: where it is, how big, and when it changed - the time
     as `{utc, offsetMinutes}`, the offset being that of whoever is recording (`where`, an aware
     moment from the recorder's clock; XC-266)."""
+    # The relation is between the plain paths - what the record carries - and the file's facts come
+    # from the operating system's form of it (XC-294).
+    stat = for_os(path).stat()
     return {
-        "pathRelative": path.relative_to(relative_to).as_posix(),
-        "sizeBytes": path.stat().st_size,
+        "pathRelative": for_people(path).relative_to(for_people(relative_to)).as_posix(),
+        "sizeBytes": stat.st_size,
         "modified": record_instant(
-            datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc), where=where,
+            datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc), where=where,
         ).as_stored(),
     }
 
@@ -97,7 +102,7 @@ def status_of(source: dict[str, Any], *, relative_to: Path) -> SourceStatus:
     recorded_size = int(source.get("sizeBytes", -1))
     recorded = source.get("modified")
     recorded_modified = str(recorded.get("utc", "")) if isinstance(recorded, dict) else ""
-    location = relative_to / relative
+    location = for_os(for_people(relative_to) / relative)
 
     if not location.exists():
         return SourceStatus(relative, SourceState.MISSING, recorded_size, recorded_modified)
@@ -160,7 +165,7 @@ def resolve_case(case: dict[str, Any], *, relative_to: Path) -> CaseResolution:
 
 def _same_file(candidate: Path, path: Path) -> bool:
     try:
-        return candidate.resolve() == path.resolve()
+        return for_people(for_os(candidate).resolve()) == for_people(for_os(path).resolve())
     except OSError:
         return False
 
@@ -169,7 +174,7 @@ def find_source(case: dict[str, Any], path: Path, *, relative_to: Path) -> dict[
     """The case's entry for this file, by its relative or its absolute path, or None."""
     for source in case.get("sources") or []:
         relative = source.get("pathRelative")
-        if relative and _same_file(relative_to / str(relative), path):
+        if relative and _same_file(for_people(relative_to) / str(relative), path):
             return source
         absolute = source.get("pathAbsolute")
         if absolute and _same_file(Path(str(absolute)), path):
@@ -191,15 +196,16 @@ def ensure_source(
     if found is not None:
         found.setdefault("declaredUnits", {})
         return found, False
+    canonical = for_people(for_os(path).resolve())
     try:
         source = record(path, relative_to=relative_to, where=where)
     except ValueError:
         source = record(path, relative_to=path.parent, where=where)
         try:
-            source["pathRelative"] = Path(os.path.relpath(path.resolve(), relative_to.resolve())).as_posix()
+            source["pathRelative"] = Path(os.path.relpath(canonical, for_people(for_os(relative_to).resolve()))).as_posix()
         except ValueError:
-            source["pathRelative"] = path.resolve().as_posix()
-    source["pathAbsolute"] = str(path.resolve())
+            source["pathRelative"] = canonical.as_posix()
+    source["pathAbsolute"] = str(canonical)
     source["declaredUnits"] = {}
     case.setdefault("sources", []).append(source)
     return source, True

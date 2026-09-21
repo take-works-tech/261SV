@@ -42,6 +42,7 @@ from domain_core.recorded_time import STORED_FORMAT, RecordedTime, from_stored, 
 from domain_core.reported_value import DIMENSIONLESS, Caveat, Provenance, ReportedValue
 from domain_core.units import UndeclaredUnitError, unit as known_unit
 from engine import reader
+from domain_core.os_paths import for_os, for_people
 from engine.analysis import derived, nodal
 from engine.completeness import FileIncomplete, ResultsLost
 from engine.analysis import weights as field_weights
@@ -526,7 +527,9 @@ def handlers(session: Session) -> tuple[Handler, ...]:
 
 
 def workspace_open(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
-    location = Path(str(parameters["path"]))
+    # In the operating system's form from here on (XC-294): what is derived from it - the lock, the
+    # output folder, the sources' relative paths - reaches the file system the same way.
+    location = for_os(str(parameters["path"]))
     try:
         loaded = load_workspace(location)
     except WorkspaceFileError as error:
@@ -689,7 +692,7 @@ def workspace_save(session: Session, parameters: Mapping[str, Any]) -> Effect | 
             f"読み取り専用で開いています：{session.lock.describe()}。保存しません。"
             "編集するには、もう一方の窓を閉じるか、そのプロセスが終了していれば takeOverStaleLock を付けて開き直してください（XC-241、XC-269）"
         )
-    target = Path(str(parameters["path"])) if parameters.get("path") else session.workspace_path
+    target = for_os(str(parameters["path"])) if parameters.get("path") else session.workspace_path
     if target is None:
         return refused("保存先がありません：path を指定してください")
     previous = target.with_name(target.name + ".previous")
@@ -724,7 +727,7 @@ def workspace_save(session: Session, parameters: Mapping[str, Any]) -> Effect | 
     return Effect(
         f"{target.name} を保存しました" + ("（直前の版を残しました）" if kept != target else ""),
         changed=(workspace.identifier,),
-        value={"path": str(target), "previousKept": str(kept) if kept != target else None},
+        value={"path": str(for_people(target)), "previousKept": str(for_people(kept)) if kept != target else None},
         undo=undo,
     )
 
@@ -736,7 +739,7 @@ def dataset_inspect(session: Session, parameters: Mapping[str, Any]) -> Effect |
     it is relied on; so is the reader's list of what it does not read. Neither needs the file open,
     and this does not open it - a file that turns out unreadable says so at `dataset.load`.
     """
-    path = Path(str(parameters["path"]))
+    path = for_os(str(parameters["path"]))
     level, gaps = reader.support_level(path)
     exists = path.exists()
     stat = path.stat() if exists else None
@@ -768,7 +771,7 @@ def dataset_load(session: Session, parameters: Mapping[str, Any]) -> Effect | Re
     if found_case is None:
         return refused(f"ケース '{case_id}' はこのワークスペースにありません")
     case_entry = found_case[0]
-    paths = [Path(str(one)) for one in parameters["filePaths"]]
+    paths = [for_os(str(one)) for one in parameters["filePaths"]]
     if len(paths) != 1:
         # Stated rather than silently taking the first: a case of several files is a real thing
         # (an Exodus run split by step) and this build does not yet read one as one dataset.
@@ -2145,9 +2148,9 @@ def report_export(session: Session, parameters: Mapping[str, Any]) -> Effect | R
     if isinstance(workspace, Result):
         return workspace
     report_id = str(parameters["reportId"])
-    path = Path(str(parameters["path"]))
+    path = for_os(str(parameters["path"]))
     if path.exists():
-        return refused(f"{path} はすでにあります。この版は上書きしません — 別の場所を指定してください")
+        return refused(f"{for_people(path)} はすでにあります。この版は上書きしません — 別の場所を指定してください")
     try:
         item = items.find(workspace.raw, "reports", report_id)
     except ItemError as error:
@@ -2194,7 +2197,7 @@ def report_export(session: Session, parameters: Mapping[str, Any]) -> Effect | R
         export.describe(),
         changed=(report_id,),
         value={
-            "path": str(export.path),
+            "path": str(for_people(export.path)),
             "bytes": export.bytes,
             "reductions": reductions,
             "omitted": list(export.stated),

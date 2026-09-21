@@ -32,6 +32,8 @@ from __future__ import annotations
 import struct
 from pathlib import Path
 
+from domain_core.os_paths import for_os
+
 from vtkmodules.vtkCommonDataModel import vtkCompositeDataSet, vtkDataSet
 
 
@@ -141,7 +143,7 @@ def check_file_is_whole(path: Path) -> None:
     dataset of wrong numbers. A file whose header says nothing usable is not refused here - that is
     not a statement that it is whole, and the reader's own checks follow.
     """
-    location = Path(path)
+    location = for_os(path)
     size = location.stat().st_size
     with location.open("rb") as handle:
         head = handle.read(min(size, HEADER_BYTES))

@@ -19,6 +19,7 @@ import os
 
 from service.command.catalogue import PROTOCOL_VERSION
 from service.command.handlers import Session, build_surface
+from domain_core.os_paths import for_os, for_people
 from service.egress.diagnostics import Level, Log
 from service.transport.local import Connection, Engine, serve
 
@@ -55,11 +56,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     arguments = parser.parse_args(argv if argv is not None else sys.argv[1:])
 
-    session = Session(log=Log(directory=arguments.log_directory, level=Level(arguments.log_level)))
+    # The directories the shell hands over, in the operating system's form: under a user's profile
+    # they run long, and the limit is lifted here rather than by a policy (XC-294).
+    connection_directory = for_os(arguments.connection_directory) if arguments.connection_directory else None
+    log_directory = for_os(arguments.log_directory) if arguments.log_directory else None
+    session = Session(log=Log(directory=log_directory, level=Level(arguments.log_level)))
     session.log.record(Level.INFO, "engine.start", pid=os.getpid(), protocol=PROTOCOL_VERSION)
     engine = Engine(session, build_surface(session), allowed_origin=arguments.allow_origin)
-    listener = serve(engine, port=arguments.port, connection_directory=arguments.connection_directory)
-    where = (arguments.connection_directory / "connection.json") if arguments.connection_directory else None
+    listener = serve(engine, port=arguments.port, connection_directory=connection_directory)
+    where = for_people(connection_directory / "connection.json") if connection_directory else None
     announce(listener.connection, where)
 
     stop = signal.SIGINT

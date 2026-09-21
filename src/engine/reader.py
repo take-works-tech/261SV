@@ -26,6 +26,7 @@ from pathlib import Path
 
 import numpy as np
 from engine.code_page import UTF8_CODE_PAGE, active_code_page
+from domain_core.os_paths import for_os
 from vtkmodules.util.numpy_support import vtk_to_numpy
 from vtkmodules.vtkCommonCore import vtkStringArray
 from vtkmodules.vtkCommonDataModel import (
@@ -103,7 +104,7 @@ def _files_of(location: Path) -> list[Path]:
 def snapshot(path: str | Path) -> Fingerprint:
     """The fingerprint of a file and of every file it names, taken now. Raises `UnreadableFileError`
     where the file is not there or the operating system will not say what it is."""
-    location = Path(path)
+    location = for_os(path)
     if not location.exists():
         raise UnreadableFileError(f"{location} does not exist")
     found: Fingerprint = {}
@@ -524,7 +525,7 @@ def read(path: str | Path) -> Dataset:
     supported file yields no geometry - never a partial dataset, and never an empty one presented as
     a result (ingest/AC-021, AC-022).
     """
-    location = Path(path)
+    location = for_os(path)
     choice = _READERS.get(location.suffix.lower())
     if choice is None:
         raise UnsupportedFormatError(
@@ -655,7 +656,7 @@ def read_case(path: str | Path, *, step: int = 0, expected: Fingerprint | None =
     and says so only on a pipeline key (E-211), so the value asked for is always a declared one and
     the one delivered is checked against it.
     """
-    location = Path(path)
+    location = for_os(path)
     choice = _READERS.get(location.suffix.lower())
     if choice is None:
         raise UnsupportedFormatError(
