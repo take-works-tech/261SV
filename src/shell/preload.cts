@@ -10,7 +10,7 @@
  */
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from "electron";
 
-import type { EngineProcessStatus, ShellApi } from "../ui/client/shell.js" with { "resolution-mode": "import" };
+import type { EngineProcessStatus, RecentWorkspace, ShellApi } from "../ui/client/shell.js" with { "resolution-mode": "import" };
 
 const api: ShellApi = {
   kind: "electron",
@@ -50,6 +50,12 @@ const api: ShellApi = {
     openWorkspace: () => ipcRenderer.invoke("dialog:openWorkspace"),
     openResult: () => ipcRenderer.invoke("dialog:openResult"),
     saveReport: (suggestedName: string) => ipcRenderer.invoke("dialog:saveReport", suggestedName),
+    saveWorkspace: (suggestedName: string) => ipcRenderer.invoke("dialog:saveWorkspace", suggestedName),
+  },
+  recent: {
+    list: () => ipcRenderer.invoke("recent:list"),
+    remember: (entry: RecentWorkspace) => ipcRenderer.invoke("recent:remember", entry),
+    forget: (path: string) => ipcRenderer.invoke("recent:forget", path),
   },
 };
 

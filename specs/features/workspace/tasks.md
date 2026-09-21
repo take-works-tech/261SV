@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-20
+updated: 2026-09-21
 ---
 
 # Tasks: workspace, cases and variables
@@ -711,3 +711,17 @@ updated: 2026-09-20
   take-over only where the lock is stale or unreadable (`engineState.takeOverLock`), and shows the
   engine's warnings beside its answers - which it had dropped until 2026-09-20, so a lock held, a
   dataset closed or a document lifted had gone unsaid
+### TASK-072 - The Workspace list with an engine
+- satisfies: AC-076
+- depends_on: TASK-071
+- done_when: with a shell and an engine the list shows what this shell opened, narrows by search
+  and tag, opens an entry, creates a new workspace where the person chose, refuses a path already
+  taken, and forgets an entry only when asked
+- done: 2026-09-21 (XC-297, #277). `workspace.create` (CT-003 3.17.0) writes a document with one
+  case and opens it; `workspace.open` answers the name and the case tags; the shell keeps
+  `recent.json` under its profile (`src/shell/recent.ts`) and offers a save dialogue for the new
+  file; the store remembers an open the engine accepted; `src/ui/logic/home.ts` narrows the list
+  and `HomeScreen` shows it in place of the design state when a shell and an engine are present.
+  Proven by `tests/test_handlers.py::TestANewWorkspace`, `src/shell/recent.test.ts`,
+  `src/ui/logic/home.test.ts` and the connected thread. The shipped sample of first launch is
+  operations/REQ-001's and not done here.

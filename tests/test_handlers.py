@@ -100,6 +100,57 @@ def loaded(tmp_path: Path, *, write=write_grid, name: str = "case.vtu") -> tuple
     return surface, session, result.value["datasetId"]
 
 
+class TestANewWorkspace:
+    """XC-297: a document written where the person chose, with one case, and opened as any other."""
+
+    def test_it_is_written_opened_and_reopens_by_its_name(self, tmp_path: Path) -> None:
+        surface, session = a_surface()
+        target = tmp_path / "studies" / "梁.svw"
+        target.parent.mkdir()
+
+        created = surface.submit(Command("workspace.create", {"path": str(target), "name": "梁の検討", "caseName": "基準"}))
+
+        assert created.status is Status.APPLIED, created.reason
+        assert created.value["name"] == "梁の検討" and created.value["tags"] == []
+        assert [one["name"] for one in created.value["cases"]] == ["基準"]
+        assert created.value["readOnly"] is False and created.value["unresolvedCases"] == []
+        assert session.workspace is not None and session.workspace.identifier == created.value["workspaceId"]
+        on_disk = json.loads(target.read_text(encoding="utf-8"))
+        assert on_disk["formatVersion"] == FORMAT_VERSION and on_disk["name"] == "梁の検討"
+        assert on_disk["workspaceItems"] == {"simulations": [], "views": [], "graphs": [], "reports": []}
+        again, _ = a_surface()
+        reopened = again.submit(Command("workspace.open", {"path": str(target)}))
+        assert reopened.status is Status.APPLIED and reopened.value["name"] == "梁の検討"
+
+    def test_it_takes_the_file_name_and_a_default_case_where_none_is_given(self, tmp_path: Path) -> None:
+        surface, _ = a_surface()
+        created = surface.submit(Command("workspace.create", {"path": str(tmp_path / "bracket.svw")}))
+        assert created.status is Status.APPLIED, created.reason
+        assert created.value["name"] == "bracket" and [one["name"] for one in created.value["cases"]] == ["ケース 1"]
+
+    def test_an_existing_file_and_a_missing_folder_are_refused_by_name_and_nothing_is_written(self, tmp_path: Path) -> None:
+        surface, session = a_surface()
+        existing = a_workspace(tmp_path)
+        before = existing.read_bytes()
+
+        over = surface.submit(Command("workspace.create", {"path": str(existing)}))
+        nowhere = surface.submit(Command("workspace.create", {"path": str(tmp_path / "no such folder" / "x.svw")}))
+
+        assert over.status is Status.REFUSED and "すでにあります" in (over.reason or "")
+        assert existing.read_bytes() == before, "nothing touched"
+        assert nowhere.status is Status.REFUSED and "フォルダがありません" in (nowhere.reason or "")
+        assert session.workspace is None
+
+    def test_the_open_answer_names_the_document_and_the_tags_of_its_cases(self, tmp_path: Path) -> None:
+        surface, _ = a_surface()
+        workspace = a_workspace(tmp_path, cases=[
+            {"id": "case:1", "name": "baseline", "tags": ["構造", "基準"], "children": [{"id": "case:2", "name": "variant", "tags": ["熱"]}]},
+        ])
+        opened = surface.submit(Command("workspace.open", {"path": str(workspace)}))
+        assert opened.status is Status.APPLIED, opened.reason
+        assert opened.value["name"] == "梁の検討" and opened.value["tags"] == ["基準", "構造", "熱"]
+
+
 class TestWhatThisBuildRegisters:
     def test_every_operation_on_the_path_has_a_handler(self) -> None:
         surface, _ = a_surface()
@@ -107,7 +158,7 @@ class TestWhatThisBuildRegisters:
         registered = set(surface.registered())
 
         assert registered == {
-            "workspace.open", "dataset.load", "dataset.describe", "dataset.parts",
+            "workspace.open", "workspace.create", "dataset.load", "dataset.describe", "dataset.parts",
             "field.declareUnit", "field.statistics", "field.derive", "view.create", "view.update", "view.get", "view.render",
             "graph.create", "graph.update", "graph.get", "graph.data",
             "dataset.probe", "view.pick", "report.create", "report.update", "report.get",
@@ -116,7 +167,7 @@ class TestWhatThisBuildRegisters:
             "system.capabilities", "system.protocols", "system.audit", "system.operations", "system.log",
             "output.list", "output.plan", "output.prune",
         }
-        assert len(surface.unimplemented()) == len(OPERATIONS) - 33
+        assert len(surface.unimplemented()) == len(OPERATIONS) - 34
 
     def test_operations_list_what_this_build_answers_and_what_it_does_not(self) -> None:
         """XC-277: the list is the surface's own registry, and the two halves are the whole catalogue."""

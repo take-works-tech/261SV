@@ -11,9 +11,10 @@
  *   unreadable-file - the named rejection with its reason; no partial case exists (XC-007)
  */
 import { EngineOpen } from "../../shared/EngineOpen";
-import { engineState } from "../../state/engine";
-import { shellApi } from "../../client/shell";
-import { useState } from "react";
+import { engineState, snapshot, useEngine } from "../../state/engine";
+import { shellApi, type RecentWorkspace } from "../../client/shell";
+import { describeFilters, describeOpened, filterRecent, suggestedName, tagsOf } from "../../logic/home";
+import { useEffect, useState } from "react";
 import { session } from "../../state/session";
 import { submit } from "../../client/operations";
 import { formatBytes, disabledBecause } from "../../logic/format";
@@ -678,13 +679,168 @@ function UnreadableFileState() {
 /* ---- the screen ----------------------------------------------------------------------------- */
 
 export function HomeScreen(props: { variant: string }) {
-  // The way into a connected engine, above whatever design state this variant is. It renders
-  // nothing at all when no engine is reachable, so the ninety-nine catalogued states are unchanged.
+  const e = useEngine();
+  // With a shell and an engine, the list is the shell's own record of what was opened (XC-297).
+  // Without either, the design states stay what they are, and a browser build keeps the way in
+  // that asks for paths in words - it renders nothing at all when no engine is reachable.
+  if (shellApi() && e.reachability.kind === "reachable" && props.variant === "default") return <RecentWorkspaces />;
   return (
     <>
       <EngineOpen />
       {homeCanvas(props.variant)}
     </>
+  );
+}
+
+/* ---- with a shell and an engine: the workspaces this shell opened (XC-297) ------------------ */
+
+function RecentWorkspaces() {
+  const e = useEngine();
+  const shell = shellApi();
+  const [entries, setEntries] = useState<readonly RecentWorkspace[] | null>(null);
+  const [query, setQuery] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [problem, setProblem] = useState<{ path: string; because: string } | null>(null);
+  useEffect(() => {
+    if (shell) void shell.recent.list().then(setEntries);
+  }, [shell]);
+  if (!shell) return null;
+  const list = entries ?? [];
+  const available = tagsOf(list);
+  const visible = filterRecent(list, query, tags);
+  const filters = describeFilters(query, tags);
+
+  const enter = async (path: string) => {
+    setProblem(null);
+    if (!(await engineState.openWorkspace(path))) {
+      setProblem({ path, because: snapshot().refusal ?? "開けませんでした" });
+      return;
+    }
+    setEntries(await shell.recent.list());
+    session.openWorkspace();
+  };
+  const create = async () => {
+    const path = await shell.dialog.saveWorkspace("新しいワークスペース.svw");
+    if (!path) return;
+    setProblem(null);
+    if (!(await engineState.createWorkspace(path, suggestedName(path)))) {
+      setProblem({ path, because: snapshot().refusal ?? "作れませんでした" });
+      return;
+    }
+    setEntries(await shell.recent.list());
+    session.openWorkspace();
+  };
+  const pick = async () => {
+    const path = await shell.dialog.openWorkspace();
+    if (path) await enter(path);
+  };
+  const drop = async (path: string) => {
+    setEntries(await shell.recent.forget(path));
+    if (problem?.path === path) setProblem(null);
+  };
+
+  return (
+    <div className="ho-page">
+      <div className="ho-inner">
+        <header className="ho-head">
+          <div>
+            <h1>ワークスペース一覧</h1>
+            <p className="ho-sub">このシェルで開いたワークスペース。名前とタグは開いたときにエンジンが答えたものです。</p>
+          </div>
+          <div className="ho-tools">
+            <label className="ho-search">
+              <SearchGlyph />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・場所・タグで検索" aria-label="ワークスペースを検索" />
+            </label>
+            <div className="ho-filter-anchor">
+              <button className="btn ghost" aria-expanded={filterOpen} aria-haspopup="listbox" disabled={available.length === 0} title={available.length === 0 ? "開いたワークスペースのケースにタグがありません" : undefined} onClick={() => setFilterOpen((open) => !open)}>
+                タグで絞り込み{tags.length > 0 ? `（${tags.length}）` : ""}
+              </button>
+              {filterOpen ? (
+                <div className="popover ho-filter-pop">
+                  <header>
+                    <b>タグで絞り込み</b>
+                    {tags.length > 0 ? <button className="btn ghost" style={{ marginLeft: "auto" }} onClick={() => setTags([])}>すべて解除</button> : null}
+                  </header>
+                  <div className="body">
+                    <ul className="ho-tag-listbox" role="listbox" aria-label="ケースのタグ" aria-multiselectable="true">
+                      {available.map((tag) => {
+                        const selected = tags.includes(tag);
+                        return (
+                          <li key={tag} role="option" aria-selected={selected}>
+                            <button onClick={() => setTags((current) => (current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag]))}>
+                              <span>{tag}</span>
+                              {selected ? <span aria-hidden>✓</span> : null}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+            <button className="btn" onClick={() => void pick()} disabled={e.busy}>開く…</button>
+            <button className="btn primary" onClick={() => void create()} disabled={e.busy} title="保存先を選ぶと、一つのケースを持つ新しい文書を書いて開きます（workspace.create）">＋ 新規作成</button>
+          </div>
+        </header>
+
+        {problem ? (
+          <div className="notice error" role="alert">
+            <b>{problem.path}</b>
+            <span className="why">{problem.because}</span>
+            {list.some((one) => one.path === problem.path) ? (
+              <button className="btn ghost" onClick={() => void drop(problem.path)}>一覧から外す</button>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="ho-filters">
+          {tags.map((tag) => (
+            <button key={tag} className="ho-chip" aria-pressed aria-label={`タグ「${tag}」の絞り込みを解除`} onClick={() => setTags((current) => current.filter((item) => item !== tag))}>
+              {tag} ✕
+            </button>
+          ))}
+          <span className="ho-result-count">{visible.length} / {list.length} 件</span>
+        </div>
+
+        {entries === null ? (
+          <p className="prop-note">一覧を読んでいます…</p>
+        ) : list.length === 0 ? (
+          <div className="ho-empty">
+            <h2>まだ開いたワークスペースがありません</h2>
+            <p>「＋ 新規作成」で保存先を選ぶと、一つのケースを持つ空の文書を作って開きます。既にある .svw は「開く…」か、ウィンドウへのドロップで開けます。</p>
+          </div>
+        ) : visible.length === 0 ? (
+          <div className="ho-empty">
+            <h2>一致するワークスペースがありません</h2>
+            <p>{filters}の条件に一致するものはありません。条件を変更するか、解除してください。</p>
+            <button className="btn" onClick={() => { setQuery(""); setTags([]); }}>検索と絞り込みを解除</button>
+          </div>
+        ) : (
+          <div className="ho-cards ho-list">
+            {visible.map((entry) => (
+              <article key={entry.path} className="ho-card" aria-label={entry.name}>
+                <span className="ho-card-kind">ワークスペース</span>
+                <h2 className="ho-card-name">{entry.name}</h2>
+                <p className="ho-card-desc" title={entry.path}>{entry.path}</p>
+                {entry.tags.length > 0 ? (
+                  <span className="ho-card-tags">
+                    {entry.tags.map((tag) => <span key={tag} className="ho-tag">{tag}</span>)}
+                  </span>
+                ) : null}
+                <span className="ho-card-meta">
+                  <span>{describeOpened(entry)}</span>
+                  <button className="btn ghost" onClick={() => void enter(entry.path)} disabled={e.busy}>開く ↗</button>
+                  <button className="btn ghost" onClick={() => void drop(entry.path)} title="ファイルは消しません。一覧から外すだけです">一覧から外す</button>
+                </span>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

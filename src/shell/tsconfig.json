@@ -23,7 +23,8 @@
   },
   "include": [
     "main.ts",
-    "engine-process.ts"
+    "engine-process.ts",
+    "recent.ts"
   ],
   "exclude": [
     "node_modules",

@@ -71,7 +71,7 @@ from service.egress.gate import Gate
 from service.workspace import items, output, sources
 from service.workspace import lock as workspace_lock
 from service.workspace.lock import LockState, LockStatus
-from service.workspace.document import FORMAT_VERSION, WorkspaceDocument, WorkspaceFileError, load as load_workspace
+from service.workspace.document import FORMAT_VERSION, WorkspaceDocument, WorkspaceFileError, fresh as fresh_document, load as load_workspace
 from service.workspace.document import WorkspaceVersionError, save as save_document
 from service.workspace.hierarchy import find as find_case, walk as walk_cases
 from service.workspace.items import ItemError
@@ -491,6 +491,7 @@ def build_surface(session: Session, *, clock: Callable[[], datetime] | None = No
 def handlers(session: Session) -> tuple[Handler, ...]:
     return (
         Handler("workspace.open", lambda p, t: workspace_open(session, p)),
+        Handler("workspace.create", lambda p, t: workspace_create(session, p)),
         Handler("workspace.save", lambda p, t: workspace_save(session, p)),
         Handler("dataset.inspect", lambda p, t: dataset_inspect(session, p)),
         Handler("dataset.load", lambda p, t: dataset_load(session, p)),
@@ -612,6 +613,10 @@ def workspace_open(session: Session, parameters: Mapping[str, Any]) -> Effect | 
             "formatVersion": loaded.format_version,
             "unresolvedCases": unresolved,
             "items": items_of(loaded),
+            # The document's own name, or its file's where it has none, and the tags of its cases as
+            # one set: what a list of workspaces shows and narrows by (XC-297).
+            "name": str(loaded.raw.get("name") or location.stem),
+            "tags": sorted({str(tag) for case, _ in walk_cases(loaded.cases) for tag in (case.get("tags") or [])}),
             # The cases the document holds, flattened with their parents, so a file dropped on the
             # window knows where it may go without the interface guessing a case id (XC-291).
             "cases": [
@@ -624,6 +629,34 @@ def workspace_open(session: Session, parameters: Mapping[str, Any]) -> Effect | 
         warnings=warnings,
         undo=undo,
     )
+
+
+def workspace_create(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
+    """A new document at a path of the person's choosing, then opened (XC-297).
+
+    Refused where a file is already there - this build overwrites nothing on a person's disk
+    without being asked - and where the folder is not, naming which. One case, named by the caller
+    or `ケース 1`, because a workspace with no case has nowhere to load a file into (XC-291). What
+    comes back is the open's answer, so the caller knows the document as it would any other.
+    """
+    location = for_os(str(parameters["path"]))
+    if location.exists():
+        return refused(f"{for_people(location)} はすでにあります。上書きはしません — 別の名前か場所を選んでください")
+    if not location.parent.exists():
+        return refused(f"{for_people(location.parent)} というフォルダがありません。あるフォルダを選んでください")
+    name = str(parameters.get("name") or location.stem)
+    document = fresh_document(
+        session.issue("ws"), name,
+        case_id=session.issue("case"), case_name=str(parameters.get("caseName") or "ケース 1"),
+    )
+    try:
+        save_document(document, location)
+    except OSError as error:
+        return refused(f"{location.name} を書けません：{error.strerror or error}")
+    opened = workspace_open(session, {"path": str(parameters["path"])})
+    if isinstance(opened, Result):
+        return opened
+    return replace(opened, summary=f"{location.name} を作って開きました")
 
 
 def items_of(workspace: WorkspaceDocument) -> dict[str, list[dict[str, str]]]:

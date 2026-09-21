@@ -64,6 +64,16 @@ export interface Orphan {
   readonly modified: RecordedTime | null;
 }
 
+/** One workspace this shell opened, as the engine described it then (XC-297): a convenience the
+ *  shell keeps under the profile, never a claim about what the file holds now. */
+export interface RecentWorkspace {
+  readonly path: string;
+  readonly name: string;
+  /** The tags of its cases as one set, as `workspace.open` answered them. */
+  readonly tags: readonly string[];
+  readonly openedAt: RecordedTime;
+}
+
 export interface ShellApi {
   readonly kind: "electron";
   /** The notices generated for this build (XC-025), or null when the build carries none. */
@@ -98,6 +108,15 @@ export interface ShellApi {
     openWorkspace(): Promise<string | null>;
     openResult(): Promise<string | null>;
     saveReport(suggestedName: string): Promise<string | null>;
+    /** Where a new workspace document goes, or null if they cancelled (XC-297). */
+    saveWorkspace(suggestedName: string): Promise<string | null>;
+  };
+  /** The workspaces this shell opened, newest first (XC-297). `remember` is called by the store
+   *  after an open the engine accepted; `forget` only when a person asks. */
+  readonly recent: {
+    list(): Promise<readonly RecentWorkspace[]>;
+    remember(entry: RecentWorkspace): Promise<readonly RecentWorkspace[]>;
+    forget(path: string): Promise<readonly RecentWorkspace[]>;
   };
 }
 

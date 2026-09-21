@@ -111,6 +111,22 @@ class WorkspaceDocument:
         return tuple(sorted(set(self.raw) - known))
 
 
+def fresh(identifier: str, name: str, *, case_id: str, case_name: str) -> WorkspaceDocument:
+    """A new document in this build's shape: one case, nothing else, every required field present.
+
+    One case rather than none, because a workspace with no case has nowhere to load a file into
+    (XC-291); its name is the caller's, and the document's name is what the list shows (XC-297).
+    """
+    return WorkspaceDocument(raw={
+        "formatVersion": FORMAT_VERSION,
+        "id": identifier,
+        "name": name,
+        "cases": [{"id": case_id, "name": case_name, "children": [], "sources": []}],
+        "variables": [],
+        "workspaceItems": {"simulations": [], "views": [], "graphs": [], "reports": []},
+    })
+
+
 def load(path: str | Path) -> WorkspaceDocument:
     """Read a workspace document, or refuse and leave the file exactly as it was."""
     location = Path(path)
