@@ -9,7 +9,14 @@ const LOADED = {
   ...snapshot(),
   datasetId: "dataset:0001",
   sourceName: "cube.vtu",
-  opened: { workspacePath: "D:/studies/beam.svw", caseId: "case:1", filePath: "D:/studies/cube.vtu" },
+  opened: { workspacePath: "D:/studies/beam.svw", loads: [{ caseId: "case:1", filePath: "D:/studies/cube.vtu" }] },
+  caseId: "case:1",
+  loaded: {
+    "case:1": {
+      caseId: "case:1", datasetId: "dataset:0001", filePath: "D:/studies/cube.vtu", sourceName: "cube.vtu", supportLevel: "verified",
+      gaps: [], fields: [], derived: {}, described: null, parts: null, partial: false, bounds: null, fieldName: null,
+    },
+  },
   supportLevel: "verified",
   gaps: [],
   fields: [

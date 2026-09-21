@@ -21,7 +21,9 @@ import type { Connection, Operation, Options, Parameters, Response, Results } fr
 import { OPERATION_FACTS, type CameraDefinition, type RecordedTime } from "../client/generated";
 import { recordNow } from "../client/time";
 import { FIRST_PATH, withKeyframe, withoutKeyframe, type CameraPathDefinition, type Interpolation } from "../logic/cameraPath";
-import { dropPlan, fileName, inspectionAllowsLoad, type DroppedCase } from "../logic/drop";
+import { dropPlan, fileName, inspectionAllowsLoad } from "../logic/drop";
+import { areaSubject, reportItemCases, workingView, type Area, type AreaSubject, type CaseSummary } from "../logic/subject";
+import { session } from "./session";
 
 /** Whether an engine is reachable, and what it said if it is not. */
 export type Reachability =
@@ -97,11 +99,30 @@ export interface AppliedWrite {
   readonly at: RecordedTime;
 }
 
-/** What was opened, so that what was saved can be opened again after the engine is restarted. */
+/** What was opened, so that what was saved can be opened again after the engine is restarted: the
+ *  document, and every file read into a case, in the order they were read (XC-292). */
 export interface Opened {
   readonly workspacePath: string;
-  readonly caseId: string | null;
-  readonly filePath: string | null;
+  readonly loads: readonly { readonly caseId: string; readonly filePath: string }[];
+}
+
+/** What this session loaded for one case, kept when the View area moves to another case so that
+ *  coming back is a switch and not a second read (XC-292). Every member arrived in an answer. */
+export interface LoadedSummary {
+  readonly caseId: string;
+  readonly datasetId: string;
+  readonly filePath: string;
+  readonly sourceName: string;
+  readonly supportLevel: string | null;
+  readonly gaps: readonly string[];
+  readonly fields: readonly FieldSummary[];
+  readonly derived: Readonly<Record<string, Derivation>>;
+  readonly described: Results["dataset.describe"] | null;
+  readonly parts: Results["dataset.parts"]["parts"] | null;
+  readonly partial: boolean;
+  readonly bounds: readonly [number[], number[]] | null;
+  /** The field the area showed for this case, so coming back shows it again. */
+  readonly fieldName: string | null;
 }
 
 /** A view the opened document already holds, as `workspace.open` answered it. */
@@ -199,8 +220,11 @@ export interface EngineState {
   /** Every notice this window raised, in order, dismissed ones included (XC-286). */
   readonly notices: readonly Notice[];
   readonly unresolvedCases: readonly string[];
-  /** The cases the open document holds, as `workspace.open` listed them (XC-291). */
-  readonly cases: readonly DroppedCase[];
+  /** The cases the open document holds, as `workspace.open` listed them, with their parents (XC-291). */
+  readonly cases: readonly CaseSummary[];
+  /** What this session loaded, by case (XC-292). The members below are the View area's subject:
+   *  the case it shows and, where one is loaded for it, that dataset. */
+  readonly loaded: Readonly<Record<string, LoadedSummary>>;
   readonly caseId: string | null;
   readonly datasetId: string | null;
   readonly sourceName: string | null;
@@ -334,6 +358,7 @@ const EMPTY: EngineState = {
   notices: [],
   unresolvedCases: [],
   cases: [],
+  loaded: {},
   caseId: null,
   datasetId: null,
   sourceName: null,
@@ -372,6 +397,10 @@ const SCREEN_GROUND: readonly [number, number, number] = [0.039, 0.047, 0.051];
 
 let state: EngineState = EMPTY;
 let engine: Engine | null = null;
+/** Which document the store is on. Bumped by an open, a disconnect and an exit, so that an answer
+ *  still in flight from the previous document - a redraw a subject move started, say - is dropped
+ *  rather than written over the one now open (16_application_model §6, class 3). */
+let generation = 0;
 let noticeCount = 0;
 
 /** Keep what a person is about to be shown, so it can be found again after looking away (§12). */
@@ -398,6 +427,98 @@ function setImage(url: string | null, reduced: string | null) {
   setState({ imageUrl: url, reduced });
 }
 
+/** What was loaded, case by case, in the form the logic layer takes. */
+function loadedList(): { caseId: string; datasetId: string }[] {
+  return Object.values(state.loaded).map((one) => ({ caseId: one.caseId, datasetId: one.datasetId }));
+}
+
+/** Keep the View area's subject under its case, so another case can be shown and this one found
+ *  again without a second read (XC-292). Called after every change to what the case holds. */
+function remember(filePath?: string) {
+  if (!state.caseId || !state.datasetId) return;
+  const path = filePath ?? state.loaded[state.caseId]?.filePath;
+  if (!path) return;
+  setState({
+    loaded: {
+      ...state.loaded,
+      [state.caseId]: {
+        caseId: state.caseId,
+        datasetId: state.datasetId,
+        filePath: path,
+        sourceName: state.sourceName ?? fileName(path),
+        supportLevel: state.supportLevel,
+        gaps: state.gaps,
+        fields: state.fields,
+        derived: state.derived,
+        described: state.described,
+        parts: state.parts,
+        partial: state.partial,
+        bounds: state.bounds,
+        fieldName: state.fieldName,
+      },
+    },
+  });
+}
+
+let showSequence = 0;
+
+/** The View area moves to `caseId` (XC-292): the dataset this session loaded for it, with its own
+ *  view found or made, or - where nothing is loaded for it - an area that says so, and never
+ *  another case's picture under this case's name. A later move wins over one still in flight. */
+async function showCase(caseId: string | null): Promise<void> {
+  const mine = ++showSequence;
+  const summary = caseId ? state.loaded[caseId] : undefined;
+  setImage(null, null);
+  setState({
+    caseId,
+    datasetId: summary?.datasetId ?? null,
+    sourceName: summary?.sourceName ?? null,
+    supportLevel: summary?.supportLevel ?? null,
+    gaps: summary?.gaps ?? [],
+    fields: summary?.fields ?? [],
+    derived: summary?.derived ?? {},
+    fieldName: summary?.fieldName ?? summary?.fields[0]?.name ?? null,
+    viewId: null,
+    savedCamera: null,
+    cameraPaths: [],
+    pathPreview: null,
+    partial: summary?.partial ?? false,
+    partVisibility: {},
+    selectedPart: null,
+    described: summary?.described ?? null,
+    parts: summary?.parts ?? null,
+    probe: null,
+    probeLocation: null,
+    probePosition: null,
+    step: 0,
+    statistics: null,
+    partStatistics: null,
+    bounds: summary?.bounds ?? null,
+    turntable: { ...START },
+    refusal: null,
+  });
+  if (!summary || mine !== showSequence) return;
+  await engineState.refresh();
+}
+
+/** Read again every file the document had read into a case, in that order, ending on the case the
+ *  View area shows - the selection the window kept across the restart (XC-292). */
+async function reloadAll(loads: Opened["loads"]): Promise<boolean> {
+  const shown = engineState.subjectOf("view").caseId;
+  const ordered = [...loads.filter((one) => one.caseId !== shown), ...loads.filter((one) => one.caseId === shown)];
+  for (const one of ordered) {
+    if (!(await engineState.loadDataset(one.caseId, one.filePath))) return false;
+  }
+  if (shown !== state.caseId) await showCase(shown);
+  else await engineState.refresh();
+  return true;
+}
+
+/** The case the last graph answer was asked for, so a subject move asks again only when it moved. */
+let graphContext: string | null = null;
+/** What the last subject change set in motion, for a caller that must see it finished. */
+let moving: Promise<unknown> = Promise.resolve();
+
 /** Ask the engine, and put a refusal where a person can read it rather than throwing it away.
  *
  * Returns the result on an answer and null on a refusal or a transport failure - the caller decides
@@ -416,17 +537,25 @@ async function ask<O extends Operation>(
   // sequence invisible: the picture failed to arrive, the next call cleared the reason, and the
   // screen showed neither an image nor why. A refusal is cleared when a person dismisses it or when
   // a new thing is asked for - not by the next step of the thing that already failed.
+  const asked = generation;
   setState({ busy: true });
   let answer: Response<O>;
   try {
     answer = await engine.submit(operation, parameters, options);
   } catch (failure) {
+    if (asked !== generation) {
+      setState({ busy: false });
+      return null;
+    }
     const because = failure instanceof TransportFailure ? failure.message : String(failure);
     setState({ busy: false, refusal: because, reachability: { kind: "absent", because } });
     notice("error", `'${operation}' に答えがありません`, because, operation);
     return null;
   }
   setState({ busy: false });
+  // Answered for a document that is no longer the one open: neither its refusal nor its warnings
+  // nor its write belong to this one.
+  if (asked !== generation) return null;
   if (answer.status === "refused" || answer.status === "failed") {
     const reason = reasonText(answer.reason) || `'${operation}' は行えませんでした`;
     setState({ refusal: reason });
@@ -488,6 +617,7 @@ export const engineState = {
    *  than sent to a port nothing answers on. */
   engineExited(status: { reason: string | null; exitCode: number | null; signal: string | null }) {
     engine = null;
+    generation += 1;
     setState({
       reachability: {
         kind: "exited",
@@ -510,10 +640,8 @@ export const engineState = {
     const reachability = await engineState.connect(connection);
     if (reachability.kind !== "reachable" || !opened) return reachability;
     const lost = state.lost;
-    if (!(await engineState.openWorkspace(opened.workspacePath))) return reachability;
-    if (opened.caseId && opened.filePath) {
-      if (await engineState.loadDataset(opened.caseId, opened.filePath)) await engineState.refresh();
-    }
+    if (!(await engineState.openWorkspace(opened.workspacePath, { keepSubjects: true }))) return reachability;
+    if (!(await reloadAll(opened.loads))) return reachability;
     setState({ lost });
     return reachability;
   },
@@ -532,10 +660,8 @@ export const engineState = {
   async takeOverLock(): Promise<boolean> {
     const opened = state.opened;
     if (!opened) return false;
-    if (!(await engineState.openWorkspace(opened.workspacePath, { takeOverStaleLock: true }))) return false;
-    if (opened.caseId && opened.filePath) {
-      if (await engineState.loadDataset(opened.caseId, opened.filePath)) await engineState.refresh();
-    }
+    if (!(await engineState.openWorkspace(opened.workspacePath, { takeOverStaleLock: true, keepSubjects: true }))) return false;
+    if (!(await reloadAll(opened.loads))) return false;
     return !state.readOnly;
   },
 
@@ -553,6 +679,7 @@ export const engineState = {
   /** No engine: the screens stay the catalogue of design states they are, and say so. */
   disconnect() {
     engine = null;
+    generation += 1;
     setImage(null, null);
     state = { ...EMPTY, reachability: { kind: "absent", because: "接続していません" } };
     emit();
@@ -565,13 +692,16 @@ export const engineState = {
   /** Class 3: open a workspace. Everything loaded from the previous one goes with it. The lock is
    *  taken for this session, or found held and the document opened read-only (XC-269); a stale or
    *  unreadable lock is taken over only when the caller says so - a person's word, never a default. */
-  async openWorkspace(path: string, options: { takeOverStaleLock?: boolean } = {}): Promise<boolean> {
+  async openWorkspace(path: string, options: { takeOverStaleLock?: boolean; keepSubjects?: boolean } = {}): Promise<boolean> {
     setState({ refusal: null, warnings: [] });
     const opened = await ask("workspace.open", options.takeOverStaleLock ? { path, takeOverStaleLock: true } : { path });
     if (!opened) return false;
+    // From here every earlier question was of the previous document.
+    generation += 1;
+    showSequence += 1;
     setImage(null, null);
     setState({
-      opened: { workspacePath: path, caseId: null, filePath: null },
+      opened: { workspacePath: path, loads: [] },
       savedViews: (opened.items?.views ?? []) as readonly SavedView[],
       savedReports: (opened.items?.reports ?? []) as readonly SavedView[],
       savedGraphs: (opened.items?.graphs ?? []) as readonly SavedView[],
@@ -590,7 +720,8 @@ export const engineState = {
       readOnly: opened.readOnly ?? false,
       lock: opened.lock ?? null,
       unresolvedCases: opened.unresolvedCases ?? [],
-      cases: (opened.cases ?? []).map((one) => ({ id: one.id, name: one.name })),
+      cases: (opened.cases ?? []).map((one) => ({ id: one.id, name: one.name, ...(one.parentId ? { parentId: one.parentId } : {}) })),
+      loaded: {},
       caseId: null,
       datasetId: null,
       sourceName: null,
@@ -612,6 +743,12 @@ export const engineState = {
       statistics: null,
       partStatistics: null,
     });
+    // The document's first case is the subject until a person chooses another; a document reopened
+    // after a restart keeps the selection and the pins the window still holds (XC-292).
+    if (!options.keepSubjects) {
+      session.resetSubjects();
+      session.selectCase(state.cases[0]?.id ?? null);
+    }
     return true;
   },
 
@@ -639,9 +776,15 @@ export const engineState = {
     const loaded = await ask("dataset.load", { caseId, filePaths: [filePath] });
     if (!loaded) return false;
     const fields = (loaded.fields ?? []) as readonly FieldSummary[];
+    // The graph of this session is over the Graph area's case: a load into that case makes its
+    // numbers those of a file no longer on screen, and it is let go; a load into another case
+    // leaves it, pinned or following (XC-292).
+    const graphOfThisCase = engineState.subjectOf("graph").caseId === caseId;
     setImage(null, null);
     setState({
-      opened: state.opened ? { ...state.opened, caseId, filePath } : null,
+      opened: state.opened
+        ? { ...state.opened, loads: [...state.opened.loads.filter((one) => one.caseId !== caseId), { caseId, filePath }] }
+        : null,
       inspection: null,
       caseId,
       datasetId: loaded.datasetId,
@@ -655,9 +798,7 @@ export const engineState = {
       savedCamera: null,
       cameraPaths: [],
       pathPreview: null,
-      graphId: null,
-      graphSpec: null,
-      graphData: null,
+      ...(graphOfThisCase ? { graphId: null, graphSpec: null, graphData: null } : {}),
       partial: false,
       partVisibility: {},
       selectedPart: null,
@@ -685,6 +826,13 @@ export const engineState = {
     // named (AC-027, XC-273, XC-274). Kept as answered; the sentences are the logic layer's.
     const parts = await ask("dataset.parts", { datasetId: loaded.datasetId });
     setState({ parts: parts?.parts ?? null });
+    remember(filePath);
+    // The View area shows what was just read - the tree's selection moves to its case - unless the
+    // area is pinned elsewhere, in which case the pinned case comes back on screen and the new
+    // dataset waits under its own case (XC-292).
+    const subject = engineState.subjectOf("view");
+    if (subject.source === "pinned" && subject.caseId !== caseId) await showCase(subject.caseId);
+    else if (subject.caseId !== caseId) session.selectCase(caseId);
     return true;
   },
 
@@ -828,11 +976,15 @@ export const engineState = {
    *  and touches no stored number (XC-003, XC-134). */
   async declareUnit(fieldName: string, unitSymbol: string): Promise<boolean> {
     if (!state.datasetId) return false;
+    // Cleared first: the answer carries no value, so a refusal is told from an answer by what this
+    // ask left - and a refusal an earlier action left on screen would read as this one's.
+    setState({ refusal: null });
     const done = await ask("field.declareUnit", { datasetId: state.datasetId, fieldName, unitSymbol });
     if (done === null && state.refusal) return false;
     setState({
       fields: state.fields.map((one) => (one.name === fieldName ? { ...one, unit: unitSymbol } : one)),
     });
+    remember();
     // The legend and every reported number carry the unit now, so both are asked for again rather
     // than edited here: this layer never computes, and a relabelled copy would be a second answer.
     await engineState.refresh();
@@ -866,6 +1018,7 @@ export const engineState = {
         ),
       },
     });
+    remember();
     await engineState.chooseField(made.fieldName);
     return true;
   },
@@ -873,6 +1026,7 @@ export const engineState = {
   /** Class 2: choose which field the colours mean. */
   async chooseField(fieldName: string): Promise<void> {
     setState({ fieldName, probe: null, probeLocation: null, probePosition: null });
+    remember();
     await engineState.refresh();
   },
 
@@ -891,17 +1045,23 @@ export const engineState = {
       setState({ refusal: `'${state.fieldName}' は点でも要素でもない場です。この版は色付けしません` });
       return;
     }
+    const dataset = state.datasetId;
     let viewId = state.viewId;
+    // The view this case works on: the document's, under the field's name or - where another loaded
+    // case already holds that name - under the field's name with this case (XC-292).
+    const working = workingView(state.fieldName, state.caseId ?? "", state.savedViews, loadedList());
     if (!viewId) {
       // The document may already hold this view - saved in an earlier session - and a second one
       // under the same name is refused (AC-030). Updating it is what a person means by "the view",
       // and what it holds is read before it is written: the camera a person kept and the parts
       // they hid are the document's, not this window's to rebuild. Until 2026-09-20 the first
       // redraw of a session overwrote both with what the window had, which was nothing (XC-274).
-      const saved = state.savedViews.find((one) => one.name === state.fieldName);
+      const saved = working.existing;
       if (saved) {
         viewId = saved.id;
         const held = await ask("view.get", { viewId });
+        // The subject moved while the document answered: what it holds is another case's now.
+        if (state.datasetId !== dataset) return;
         const kept = (held?.definition ?? {}) as {
           camera?: CameraDefinition;
           partVisibility?: Record<string, boolean>;
@@ -924,7 +1084,7 @@ export const engineState = {
       id: viewId ?? "view:pending",
       datasetId: state.datasetId,
       representation: "surface",
-      name: state.fieldName,
+      name: working.name,
       colouring: { fieldName: state.fieldName, association, colourMap: state.colourMap },
       // Which parts the picture shows, as the outliner last set it (CT-004, XC-274).
       partVisibility: { ...state.partVisibility },
@@ -944,11 +1104,13 @@ export const engineState = {
     };
     if (viewId) {
       await ask("view.update", { viewId, definition });
+      if (state.datasetId !== dataset) return;
     } else {
       const created = await ask("view.create", {
         workspaceId: state.workspaceId ?? "",
         definition,
       });
+      if (state.datasetId !== dataset) return;
       viewId = created?.id ?? null;
       // The view the document now holds, remembered beside the ones it held at open: a dataset
       // loaded again would otherwise create a second view under this name, which the document
@@ -957,18 +1119,20 @@ export const engineState = {
         viewId,
         savedViews:
           viewId && state.fieldName && state.datasetId
-            ? [...state.savedViews, { id: viewId, name: state.fieldName, datasetId: state.datasetId }]
+            ? [...state.savedViews, { id: viewId, name: working.name, datasetId: state.datasetId }]
             : state.savedViews,
       });
     }
     if (!viewId) return;
     if (!state.savedCamera && definition.camera) setState({ savedCamera: definition.camera });
     await engineState.draw();
+    if (state.datasetId !== dataset) return;
     const statistics = await ask("field.statistics", {
       datasetId: state.datasetId,
       fieldName: state.fieldName,
       resultPosition: state.step,
     });
+    if (state.datasetId !== dataset) return;
     setState({ statistics });
     await engineState.refreshPartStatistics();
   },
@@ -1007,6 +1171,8 @@ export const engineState = {
       // From a position on a path while one is previewed (XC-289), else from the live look.
       ...(preview ? { cameraPath: { id: preview.id, at: preview.at } } : { camera: cameraFrom(state.turntable, state.bounds) }),
     });
+    // The picture is of the view it was asked for; a subject that moved meanwhile has its own.
+    if (state.viewId !== viewId) return;
     if (rendered?.cameraPath) setState({ pathPreview: rendered.cameraPath });
     else if (preview && !rendered) setState({ pathPreview: null });
     if (rendered?.handle) {
@@ -1155,10 +1321,18 @@ export const engineState = {
    *  axis - written to the document as a definition (graph/AC-004) and read back as numbers from
    *  the engine (XC-290). One graph per session under this dataset's name, updated in place. */
   async showGraph(spec: GraphSpec): Promise<boolean> {
-    if (!state.datasetId || !state.workspaceId) return false;
+    if (!state.workspaceId) return false;
+    // The graph is of the Graph area's case - the tree's, or the one the area is pinned to - and
+    // its field is that case's (XC-292). A case with nothing loaded has no field to name.
+    const subject = engineState.subjectOf("graph");
+    const from = subject.caseId ? state.loaded[subject.caseId] : undefined;
+    if (!from) {
+      setState({ refusal: `${subject.label}：このセッションで読み込んだデータセットがありません。グラフの場を選べません` });
+      return false;
+    }
     setState({ refusal: null, graphSpec: spec });
-    const field = state.fields.find((one) => one.name === spec.fieldName);
-    const name = `${state.sourceName ?? "グラフ"}：${spec.fieldName}`;
+    const field = from.fields.find((one) => one.name === spec.fieldName);
+    const name = `${from.sourceName}：${spec.fieldName}`;
     const definition = {
       id: state.graphId ?? "graph:pending",
       name,
@@ -1166,7 +1340,7 @@ export const engineState = {
       series: [
         {
           label: `${spec.fieldName} の${REDUCTION_WORD[spec.reduction]}`,
-          source: { kind: "field", datasetId: state.datasetId, fieldName: spec.fieldName, association: field?.association ?? "point", reduction: spec.reduction },
+          source: { kind: "field", datasetId: from.datasetId, fieldName: spec.fieldName, association: field?.association ?? "point", reduction: spec.reduction },
           ...(field?.unit ? { unit: field.unit, unitDeclared: true } : { unitDeclared: false }),
         },
       ],
@@ -1192,7 +1366,11 @@ export const engineState = {
   /** The graph's numbers, read again from the engine: after a declaration, a step, a change. */
   async refreshGraph(): Promise<boolean> {
     if (!state.graphId) return false;
-    const data = await ask("graph.data", { graphId: state.graphId });
+    // The Graph area's case goes with the question (CT-003 3.15.0): the definition's own cases win
+    // where it names them, and the answer says which it was (XC-292).
+    const subject = engineState.subjectOf("graph");
+    graphContext = subject.caseId;
+    const data = await ask("graph.data", { graphId: state.graphId, ...(subject.caseId ? { contextCaseIds: [subject.caseId] } : {}) });
     setState({ graphData: data });
     return data !== null;
   },
@@ -1202,7 +1380,9 @@ export const engineState = {
    *  the plan decided; everything else is refused with the reason, as a notice, and nothing is
    *  read. The outcome is returned for the screen that showed the drop. */
   async dropFiles(paths: readonly string[]): Promise<DropOutcome> {
-    const plan = dropPlan(paths, { workspaceOpen: state.workspaceId !== null, cases: state.cases, caseId: state.caseId });
+    // The file goes to the case the View area shows - the tree's selection or the pinned case - and
+    // to the one a dataset was loaded into only where nothing is selected (XC-291, XC-292).
+    const plan = dropPlan(paths, { workspaceOpen: state.workspaceId !== null, cases: state.cases, caseId: engineState.subjectOf("view").caseId ?? state.caseId });
     if (plan.kind === "refused") {
       setState({ refusal: plan.reason });
       notice("refusal", "ドロップを受け付けません", plan.reason);
@@ -1266,10 +1446,47 @@ export const engineState = {
     );
   },
 
+  /** Which case an area shows and why (XC-292): the rule is the logic layer's; what goes into it is
+   *  the session's binding and selection, the document's cases, and - for the Graph and Report
+   *  areas - the cases the open item names for itself, which the tree cannot override. A report
+   *  with no view block reads whatever this session loaded, and that is what it says. */
+  subjectOf(area: Area): AreaSubject {
+    const current = session.current();
+    const loaded = loadedList();
+    const item =
+      area === "graph"
+        ? state.graphData && state.graphData.selection === "given"
+          ? [...state.graphData.cases]
+          : null
+        : area === "report" && state.report
+          ? (reportItemCases(state.report.blocks, state.savedViews, loaded) ?? loaded.map((one) => one.caseId))
+          : null;
+    return areaSubject(current.subjects[area], current.selectedCaseId, item, state.cases);
+  },
+
+  /** The session's selection or a binding changed (class 2): every following area moves. The View
+   *  area's move is a switch of dataset; the Graph area's is a new question with its case. */
+  subjectsMoved() {
+    if (!engine || !state.workspaceId) return;
+    const steps: Promise<unknown>[] = [];
+    const view = engineState.subjectOf("view");
+    if (view.caseId !== state.caseId) steps.push(showCase(view.caseId));
+    if (state.graphId && engineState.subjectOf("graph").caseId !== graphContext) steps.push(engineState.refreshGraph());
+    if (steps.length > 0) moving = Promise.all(steps);
+  },
+
+  /** Everything the last subject change set in motion, finished - for a test that drives the tree. */
+  settled(): Promise<void> {
+    return moving.then(() => undefined);
+  },
+
   clearRefusal() {
     setState({ refusal: null });
   },
 };
+
+// Selecting a case or pinning an area is the session's; what it means for the engine is this store's.
+session.subscribe(() => engineState.subjectsMoved());
 
 /** The store as it stands, for a caller that is not a component: a test that drives the thread
  *  and reads what a screen would have been given. Read-only - the object is frozen by convention

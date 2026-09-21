@@ -4,6 +4,7 @@
 import type { EngineState } from "../state/engine";
 import { absentParts } from "./parts";
 import { currentStep } from "./resultPosition";
+import { caseName } from "./subject";
 
 /** The engine's own word for a picture that left nothing out (engine/visualization/render.py). A
  *  `reduced` statement that starts otherwise names what the picture dropped (INV-001). */
@@ -31,7 +32,7 @@ export function viewFooter(state: EngineState, undeclared: string): Showing | nu
   if (!state.workspaceId) return { showing: "ワークスペースが開いていません", incomplete: [] };
 
   const showing: string[] = [`ワークスペース ${state.workspaceId}`];
-  if (state.caseId) showing.push(`ケース ${state.caseId}`);
+  if (state.caseId) showing.push(`ケース ${caseName(state.cases, state.caseId)}`);
   showing.push(state.sourceName ? `データセット ${state.sourceName}` : "データセット未読込");
   if (state.fieldName) {
     const unit = state.fields.find((one) => one.name === state.fieldName)?.unit ?? null;

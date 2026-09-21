@@ -161,7 +161,7 @@ honestly is better than an automated check that passes while the proposal is use
 | graph/AC-005 | integration (planned) | - | a case plus a reference file | authored here | exact | every available quantity offered |
 | graph/AC-006 | integration (planned) | - | a computed series | authored here | exact | expression shown; computation happens in the analysis module |
 | graph/AC-007 | integration (planned) | - | an expression failing on one case | authored here | exact | that case drawn as no data with a reason |
-| graph/AC-008 | integration | tests/test_handlers.py::TestAGraphOverTheLoadedCase | no selection given | authored here | exact | the loaded cases are plotted and the answer says the selection was theirs |
+| graph/AC-008 | integration | tests/test_handlers.py::TestAGraphOverTheLoadedCase | no selection given, and the asking area's context given | authored here | exact | the loaded cases are plotted, or the context's, and the answer says which; a definition naming its cases wins (XC-292) |
 | graph/AC-009 | integration (planned) | - | a declarative selection | authored here | exact | exactly the resolved cases plotted and listed |
 | graph/AC-010 | integration (planned) | - | a selection matching nothing | authored here | exact | the emptying condition is named |
 | graph/AC-011 | integration (planned) | - | failing selection code | authored here | exact | nothing selected, failure reported (XC-089) |
@@ -422,7 +422,7 @@ honestly is better than an automated check that passes while the proposal is use
 | assistant/AC-033 | integration (planned) | - | a changed model or prompt | recorded responses | stated bar | the set re-runs and a regression is visible |
 | assistant/AC-034 | integration (planned) | - | a build with no model configured | authored here | exact | reported skipped, never reported as a pass |
 | operations/AC-020 | manual | - | launch on the sample workspace | the installer under test | LIM-010 | a rendered result within the budget once numbered |
-| operations/AC-021 | manual | - | selecting a case with every area open | the sample workspace | LIM-011 | every area reflects it within the budget once numbered |
+| operations/AC-021 | integration, and manual for the budget | src/ui/logic/subject.test.ts and src/ui/state/engine.connected.test.ts against a real engine | selecting a case with every area open, one area pinned | the demo workspace with a second case added | exact; LIM-011 once numbered | every following area shows the selected case and says so, the pinned one stays, and the budget is measured by hand until LIM-011 has a value |
 | operations/AC-022 | unit (planned) | - | the shared-component table and the interface source | the specification and the repository | exact | each named component resolves to one implementation in its owning module |
 | operations/AC-023 | unit (planned) | - | a deliberate second implementation | authored in the test | exact | the gate fails and names both places |
 | operations/AC-024 | unit | tests/test_check_commands.py::test_the_gate_reports_shared_components_as_unexamined | a run with no interface code | the repository as it stands | exact | reported as not examined, never as unique |

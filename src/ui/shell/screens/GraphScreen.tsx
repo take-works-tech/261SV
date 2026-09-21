@@ -13,12 +13,12 @@
  * Values are illustrative but honest: unit or 単位未宣言, provenance, digits per INV-014.
  */
 import { useState, type ReactNode } from "react";
-import { session } from "../../state/session";
+import { session, useSession } from "../../state/session";
 import { engineState, useEngine, type GraphSpec } from "../../state/engine";
 import { SeriesChart } from "../../shared/SeriesChart";
 import { CopyValues } from "../../shared/CopyValues";
 import { UNDECLARED } from "../../shared/primitives";
-import { graphCopyRows } from "../../logic/graphs";
+import { graphCopyRows, SELECTION_LABEL } from "../../logic/graphs";
 import { axisSteps, hasSteps } from "../../logic/resultPosition";
 import { submit } from "../../client/operations";
 import { formatValue, disabledBecause } from "../../logic/format";
@@ -420,7 +420,10 @@ function Row(props: { label: string; children: ReactNode }): ReactNode {
 
 export function GraphScreen(props: { variant: string }): ReactNode {
   const e = useEngine();
-  if (props.variant === "default" && e.reachability.kind === "reachable" && e.datasetId) return <LiveGraph />;
+  if (props.variant === "default" && e.reachability.kind === "reachable" && e.workspaceId) {
+    // Remounted per subject: the field a person was choosing belongs to the case it was chosen for.
+    return <LiveGraph key={engineState.subjectOf("graph").caseId ?? "none"} />;
+  }
   if (props.variant === "empty") return <GraphEmpty />;
   if (props.variant === "no-points") return <GraphNoPoints />;
   return <GraphFigure variant={props.variant} />;
@@ -432,9 +435,13 @@ export function GraphScreen(props: { variant: string }): ReactNode {
  * beside, the reduction with its scope and weighting, each missing point with its reason. */
 function LiveGraph(): ReactNode {
   const e = useEngine();
-  const steps = axisSteps(e.described);
-  const scalar = e.fields.filter((one) => (one.components ?? 1) === 1);
-  const [fieldName, setFieldName] = useState<string>(e.graphSpec?.fieldName ?? e.fieldName ?? scalar[0]?.name ?? "");
+  useSession();
+  // The Graph area's own subject (XC-292): the case its badge names, and that case's fields.
+  const subject = engineState.subjectOf("graph");
+  const from = subject.caseId ? e.loaded[subject.caseId] : undefined;
+  const steps = axisSteps(from?.described ?? null);
+  const scalar = (from?.fields ?? []).filter((one) => (one.components ?? 1) === 1);
+  const [fieldName, setFieldName] = useState<string>(e.graphSpec?.fieldName ?? from?.fieldName ?? scalar[0]?.name ?? "");
   const [reduction, setReduction] = useState<GraphSpec["reduction"]>(e.graphSpec?.reduction ?? "max");
   const overAxis = hasSteps(steps);
   const spec: GraphSpec = { fieldName, reduction, kind: overAxis ? "overTime" : "line" };
@@ -442,9 +449,10 @@ function LiveGraph(): ReactNode {
   return (
     <div className="gr-root" style={{ display: "grid", gap: 12, padding: 16, alignContent: "start" }}>
       <header style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <b>グラフ：{e.sourceName ?? "データセット"}</b>
+        <b>グラフ：{subject.label}</b>
         <span className="type-caption" style={{ color: "var(--ink-muted)" }}>
-          {overAxis ? `結果軸に沿って（${steps.count} ステップ）` : "読み込まれたケースごとに（1 ケース）"}
+          {subject.because}
+          {from ? `・${from.sourceName}・${overAxis ? `結果軸に沿って（${steps.count} ステップ）` : "ケースごとに 1 点"}` : "・このセッションで読み込んだデータセットがありません"}
         </span>
       </header>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -463,13 +471,18 @@ function LiveGraph(): ReactNode {
             </button>
           ))}
         </span>
-        <button className="btn primary" disabled={!fieldName} onClick={() => void engineState.showGraph(spec)} title="定義を文書に書き、エンジンの数で描きます（graph/AC-004）">
+        <button className="btn primary" disabled={!fieldName || !from} onClick={() => void engineState.showGraph(spec)} title={from ? "定義を文書に書き、エンジンの数で描きます（graph/AC-004）" : "このケースにはこのセッションで読み込んだデータセットがありません"}>
           {shown ? "描き直す" : "描く"}
         </button>
         {e.graphData ? <CopyValues rows={graphCopyRows(e.graphData, UNDECLARED)} label="点を写す" title="系列・位置・値・単位・縮約・来歴をタブ区切りで写します" /> : null}
       </div>
       {e.graphData ? (
-        <SeriesChart data={e.graphData} undeclared={UNDECLARED} />
+        <>
+          <SeriesChart data={e.graphData} undeclared={UNDECLARED} />
+          <p className="type-caption" style={{ color: "var(--ink-muted)", margin: 0 }}>
+            対象ケース：{e.graphData.cases.join("、") || "なし"}（{SELECTION_LABEL[e.graphData.selection] ?? e.graphData.selection}）
+          </p>
+        </>
       ) : (
         <p className="prop-note">場と縮約を選んで「描く」と、エンジンが答えた数だけで図を描きます。場は多くの数なので、どの一つを描くかはここで選びます（INV-017）。</p>
       )}

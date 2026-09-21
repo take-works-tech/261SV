@@ -1020,6 +1020,9 @@ function LiveOverall({ report }: { report: ReportDefinition }) {
 
 function LiveContents({ report }: { report: ReportDefinition }) {
   const e = useEngine();
+  useSession();
+  // Which cases the report reads: its view blocks bind them, and the tree cannot override (XC-292).
+  const subject = engineState.subjectOf("report");
   const rows = blockRows(report, e.savedViews, e.viewId);
   const [draft, setDraft] = useState<{ index: number; text: string } | null>(null);
   const write = (blocks: readonly ReportBlock[]) => void engineState.updateReport({ ...report, blocks });
@@ -1028,7 +1031,7 @@ function LiveContents({ report }: { report: ReportDefinition }) {
       <div className="prop-section">
         <h3>参照範囲</h3>
         <div className="prop-row"><label>ワークスペース</label><span>{e.workspaceId}</span></div>
-        <div className="prop-row"><label>ケース</label><span>{e.caseId ?? "（未読込）"}</span></div>
+        <div className="prop-row"><label>ケース</label><span title={subject.because}>{subject.label}・{subject.because}</span></div>
         <div className="prop-row"><label>データセット</label><span>{e.sourceName ?? "（未読込）"}</span></div>
       </div>
       <div className="prop-section">

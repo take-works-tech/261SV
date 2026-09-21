@@ -67,6 +67,8 @@ updated: 2026-09-21
   A selection of nothing at all chooses **nothing**, not everything. "No selection" and "select all" are
   different intentions, and the expensive direction is the one where a study silently covers every case
   in the workspace.
+  2026-09-21: the interface's selection reaches the engine as `contextCaseIds` (CT-003 3.15.0,
+  XC-292) and the answer says `context`; a definition that names its cases still wins.
 ### TASK-006 - Selection code, isolated
 - satisfies: AC-011
 - depends_on: TASK-004

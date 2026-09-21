@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-20
+updated: 2026-09-21
 ---
 
 # Tasks: running the product
@@ -208,3 +208,16 @@ updated: 2026-09-20
 - done: 2026-09-20 (XC-278). `src/ui/logic/palette.ts` decides what can run and with what;
   `engineState.run` dispatches through the same `ask` as every screen, so a write enters the journal;
   the refusal comes back as the outcome's reason. No key is bound
+### TASK-031 - Each area says which case it shows, and follows the tree or is pinned
+- satisfies: AC-021
+- depends_on: TASK-021
+- done_when: with an engine connected, the case tree lists the document's cases; each of the View,
+  Graph and Report areas names in its header the case it shows and why; selecting another case moves
+  every following area, a pinned one stays, and an item that names its cases is not overridden
+- done: 2026-09-21 (XC-292). `src/ui/logic/subject.ts` holds the rule and the labels;
+  `src/ui/state/session.ts` holds the tree selection and the per-area binding (16_application_model
+  §8.2); `src/ui/state/engine.ts` keeps what was loaded per case and moves the View area with its
+  subject, and asks `graph.data` with the Graph area's case as its context (CT-003 3.15.0);
+  `src/ui/shared/SubjectBadge.tsx` is the header badge with its one control. Proven by
+  `src/ui/logic/subject.test.ts` and the two-case thread in `src/ui/state/engine.connected.test.ts`.
+  The LIM-011 budget itself stays TASK-021: it is unmeasured, and this task does not claim it.

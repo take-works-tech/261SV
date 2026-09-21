@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "3.14.0";
+export const PROTOCOL_VERSION = "3.15.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -200,7 +200,7 @@ export const OPERATION_FACTS: Readonly<Record<Operation, OperationFacts>> = {
   "graph.duplicate": { writes: true, required: ["graphId", "newName"], optional: [], answers: ["id"] },
   "graph.rename": { writes: true, required: ["graphId", "newName"], optional: [], answers: ["id", "revision"] },
   "graph.delete": { writes: true, required: ["graphId"], optional: [], answers: ["deletedId", "unresolvedUnitIds"] },
-  "graph.data": { writes: false, required: ["graphId"], optional: [], answers: ["series", "resultAxisNote", "axisLabel", "cases", "selection", "missing"] },
+  "graph.data": { writes: false, required: ["graphId"], optional: ["contextCaseIds"], answers: ["series", "resultAxisNote", "axisLabel", "cases", "selection", "missing"] },
   "diff.create": { writes: true, required: ["basisCaseId", "caseIdA", "caseIdB"], optional: [], answers: ["diffId", "outsideCount", "outsideFraction", "roundTripError", "disclosure"] },
   "report.create": { writes: true, required: ["definition", "workspaceId"], optional: ["sourceTemplateId", "sourceTemplateRevision"], answers: ["id", "revision"] },
   "report.update": { writes: true, required: ["definition", "reportId"], optional: [], answers: ["id", "revision"] },
@@ -367,6 +367,7 @@ export interface Parameters {
   };
   "graph.data": {
     graphId: string;
+    contextCaseIds?: readonly (string)[];
   };
   "diff.create": {
     caseIdA: string;
@@ -803,7 +804,7 @@ export interface Results {
     resultAxisNote?: string;
     axisLabel: string;
     cases: readonly (string)[];
-    selection: "loaded" | "given";
+    selection: "loaded" | "given" | "context";
     missing: readonly (string)[];
   };
   "diff.create": {

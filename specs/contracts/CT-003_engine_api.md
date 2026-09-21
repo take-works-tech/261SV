@@ -10,7 +10,14 @@ updated: 2026-09-21
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 3.14.0
+- version: 3.15.0
+- correction: 2026-09-21, version 3.14.0 to 3.15.0. `graph.data` takes `contextCaseIds` - the
+  cases the asking area is showing: the tree's selection, or the case the area is pinned to
+  (16_application_model §8.2, XC-292). A definition that names its own cases (`caseSelection`)
+  is the authority and the context is ignored; without either, the loaded cases are plotted as
+  before. The answer's `selection` says which of the three it was (`given`, `context`, `loaded`),
+  because a graph that plotted the selected case silently looks identical to one told to plot it
+  (graph/AC-008). Additive
 - correction: 2026-09-21, version 3.13.0 to 3.14.0. `workspace.open` answers `cases` - the document's
   cases, flattened with their parents - so a file dropped on the window knows where it may go and
   the interface guesses no case id (XC-291, ingest/AC-020). Additive
@@ -212,7 +219,7 @@ no identifier to report.
 | `graph.duplicate` | write | graph id, new name | new independent workspace graph id |
 | `graph.rename` | write | graph id, new name | new revision; stored id references unchanged |
 | `graph.delete` | write | graph id | deleted id; dependent pipeline units retained as unresolved |
-| `graph.data` | read | graph id | the series as numbers in the internal unit of their quantity with the declared unit beside, provenance, reduction, scope, weighting and digits; one point per case, or per step of the result axis for `overTime`, each missing point with its reason; the cases drawn and how they were chosen, the value axis's label, and the note where series come from different result axes (INV-017, graph/AC-002, graph/AC-008, graph/AC-013, XC-131, XC-290) |
+| `graph.data` | read | graph id, context case ids? - what the asking area shows, used only where the definition names no cases (XC-292) | the series as numbers in the internal unit of their quantity with the declared unit beside, provenance, reduction, scope, weighting and digits; one point per case, or per step of the result axis for `overTime`, each missing point with its reason; the cases drawn and how they were chosen - the definition's own, the context given, or the loaded ones - the value axis's label, and the note where series come from different result axes (INV-017, graph/AC-002, graph/AC-008, graph/AC-013, XC-131, XC-290) |
 | `diff.create` | write | case id a, case id b, basis case id | diff id, outside-point count and proportion, round-trip error |
 | `report.create` | write | workspace id, definition (CT-006), source template id and revision? | workspace report id and revision (XC-109) |
 | `report.update` | write | report id, definition | new report revision |

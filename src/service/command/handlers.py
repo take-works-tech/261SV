@@ -1860,13 +1860,18 @@ def graph_data(session: Session, parameters: Mapping[str, Any]) -> Effect | Resu
     if not session.datasets:
         return refused("データセットが読み込まれていません。グラフの点は読み込まれたケースから作ります")
 
-    # Which cases: the given ones, or every loaded one - and the answer says which (AC-008, AC-009).
+    # Which cases: the definition's own, else the context the asking area gave - the tree's
+    # selection or the case it is pinned to (XC-292) - else every loaded one; and the answer says
+    # which (AC-008, AC-009). A definition that names its cases is the authority: the tree cannot
+    # override it by clicking (11_ui.md), so the context is ignored rather than merged in.
     selection = definition.get("caseSelection") or {}
     given = [str(one) for one in (selection.get("caseIds") or [])] if isinstance(selection, Mapping) else []
+    context = [str(one) for one in (parameters.get("contextCaseIds") or [])]
     by_case: dict[str, Loaded] = {}
     for loaded in session.datasets.values():
         by_case[loaded.case_id] = loaded
-    cases = given if given else list(by_case)
+    cases = given or context or list(by_case)
+    chosen = "given" if given else "context" if context else "loaded"
 
     # The series with the units the fields carry **now**: a definition written before a declaration
     # would otherwise label the axis with a unit the numbers are no longer in (XC-003).
@@ -1954,7 +1959,7 @@ def graph_data(session: Session, parameters: Mapping[str, Any]) -> Effect | Resu
         "series": answered,
         "axisLabel": graph_definition.axis_label(live_series),
         "cases": cases,
-        "selection": "given" if given else "loaded",
+        "selection": chosen,
         "missing": missing,
     }
     note = graph_definition.note_result_axes(dict(definition), axes)

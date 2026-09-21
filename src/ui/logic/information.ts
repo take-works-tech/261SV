@@ -107,7 +107,7 @@ export function informationOf(state: EngineState): InformationView | null {
   return {
     file: {
       name: state.sourceName,
-      path: state.opened?.filePath ?? null,
+      path: state.caseId ? (state.loaded[state.caseId]?.filePath ?? null) : null,
       format: extension,
       supportLevel: state.supportLevel,
       supportLabel: level?.label ?? state.supportLevel ?? "不明",

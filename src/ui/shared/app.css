@@ -127,7 +127,9 @@ button:disabled { cursor: not-allowed; color: var(--ink-faint); }
   border-top: 1px solid var(--line); padding: 0 8px;
   background: var(--surface-panel);
 }
-.work-toolbar .cluster { display: flex; align-items: center; gap: 2px; }
+/* One rule for both bars: the area bar's split cluster used the class and had no rule, so its
+   buttons stacked in a column and the bar grew to hold them. */
+.work-toolbar .cluster, .work-area-bar .cluster { display: flex; align-items: center; gap: 2px; flex: none; }
 .tool-divider { width: 1px; align-self: center; height: 22px; background: var(--line); margin: 0 4px; flex: 0 0 1px; }
 
 .area-tabs { display: flex; align-items: stretch; gap: 2px; margin-left: 4px; min-width: 0; }
@@ -249,6 +251,11 @@ button:disabled { cursor: not-allowed; color: var(--ink-faint); }
 }
 .work-area-bar .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-strong); font-size: var(--text-emphasis); font-weight: var(--weight-medium); }
 .work-area-bar .spacer { flex: 1; }
+/* The area's subject (XC-292): one line that shrinks before the bar overflows, and one control. */
+.subject-badge { display: inline-flex; align-items: center; gap: 6px; min-width: 0; flex: 0 1 auto; }
+.subject-badge-case { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-caption); color: var(--ink-muted); }
+.subject-badge-case b { color: var(--ink-strong); font-weight: var(--weight-medium); }
+.subject-badge .btn { flex: none; padding: 1px 8px; font-size: var(--text-caption); }
 
 .shelf { border-top: 1px solid var(--line); background: var(--surface-panel); }
 .shelf > header { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px; }

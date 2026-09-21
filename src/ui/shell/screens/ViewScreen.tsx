@@ -322,7 +322,10 @@ function ViewCanvas({ variant }: { variant: string }) {
   const s = useSession();
   const e = useEngine();
   const [axisId, setAxisId] = useState<AxisId>("time");
-  const caseName = e.sourceName ?? CASE_LABEL[s.selectedCaseId ?? ""] ?? "ケース未選択";
+  // With a document open, the pane is labelled with the area's subject - the case in the document's
+  // words - and the dataset beside it (XC-292). Without one, the fixture tree's selection.
+  const subject = e.reachability.kind === "reachable" && e.workspaceId ? engineState.subjectOf("view") : null;
+  const caseName = subject ? `${subject.label}${e.sourceName ? `・${e.sourceName}` : ""}` : CASE_LABEL[s.selectedCaseId ?? ""] ?? "ケース未選択";
   // With an engine, the first pane carries what it drew and the readout carries what it answered.
   // Without one, every line below is the design state it has always been.
   const live = e.imageUrl
@@ -355,6 +358,7 @@ function ViewCanvas({ variant }: { variant: string }) {
     : undefined;
 
   if (variant === "empty") return <EmptyCanvas />;
+  if (subject && !e.datasetId && variant === "default") return <LiveEmptyCanvas label={subject.label} because={subject.because} />;
   if (variant === "renderer-error") return <RendererErrorCanvas />;
 
   const spec = comparisonSpec(variant);
@@ -886,6 +890,19 @@ function PreflightDialog() {
           <button className="btn ghost" onClick={() => session.navigate("view", "default")}>戻る</button>
           <button className="btn primary" {...disabledBecause("カメラパスが未指定です")}>出力を開始</button>
         </footer>
+      </div>
+    </div>
+  );
+}
+
+/* The View area with a document open and nothing loaded for the case it shows (XC-292): said as
+ * such - never another case's picture under this case's name, and never the design state's samples. */
+function LiveEmptyCanvas({ label, because }: { label: string; because: string }) {
+  return (
+    <div className="vi-canvas" style={{ overflow: "auto", display: "block" }}>
+      <div className="empty-state">
+        <h2>{label}：このセッションで読み込んだデータセットがありません</h2>
+        <p>{because}。結果ファイルをウィンドウに落とすと、このケースへ読み込みます（.svw はワークスペースを開きます）。読み込む前に、形式ごとの対応可否を示します（ingest/AC-020）。</p>
       </div>
     </div>
   );

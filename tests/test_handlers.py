@@ -2199,6 +2199,39 @@ class TestAGraphOverTheLoadedCase:
         got = surface.submit(Command("graph.get", {"graphId": graph_id}))
         assert got.status is Status.ANSWERED and got.value["definition"]["kind"] == "line" and got.value["revision"] == 1
 
+    def test_the_context_case_is_plotted_where_the_definition_names_none_and_the_answer_says_so(self, tmp_path: Path) -> None:
+        """XC-292, graph/AC-008: the asking area's case is the graph's subject where the definition
+        names none; a case with nothing loaded is a point with its reason, not the loaded case instead."""
+        surface, _, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        graph_id = a_graph(surface, dataset_id)
+
+        result = surface.submit(Command("graph.data", {"graphId": graph_id, "contextCaseIds": ["case:2"]}))
+
+        assert result.status is Status.ANSWERED, result.reason
+        assert result.value["cases"] == ["case:2"] and result.value["selection"] == "context"
+        point = result.value["series"][0]["points"][0]
+        assert point["caseId"] == "case:2" and point["value"] is None
+        assert point["reason"] == "ケース 'case:2' は読み込まれていません"
+        assert result.value["missing"] == ["温度の最大 / case:2：ケース 'case:2' は読み込まれていません"]
+
+        same = surface.submit(Command("graph.data", {"graphId": graph_id, "contextCaseIds": ["case:1"]}))
+        assert same.value["selection"] == "context" and same.value["series"][0]["points"][0]["value"] == 8.0
+
+    def test_a_definition_that_names_its_cases_is_the_authority_over_the_context(self, tmp_path: Path) -> None:
+        """11_ui.md, XC-292: an item that binds its own cases is not overridden by the tree."""
+        surface, _, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        graph_id = a_graph(surface, dataset_id)
+        got = surface.submit(Command("graph.get", {"graphId": graph_id})).value["definition"]
+        bound = {**got, "caseSelection": {"caseIds": ["case:1"]}}
+        updated = surface.submit(Command("graph.update", {"graphId": graph_id, "definition": bound}))
+        assert updated.status is Status.APPLIED, updated.reason
+
+        result = surface.submit(Command("graph.data", {"graphId": graph_id, "contextCaseIds": ["case:2"]}))
+
+        assert result.status is Status.ANSWERED, result.reason
+        assert result.value["cases"] == ["case:1"] and result.value["selection"] == "given"
+        assert result.value["series"][0]["points"][0]["value"] == 8.0
+
     def test_a_declared_unit_puts_the_values_in_the_internal_unit_with_the_declared_one_beside(self, tmp_path: Path) -> None:
         surface, _, dataset_id = loaded(tmp_path)
         surface.submit(Command("field.declareUnit", {"datasetId": dataset_id, "fieldName": "stress", "unitSymbol": "MPa"}))

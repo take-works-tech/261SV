@@ -10,6 +10,7 @@ import { connectionFromEnvironment, engineState, useEngine } from "../state/engi
 import { shellApi } from "../client/shell";
 import { EngineLost, EngineRefusal, EngineWarnings, OrphanNotice } from "../shared/EngineStatus";
 import { InstructionBar } from "../shared/InstructionBar";
+import { SubjectBadge } from "../shared/SubjectBadge";
 import { MaterialLibraryShelf, type ShelfAsset, type ShelfState } from "../shared/MaterialLibraryShelf";
 import { Topbar } from "./Topbar";
 import { WorkToolbar } from "./WorkToolbar";
@@ -223,6 +224,7 @@ export function App() {
           {!isChat ? (
             <div className="work-area-bar">
               <span className="title">{TITLES[s.screen]}</span>
+              {s.screen === "view" || s.screen === "graph" || s.screen === "report" ? <SubjectBadge area={s.screen} /> : null}
               {s.screen === "view" ? (
                 <span className="cluster" role="group" aria-label="分割">
                   {([1, 2, 3, 4] as const).map((count) => (

@@ -12,8 +12,14 @@
  * Deep links: #/screen/variant. The variant is a design-state address (mockup 2 is a catalogue of
  * design states, not evidence of implemented behaviour); entering a screen with no variant lands on
  * its baseline (XC-207).
+ *
+ * The subject of each artefact area is here too (§8.2 `SubjectBinding`, XC-292): the tree's one
+ * selection, and per area whether it follows that selection or is pinned to a case. Without a
+ * window - the store's tests run under Node - there is no hash to read and nothing to listen to, and
+ * the session is the same object driven by calls.
  */
 import { useCallback, useSyncExternalStore } from "react";
+import { FOLLOW, type Area, type SubjectBinding } from "../logic/subject";
 
 export type ScreenId =
   | "home"
@@ -41,7 +47,13 @@ export type Session = {
   rightWidth: number;
   paneCount: 1 | 2 | 3 | 4;
   cameraSync: boolean;
+  /** Which case each artefact area shows: the tree's selection, or one it is pinned to (XC-292). */
+  subjects: Readonly<Record<Area, SubjectBinding>>;
 };
+
+const FOLLOW_ALL: Readonly<Record<Area, SubjectBinding>> = { view: FOLLOW, graph: FOLLOW, report: FOLLOW };
+
+const hasWindow = typeof window !== "undefined";
 
 const SCREENS: ScreenId[] = [
   "home", "simulation", "view", "graph", "report", "pipeline",
@@ -49,6 +61,7 @@ const SCREENS: ScreenId[] = [
 ];
 
 function fromHash(): { screen: ScreenId; variant: string } {
+  if (!hasWindow) return { screen: "home", variant: "default" };
   const parts = window.location.hash.replace(/^#\/?/, "").split("/");
   const screen = (SCREENS as string[]).includes(parts[0] ?? "") ? (parts[0] as ScreenId) : "home";
   return { screen, variant: parts[1] && parts[1] !== "" ? parts[1] : "default" };
@@ -65,6 +78,7 @@ let state: Session = {
   rightWidth: 288,
   paneCount: 1,
   cameraSync: false,
+  subjects: FOLLOW_ALL,
 };
 
 const listeners = new Set<() => void>();
@@ -78,15 +92,21 @@ function setState(patch: Partial<Session>) {
   emit();
 }
 
-window.addEventListener("hashchange", () => {
-  const { screen, variant } = fromHash();
-  // A hash change is a class-1 transition: the tool changes, the subject survives.
-  setState({ screen, variant, workspaceOpen: screen === "home" ? state.workspaceOpen : true });
-});
+if (hasWindow) {
+  window.addEventListener("hashchange", () => {
+    const { screen, variant } = fromHash();
+    // A hash change is a class-1 transition: the tool changes, the subject survives.
+    setState({ screen, variant, workspaceOpen: screen === "home" ? state.workspaceOpen : true });
+  });
+}
 
 export const session = {
   /** Class 1: change the tool. The subject - case, result position, selection - survives. */
   navigate(screen: ScreenId, variant = "default") {
+    if (!hasWindow) {
+      setState({ screen, variant, workspaceOpen: screen === "home" ? state.workspaceOpen : true });
+      return;
+    }
     window.location.hash = `#/${screen}/${variant}`;
   },
   /** Class 2: change the subject. Context-following areas re-render. */
@@ -102,8 +122,28 @@ export const session = {
     session.navigate("view");
   },
   closeWorkspace() {
-    setState({ workspaceOpen: false, selectedCaseId: null });
+    setState({ workspaceOpen: false, selectedCaseId: null, subjects: FOLLOW_ALL });
     session.navigate("home");
+  },
+  /** Pin an area to one case - it stops following the tree - or let it follow again (§8.2, XC-292).
+   *  Session state: nothing of it enters the document. */
+  pinArea(area: Area, caseId: string) {
+    setState({ subjects: { ...state.subjects, [area]: { mode: "pinned", caseId } } });
+  },
+  followArea(area: Area) {
+    setState({ subjects: { ...state.subjects, [area]: FOLLOW } });
+  },
+  /** Class 3: another document. Its pins named cases of the one that is gone. */
+  resetSubjects() {
+    setState({ subjects: FOLLOW_ALL });
+  },
+  /** The session as it stands, for a caller that is not a component: the store, or a test. */
+  current(): Session {
+    return state;
+  },
+  subscribe(listener: () => void): () => void {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
   },
   toggleLeft() { setState({ leftOpen: !state.leftOpen }); },
   toggleRight() { setState({ rightOpen: !state.rightOpen }); },
@@ -114,9 +154,6 @@ export const session = {
 };
 
 export function useSession(): Session {
-  const subscribe = useCallback((listener: () => void) => {
-    listeners.add(listener);
-    return () => listeners.delete(listener);
-  }, []);
+  const subscribe = useCallback((listener: () => void) => session.subscribe(listener), []);
   return useSyncExternalStore(subscribe, () => state);
 }
