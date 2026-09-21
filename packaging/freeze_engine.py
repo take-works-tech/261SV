@@ -74,6 +74,10 @@ def freeze() -> Path:
         "--specpath", str(BUILD),
         "--log-level", "WARN",
     ]
+    if os.name == "nt":
+        # The UTF-8 code page for every narrow-string call, so the toolkit's Exodus library takes a
+        # path with Japanese in it instead of ending the process (XC-293, E-216).
+        command += ["--manifest", str(ROOT / "packaging" / "engine.manifest")]
     for distribution in RUNTIME_DISTRIBUTIONS:
         command += ["--copy-metadata", distribution]
     for excluded in EXCLUDED_MODULES:
@@ -99,6 +103,17 @@ def freeze() -> Path:
 
 def check(executable: Path) -> int:
     """Start the frozen engine the way the shell does, and say what happened."""
+    sys.path.insert(0, str(ROOT / "src"))
+    from engine.code_page import CODE_PAGE_PROBE_ARGUMENT  # noqa: PLC0415 - imports nothing of the toolkit
+
+    # Whether the manifest took: on Windows the frozen engine must be in the UTF-8 code page, or the
+    # Exodus family refuses every path with Japanese in it (XC-293, E-216).
+    probe = subprocess.run([str(executable), CODE_PAGE_PROBE_ARGUMENT], cwd=executable.parent, capture_output=True, text=True, encoding="utf-8")
+    code_page = json.loads(probe.stdout.strip().splitlines()[-1]) if probe.stdout.strip() else {}
+    print(json.dumps({"code_page": code_page}, ensure_ascii=False))
+    if os.name == "nt" and not code_page.get("utf8"):
+        print("the frozen engine is not in the UTF-8 code page: packaging/engine.manifest did not take (XC-293)")
+        return 1
     directory = Path(tempfile.mkdtemp(prefix="solvia-frozen-"))
     connection_file = directory / "connection.json"
     started = time.perf_counter()
@@ -149,7 +164,7 @@ def thread(executable: Path) -> int:
     export. Each step's answer is printed; the first refusal ends it.
     """
     sys.path.insert(0, str(ROOT / "tests"))
-    from demo_case import write_demo_case  # noqa: PLC0415 - tests/ is not a package
+    from demo_case import write_demo_case, write_exodus  # noqa: PLC0415 - tests/ is not a package
 
     directory = Path(tempfile.mkdtemp(prefix="solvia-frozen-thread-"))
     workspace, cube = write_demo_case(directory / "demo")
@@ -207,7 +222,21 @@ def thread(executable: Path) -> int:
         target = directory / "frozen.html"
         exported = ask("report.export", reportId=report["id"], path=str(target))
         summary["export"] = {"bytes": exported.get("bytes"), "on_disk": target.stat().st_size if target.exists() else None}
-        summary["ok"] = bool(summary["render"]["png"]) and summary["export"]["bytes"] == summary["export"]["on_disk"]
+        # An Exodus file at a path with Japanese and an emoji in it, through the frozen engine's own
+        # code page (XC-293, E-216): written where the toolkit's writer can, and copied.
+        plain = directory / "plain.ex2"
+        write_exodus(plain)
+        elsewhere = directory / "解析 結果 📐"
+        elsewhere.mkdir()
+        exotic = elsewhere / "ケース.ex2"
+        shutil.copyfile(plain, exotic)
+        loaded_there = ask("dataset.load", caseId="case:1", filePaths=[str(exotic)])
+        summary["non_ascii_path"] = {"file": exotic.name, "fields": sorted(one["name"] for one in loaded_there.get("fields", []))}
+        summary["ok"] = (
+            bool(summary["render"]["png"])
+            and summary["export"]["bytes"] == summary["export"]["on_disk"]
+            and summary["non_ascii_path"]["fields"] == ["elem_stress", "stress", "temp"]
+        )
         print(json.dumps(summary, ensure_ascii=False, indent=1))
         return 0 if summary["ok"] else 1
     except Exception as error:  # noqa: BLE001 - the point is to print whatever the frozen engine did

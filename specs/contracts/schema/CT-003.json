@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "3.15.0",
+  "version": "3.16.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -4729,6 +4729,11 @@
             },
             "exists": {
               "type": "boolean"
+            },
+            "refusal": {
+              "type": "string",
+              "minLength": 1,
+              "description": "この経路のこの形式を読もうとすれば拒まれる理由。分かっている場合だけ：この形式のライブラリが受け取れない経路（XC-293）。無ければ読める見込みで、読めるかどうかは dataset.load が言う"
             }
           }
         },

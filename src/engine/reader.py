@@ -16,6 +16,7 @@ Specification: ingest/REQ-010, REQ-011, REQ-013, ingest/TASK-001, TASK-002.
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -24,6 +25,7 @@ from typing import Callable
 from pathlib import Path
 
 import numpy as np
+from engine.code_page import UTF8_CODE_PAGE, active_code_page
 from vtkmodules.util.numpy_support import vtk_to_numpy
 from vtkmodules.vtkCommonCore import vtkStringArray
 from vtkmodules.vtkCommonDataModel import (
@@ -216,6 +218,10 @@ class ReaderChoice:
     # Run after `Update` to refuse a read that lost something. Separate from `prepare` because the
     # switching is an attempt and the checking is the guarantee.
     verify: "Callable[[object, object], None] | None" = None
+    # The library behind this reader takes the path as a narrow string on Windows, and given a
+    # character outside the process's code page it does not fail: it takes the process down
+    # (E-216). Such a path is refused here, by name, before the library sees it (XC-293).
+    narrow_path: bool = False
 
     def __post_init__(self) -> None:
         carried = FORMATS_CARRYING_UNIT_INFORMATION.get(self.suffix)
@@ -237,6 +243,7 @@ _EXODUS = ReaderChoice(
     ),
     prepare=exodus.enable_everything,
     verify=exodus.verify,
+    narrow_path=True,
 )
 
 # CGNS is the one format this build reads that **declares** its units, and the one whose reader
@@ -265,6 +272,38 @@ _READERS: dict[str, ReaderChoice] = {
 
 def supported_suffixes() -> list[str]:
     return sorted(_READERS)
+
+
+__all__ = ["UTF8_CODE_PAGE", "active_code_page"]  # re-exported for the readers' callers and tests
+
+
+def path_the_reader_cannot_take(location: Path, choice: ReaderChoice) -> str | None:
+    """Why this reader must not be handed this path, or None where it may be (XC-293, E-216).
+
+    Only the readers whose library takes a narrow path are concerned, and only on Windows, and only
+    when the path carries a character outside ASCII and the process is not running in the UTF-8 code
+    page. The measured alternative is the engine process ending with no answer at all, which is
+    worse than any refusal: a refusal names the file, the library and the two ways out.
+    """
+    if not choice.narrow_path or sys.platform != "win32":
+        return None
+    text = str(location)
+    if text.isascii() or active_code_page() == UTF8_CODE_PAGE:
+        return None
+    offending = "".join(dict.fromkeys(ch for ch in text if ord(ch) > 127))[:8]
+    return (
+        f"{location.name} はこの経路からは読めません：この形式（{choice.suffix}）のライブラリ（netCDF）は Windows で"
+        f"経路を狭い文字列として受け取り、ASCII 以外の文字（ここでは '{offending}'）を含む経路では読めずにエンジンごと"
+        "止まります（E-216）。ASCII だけの名前の場所に置いて読み込むか、UTF-8 コードページで動く版でお使いください（XC-293）"
+    )
+
+
+def load_refusal(path: str | Path) -> str | None:
+    """Why a load of this file would be refused before anything is read, or None: what
+    `dataset.inspect` answers so that a drop is refused before any load (XC-291, XC-293)."""
+    location = Path(path)
+    choice = _READERS.get(location.suffix.lower())
+    return path_the_reader_cannot_take(location, choice) if choice is not None else None
 
 
 def _canonical_cells(data: vtkDataSet) -> Cells:
@@ -493,6 +532,9 @@ def read(path: str | Path) -> Dataset:
         )
     if not location.exists():
         raise UnreadableFileError(f"{location} does not exist")
+    refused = path_the_reader_cannot_take(location, choice)
+    if refused:
+        raise UnreadableFileError(refused)
     before = snapshot(location)
     _readable(location)
 
@@ -623,6 +665,9 @@ def read_case(path: str | Path, *, step: int = 0, expected: Fingerprint | None =
         if expected is not None:
             raise _vanished(location, expected, during=False)
         raise UnreadableFileError(f"{location} does not exist")
+    refused = path_the_reader_cannot_take(location, choice)
+    if refused:
+        raise UnreadableFileError(refused)
     before = snapshot(location)
     if expected is not None and before != expected:
         raise _changed(location, expected, before, during=False)

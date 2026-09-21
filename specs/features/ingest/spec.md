@@ -47,6 +47,11 @@ updated: 2026-09-21
   - AC-046: If a file changes while it is being read, or has changed since the @Dataset was loaded from
     it when it is read again, then the system shall refuse the read naming the file and the change,
     and shall not present anything read from it (XC-284)
+  - AC-047: When a path carries characters outside ASCII - Japanese, full-width forms, spaces,
+    punctuation, characters beyond the Basic Multilingual Plane - the system shall read, record,
+    reopen and write at it exactly as at an ASCII path, for every format it reads and every file it
+    writes; where a library it depends on cannot take such a path, the system shall refuse the read
+    by name before the library sees it, rather than end (XC-293)
 
 ### REQ-011 - What the file did not say is not invented
 - priority: MUST

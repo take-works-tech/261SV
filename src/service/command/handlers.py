@@ -751,6 +751,11 @@ def dataset_inspect(session: Session, parameters: Mapping[str, Any]) -> Effect |
         # The file's time with this session's offset beside it (XC-266); absent rather than empty
         # where there is no file, because "" is not a time (XC-001).
         value["modified"] = modified_time(path, session.clock()).as_stored()
+    # A load this build would refuse before reading - a path the format's library cannot take -
+    # is said here, so a drop is refused before any load (XC-291, XC-293).
+    refusal = reader.load_refusal(path)
+    if refusal:
+        value["refusal"] = refusal
     return Effect(f"{path.name}：{level}", value=value)
 
 

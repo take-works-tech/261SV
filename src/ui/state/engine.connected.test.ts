@@ -53,7 +53,9 @@ async function until(what: () => boolean, ms: number, name: string): Promise<voi
 }
 
 beforeAll(async () => {
-  directory = mkdtempSync(join(tmpdir(), "solvia-connected-"));
+  // Under a directory named as a Japanese desktop names one: the workspace, the files and the
+  // run directory all carry characters outside ASCII through Node, the engine and its readers (#253).
+  directory = mkdtempSync(join(tmpdir(), "solvia-接続 (試験)-"));
 
   // The demo case, from the one definition the Python tests also use.
   const written = spawnSync(PYTHON, [join(ROOT, "tests", "demo_case.py"), join(directory, "demo")], {
