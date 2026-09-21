@@ -2155,3 +2155,23 @@ Recorded so that nothing silently depends on them:
   plain first `Update()` not at all. Not measured: the Exodus reader on a file of several steps, for
   which no fixture exists here; it publishes the same pipeline keys
 - justifies: XC-283
+
+### E-212 - What each reader does with a file cut short, measured here
+- tier: T1
+- url: tests/test_incomplete_files.py, from a probe run on the development machine on 2026-09-21
+  (VTK 9.5.2, h5py 3.16.0) against fixtures written by the toolkit's own writers and cut at 50, 80,
+  90, 95, 99 and 99.9 per cent and one byte short
+- verified: 2026-09-21
+- says: CGNS (HDF5): refused at every cut, including one byte short. `.vtu`, `.vtp`: refused at
+  every cut inside the data, read with every value identical to the complete file when the cut is
+  inside the closing tag (99 per cent and one byte short for a 1.8 kB `.vtu`; one byte short for a
+  7.7 kB `.vtp`). Binary `.stl`: refused at every cut but one byte short, which reads whole. A
+  `.pvtu` with a piece cut: refused at 50 and 90 per cent, whole at 99; with the manifest cut or a
+  piece missing: refused. Exodus II (NetCDF classic, magic `CDF\x02`, 3,308 bytes): refused at 50
+  and 80 per cent by the results-arrived check (`ResultsLost`); **at 90, 95 and 99 per cent read as
+  4 points, 2 cells and all three fields with every value 0.0**, with nothing written to the
+  toolkit's output window; at 99.9 per cent and one byte short read whole. The file's NetCDF header
+  declares an extent of 3,308 bytes, equal to the complete file and greater than every cut, one byte
+  short included. Not measured: an Exodus file in HDF5 form (the writer here makes NetCDF classic);
+  a file cut while a reader holds it open
+- justifies: XC-284

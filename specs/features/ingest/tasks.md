@@ -422,3 +422,17 @@ is either missing a requirement or is not work this specification asked for.
 - done: 2026-09-20 (XC-273). `src/ui/logic/information.ts` turns the store's answers into the area's
   facts; the screen and its rail render them, and without an engine stay the design states. The
   §4 row of 16_application_model now claims the screen, and the §14 gap row is gone
+
+### TASK-035 - A file that is still being written is not a result
+- satisfies: AC-022, AC-046
+- depends_on: TASK-008
+- done_when: for every format this build reads, a file cut short is refused or reads exactly as the
+  complete file, never as something else; a file that changes while it is read, or since it was
+  loaded, is refused naming the change
+- done: 2026-09-21 (XC-284, #263). Measured first (E-212): the Exodus reader zero-fills a file cut
+  in its last ten per cent and says nothing, so `engine/completeness.py` reads the NetCDF classic
+  header and refuses a file shorter than it declares, before the read. `reader.read_case` and
+  `reader.read` fingerprint every file involved before and after the read; `dataset.load` records
+  the fingerprint and another step is read only from the same file. `tests/test_incomplete_files.py`
+  cuts every format at six places and one byte short on every run. Found on the way: a `.pvtu`
+  manifest cut in half reached the caller as the XML parser's own exception; it is refused by name

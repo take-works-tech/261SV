@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-20
+updated: 2026-09-21
 ---
 
 # Feature: result ingest
@@ -44,6 +44,9 @@ updated: 2026-09-20
     shall state that it is not supported, without creating a partial @Case
   - AC-022: If a supported file is unreadable or truncated, then the system shall report the failure
     with the file name and shall leave the @Workspace unchanged
+  - AC-046: If a file changes while it is being read, or has changed since the @Dataset was loaded from
+    it when it is read again, then the system shall refuse the read naming the file and the change,
+    and shall not present anything read from it (XC-284)
 
 ### REQ-011 - What the file did not say is not invented
 - priority: MUST

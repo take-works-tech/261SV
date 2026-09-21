@@ -6201,3 +6201,38 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a reader that surfaces the file's own axis kind (XC-240's trigger), at which point
   the kind-naming members are accepted for that format; and a measured cost of re-reading a step that
   argues for a larger cache, at which point the bound becomes a number with evidence behind it
+
+### XC-284 - A file that is not all there is not a result, and a file must hold still while it is read
+- decided: 2026-09-21
+- status: active
+- decision: a result file is read only when its container's own statement of its length is met - for
+  a NetCDF classic container (Exodus II), the header's declared extent, checked before the reader is
+  asked for anything - and only when its fingerprint, the size and modification time of every file
+  involved, is the same after the read as before it. A file shorter than it declares, a file that
+  changed during the read, and a file that has changed since the @Dataset was loaded when another
+  step is read from it, are each refused naming the file and the fact, and nothing read from them is
+  presented. What was read before the change stays what it was; a re-read waits for a person. The
+  check is of the header and of the metadata, not a checksum, and says so
+- decided_by: engineering judgement, from #263's condition, ingest/AC-022 and a measurement taken here
+- rationale: measured on 2026-09-21 (E-212), on every format this build reads cut at six places: the
+  HDF5 container refuses every cut, the XML and STL readers refuse a cut inside the data and accept
+  one inside the closing bytes with every value intact - and the Exodus reader accepts a file cut
+  anywhere in its last ten per cent, returning every point, every cell and every field name of the
+  complete file with the values zeroed, and prints nothing. A solver writing into a watched folder
+  produces exactly such a file for minutes at a time, and zeros in every field are a plausible result.
+  The NetCDF classic header declares where each variable's bytes lie, so the least the file can be is
+  known before it is read; a complete file is exactly that long. The fingerprint before and after
+  is the cheapest statement that the bytes read were one version of the file; without it a file
+  appended to mid-read is a dataset of two runs under one name
+- alternatives: **reading the file twice and comparing** - twice the cost for a weaker statement than
+  the header's. **A checksum** - reads every byte of a file that may be gigabytes, on every open;
+  the size and time comparison is what CT-001 already records and what workspace/AC-012 already
+  checks, stated as not a checksum. **Waiting for the file to stop changing** - a delay chosen by
+  guess, and a file that stops mid-write is still short. **Refusing a recently modified file** - a
+  guess about the writer, where the header is a fact about the file
+- basis: E-212 (T1)
+- affects: MOD-002, MOD-012, ingest/REQ-010
+- decidedness: Fixed
+- reversal_trigger: a format whose container declares no length and whose reader fills silently,
+  which would need a reader-side check this design does not have; and an Exodus file in HDF5 form,
+  for which the HDF5 measurement on CGNS is the evidence rather than one on Exodus itself
