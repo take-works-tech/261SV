@@ -6738,3 +6738,34 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a sample that must show a format this generator cannot write, or a result the
   formulas cannot give - a transient, a mode shape - at which point a second generated sample joins
   this one rather than replacing it
+
+### XC-299 - A number is accepted against a known solution through the path a person reads it by, and a discrete answer is held to its predicted error, not to a tolerance
+- decided: 2026-09-21
+- status: active
+- decision: the product's numbers are accepted against a known solution - the generated sample of
+  XC-298, whose fields follow from five constants and two formulas - **through every path a person
+  reads a number by**: the statistics with their weighting, both numbers of a cell field, a probe at
+  a point, a pick on a picture, a derived quantity, a graph over cases and the value table of a
+  deliverable (`tests/test_known_solution.py`, E-221). Each is held to the formula's value where the
+  discrete field is the continuous one - a bilinear stress at the nodes, its maximum a float32 number
+  exactly - and where it cannot be, **the difference is predicted and asserted rather than
+  tolerated**: the trilinear interpolant of a cubic deflection integrates to the trapezoid rule's
+  value, `dx^2 F L / (24 E I)` above the analytic mean on this grid, and the weighted mean is
+  expected to be that, to a part in a hundred thousand, and expected **not** to be the analytic mean.
+  A tolerance wide enough to hide a discretisation error is wide enough to hide a wrong weighting
+- decided_by: engineering judgement, from #204's condition and INV-001, INV-017, INV-031 and INV-032
+- rationale: correct arithmetic can report a wrong number (E-143, E-144), and a check placed at one
+  path - the reader, say - passes while the graph or the deliverable reports something else. The
+  sample exists so that a reader can check the product by hand; the acceptance test is that reader,
+  run every time. Holding the mean to its trapezoid value rather than to "within a percent of the
+  analytic" is what makes a wrong weighting visible: the equal split and the dual volume differ by
+  less than a percent on a uniform grid and by exactly this prediction not at all
+- alternatives: **loose tolerances** - hide the weighting. **A separate analytic mesh for tests** -
+  a second known solution nobody ships; the sample is the one the reader has. **Holding the pick to
+  a node's value by identifier** - the sample carries no identifiers, so the pick is held to the set
+  of values the field takes, which is the honest check for a file that names no node
+- basis: E-221 (T1), E-220 (T1)
+- affects: MOD-004, operations/REQ-001
+- decidedness: Fixed
+- reversal_trigger: a second generated sample with a result the formulas cannot give exactly - a
+  transient, a mode - at which point that sample's acceptance names its own predicted error
