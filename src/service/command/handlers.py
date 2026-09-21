@@ -54,6 +54,7 @@ from engine.report.document import (
     ValueRow,
     build as build_document,
 )
+from engine.visualization import camera_path as camera_paths
 from engine.visualization import pick
 from engine.visualization import render as render_module
 from engine.visualization.backends import REQUIRES, Backend, probe
@@ -1428,6 +1429,63 @@ def camera_of(stated: Mapping[str, Any] | None) -> Camera | Result:
         return refused(f"camera が読めません：{error}")
 
 
+def camera_for(definition: Mapping[str, Any], parameters: Mapping[str, Any]) -> tuple[Camera, dict[str, Any] | None] | Result:
+    """The camera a picture is drawn or picked with, and - where it came from a path - the statement
+    of which path, where on it, by what rule, and the pose that gave (XC-289).
+
+    Three sources, in this order: `cameraPath` in the parameters (a path of the definition and a
+    parameter on it), `camera` in the parameters (a look, interface state, XC-270), the definition's
+    own camera. Two of the first two together are refused: two answers to "from where".
+    """
+    stated_path = parameters.get("cameraPath")
+    stated_camera = parameters.get("camera")
+    if stated_path and stated_camera:
+        return refused("camera と cameraPath は同時に指定できません：どこから描くかの答えが二つになります")
+    if not stated_path:
+        camera = camera_of(stated_camera or definition.get("camera"))
+        return camera if isinstance(camera, Result) else (camera, None)
+    if not isinstance(stated_path, Mapping):
+        return refused(f"cameraPath はオブジェクトです（{type(stated_path).__name__} が渡されました）")
+    wanted = str(stated_path.get("id", ""))
+    found = next((one for one in (definition.get("cameraPaths") or []) if isinstance(one, Mapping) and str(one.get("id")) == wanted), None)
+    if found is None:
+        known = [str(one.get("id")) for one in (definition.get("cameraPaths") or []) if isinstance(one, Mapping)]
+        return refused(f"カメラパス '{wanted}' はこのビューにありません。あるのは {known} です")
+
+    def parse(stated: Mapping[str, Any] | None) -> Camera:
+        camera = camera_of(stated)
+        if isinstance(camera, Result):
+            raise camera_paths.CameraPathError(camera.reason or "camera が読めません")
+        return camera
+
+    try:
+        path = camera_paths.from_definition(found, parse)
+        camera = path.at(float(stated_path.get("at", float("nan"))))
+    except (camera_paths.CameraPathError, TypeError, ValueError) as error:
+        return refused(str(error))
+    return camera, {
+        "id": path.id,
+        "at": float(stated_path["at"]),
+        "interpolation": path.interpolation,
+        "rule": path.rule,
+        "camera": camera_definition(camera),
+    }
+
+
+def camera_definition(camera: Camera) -> dict[str, Any]:
+    """A camera in CT-004's shape, so a pose the engine computed can be handed back and used again."""
+    stated: dict[str, Any] = {"projection": camera.projection}
+    if camera.position_m is not None:
+        stated["position_m"] = list(camera.position_m)
+    if camera.focal_point_m is not None:
+        stated["focalPoint_m"] = list(camera.focal_point_m)
+    if camera.view_up is not None:
+        stated["viewUp"] = list(camera.view_up)
+    if camera.parallel_scale_m is not None:
+        stated["parallelScale_m"] = camera.parallel_scale_m
+    return stated
+
+
 #: The ground a picture is drawn on when the view does not say. White, because the deliverable is the
 #: harder case: a document printed on paper wants a white ground, and a screen can ask for its own.
 DEFAULT_BACKGROUND = (1.0, 1.0, 1.0)
@@ -1495,10 +1553,12 @@ def view_render(session: Session, parameters: Mapping[str, Any]) -> Effect | Res
     if isinstance(shown, Result):
         return shown
     # A camera given draws the picture from there and leaves the definition's camera as it is: a
-    # camera move is interface state, not a document change (XC-270, 16_application_model §6).
-    camera = camera_of(parameters.get("camera") or definition.get("camera"))
-    if isinstance(camera, Result):
-        return camera
+    # camera move is interface state, not a document change (XC-270, 16_application_model §6). A
+    # position on one of the definition's camera paths is a computed pose, answered with its rule.
+    looked = camera_for(definition, parameters)
+    if isinstance(looked, Result):
+        return looked
+    camera, from_path = looked
     available, detail = session.offscreen()
     if not available:
         # Asked before drawing, because drawing without a context does not fail - it takes the
@@ -1516,9 +1576,12 @@ def view_render(session: Session, parameters: Mapping[str, Any]) -> Effect | Res
     except RenderError as error:
         return refused(str(error))
     handle = session.handles.issue(rendered.png)
+    answer: dict[str, Any] = {"handle": handle["id"], "reduced": rendered.reduced, "resultPosition": stated_position(position)}
+    if from_path is not None:
+        answer["cameraPath"] = from_path
     return Effect(
         f"{rendered.width}x{rendered.height} の画像を描きました（{handle['bytes']} バイト）",
-        value={"handle": handle["id"], "reduced": rendered.reduced, "resultPosition": stated_position(position)},
+        value=answer,
     )
 
 
@@ -1596,10 +1659,12 @@ def view_pick(session: Session, parameters: Mapping[str, Any]) -> Effect | Resul
     colouring = colouring_of(stated)
     if isinstance(colouring, Result):
         return colouring
-    # The camera the picture was drawn with, where the caller gave one (XC-270).
-    camera = camera_of(parameters.get("camera") or definition.get("camera"))
-    if isinstance(camera, Result):
-        return camera
+    # The camera the picture was drawn with, where the caller gave one (XC-270) - or the pose on a
+    # path the picture was drawn from, so the pixel is read off the same picture (XC-289).
+    looked = camera_for(definition, parameters)
+    if isinstance(looked, Result):
+        return looked
+    camera, from_path = looked
     available, detail = session.offscreen()
     if not available:
         # The unprojection needs the same scene the picture was drawn in, and that needs the toolkit
@@ -1656,6 +1721,8 @@ def view_pick(session: Session, parameters: Mapping[str, Any]) -> Effect | Resul
         # Which part answered, so the outliner's selection can follow the viewport's (view/AC-055).
         # Nothing hit names no part: a name there would be the part the ray happened to be asked last.
         answered["part"] = part.label
+    if from_path is not None:
+        answered["cameraPath"] = from_path
     return Effect(
         f"画素 {pixel} の値を読みました" if not value.is_missing else f"画素 {pixel} の先には何もありません",
         value=answered,

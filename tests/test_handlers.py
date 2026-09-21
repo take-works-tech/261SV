@@ -2068,3 +2068,96 @@ class TestTheLogArea:
         assert surface.submit(Command("system.log", {"level": "loud"})).status is Status.REFUSED
         assert surface.submit(Command("system.log", {"limit": 0})).status is Status.REFUSED
         assert surface.submit(Command("system.log", {"since": "yesterday"})).status is Status.REFUSED
+
+
+PATH_KEYFRAMES = [
+    {"at": 0.0, "camera": {"position_m": [4.0, 0.0, 0.0], "focalPoint_m": [0.5, 0.5, 0.5], "viewUp": [0.0, 0.0, 1.0], "projection": "perspective"}},
+    {"at": 1.0, "camera": {"position_m": [0.0, 4.0, 0.0], "focalPoint_m": [0.5, 0.5, 0.5], "viewUp": [0.0, 0.0, 1.0], "projection": "perspective"}},
+]
+
+
+def a_view_with_a_path(surface: Surface, dataset_id: str, keyframes=None) -> str:
+    return surface.submit(Command("view.create", {"workspaceId": "ws:1", "definition": {
+        "name": "経路つき", "datasetId": dataset_id, "representation": "surface",
+        "colouring": {"fieldName": "temperature", "association": "point", "colourMap": "viridis"},
+        "cameraPaths": [{"id": "path:1", "name": "四分の一周", "interpolation": "linear", "keyframes": keyframes or PATH_KEYFRAMES}],
+    }})).value["id"]
+
+
+@needs_offscreen
+class TestAFrameFromACameraPath:
+    """XC-289: a picture drawn from a position on one of the view's camera paths, answered with the
+    pose the path's rule gave and the rule, so the frame carries how its viewpoint was computed."""
+
+    def test_the_frame_is_drawn_from_the_interpolated_pose_and_says_so(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        view_id = a_view_with_a_path(surface, dataset_id)
+
+        drawn = surface.submit(Command("view.render", {"viewId": view_id, "width": 200, "height": 150, "format": "png", "cameraPath": {"id": "path:1", "at": 0.5}}))
+
+        assert drawn.status is Status.ANSWERED, drawn.reason
+        stated = drawn.value["cameraPath"]
+        assert stated["id"] == "path:1" and stated["at"] == 0.5 and stated["interpolation"] == "linear"
+        assert stated["camera"]["position_m"] == [2.0, 2.0, 0.0]
+        assert stated["camera"]["viewUp"] == [0.0, 0.0, 1.0] and stated["camera"]["projection"] == "perspective"
+        assert "直線補間" in stated["rule"]
+
+    def test_the_same_pose_given_as_a_camera_draws_the_same_picture(self, tmp_path: Path) -> None:
+        surface, session, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        view_id = a_view_with_a_path(surface, dataset_id)
+        size = {"viewId": view_id, "width": 200, "height": 150, "format": "png"}
+
+        from_path = surface.submit(Command("view.render", {**size, "cameraPath": {"id": "path:1", "at": 0.25}}))
+        pose = from_path.value["cameraPath"]["camera"]
+        from_camera = surface.submit(Command("view.render", {**size, "camera": pose}))
+
+        assert from_path.status is Status.ANSWERED and from_camera.status is Status.ANSWERED
+        assert session.handles.fetch(from_path.value["handle"]) == session.handles.fetch(from_camera.value["handle"])
+        assert "cameraPath" not in from_camera.value
+
+    def test_a_pick_on_a_path_frame_reads_the_same_picture(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        view_id = a_view_with_a_path(surface, dataset_id)
+
+        picked = surface.submit(Command("view.pick", {"viewId": view_id, "width": 300, "height": 300, "x": 150, "y": 150, "cameraPath": {"id": "path:1", "at": 0.5}}))
+
+        assert picked.status is Status.ANSWERED, picked.reason
+        assert picked.value["cameraPath"]["camera"]["position_m"] == [2.0, 2.0, 0.0]
+        assert picked.value["value"]["value"] in {float(one) for one in range(1, 9)}
+
+
+class TestWhatACameraPathRefuses:
+    def test_a_path_the_view_does_not_have_is_refused_with_what_there_is(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        view_id = a_view_with_a_path(surface, dataset_id)
+
+        result = surface.submit(Command("view.render", {"viewId": view_id, "width": 200, "height": 150, "format": "png", "cameraPath": {"id": "path:9", "at": 0.5}}))
+
+        assert result.status is Status.REFUSED and "path:9" in (result.reason or "") and "path:1" in (result.reason or "")
+
+    def test_a_parameter_past_the_ends_is_refused_not_clamped(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        view_id = a_view_with_a_path(surface, dataset_id)
+
+        result = surface.submit(Command("view.render", {"viewId": view_id, "width": 200, "height": 150, "format": "png", "cameraPath": {"id": "path:1", "at": 1.5}}))
+
+        assert result.status is Status.REFUSED and "代用はしません" in (result.reason or "")
+
+    def test_a_camera_and_a_path_together_are_two_answers_and_refused(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        view_id = a_view_with_a_path(surface, dataset_id)
+
+        result = surface.submit(Command("view.render", {
+            "viewId": view_id, "width": 200, "height": 150, "format": "png",
+            "cameraPath": {"id": "path:1", "at": 0.5}, "camera": PATH_KEYFRAMES[0]["camera"],
+        }))
+
+        assert result.status is Status.REFUSED and "同時に" in (result.reason or "")
+
+    def test_a_path_of_one_keyframe_is_refused_by_name(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        view_id = a_view_with_a_path(surface, dataset_id, keyframes=PATH_KEYFRAMES[:1])
+
+        result = surface.submit(Command("view.render", {"viewId": view_id, "width": 200, "height": 150, "format": "png", "cameraPath": {"id": "path:1", "at": 0.0}}))
+
+        assert result.status is Status.REFUSED and "2 件以上" in (result.reason or "")

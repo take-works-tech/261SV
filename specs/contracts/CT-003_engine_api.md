@@ -10,7 +10,12 @@ updated: 2026-09-21
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 3.11.0
+- version: 3.12.0
+- correction: 2026-09-21, version 3.11.0 to 3.12.0. `view.render` and `view.pick` take `cameraPath`
+  - one of the view definition's camera paths (CT-004 3.3.0) and a parameter on it - and answer
+  the pose the path's rule gave, with the rule, so a frame drawn from a computed pose carries how it
+  was computed (INV-020, XC-289). `camera` and `cameraPath` together are refused: two answers to
+  "from where". Additive
 - correction: 2026-09-21, version 3.10.0 to 3.11.0. `system.log` is added: the diagnostic log of
   XC-263 read back - commands with their outcomes and reasons, the warnings an answer carried, and
   the egress decisions, from the files that outlive the process where there are files, and the
@@ -190,8 +195,8 @@ no identifier to report.
 | `view.duplicate` | write | view id, new name | new independent workspace view id |
 | `view.rename` | write | view id, new name | new revision; stored id references unchanged |
 | `view.delete` | write | view id | deleted id; dependent pipeline units retained as unresolved |
-| `view.render` | read | view id, width, height, format, legend (default true), camera? | image bytes or a handle to them, and which step the picture is of - the definition's `resultPosition` (CT-004, view/AC-032); a camera given draws the picture from there and leaves the definition's camera as it is (XC-270) |
-| `view.pick` | read | view id, width, height, pixel x and y, camera? | the value under that pixel with its unit, digits, provenance and location, which point or cell it is, which part answered and which step it is of - or nothing, where the pixel is off the model or on a hidden part (view/AC-027, view/AC-029, view/AC-032, view/AC-055) |
+| `view.render` | read | view id, width, height, format, legend (default true), camera? or cameraPath? - a path of the definition and a parameter on it | image bytes or a handle to them, and which step the picture is of - the definition's `resultPosition` (CT-004, view/AC-032); a camera given draws the picture from there and leaves the definition's camera as it is (XC-270); a path position draws from the pose the path's rule gives and answers that pose with the rule (XC-289) |
+| `view.pick` | read | view id, width, height, pixel x and y, camera? or cameraPath? | the value under that pixel with its unit, digits, provenance and location, which point or cell it is, which part answered and which step it is of - or nothing, where the pixel is off the model or on a hidden part (view/AC-027, view/AC-029, view/AC-032, view/AC-055) |
 | `graph.create` | write | workspace id, definition (CT-005), source template id and revision? | workspace graph id and revision (XC-109) |
 | `graph.update` | write | graph id, definition | new graph revision |
 | `graph.duplicate` | write | graph id, new name | new independent workspace graph id |

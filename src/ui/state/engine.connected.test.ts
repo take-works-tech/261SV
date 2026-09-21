@@ -587,6 +587,44 @@ describe("the prototype thread from the interface's side", () => {
   });
 });
 
+describe("a camera path (XC-289)", () => {
+  test("keyframes from the live look are written to the view, read back, and a frame on the path carries the engine's pose and rule", async () => {
+    expect(await engineState.loadDataset("case:1", cubePath)).toBe(true);
+    await engineState.refresh();
+    expect(snapshot().imageUrl).toMatch(/^blob:/);
+
+    expect(await engineState.addPathKeyframe(0)).toBe(true);
+    await engineState.orbit(90, 0);
+    expect(await engineState.addPathKeyframe(1)).toBe(true);
+    let s = snapshot();
+    expect(s.cameraPaths[0]?.keyframes.map((one) => one.at)).toEqual([0, 1]);
+    expect(s.cameraPaths[0]?.interpolation).toBe("linear");
+    // The same parameter twice is refused before anything is written.
+    expect(await engineState.addPathKeyframe(1)).toBe(false);
+    expect(snapshot().refusal).toContain("既にキーフレーム");
+
+    expect(await engineState.previewPath(0.5)).toBe(true);
+    s = snapshot();
+    expect(s.pathPreview?.id).toBe("path:1");
+    expect(s.pathPreview?.at).toBe(0.5);
+    expect(s.pathPreview?.rule).toContain("直線補間");
+    expect(s.pathPreview?.camera.position_m).toHaveLength(3);
+    expect(s.imageUrl).toMatch(/^blob:/);
+
+    await engineState.setPathInterpolation("smooth");
+    s = snapshot();
+    expect(s.cameraPaths[0]?.interpolation).toBe("smooth");
+    expect(s.pathPreview?.interpolation).toBe("smooth");
+
+    // The document holds the path: a fresh read of the view brings it back.
+    const before = s.cameraPaths[0];
+    await engineState.clearPathPreview();
+    expect(snapshot().pathPreview).toBeNull();
+    await engineState.refresh();
+    expect(snapshot().cameraPaths[0]).toEqual(before);
+  });
+});
+
 describe("the log area (XC-286)", () => {
   test("a refusal is a notice kept after dismissal, and the engine's log reads it back with where it lives", async () => {
     expect(await engineState.loadDataset("case:1", fieldsPath)).toBe(true);

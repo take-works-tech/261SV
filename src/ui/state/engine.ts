@@ -20,6 +20,7 @@ import { Engine, TransportFailure, reasonText } from "../client/engine";
 import type { Connection, Operation, Options, Parameters, Response, Results } from "../client/engine";
 import { OPERATION_FACTS, type CameraDefinition, type RecordedTime } from "../client/generated";
 import { recordNow } from "../client/time";
+import { FIRST_PATH, withKeyframe, withoutKeyframe, type CameraPathDefinition, type Interpolation } from "../logic/cameraPath";
 
 /** Whether an engine is reachable, and what it said if it is not. */
 export type Reachability =
@@ -55,6 +56,8 @@ export interface Derivation {
 /** A number the engine reported, carried whole. Never unpacked into a bare value: a value without
  *  its unit, digits and provenance is a value in whatever unit the reader assumed (XC-003). */
 export type Reported = Results["dataset.probe"]["value"];
+/** What the engine answered about a frame drawn from a camera path (CT-003 3.12.0). */
+export type PathPreview = NonNullable<Results["view.render"]["cameraPath"]>;
 
 /** A notice this window raised - a refusal, a failure, a warning beside an answer - kept after
  *  dismissal with the time it was dismissed (16_application_model §12, XC-286). The engine's log
@@ -191,6 +194,13 @@ export interface EngineState {
   /** The view's own camera - what a report renders - as this session last wrote it. The live camera
    *  is the turntable and stays out of the document until `keepCamera` (XC-270). */
   readonly savedCamera: CameraDefinition | null;
+  /** The view's camera paths as the document holds them (CT-004 3.3.0, XC-289): read back with the
+   *  view and written with every refresh. */
+  readonly cameraPaths: readonly CameraPathDefinition[];
+  /** The last frame drawn from a path: which path, where on it, the pose the engine's rule gave and
+   *  the rule - the engine's answer, kept so the panel shows what was drawn. Null while the picture
+   *  is the turntable's. */
+  readonly pathPreview: PathPreview | null;
   /** An object URL for the rendered frame, or null. Revoked when it is replaced. */
   readonly imageUrl: string | null;
   readonly reduced: string | null;
@@ -307,6 +317,8 @@ const EMPTY: EngineState = {
   colourMap: "viridis",
   viewId: null,
   savedCamera: null,
+  cameraPaths: [],
+  pathPreview: null,
   imageUrl: null,
   reduced: null,
   partial: false,
@@ -553,6 +565,8 @@ export const engineState = {
       derived: {},
       fieldName: null,
       viewId: null,
+      cameraPaths: [],
+      pathPreview: null,
       partial: false,
       partVisibility: {},
       selectedPart: null,
@@ -606,6 +620,8 @@ export const engineState = {
       fieldName: fields[0]?.name ?? null,
       viewId: null,
       savedCamera: null,
+      cameraPaths: [],
+      pathPreview: null,
       partial: false,
       partVisibility: {},
       selectedPart: null,
@@ -642,12 +658,61 @@ export const engineState = {
    *  is written, so nothing enters the undo history or the unsaved work (XC-270). */
   async orbit(byAzimuth: number, byElevation: number): Promise<void> {
     setState({
+      pathPreview: null,
       turntable: {
         ...state.turntable,
         azimuthDegrees: state.turntable.azimuthDegrees + byAzimuth,
         elevationDegrees: state.turntable.elevationDegrees + byElevation,
       },
     });
+    await engineState.draw();
+  },
+
+  /** A keyframe of the one path from the live look, at parameter `at` (XC-289). A document write:
+   *  the definition is written with the next refresh, and the engine reads the path back from it. */
+  async addPathKeyframe(at: number): Promise<boolean> {
+    const camera = cameraFrom(state.turntable, state.bounds);
+    if (!camera || !state.viewId) {
+      setState({ refusal: "絵がまだありません：向きを取るには、先に描かれたビューが要ります" });
+      return false;
+    }
+    const added = withKeyframe(state.cameraPaths[0] ?? null, at, camera);
+    if ("refused" in added) {
+      setState({ refusal: added.refused });
+      return false;
+    }
+    setState({ cameraPaths: [added.path, ...state.cameraPaths.slice(1)], refusal: null });
+    await engineState.refresh();
+    return state.refusal === null;
+  },
+
+  async removePathKeyframe(at: number): Promise<void> {
+    const path = state.cameraPaths[0];
+    if (!path) return;
+    setState({ cameraPaths: [withoutKeyframe(path, at), ...state.cameraPaths.slice(1)], pathPreview: null });
+    await engineState.refresh();
+  },
+
+  async setPathInterpolation(interpolation: Interpolation): Promise<void> {
+    const path = state.cameraPaths[0];
+    if (!path) return;
+    setState({ cameraPaths: [{ ...path, interpolation }, ...state.cameraPaths.slice(1)] });
+    await engineState.refresh();
+    if (state.pathPreview) await engineState.previewPath(state.pathPreview.at);
+  },
+
+  /** The frame from parameter `at` on the path, as the engine interpolates it; the answer's pose
+   *  and rule are kept beside the picture. The turntable is untouched: this is a look, not a move. */
+  async previewPath(at: number): Promise<boolean> {
+    const path = state.cameraPaths[0];
+    if (!path || !state.viewId) return false;
+    setState({ refusal: null, pathPreview: { id: path.id, at, interpolation: path.interpolation, rule: "", camera: {} } });
+    await engineState.draw();
+    return state.pathPreview !== null && state.pathPreview.rule !== "";
+  },
+
+  async clearPathPreview(): Promise<void> {
+    setState({ pathPreview: null });
     await engineState.draw();
   },
 
@@ -671,8 +736,11 @@ export const engineState = {
       height: FRAME.height,
       x: Math.round(x),
       y: Math.round(y),
-      // The camera the frame on screen was drawn with, or the pixel is read off another picture.
-      camera: cameraFrom(state.turntable, state.bounds),
+      // The camera the frame on screen was drawn with, or the pixel is read off another picture -
+      // the path's pose while a path frame is on screen (XC-289).
+      ...(state.pathPreview
+        ? { cameraPath: { id: state.pathPreview.id, at: state.pathPreview.at } }
+        : { camera: cameraFrom(state.turntable, state.bounds) }),
     });
     setState({
       probe: answer?.value ?? null,
@@ -803,6 +871,7 @@ export const engineState = {
           partVisibility?: Record<string, boolean>;
           colouring?: { colourMap?: string };
           resultPosition?: { step?: number };
+          cameraPaths?: CameraPathDefinition[];
         };
         setState({
           viewId,
@@ -811,6 +880,7 @@ export const engineState = {
           colourMap: kept.colouring?.colourMap ?? state.colourMap,
           // The step the document kept the view at (CT-004), read before it is written (XC-283).
           step: kept.resultPosition?.step ?? 0,
+          cameraPaths: kept.cameraPaths ?? [],
         });
       }
     }
@@ -825,6 +895,8 @@ export const engineState = {
       // The step the view is at, by its ordinal along the sequence the file declared - the one
       // member an axis of undeclared kind can take (CT-004 3.2.0, XC-240, XC-283).
       resultPosition: { step: state.step },
+      // The view's camera paths, as this window last edited them (CT-004 3.3.0, XC-289).
+      cameraPaths: state.cameraPaths.map((one) => ({ ...one, keyframes: [...one.keyframes] })),
       // The view's own camera, not the live one: the definition is what a report renders, and the
       // turntable stays out of it until the person keeps a look (XC-270). The first definition
       // takes the pose the model is first seen from, so a report of an unkept view is not blank.
@@ -890,13 +962,17 @@ export const engineState = {
     if (!viewId || !engine) return;
     // No bar inside the picture: the rail's legend carries the range with its unit, which the
     // bar cannot (E-192), and two scales for one image is one too many. A document asks for it.
+    const preview = state.pathPreview;
     const rendered = await ask("view.render", {
       viewId,
       ...FRAME,
       format: "png",
       legend: false,
-      camera: cameraFrom(state.turntable, state.bounds),
+      // From a position on a path while one is previewed (XC-289), else from the live look.
+      ...(preview ? { cameraPath: { id: preview.id, at: preview.at } } : { camera: cameraFrom(state.turntable, state.bounds) }),
     });
+    if (rendered?.cameraPath) setState({ pathPreview: rendered.cameraPath });
+    else if (preview && !rendered) setState({ pathPreview: null });
     if (rendered?.handle) {
       try {
         const blob = await engine.handle(rendered.handle);

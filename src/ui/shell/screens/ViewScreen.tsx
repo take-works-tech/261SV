@@ -22,6 +22,7 @@ import { reducedNote, viewFooter } from "../../logic/showing";
 import { axisSteps, currentStep, describeStep, endReason, hasSteps, type AxisSteps } from "../../logic/resultPosition";
 import { probeRows, statisticsRows } from "../../logic/copy";
 import { CopyValues } from "../../shared/CopyValues";
+import { CameraPathPanel } from "../../shared/CameraPathPanel";
 import { COPY_LABELS } from "../../shared/primitives";
 import { UnresolvedList } from "../../shared/UnresolvedList";
 import { WorkspaceItemList } from "../../shared/WorkspaceItemList";
@@ -419,6 +420,7 @@ function ViewCanvas({ variant }: { variant: string }) {
 
       {variant === "result-bookmarks" ? <BookmarkPanel caseName={caseName} /> : null}
       {variant === "output-motion" ? <PresetPanel /> : null}
+      {live && variant === "default" ? <CameraPathPanel /> : null}
       {variant === "assistant-drawer" ? <AssistantDrawer /> : null}
       {variant === "output-preflight" ? <PreflightDialog /> : null}
 

@@ -6384,3 +6384,38 @@ model or the prompt, never in a description that quietly went stale.
   rule gains that type's quadrature rather than an approximation; and a measured cost of the pass on
   a case at LIM-001's scale that a person waits for, at which point the shares are computed once per
   dataset and kept
+
+### XC-289 - A camera path is keyframes on its own parameter with a rule that travels with every frame
+- decided: 2026-09-21
+- status: active
+- decision: a @View holds named camera paths (CT-004 `cameraPaths`), each a list of keyframes - a full
+  camera pose at a parameter from 0 to 1 - and an interpolation rule, `linear` or `smooth` (a uniform
+  Catmull-Rom curve through the keyframes for the position and the focal point; the view-up straight
+  and normalised, the parallel scale straight, the projection one for the path). The parameter is the
+  path's own: a @Timeline says when and carries no camera (XC-200), a path says from where, and a
+  video names one of each. `view.render` and `view.pick` take a path and a parameter on it and answer
+  the pose the rule gave together with the rule, so a frame drawn from a computed viewpoint carries how
+  it was computed (INV-020), and the same pose handed back as `camera` draws the same picture. Refused
+  by name: fewer than two keyframes, keyframes out of order or with a default pose, a parameter past
+  the ends - never clamped - and `camera` given together with `cameraPath`. The interface adds a
+  keyframe from the live look, chooses the rule, and previews the path with a scrub; the video and
+  its playback speed wait on the encoder decision (#276)
+- decided_by: engineering judgement, from #289's condition, 16_application_model §7 (`timeline`:
+  named paths, keyframes, interpolation, preview) and XC-200
+- rationale: a frame between two keyframes is a computed pose, and a computed number carries its
+  formula - here the rule and the pose, so a reviewer can check a frame's viewpoint and reproduce it
+  from the pose alone. Two rules rather than one because a straight cut between two looks and a
+  smooth fly-round are both things an engineer asks for, and neither is the other; more than two is
+  a surface nobody has asked for. The parameter is not the result axis because XC-200 separated when
+  from where for a reason that still holds: the same path seen at another speed is one path and
+  another timeline, not two paths
+- alternatives: **keyframes on result positions** - the app model allows it and XC-200 argues against
+  binding where to when; a path on its own parameter is paired with any timeline. **Clamping past
+  the ends** - the frame at the end shown for a parameter past it is a lie about where. **Only
+  linear** - a fly-round with visible corners at every keyframe is what people ask smoothing for
+- basis: E-121 (T1)
+- affects: MOD-003, MOD-012, MOD-016, CT-003, CT-004, view/REQ-015
+- decidedness: Fixed
+- reversal_trigger: a video output (#276), at which point the path's parameter is mapped to the
+  timeline's frames and the playback speed is recorded on the output (view/AC-041); and a request
+  for a rule the two cannot express, which is a third named rule rather than a parameter on these

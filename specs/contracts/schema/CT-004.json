@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-004 view definition",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "type": "object",
   "additionalProperties": true,
   "required": [
@@ -706,6 +706,62 @@
     "cameraSynchronised": {
       "type": "boolean",
       "default": true
+    },
+    "cameraPaths": {
+      "type": "array",
+      "description": "named camera paths of this view: where a picture is looked at from, along a parameter from 0 to 1 (XC-289). A @Timeline says when and carries no camera (XC-200); a video names one timeline and one path",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "keyframes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "interpolation": {
+            "type": "string",
+            "enum": [
+              "linear",
+              "smooth"
+            ],
+            "default": "linear",
+            "description": "the rule between keyframes, part of the definition and stated on every frame drawn from it: linear draws straight between the keyframes around the parameter; smooth draws a uniform Catmull-Rom curve through them for the position and the focal point"
+          },
+          "keyframes": {
+            "type": "array",
+            "description": "in increasing parameter order, at least two for a path that can be followed; a single keyframe cannot produce a video and the preflight says so",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "at",
+                "camera"
+              ],
+              "properties": {
+                "at": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "description": "the path's own parameter, from 0 to 1 - not a result position; the timeline maps time"
+                },
+                "camera": {
+                  "$ref": "#/properties/camera",
+                  "description": "the pose at this keyframe: position, focal point and view-up all stated, because a default pose cannot be interpolated"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "$defs": {
