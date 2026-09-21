@@ -464,3 +464,11 @@ button:disabled { cursor: not-allowed; color: var(--ink-faint); }
 .field-with-action .field-input { flex: 1; min-width: 0; }
 .engine-dot.absent { background: var(--ink-faint); }
 .engine-busy { color: var(--ink-faint); }
+
+/* ---- a drop in progress (XC-291): the whole window is the target, and says what it takes ------- */
+.drop-hint {
+  position: fixed; inset: 8px; z-index: 80; display: grid; place-items: center; pointer-events: none;
+  border: 2px dashed var(--ink-strong); border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--surface-panel) 88%, transparent);
+  color: var(--ink-strong); font-size: var(--text-body); text-align: center; padding: 24px;
+}

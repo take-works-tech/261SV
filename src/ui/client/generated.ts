@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "3.13.0";
+export const PROTOCOL_VERSION = "3.14.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -174,7 +174,7 @@ export interface OperationFacts {
 }
 
 export const OPERATION_FACTS: Readonly<Record<Operation, OperationFacts>> = {
-  "workspace.open": { writes: true, required: ["path"], optional: ["takeOverStaleLock"], answers: ["workspaceId", "formatVersion", "unresolvedCases", "items", "readOnly", "lock"] },
+  "workspace.open": { writes: true, required: ["path"], optional: ["takeOverStaleLock"], answers: ["workspaceId", "formatVersion", "unresolvedCases", "items", "readOnly", "lock", "cases"] },
   "workspace.save": { writes: true, required: ["workspaceId"], optional: ["path"], answers: ["path", "previousKept"] },
   "workspace.close": { writes: true, required: ["workspaceId"], optional: [], answers: [] },
   "case.create": { writes: true, required: ["name", "workspaceId"], optional: ["parentCaseId"], answers: ["id"] },
@@ -594,6 +594,11 @@ export interface Results {
       };
       detail?: string;
     };
+    cases: readonly ({
+      id: string;
+      name: string;
+      parentId?: string;
+    })[];
   };
   "workspace.save": {
     path: string;

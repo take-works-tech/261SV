@@ -2288,3 +2288,26 @@ class TestAGraphOverTheLoadedCase:
         assert [(one["x"], one["value"]) for one in points] == [(0.0, 90.0), (0.5, 91.0)]
         assert points[1]["resultPosition"]["stated"] == "ステップ 2/2（位置 0.5・軸の種類は宣言なし）"
         assert "宣言されていない" in result.value.get("resultAxisNote", "")
+
+
+class TestTheOpenAnswerNamesTheCases:
+    """XC-291: a file dropped on the window goes to a case the document names, never one the
+    interface guessed; the open answer lists them flat, with their parents."""
+
+    def test_the_demo_workspace_has_its_one_case(self, tmp_path: Path) -> None:
+        surface, _, workspace = opened(tmp_path)
+
+        result = surface.submit(Command("workspace.open", {"path": str(workspace)}))
+
+        assert result.status is Status.APPLIED, result.reason
+        assert result.value["cases"] == [{"id": "case:1", "name": "baseline"}]
+
+    def test_a_nested_case_names_its_parent(self, tmp_path: Path) -> None:
+        document = a_workspace(tmp_path, cases=[{"id": "case:1", "name": "study", "children": [{"id": "case:1a", "name": "variant"}]}])
+        session = Session(clock=at(9), issue=counting_issuer(), native_offscreen=lambda: (False, "テスト"))
+        surface = build_surface(session)
+
+        result = surface.submit(Command("workspace.open", {"path": str(document)}))
+
+        assert result.status is Status.APPLIED, result.reason
+        assert result.value["cases"] == [{"id": "case:1", "name": "study"}, {"id": "case:1a", "name": "variant", "parentId": "case:1"}]

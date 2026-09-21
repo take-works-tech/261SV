@@ -609,6 +609,12 @@ def workspace_open(session: Session, parameters: Mapping[str, Any]) -> Effect | 
             "formatVersion": loaded.format_version,
             "unresolvedCases": unresolved,
             "items": items_of(loaded),
+            # The cases the document holds, flattened with their parents, so a file dropped on the
+            # window knows where it may go without the interface guessing a case id (XC-291).
+            "cases": [
+                {"id": str(case.get("id", "")), "name": str(case.get("name", case.get("id", ""))), **({"parentId": ancestors[-1]} if ancestors else {})}
+                for case, ancestors in walk_cases(loaded.cases)
+            ],
             "readOnly": not status.may_edit,
             "lock": status.as_stored(workspace_lock.lock_for(location)),
         },

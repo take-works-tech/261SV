@@ -87,6 +87,11 @@ export interface ShellApi {
     orphans(): Promise<readonly Orphan[]>;
     removeOrphans(ids: readonly string[]): Promise<readonly Orphan[]>;
   };
+  readonly files: {
+    /** The path of a file dropped on the window (XC-291). A page in a browser gets a `File` and
+     *  never a path; only the shell can say where it is. */
+    pathOf(file: File): string;
+  };
   readonly dialog: {
     /** A path the person chose, or null if they cancelled. The path is the shell's to obtain: a page
      *  in a browser gets a File and never a path, and the engine reads from disk (XC-259). */
