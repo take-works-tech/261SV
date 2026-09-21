@@ -112,11 +112,13 @@ export interface ShellApi {
     saveWorkspace(suggestedName: string): Promise<string | null>;
   };
   /** The workspaces this shell opened, newest first (XC-297). `remember` is called by the store
-   *  after an open the engine accepted; `forget` only when a person asks. */
+   *  after an open the engine accepted; `forget` and `clear` only when a person asks - the list is
+   *  their information, kept by the shell alone and part of no bundle (XC-300). */
   readonly recent: {
     list(): Promise<readonly RecentWorkspace[]>;
     remember(entry: RecentWorkspace): Promise<readonly RecentWorkspace[]>;
     forget(path: string): Promise<readonly RecentWorkspace[]>;
+    clear(): Promise<readonly RecentWorkspace[]>;
   };
 }
 

@@ -6,7 +6,11 @@
  *
  * Nothing here is a claim about a workspace: a name and tags are what the engine answered when the
  * document was opened, and the path is where it was then. A file that has since gone is found out
- * when it is opened again, and the entry is removed only when a person asks. */
+ * when it is opened again, and the entry is removed only when a person asks.
+ *
+ * The list is the person's information (XC-300): its paths carry a customer's names. So it lives
+ * beside the engine's directories and inside none of them (profile.ts), it goes into no bundle, and
+ * it is emptied - one entry or all of it - only on the person's word. */
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
@@ -67,4 +71,12 @@ export function forget(file: string, path: string): RecentWorkspace[] {
   const next = readRecent(file).filter((one) => !sameFile(one.path, path));
   writeRecent(file, next);
   return next;
+}
+
+/** The list emptied - every entry at once - on a person's word and never the shell's (XC-300).
+ *  Written as an empty list in place rather than deleted, so the file keeps the one shape this
+ *  module reads; what it held is no longer in it. No file an entry named is touched. */
+export function clear(file: string): RecentWorkspace[] {
+  writeRecent(file, []);
+  return [];
 }

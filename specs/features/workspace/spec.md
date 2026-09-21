@@ -278,6 +278,11 @@ updated: 2026-09-21
     one on request, and create a new workspace at a path the person chose - written with one case
     and opened, refused where a file already is - without scanning folders or inferring anything
     from a file it did not open (XC-297)
+  - AC-077: When the Workspace list holds entries, it shall let the person remove one entry or clear
+    the whole list, removing no file either way; the shell alone shall keep the list, beside the
+    engine's transient root and log directory and inside neither, it shall appear in no support
+    bundle, audit or egress, and the shell shall drop an entry on its own only past the list's
+    limit (XC-300)
   - AC-057: When a workspace is open, the second toolbar shall place the left-panel toggle at its far
     left and the right-panel toggle at its far right, so either panel can be reopened after closing;
     neither sidebar shall repeat those controls, and the left sidebar shall not show a

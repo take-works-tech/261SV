@@ -56,6 +56,7 @@ const api: ShellApi = {
     list: () => ipcRenderer.invoke("recent:list"),
     remember: (entry: RecentWorkspace) => ipcRenderer.invoke("recent:remember", entry),
     forget: (path: string) => ipcRenderer.invoke("recent:forget", path),
+    clear: () => ipcRenderer.invoke("recent:clear"),
   },
 };
 
