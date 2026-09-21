@@ -20,6 +20,7 @@ import { Engine, TransportFailure, reasonText } from "../client/engine";
 import type { Connection, Operation, Options, Parameters, Response, Results } from "../client/engine";
 import { OPERATION_FACTS, type CameraDefinition, type RecordedTime } from "../client/generated";
 import { recordNow } from "../client/time";
+import { shellApi } from "../client/shell";
 import { FIRST_PATH, withKeyframe, withoutKeyframe, type CameraPathDefinition, type Interpolation } from "../logic/cameraPath";
 import { dropPlan, fileName, inspectionAllowsLoad } from "../logic/drop";
 import { areaSubject, reportItemCases, workingView, type Area, type AreaSubject, type CaseSummary } from "../logic/subject";
@@ -210,6 +211,9 @@ export interface EngineState {
    *  the caps dropped said in numbers (LIM-014, LIM-015). Null until asked. */
   readonly history: Results["history.list"] | null;
   readonly workspaceId: string | null;
+  /** The document's name and the tags of its cases as one set, as `workspace.open` answered (XC-297). */
+  readonly workspaceName: string | null;
+  readonly caseTags: readonly string[];
   /** Whether the document may not be written back - somebody else holds its lock - and what the
    *  lock said. Read-only is drawn at the save: the window works in memory (XC-269). */
   readonly readOnly: boolean;
@@ -352,6 +356,8 @@ const EMPTY: EngineState = {
   savedAt: null,
   history: null,
   workspaceId: null,
+  workspaceName: null,
+  caseTags: [],
   readOnly: false,
   lock: null,
   warnings: [],
@@ -717,6 +723,8 @@ export const engineState = {
       journal: [],
       savedAt: null,
       workspaceId: opened.workspaceId,
+      workspaceName: opened.name ?? null,
+      caseTags: opened.tags ?? [],
       readOnly: opened.readOnly ?? false,
       lock: opened.lock ?? null,
       unresolvedCases: opened.unresolvedCases ?? [],
@@ -749,7 +757,24 @@ export const engineState = {
       session.resetSubjects();
       session.selectCase(state.cases[0]?.id ?? null);
     }
+    // The shell's list of what was opened, for the Workspace list to offer again (XC-297): as the
+    // engine described the document, and only after the engine accepted the open.
+    const shell = shellApi();
+    if (shell && !options.keepSubjects) {
+      void shell.recent.remember({ path, name: opened.name ?? fileName(path), tags: opened.tags ?? [], openedAt: recordNow() });
+    }
     return true;
+  },
+
+  /** Class 3: a new document at a path the person chose, with one case, then opened - the engine
+   *  writes it and answers as it does for any open (`workspace.create`, XC-297). */
+  async createWorkspace(path: string, name: string, caseName?: string): Promise<boolean> {
+    setState({ refusal: null, warnings: [] });
+    const created = await ask("workspace.create", { path, name, ...(caseName ? { caseName } : {}) });
+    if (!created) return false;
+    // The document now exists and is open in the engine; the store takes it as it takes any open,
+    // by opening it again rather than by copying the answer into a second set of fields.
+    return engineState.openWorkspace(path);
   },
 
   /** Before reading a file: the support level this build promises for its format, and what the

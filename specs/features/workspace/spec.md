@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-20
+updated: 2026-09-21
 ---
 
 # Feature: workspace, cases and variables
@@ -273,6 +273,11 @@ updated: 2026-09-20
     destinations and shall not label the workspace collection as `Case list`
   - AC-056: When the Workspace list is open, it shall provide search, filtering, grid/list controls,
     new-workspace action and workspace cards without presenting invented analysis values
+  - AC-076: When the Workspace list is open with an engine, it shall list the workspaces this shell
+    opened with the name and case tags the engine answered, narrow them by search and by tag, open
+    one on request, and create a new workspace at a path the person chose - written with one case
+    and opened, refused where a file already is - without scanning folders or inferring anything
+    from a file it did not open (XC-297)
   - AC-057: When a workspace is open, the second toolbar shall place the left-panel toggle at its far
     left and the right-panel toggle at its far right, so either panel can be reopened after closing;
     neither sidebar shall repeat those controls, and the left sidebar shall not show a

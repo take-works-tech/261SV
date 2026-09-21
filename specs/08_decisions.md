@@ -6665,3 +6665,40 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a customer who prints on Letter, at which point the sheet becomes a setting
   written into the document at export rather than a rule; or a browser among the supported ones
   (#256) that ignores `@page` size, at which point the test says which
+
+### XC-297 - The Workspace list is what this shell opened, a new workspace is written where the person chose, and the engine describes each document as it opens it
+- decided: 2026-09-21
+- status: active
+- decision: with a shell and an engine, the Workspace list shows the workspaces **this shell
+  opened** - path, the document's name, the tags of its cases as one set, and when - newest first,
+  narrowed by a search over name, path and tags and by the tags they carry. The list is the
+  shell's, kept as one file under its profile (`recent.json`, whole or absent, twenty entries),
+  because the shell is the only part that outlives a session and the engine holds one document at
+  a time; an entry is written only after the engine accepted the open, and removed only when a
+  person asks - a file that has since gone is found out when it is opened again, refused by name,
+  and offered for removal then. **A new workspace is written where the person chose**
+  (`workspace.create`, CT-003 3.17.0): the shell's save dialogue names the path, the engine refuses
+  a path that already holds a file or whose folder is not there, writes a document with one case -
+  named by the caller or `ケース 1`, because a workspace with no case has nowhere to load a file
+  into (XC-291) - and opens it, answering what `workspace.open` answers. **The engine describes
+  the document as it opens it**: `workspace.open` answers the document's name and the tags of its
+  cases, so the list shows what the engine said and never what the shell inferred from a file.
+  Without a shell the browser build keeps its way in that asks for paths in words, and the design
+  states stay what they are. The sample workspace of first launch (operations/REQ-001, XC-129) is
+  not this decision's: it needs a shipped sample first
+- decided_by: engineering judgement, from #277's condition and workspace/REQ-017
+- rationale: the first screen a person meets must offer what they were doing and a way to start;
+  a list that had to scan folders would guess, and a list the engine kept would forget at every
+  restart. Twenty entries is a screen and a half of cards and still means recent; the number is a
+  choice (Bounded), not a measurement. Tags are the cases' because the document carries no tags of
+  its own (CT-001), and inventing a workspace tag would be a second thing named tag
+- alternatives: **scanning a folder for `.svw` files** - guesses where a person keeps work and
+  reads files nobody asked to open. **Keeping the list in the engine** - lost at every restart,
+  and the engine's directory is transient by decision (XC-262). **Creating a workspace without a
+  case** - the first drop would be refused for want of a case
+- basis: E-001 (T1)
+- affects: MOD-007, MOD-012, MOD-016, MOD-017, MOD-018, CT-003, workspace/REQ-017
+- decidedness: Fixed
+- reversal_trigger: a document that carries its own tags (a CT-001 change), at which point the
+  list's tags are the document's; or a shared list across machines, which is a synchronisation
+  question and not this one

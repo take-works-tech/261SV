@@ -30,6 +30,7 @@ import {
   type Engine,
   type Orphan,
 } from "./engine-process.js";
+import { forget, readRecent, remember } from "./recent.js";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url)); // <package>/dist/shell/
 const PACKAGE = resolve(HERE, "..", "..");
@@ -122,6 +123,12 @@ function transientRoot(): string {
 
 function engineDirectory(): string {
   return sessionDirectory(transientRoot());
+}
+
+/** The recent-workspace list, under the profile - beside the engine's root, not inside it, because
+ *  it is the shell's own and outlives every session (XC-297). The smoke keeps it with its temp. */
+function recentFile(): string {
+  return SMOKE ? join(transientRoot(), "recent.json") : join(app.getPath("userData"), "recent.json");
 }
 
 /** Orphans found at start: sessions of shells that are gone. Reported to the interface, removed
@@ -246,6 +253,31 @@ function registerBridge(): void {
     });
     return chosen.canceled ? null : chosen.filePaths[0] ?? null;
   });
+  ipcMain.handle("dialog:saveWorkspace", async (_event, suggestedName: unknown) => {
+    const name = typeof suggestedName === "string" && suggestedName ? suggestedName : "workspace.svw";
+    const chosen = await dialog.showSaveDialog({
+      title: "新しいワークスペースを作る",
+      defaultPath: name.endsWith(".svw") ? name : `${name}.svw`,
+      filters: [{ name: "SOLVIA ワークスペース", extensions: ["svw"] }],
+    });
+    return chosen.canceled ? null : chosen.filePath ?? null;
+  });
+  ipcMain.handle("recent:list", () => readRecent(recentFile()));
+  ipcMain.handle("recent:remember", (_event, entry: unknown) => {
+    // What the interface hands over is checked by shape: the bridge is not a place to trust a value.
+    if (typeof entry !== "object" || entry === null) return readRecent(recentFile());
+    const one = entry as { path?: unknown; name?: unknown; tags?: unknown; openedAt?: unknown };
+    if (typeof one.path !== "string" || typeof one.name !== "string" || !Array.isArray(one.tags) || typeof one.openedAt !== "object" || one.openedAt === null) {
+      return readRecent(recentFile());
+    }
+    return remember(recentFile(), {
+      path: one.path,
+      name: one.name,
+      tags: one.tags.filter((tag): tag is string => typeof tag === "string"),
+      openedAt: one.openedAt as { utc: string; offsetMinutes: number | null },
+    });
+  });
+  ipcMain.handle("recent:forget", (_event, path: unknown) => (typeof path === "string" ? forget(recentFile(), path) : readRecent(recentFile())));
   ipcMain.handle("dialog:saveReport", async (_event, suggestedName: unknown) => {
     const name = typeof suggestedName === "string" && suggestedName ? suggestedName : "report.html";
     const chosen = await dialog.showSaveDialog({

@@ -12,7 +12,7 @@
  * connected screens are still judged by a person.
  */
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -352,7 +352,7 @@ describe("the prototype thread from the interface's side", () => {
 
     const s = snapshot();
     expect(s.operations?.registered).toContain("system.operations");
-    expect(s.operations?.registered.length).toBe(33);
+    expect(s.operations?.registered.length).toBe(34);
     expect([...(s.operations?.registered ?? []), ...(s.operations?.unimplemented ?? [])].sort()).toEqual([...OPERATIONS].sort());
     const rows = commandGroups(s.operations, "").flatMap((group) => group.rows);
     expect(rows).toHaveLength(OPERATIONS.length);
@@ -820,6 +820,35 @@ describe("each area says which case it shows (XC-292)", () => {
     expect(snapshot().sourceName).toBe("cube.vtu");
     expect(await engineState.openWorkspace(workspacePath)).toBe(true);
     expect(session.current().subjects.view).toEqual({ mode: "follow" });
+    expect(await engineState.loadDataset("case:1", cubePath)).toBe(true);
+    await engineState.refresh();
+    expect(snapshot().imageUrl).toMatch(/^blob:/);
+  });
+});
+
+describe("a new workspace (XC-297)", () => {
+  test("is written where it was asked for, with one case, opened, and refused where a file already is", async () => {
+    const folder = join(directory, "新しい検討");
+    mkdirSync(folder);
+    const made = join(folder, "made.svw");
+    expect(await engineState.createWorkspace(made, "作った検討", "基準")).toBe(true);
+    let s = snapshot();
+    expect(s.workspaceName).toBe("作った検討");
+    expect(s.cases.map((one) => one.name)).toEqual(["基準"]);
+    expect(s.caseTags).toEqual([]);
+    expect(existsSync(made)).toBe(true);
+    expect(session.current().selectedCaseId).toBe(s.cases[0]?.id ?? null);
+    // A second document under the same name is refused, and the first is untouched.
+    const before = readFileSync(made, "utf-8");
+    expect(await engineState.createWorkspace(made, "二つ目")).toBe(false);
+    expect(snapshot().refusal).toContain("すでにあります");
+    expect(readFileSync(made, "utf-8")).toBe(before);
+    engineState.clearRefusal();
+
+    // The thread goes on with the demo workspace and the cube.
+    expect(await engineState.openWorkspace(workspacePath)).toBe(true);
+    s = snapshot();
+    expect(s.workspaceName).toBe("梁の検討");
     expect(await engineState.loadDataset("case:1", cubePath)).toBe(true);
     await engineState.refresh();
     expect(snapshot().imageUrl).toMatch(/^blob:/);

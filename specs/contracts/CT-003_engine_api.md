@@ -10,7 +10,12 @@ updated: 2026-09-21
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 3.16.0
+- version: 3.17.0
+- correction: 2026-09-21, version 3.16.0 to 3.17.0. `workspace.create` is added: a new document
+  at a path the person chose - refused where a file is already there or the folder is not - with
+  one case, then opened, answering what `workspace.open` answers. `workspace.open` answers the
+  document's `name` and the `tags` of its cases as one set, which is what a list of workspaces
+  shows and narrows by (XC-297). Additive
 - correction: 2026-09-21, version 3.15.0 to 3.16.0. `dataset.inspect` answers `refusal` where a
   load of the file would be refused before anything is read: a path the format's library cannot
   take (XC-293, E-216). A drop is then refused at the inspection, before any load (XC-291).
@@ -194,7 +199,8 @@ no identifier to report.
 
 | Operation | Reads or writes | Parameters | Result |
 |---|---|---|---|
-| `workspace.open` | write | path, take over stale lock? | workspace id, unresolved cases, format version, the items the document holds (views, graphs, reports: id, name, dataset), whether it opened read-only, and what the lock said - state, holder, file (XC-241, XC-269); the cases the document holds, with their parents (XC-291) |
+| `workspace.open` | write | path, take over stale lock? | workspace id, unresolved cases, format version, the items the document holds (views, graphs, reports: id, name, dataset), whether it opened read-only, and what the lock said - state, holder, file (XC-241, XC-269); the cases the document holds, with their parents (XC-291); the document's name and the tags of its cases as one set (XC-297) |
+| `workspace.create` | write | path, name?, case name? | a new document with one case written at the path - refused where a file is already there or the folder is not - then opened: what `workspace.open` answers (XC-297) |
 | `workspace.save` | write | workspace id, path? | path written, previous version kept |
 | `workspace.close` | write | workspace id | - |
 | `case.create` | write | workspace id, parent case id?, name | case id |

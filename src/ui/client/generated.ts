@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "3.16.0";
+export const PROTOCOL_VERSION = "3.17.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -19,6 +19,7 @@ export const CONNECTION_FILE: string = "connection.json";
 
 export type Operation =
   | "workspace.open"
+  | "workspace.create"
   | "workspace.save"
   | "workspace.close"
   | "case.create"
@@ -92,6 +93,7 @@ export type Operation =
 
 export const OPERATIONS: readonly Operation[] = [
   "workspace.open",
+  "workspace.create",
   "workspace.save",
   "workspace.close",
   "case.create",
@@ -174,7 +176,8 @@ export interface OperationFacts {
 }
 
 export const OPERATION_FACTS: Readonly<Record<Operation, OperationFacts>> = {
-  "workspace.open": { writes: true, required: ["path"], optional: ["takeOverStaleLock"], answers: ["workspaceId", "formatVersion", "unresolvedCases", "items", "readOnly", "lock", "cases"] },
+  "workspace.open": { writes: true, required: ["path"], optional: ["takeOverStaleLock"], answers: ["workspaceId", "formatVersion", "unresolvedCases", "items", "readOnly", "lock", "cases", "name", "tags"] },
+  "workspace.create": { writes: true, required: ["path"], optional: ["name", "caseName"], answers: ["workspaceId", "formatVersion", "unresolvedCases", "items", "readOnly", "lock", "cases", "name", "tags"] },
   "workspace.save": { writes: true, required: ["workspaceId"], optional: ["path"], answers: ["path", "previousKept"] },
   "workspace.close": { writes: true, required: ["workspaceId"], optional: [], answers: [] },
   "case.create": { writes: true, required: ["name", "workspaceId"], optional: ["parentCaseId"], answers: ["id"] },
@@ -251,6 +254,11 @@ export interface Parameters {
   "workspace.open": {
     path: string;
     takeOverStaleLock?: boolean;
+  };
+  "workspace.create": {
+    path: string;
+    name?: string;
+    caseName?: string;
   };
   "workspace.save": {
     workspaceId: string;
@@ -600,6 +608,49 @@ export interface Results {
       name: string;
       parentId?: string;
     })[];
+    name: string;
+    tags: readonly (string)[];
+  };
+  "workspace.create": {
+    workspaceId: string;
+    formatVersion: string;
+    unresolvedCases: readonly (string)[];
+    items?: {
+      views?: readonly ({
+        id: string;
+        name: string;
+        datasetId?: string;
+      })[];
+      graphs?: readonly ({
+        id: string;
+        name: string;
+        datasetId?: string;
+      })[];
+      reports?: readonly ({
+        id: string;
+        name: string;
+        datasetId?: string;
+      })[];
+    };
+    readOnly: boolean;
+    lock: {
+      state: "free" | "held" | "stale" | "unreadable";
+      lockFile: string;
+      holder?: {
+        processId: number;
+        host: string;
+        user: string;
+        takenAt: RecordedTime;
+      };
+      detail?: string;
+    };
+    cases: readonly ({
+      id: string;
+      name: string;
+      parentId?: string;
+    })[];
+    name: string;
+    tags: readonly (string)[];
   };
   "workspace.save": {
     path: string;
