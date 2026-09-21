@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-21
+updated: 2026-09-22
 ---
 
 # Feature: result ingest
@@ -42,6 +42,11 @@ updated: 2026-09-21
     or update a @Case and shall list every @Field it read, with point or cell association shown
   - AC-021: If a dropped file is of an unsupported format, then the system shall name the format and
     shall state that it is not supported, without creating a partial @Case
+  - AC-049: When several result files are dropped together, the system shall load them only when
+    each is recorded under exactly one @Case and no two under the same, each into its @Case in the
+    document's order, and shall otherwise load nothing and name each file that does not qualify
+    with the reason; a single dropped file shall go to the @Case whose record holds that very file,
+    and never to a @Case on the strength of a matching name (XC-301)
   - AC-022: If a supported file is unreadable or truncated, then the system shall report the failure
     with the file name and shall leave the @Workspace unchanged
   - AC-046: If a file changes while it is being read, or has changed since the @Dataset was loaded from

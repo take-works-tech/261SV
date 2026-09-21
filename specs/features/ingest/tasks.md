@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-20
+updated: 2026-09-22
 ---
 
 # Tasks: result ingest
@@ -481,3 +481,17 @@ is either missing a requirement or is not work this specification asked for.
   `tests/test_long_paths.py` walks every reader, the document, the export and the engine process
   through a 300-character directory, a long source beside a short document, and keeps the
   measurement that the plain form fails where the policy is off.
+
+### TASK-039 - Several files at once
+- satisfies: AC-049
+- depends_on: TASK-007
+- done_when: several files dropped together each load into the case whose record holds that file,
+  in the document's order; a file no case records, or two files for one case, load nothing and are
+  named; one recorded file goes to its case whichever case is on screen
+- done: 2026-09-22 (XC-301, #409). `src/ui/logic/drop.ts` plans a drop from the paths and the
+  records - the document's sources as `workspace.open` answered them and this session's loads,
+  matched path for path and never by name - and the store inspects every file, runs the loads in
+  the document's order, and returns the View area to the case it showed. Proven by
+  `src/ui/logic/drop.test.ts` and the sample thread of `src/ui/state/engine.connected.test.ts`
+  against a real engine, where the two recorded files dropped in reverse order load into their
+  own cases and the variant reports its own maximum.

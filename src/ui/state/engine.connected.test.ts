@@ -590,7 +590,7 @@ describe("the prototype thread from the interface's side", () => {
   });
 });
 
-describe("a drop on the window (XC-291)", () => {
+describe("a drop on the window (XC-301)", () => {
   test("one result file is inspected, then loaded into the one case; an unsupported one and two at once are refused by name", async () => {
     expect(snapshot().cases.map((one) => one.id)).toEqual(["case:1"]);
 
@@ -609,8 +609,11 @@ describe("a drop on the window (XC-291)", () => {
     expect(s.datasetId).toBeTruthy();
     expect(s.notices.some((one) => one.severity === "refusal" && one.detail.includes("'.sim'"))).toBe(true);
 
+    // Two at once: the cube is recorded under the one case by this session's load, the bar under
+    // none, so nothing is loaded and the bar is named (XC-301).
     const two = await engineState.dropFiles([cubePath, barPath]);
-    expect(two.kind === "refused" && two.reason).toContain("1 件ずつ");
+    expect(two.kind === "refused" && two.reason).toContain("bar.vtu：どのケースの記録にもありません");
+    expect(snapshot().datasetId).toBeTruthy();
 
     const opened = await engineState.dropFiles([workspacePath]);
     expect(opened).toEqual({ kind: "opened", path: workspacePath });
@@ -874,6 +877,42 @@ describe("the shipped sample (XC-298)", () => {
     expect(s.statistics?.maximum?.unit).toBe("Pa");
     expect(existsSync(join(folder, "片持ち梁.data", "cantilever_150N.vtu"))).toBe(true);
     console.log(`sample: asked for, written, opened, loaded and drawn in ${elapsed.toFixed(0)} ms (this machine, not a launch)`);
+
+    // Several files at once (XC-301): each recorded under one case, dropped in an order not the
+    // document's, loaded in the document's order; the View area keeps the case it showed.
+    const first = s.cases[0]!;
+    const second = s.cases[1]!;
+    const path100 = first.sources?.[0]?.path;
+    const path150 = second.sources?.[0]?.path;
+    expect(path100 && path150).toBeTruthy();
+    const dropped = await engineState.dropFiles([path150!, path100!]);
+    expect(dropped).toEqual({ kind: "loadedEach", loads: [{ path: path100, caseId: first.id }, { path: path150, caseId: second.id }] });
+    let after = snapshot();
+    expect(Object.keys(after.loaded).sort()).toEqual([first.id, second.id].sort());
+    expect(after.caseId).toBe(first.id);
+    expect(after.sourceName).toBe("cantilever_100N.vtu");
+    expect(after.notices.some((one) => one.severity === "info" && one.title === "2 件を読み込みました")).toBe(true);
+    // The variant's numbers are its own: the maximum stress under 150 N is 1.5 times the 100 N one.
+    session.selectCase(second.id);
+    await engineState.settled();
+    after = snapshot();
+    expect(after.caseId).toBe(second.id);
+    expect(after.sourceName).toBe("cantilever_150N.vtu");
+    expect(after.statistics?.maximum?.value).toBeCloseTo(1.8e6, 0);
+    // A file the document does not record, dropped with one it does, loads nothing and is named.
+    const stray = await engineState.dropFiles([path100!, cubePath]);
+    expect(stray.kind).toBe("refused");
+    if (stray.kind === "refused") expect(stray.reason).toContain("cube.vtu：どのケースの記録にもありません");
+    expect(Object.keys(snapshot().loaded).sort()).toEqual([first.id, second.id].sort());
+    // One recorded file alone goes to the case that records it, whichever case is on screen.
+    session.selectCase(first.id);
+    await engineState.settled();
+    expect(snapshot().caseId).toBe(first.id);
+    const alone = await engineState.dropFiles([path150!]);
+    expect(alone).toEqual({ kind: "loaded", path: path150, caseId: second.id });
+    expect(snapshot().caseId).toBe(second.id);
+    expect(snapshot().statistics?.maximum?.value).toBeCloseTo(1.8e6, 0);
+    engineState.clearRefusal();
     // Asked again at the same place, nothing is written over.
     expect(await engineState.openSample(join(folder, "片持ち梁.svw"))).toBe(false);
     expect(snapshot().refusal).toContain("すでにあります");
