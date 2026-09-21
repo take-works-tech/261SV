@@ -10,7 +10,15 @@ updated: 2026-09-21
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 3.9.0
+- version: 3.10.0
+- correction: 2026-09-21, version 3.9.0 to 3.10.0. Every number says which step it came from
+  (view/AC-032): `field.statistics`, `dataset.probe`, `view.pick` and `view.render` answer
+  `resultPosition` - the step, of how many, on what kind of axis, with the value the file declared
+  there and its unit or null. `field.statistics` takes `resultPosition`, the step's ordinal from 0,
+  as `dataset.probe` already did; `view.render` and `view.pick` follow the view definition's
+  `resultPosition` (CT-004 3.2.0, `step`). A step the case does not have is refused by name and
+  nothing nearer is read instead (view/AC-033, XC-283): until this change the engine read every
+  file's first step, and `dataset.probe` refused any other position as "later". Additive
 - correction: 2026-09-21, version 3.8.0 to 3.9.0. `field.derive` is answered: it takes `component`
   for the component entry and `asTensor` for a three-component field read as a two-dimensional
   symmetric tensor, and answers `fieldNames` (three for the principal values), `association`
@@ -166,7 +174,7 @@ no identifier to report.
 | `dataset.load` | write | case id, file paths | dataset id, fields with association and component count, support level, gaps |
 | `dataset.describe` | read | dataset id | point and cell counts, bounds in metres, time steps, partial flag |
 | `field.declareUnit` | write | dataset id, field name, unit symbol | - |
-| `field.statistics` | read | dataset id, field name, region? - a part's name as `dataset.parts` lists it | min, max, mean, missing count, the association used, and the scope: the whole case or the one part (INV-017, INV-019); for a cell field, the label that these are the element values and the averaged extrema with the spread at the peak (INV-032) |
+| `field.statistics` | read | dataset id, field name, region? - a part's name as `dataset.parts` lists it, result position? - a step's ordinal from 0, the first step when absent | min, max, mean, missing count, the association used, the scope: the whole case or the one part (INV-017, INV-019), and which step the numbers are of (view/AC-032); for a cell field, the label that these are the element values and the averaged extrema with the spread at the peak (INV-032) |
 | `variable.declare` | write | workspace id or case id, name, value, unit? | variable id |
 | `variable.set` | write | variable id, value | ids of every place that changed |
 | `variable.detach` | write | case id, variable id | the value it kept - the variable stops following the parent (XC-117) |
@@ -176,8 +184,8 @@ no identifier to report.
 | `view.duplicate` | write | view id, new name | new independent workspace view id |
 | `view.rename` | write | view id, new name | new revision; stored id references unchanged |
 | `view.delete` | write | view id | deleted id; dependent pipeline units retained as unresolved |
-| `view.render` | read | view id, width, height, format, legend (default true), camera? | image bytes or a handle to them; a camera given draws the picture from there and leaves the definition's camera as it is (XC-270) |
-| `view.pick` | read | view id, width, height, pixel x and y, camera? | the value under that pixel with its unit, digits, provenance and location, which point or cell it is, and which part answered - or nothing, where the pixel is off the model or on a hidden part (view/AC-027, view/AC-029, view/AC-055) |
+| `view.render` | read | view id, width, height, format, legend (default true), camera? | image bytes or a handle to them, and which step the picture is of - the definition's `resultPosition` (CT-004, view/AC-032); a camera given draws the picture from there and leaves the definition's camera as it is (XC-270) |
+| `view.pick` | read | view id, width, height, pixel x and y, camera? | the value under that pixel with its unit, digits, provenance and location, which point or cell it is, which part answered and which step it is of - or nothing, where the pixel is off the model or on a hidden part (view/AC-027, view/AC-029, view/AC-032, view/AC-055) |
 | `graph.create` | write | workspace id, definition (CT-005), source template id and revision? | workspace graph id and revision (XC-109) |
 | `graph.update` | write | graph id, definition | new graph revision |
 | `graph.duplicate` | write | graph id, new name | new independent workspace graph id |
@@ -197,7 +205,7 @@ no identifier to report.
 | `system.operations` | read | - | the catalogue operations this build answers, and those it does not (XC-277) |
 | `history.undo` | write | undo id | ids restored |
 | `history.list` | read | workspace id | operations with origin, time and outcome |
-| `dataset.probe` | read | dataset id, field name, point in metres, result position | value, association, unit, significant digits, provenance - missing where there is none (view/AC-027) |
+| `dataset.probe` | read | dataset id, field name, point in metres, result position - a step's ordinal from 0 along the sequence the file declared | value, association, unit, significant digits, provenance - missing where there is none (view/AC-027) - and which step it is of; a step the case lacks is refused, never the nearest one (view/AC-032, view/AC-033) |
 | `dataset.parts` | read | dataset id | every part the file named, present or absent, with its path from the root, its parent where the file has a hierarchy, counts and bounds; an absent part carries the reader's reason and nothing counted (GL-029, GL-042, INV-019); no hierarchy is inferred |
 | `field.derive` | read | dataset id, field name, quantity from the catalogue, component? for the component entry, asTensor? for a three-component symmetric tensor, frame? | the derived field or fields (three principal values) with the formula and the conventions used - component order, principal ordering, the frame - their association and the source's unit; a quantity this build does not derive, a frame that does not exist and a field of the wrong shape are refused by name (INV-020, INV-021, XC-282) |
 | `field.setDisplayUnit` | write | workspace id, quantity, unit symbol | - - presentation only; storage stays canonical (INV-026) |

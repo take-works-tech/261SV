@@ -3,6 +3,7 @@
  * the contract does not carry a fact the area's design lists, the fact is named as not answered, never
  * filled with a plausible value (XC-001). No React and no transport here. */
 import type { EngineState, FieldSummary } from "../state/engine";
+import { currentStep } from "./resultPosition";
 
 export interface FileFacts {
   name: string;
@@ -45,6 +46,8 @@ export interface AxisFacts {
   first: number | null;
   last: number | null;
   unit: string | null;
+  /** The step the view is at, as a sentence, where the case has more than one (view/AC-032). */
+  current: string | null;
 }
 
 export interface NotAnswered {
@@ -147,6 +150,7 @@ export function informationOf(state: EngineState): InformationView | null {
           first: positions && positions.length > 0 ? positions[0] ?? null : null,
           last: positions && positions.length > 0 ? positions[positions.length - 1] ?? null : null,
           unit: axis.unit ?? null,
+          current: currentStep(state),
         }
       : null,
     notAnswered: [...NOT_ANSWERED],

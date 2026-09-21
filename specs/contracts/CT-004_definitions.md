@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-20
+updated: 2026-09-21
 ---
 
 # Contracts: view, graph and report definitions
@@ -15,7 +15,7 @@ hold values, pixels, or a resolved colour scale. That is what makes a saved work
 ### CT-004 - View definition
 - purpose: the reproducible description of one @View - what is shown, from where, in what style
 - schema: schema/CT-004.json
-- version: 3.1.0
+- version: 3.2.0
 - strictness: unknown fields are **preserved**, because a view authored by a newer build must survive
   being opened and saved by an older one (CT-001)
 - compatibility: a field added to the definition has a default that reproduces the previous appearance
@@ -34,7 +34,7 @@ picture that could not be reproduced or could be misread:
 
 | Field | Why it is in the definition |
 |---|---|
-| `resultPosition` | a position on the @Result axis, which may be a time, a mode, or a frequency with a phase (XC-131) |
+| `resultPosition` | a position on the @Result axis, which may be a time, a mode, or a frequency with a phase (XC-131) - or, on an axis whose kind the file did not state, a `step`: the ordinal along the declared sequence (XC-240, XC-283) |
 | `deformation` | the scale a body is drawn at. **1.0 is the default**, and the factor is drawn into every export (XC-132) |
 | `componentFrame` | the named frame components are reported in; absent means global Cartesian (XC-122) |
 | `derivedVisualisations` | seed, integrator, step size and limits for streamlines - change one and the picture changes (INV-025) |
@@ -87,6 +87,14 @@ alpha is `displayOpacity * edgeSettings.opacity`. Analysis values, colour-map va
 numbers are unchanged. An absent `objectPresentations` member retains the legacy top-level
 `representation` and existing visibility behaviour, so opening an older definition does not alter its
 appearance. New saves write the per-object entry when the user edits any of these controls (XC-180).
+
+Version 3.2.0 adds `resultPosition.step`: the ordinal along the sequence the file declared, from 0.
+Every sequence this build reads is of undeclared kind (XC-240), and the members that existed - `timeStep`,
+`modeNumber`, `frequencyHz` - each say what the sequence *is*; a definition that called the second of
+"0, 0.5" a time step would have labelled a value the file did not label. `step` says only which one.
+The engine accepts the kind-naming members where the file states that kind, which no reader yet
+surfaces, and refuses them otherwise by name; a definition naming no position is at the first step
+(XC-283). The same rule applies to `resultPositionBinding` when a material input binds a result.
 
 Resolution state is derived and is not saved as if it were a user choice. An unresolved required input
 retains the binding, reports CT-010 detail and renders that target diagnostic magenta until repaired.

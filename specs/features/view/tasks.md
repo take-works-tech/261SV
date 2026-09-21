@@ -167,11 +167,20 @@ updated: 2026-09-21
 - satisfies: AC-032
 - depends_on: TASK-026
 - done_when: every displayed and exported value names its time step
+- done: 2026-09-21 (XC-283, CT-003 3.10.0). Every answer that carries a number carries
+  `resultPosition` with the engine's sentence; the report's rows and figure descriptions say the step
+  where the case has more than one; the interface's footer, overlay caption and probe readout use the
+  engine's sentence rather than a second spelling. TASK-026's binding waits on the pipeline; the step
+  it will bind is held in the view definition (CT-004 3.2.0 `resultPosition.step`)
 
 ### TASK-028 - Absent time steps refused
 - satisfies: AC-033
 - depends_on: TASK-026
 - done_when: a missing step is reported, with no nearest-step substitution
+- done: 2026-09-21 (XC-283). `ResultAxis.at` refuses by name with what there is, before anything is
+  read; `reader.read_case` asks the toolkit only for a value the file declared and checks the step it
+  delivered, because the toolkit substitutes silently (E-211); the interface refuses a step past the
+  count before the definition is written
 
 ### TASK-029 - View Outliner
 - satisfies: AC-034, AC-055, AC-056

@@ -6161,3 +6161,43 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: named frames in the document, at which point a component is reported in the
   frame it names; and units with powers, at which point the invariants join the catalogue's built
   half
+
+### XC-283 - A result position is a step on the declared sequence, read on request, and every number says which
+- decided: 2026-09-21
+- status: active
+- decision: a @Case's result position is addressed by **step** - the ordinal, from 0, along the sequence
+  the file declared - and by nothing else while the axis kind is undeclared: CT-004's `resultPosition`
+  gains `step`, and `timeStep`, `modeNumber` and `frequencyHz` are accepted only where the file states
+  that kind, which no reader yet surfaces (XC-240). The engine reads a requested step from the file
+  through the toolkit's pipeline with a value the file declared and checks the step it delivered
+  against the one asked for; the first step stays as loaded and **the last other step asked for is
+  kept beside it**, with the dataset's declared units and derived fields made again on it. A step the
+  case does not have is refused by name with what there is, before anything is read, and nothing
+  nearer is read instead (view/AC-033). `field.statistics`, `dataset.probe`, `view.pick` and
+  `view.render` answer `resultPosition` - the step, the count, the kind, the declared value with its
+  unit, and the sentence - and the report's rows and figures say which step they are of (view/AC-032).
+  The interface moves the view's `resultPosition.step` and redraws; the sentence that carries the
+  declared value is the engine's, so one number is spelled one way everywhere
+- decided_by: engineering judgement, from #210's condition, view/REQ-011, XC-131, XC-240 and two
+  measurements taken here
+- rationale: measured on 2026-09-21 (E-211): the toolkit, asked for a value between two declared
+  positions, delivers the next declared one, and asked for one past the end delivers the last - in
+  both cases silently, saying so only on a pipeline key nobody reads. A position addressed by value
+  is therefore a position that can be answered with another step's numbers, which is a value wrong in
+  a way that looks right. An ordinal cannot fall between two steps, and the delivered step is checked
+  against the asked-for one. `timeStep` on an undeclared axis would write into the document the
+  statement XC-240 refuses to make. Keeping one other step bounds memory at two cases per dataset
+  (LIM-001); keeping every step visited would not, and the measurement that would justify a larger
+  cache has not been taken
+- alternatives: **addressing a position by its value** - what the toolkit offers, and what snaps.
+  **Using `timeStep` as the ordinal** - the word says time, and the file did not. **Reading every step
+  at load** - a transient case of a hundred steps would cost a hundred cases against LIM-001 for
+  steps nobody looks at. **Keeping every step visited** - unbounded; a bound is a measurement not yet
+  taken. **Binding the step as a @Variable and iterating it from a @Pipeline** (view/AC-031) - waits
+  on the pipeline, which is not built; the step is held in the definition where a binding will reach it
+- basis: E-211 (T1)
+- affects: MOD-002, MOD-012, CT-003, CT-004, view/REQ-011
+- decidedness: Fixed
+- reversal_trigger: a reader that surfaces the file's own axis kind (XC-240's trigger), at which point
+  the kind-naming members are accepted for that format; and a measured cost of re-reading a step that
+  argues for a larger cache, at which point the bound becomes a number with evidence behind it
