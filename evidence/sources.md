@@ -2307,3 +2307,27 @@ Recorded so that nothing silently depends on them:
   own preview pane, SmartScreen, opening by double-click from a folder, and browsers other than these
   two - the browser range is #256's question
 - justifies: XC-295
+
+### E-219 - The exported document and the application screen printed to PDF, measured here
+- tier: T1
+- url: tests/test_exported_document_prints.py, run on the development machine on 2026-09-21:
+  Microsoft Edge 153.0.4234.48 and Google Chrome 153.0.8010.52, headless
+  (`--print-to-pdf --no-pdf-header-footer`, a fresh profile each run), the pages read back from
+  the PDF's page tree and looked at as rendered pages
+- verified: 2026-09-21
+- says: with a stylesheet that says nothing about paper, both browsers print on US Letter (612 x
+  792 pt); with `@page{size:A4}` both print 595 x 842 pt. Before the print rules, a heading was
+  left alone at the foot of a sheet with its figure on the next, a six-row table split across two
+  sheets with its header repeated, and the trust sections followed inline. With the rules, a
+  page-break block adds exactly one sheet (two and three sheets for one and two breaks), a figure
+  at the width of the page sits whole on one sheet with its heading, legend, note and value, the
+  provenance section - not split - opens the next sheet when it would not fit, a table's rows stay
+  whole, and the two browsers lay the same five documents out to the same sheets (1, 2, 3, 3 and
+  4). A document without an embedded font carries, in its limitations section, one line per
+  element naming the characters it could not carry - the state OPEN-032 leaves the deliverable in -
+  and that list alone turned a one-sheet document into two. The application screen printed from
+  the browser is one Letter sheet holding the whole dark workbench, the report preview squeezed to a
+  column some 60 mm wide, sidebars and toolbars around it: nothing of it is a document. Not
+  measured: a physical printer, the browser's own print dialogue (the same engine, with margins and
+  scaling as the person sets them), and browsers other than these two
+- justifies: XC-296
