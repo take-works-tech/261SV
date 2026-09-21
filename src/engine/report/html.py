@@ -506,12 +506,23 @@ def _limitations(document: Document, stated: tuple[Unrepresentable, ...]) -> str
 def _provenance(document: Document) -> str:
     """The trust content, as the document model already composes it (AC-007, INV-027)."""
     lines = document.provenance.as_text().split("\n")
-    body = "".join(
-        f"<li>{_text(line.strip().lstrip('- '))}</li>" if line.startswith("  - ")
-        else f"<p>{_text(line)}</p>"
-        for line in lines[1:]
-    )
-    return f'<section class="provenance"><h2>来歴</h2>{body}</section>'
+    parts: list[str] = []
+    items: list[str] = []
+
+    def flush() -> None:
+        if items:
+            parts.append("<ul>" + "".join(items) + "</ul>")
+            items.clear()
+
+    for line in lines[1:]:
+        if line.startswith("  - "):
+            # The items the model indents are one list, and a list item belongs in a list.
+            items.append(f"<li>{_text(line.strip().lstrip('- '))}</li>")
+        else:
+            flush()
+            parts.append(f"<p>{_text(line)}</p>")
+    flush()
+    return f'<section class="provenance"><h2>来歴</h2>{"".join(parts)}</section>'
 
 
 def _stylesheet(font: EmbeddedFont | None) -> str:
@@ -554,8 +565,21 @@ def _stylesheet(font: EmbeddedFont | None) -> str:
         + ".legend-range{font-variant-numeric:tabular-nums}"
         + ".legend-map{opacity:.85}"
         + "hr.page-break{border:0;border-top:1px solid currentColor;margin:2rem 0}"
-        + "@media print{hr.page-break{break-after:page;border:0}}"
         + "section.limitations,section.provenance{margin-top:2.5rem;font-size:.95rem}"
+        # On paper (XC-296, E-219): A4, because that is the sheet a Japanese office prints on and a
+        # document printed on two sheet sizes is two layouts; a page-break block is a page break; a
+        # figure, a table row and each trust section stay whole, and a heading stays with what it
+        # heads, because a picture cut in two or a value parted from its unit is a different document;
+        # a long table repeats its header on every page. The screen's width limit is lifted so the page
+        # margins alone decide the measure.
+        + "@media print{"
+        + "@page{size:A4;margin:18mm 20mm}"
+        + "body{max-width:none;margin:0;padding:0}"
+        + "hr.page-break{break-after:page;border:0;margin:0}"
+        + "figure.view,table.values tr,section.limitations,section.provenance{break-inside:avoid}"
+        + "h1,h2,figure.view figcaption{break-after:avoid}"
+        + "table.values thead{display:table-header-group}"
+        + "}"
     )
 
 

@@ -6632,3 +6632,36 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a supported browser (once #256 names them) that blocks an inline script or a
   data URI from a marked local file - at which point the interactive view needs a way that browser
   allows, and the test says which
+
+### XC-296 - A deliverable prints as A4 sheets that keep a figure with its heading and a row whole, and the screen is not a print surface
+- decided: 2026-09-21
+- status: active
+- decision: the exported document carries its own print rules (`engine/report/html.py`): A4 with
+  18 mm and 20 mm margins, because that is the sheet a Japanese office prints on and a document
+  printed on two sheet sizes is two layouts; a page-break block is a page break and nothing else;
+  a figure, a table row and each trust section stay whole and a heading stays with what it heads,
+  because a picture cut in two or a value parted from its unit is a different document; a long
+  table repeats its header on every sheet; the screen's width limit is lifted so the page margins
+  alone decide the measure. What the rules do is measured (E-219) in the two browsers present and
+  kept as `tests/test_exported_document_prints.py`, which reads the sheets back from the PDF and
+  skips, saying so, where no browser is installed. **The application screen is not a print
+  surface**: printed, it is the workbench on one sheet with the document squeezed to a column, so
+  the application's print action is the exported document - export, then print that file - and the
+  screen's own print stylesheet exists only to say so; that action is report/TASK-048, not yet
+  built. The margins are a choice (Bounded within this decision) and not a measurement
+- decided_by: engineering judgement, from #267's condition and the measurement
+- rationale: a report is still handed round on paper, and a printed figure that lost its heading or
+  a value that lost its unit to a sheet boundary is a wrong document that looks right - the
+  failure this product exists to refuse, on paper. The rules are the document's own, so it prints
+  the same from every reader's browser; a document that relied on the reader's print settings would
+  print differently on every desk
+- alternatives: **US Letter or the reader's default** - the browsers' default here, and a document
+  whose page breaks depend on where it is printed. **Printing the screen** - measured, and not a
+  document. **A PDF export of the product's own** - a second writer for one document, before the
+  first one's pages were measured
+- basis: E-219 (T1)
+- affects: MOD-006, report/REQ-001
+- decidedness: Fixed
+- reversal_trigger: a customer who prints on Letter, at which point the sheet becomes a setting
+  written into the document at export rather than a rule; or a browser among the supported ones
+  (#256) that ignores `@page` size, at which point the test says which

@@ -62,6 +62,10 @@ updated: 2026-09-21
     downloaded (the Windows Internet-zone mark) or through a network share, in a supported
     browser, the document shall render the same and its embedded style, images and script shall
     apply and run, with no prompt (XC-295)
+  - AC-037: When an exported document is printed from a supported browser, it shall lay out on A4
+    sheets with a page-break block starting a new sheet, a figure whole with its heading, legend
+    and values, a table row and each trust section whole, and a long table's header repeated on
+    every sheet; the application's screen is not the print surface (XC-296)
 
 ### REQ-002 - Office formats carry the same content
 - priority: MUST

@@ -319,3 +319,21 @@ updated: 2026-09-21
   `tests/test_exported_document_opens.py` keeps it, skipping by name where no browser or share is
   present and printing the versions it used. A mail client's preview pane, SmartScreen and a
   double-click from a folder are not measured and are said so; the browser range is #256.
+### TASK-047 - The exported document prints as pages
+- satisfies: AC-037
+- depends_on: TASK-046
+- done_when: printed to PDF from the browsers present, a page-break block adds a sheet, a figure sits
+  whole with its heading, a table row and each trust section stay whole, the sheet is A4, and the
+  two browsers agree on the pages of one document
+- done: 2026-09-21 (XC-296, #267). Measured with Edge 153.0.4234.48 and Chrome 153.0.8010.52
+  (E-219): before the rules a heading was left at the foot of a sheet with its figure on the next;
+  with them the five measured documents print to the same sheets in both browsers, on A4.
+  `tests/test_exported_document_prints.py` reads the sheets back from the PDF. The provenance list
+  items were written without a list around them and now are in one. Not measured: a physical
+  printer and the browser's own print dialogue.
+### TASK-048 - The application's print action is the exported document
+- satisfies: AC-037
+- depends_on: TASK-047
+- done_when: printing from the application exports the report to the directory the shell owns
+  (XC-262) and prints that file, and the screen's own print stylesheet says the screen is not the
+  document rather than printing the workbench
