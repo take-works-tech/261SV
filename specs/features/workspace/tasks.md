@@ -725,3 +725,17 @@ updated: 2026-09-21
   Proven by `tests/test_handlers.py::TestANewWorkspace`, `src/shell/recent.test.ts`,
   `src/ui/logic/home.test.ts` and the connected thread. The shipped sample of first launch is
   operations/REQ-001's and not done here.
+
+### TASK-073 - The list is the person's information
+- satisfies: AC-077
+- depends_on: TASK-072
+- done_when: the whole list can be emptied from the Workspace list on a second word and one entry
+  removed, a test holds the list's place outside the engine's root and log directory, and the
+  decision states that no bundle carries it
+- done: 2026-09-21 (XC-300, #269). `src/shell/profile.ts` lays out the profile - engine root, log
+  directory, recent list beside them - and `src/shell/profile.test.ts` holds the list outside both;
+  `src/shell/recent.ts` gained `clear`, bridged as `recent:clear`, and `HomeScreen` offers
+  一覧をすべて消す behind a second word beside 一覧から外す, saying in its subtitle that the list is
+  the shell's alone, in no diagnostics and never off the machine. The engine is untouched: its
+  bundle is assembled from named items (`src/service/egress/diagnostics.py`) and the shell hands
+  it none.

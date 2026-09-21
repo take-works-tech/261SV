@@ -6769,3 +6769,43 @@ model or the prompt, never in a description that quietly went stale.
 - decidedness: Fixed
 - reversal_trigger: a second generated sample with a result the formulas cannot give exactly - a
   transient, a mode - at which point that sample's acceptance names its own predicted error
+
+### XC-300 - The recent list is the person's information: theirs to clear, kept beside the engine and inside nothing it is told about, and part of no bundle
+- decided: 2026-09-21
+- status: active
+- decision: the list of XC-297 carries a customer's names in its paths, so it is the person's
+  information and is handled as such. **The shell alone holds it**, as one file in the profile
+  **beside** the engine's transient root (XC-262) and the log directory (XC-263) and inside
+  neither, laid out by one function (`src/shell/profile.ts`) that a test holds to; the engine is
+  never told where it is, and nothing the engine can name - its session directory, its log
+  directory, the open document's folder - contains it. **It is in no bundle**: a support bundle
+  (XC-126, operations/AC-008) is assembled by the engine from named items - its own log, the open
+  document's id, its case names, the source paths it was handed - and the shell contributes
+  nothing to it, so the list is in no bundle under any consent, in no audit, and in no egress. An
+  entry's path leaves the shell only as the argument of a `workspace.open` the person chose. **The
+  person clears it**: one entry, or the whole list, from the Workspace list, each on their word and
+  the whole list after a second one; clearing removes no file an entry names and writes the list
+  empty in place. The shell drops an entry on its own only past the list's limit (XC-297) - never
+  because a file went missing, never at an update, and at uninstall only as #180 decides. The
+  shell's own notes name no entry
+- decided_by: engineering judgement, from #269's condition, XC-126 and XC-297
+- rationale: a path is where the customer's name ends up once a document has been filed with care
+  - a client folder, a part number - and twenty of them are a list of who this person works for.
+  XC-126's bundle is read before it is sent, and the one way a file gets into a bundle without
+  being read is a later change that packages a directory; a file outside every directory the
+  engine knows cannot get in that way, and the layout test is what says so. Clearing is the
+  person's because the list is theirs: nothing in it is the product's knowledge, and a product
+  that kept it against their wish would be keeping a customer list
+- alternatives: **listing it in the bundle under consent** - it adds nothing to a support case
+  the engine's log does not already record (every `workspace.open` and its outcome), and every
+  line added to a manifest is one more a person must read before accepting. **Showing names
+  without paths** - the path is what tells two workspaces of one name apart and where the person
+  finds the file. **Clearing at uninstall on the product's own initiative** - #180's question,
+  decided there
+- basis: E-001 (T1)
+- affects: MOD-018, workspace/REQ-017, XC-126
+- decidedness: Fixed
+- reversal_trigger: a list shared across machines (XC-297's trigger), which makes it leave the
+  machine and so needs a consent of its own; or a bundle that packages a directory rather than
+  named items, at which point the layout test is the one thing between the list and the bundle,
+  and the bundle's manifest must name the list or exclude it in so many words

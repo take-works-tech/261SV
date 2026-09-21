@@ -30,7 +30,8 @@ import {
   type Engine,
   type Orphan,
 } from "./engine-process.js";
-import { forget, readRecent, remember } from "./recent.js";
+import { layoutUnder, type ProfileLayout } from "./profile.js";
+import { clear, forget, readRecent, remember } from "./recent.js";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url)); // <package>/dist/shell/
 const PACKAGE = resolve(HERE, "..", "..");
@@ -94,10 +95,17 @@ function broadcast(status: EngineProcessStatus): void {
   for (const each of BrowserWindow.getAllWindows()) each.webContents.send("engine:status", status);
 }
 
+/** What the shell keeps under its profile, laid out by `profile.ts` so the arrangement is one a
+ *  test holds to (XC-300): the engine's transient root, the log directory, and the recent list
+ *  beside them. The smoke stands in a root of its own under temp and removes it whole. */
+function layout(): ProfileLayout {
+  return layoutUnder(SMOKE ? join(app.getPath("temp"), `solvia-smoke-${process.pid}`) : app.getPath("userData"));
+}
+
 /** Where logs go: the engine's diagnostic log and the shell's own notes, beside each other, in a
- *  directory a person can open (XC-263). The smoke keeps them under its own root. */
+ *  directory a person can open (XC-263). */
 function logDirectory(): string {
-  return SMOKE ? join(transientRoot(), "logs") : join(app.getPath("userData"), "logs");
+  return layout().logDirectory;
 }
 
 async function start(directory: string): Promise<Engine> {
@@ -115,20 +123,21 @@ async function start(directory: string): Promise<Engine> {
 }
 
 /** The root of everything transient (XC-262): the engine's session directories live under it, and
- *  nothing transient lives anywhere else. The smoke uses a root of its own under temp and removes
- *  it when it is done - the smoke's own leftovers were the first orphans measured (E-208). */
+ *  nothing transient lives anywhere else. The smoke's is under its own root and goes with it when
+ *  it is done - the smoke's own leftovers were the first orphans measured (E-208). */
 function transientRoot(): string {
-  return SMOKE ? join(app.getPath("temp"), `solvia-smoke-${process.pid}`) : join(app.getPath("userData"), "engine");
+  return layout().engineRoot;
 }
 
 function engineDirectory(): string {
   return sessionDirectory(transientRoot());
 }
 
-/** The recent-workspace list, under the profile - beside the engine's root, not inside it, because
- *  it is the shell's own and outlives every session (XC-297). The smoke keeps it with its temp. */
+/** The recent-workspace list, under the profile beside the engine's root and the logs and inside
+ *  neither (XC-297, XC-300): it is the shell's own, it outlives every session, and nothing the
+ *  engine is told about contains it. */
 function recentFile(): string {
-  return SMOKE ? join(transientRoot(), "recent.json") : join(app.getPath("userData"), "recent.json");
+  return layout().recentFile;
 }
 
 /** Orphans found at start: sessions of shells that are gone. Reported to the interface, removed
@@ -278,6 +287,8 @@ function registerBridge(): void {
     });
   });
   ipcMain.handle("recent:forget", (_event, path: unknown) => (typeof path === "string" ? forget(recentFile(), path) : readRecent(recentFile())));
+  // The whole list, on the person's word (XC-300): the interface asks twice, the shell empties once.
+  ipcMain.handle("recent:clear", () => clear(recentFile()));
   ipcMain.handle("dialog:saveReport", async (_event, suggestedName: unknown) => {
     const name = typeof suggestedName === "string" && suggestedName ? suggestedName : "report.html";
     const chosen = await dialog.showSaveDialog({
@@ -410,9 +421,10 @@ async function smoke(): Promise<number> {
     startsAndStops: (logText.match(/"engine\.(start|stop)"/g) ?? []).length,
     tokenInLog: Boolean(engine?.connection?.token && logText.includes(engine.connection.token)),
   };
-  // The smoke's own transient root goes with it: the leftovers it used to keep were the first
-  // orphans this product measured (E-208).
-  rmSync(transientRoot(), { recursive: true, force: true });
+  // The smoke's own root - engine sessions, logs and list alike - goes with it: the leftovers it
+  // used to keep were the first orphans this product measured (E-208). Guarded on the flag rather
+  // than on this function being the smoke, because the root outside the smoke is the profile.
+  if (SMOKE) rmSync(layout().root, { recursive: true, force: true });
   summary.transientRootRemoved = !existsSync(transientRoot());
   summary.ok = summary.ok === true && summary.transientRootRemoved === true
     && (summary.orphans as { removed: string[]; remaining: number }).removed.length === 1

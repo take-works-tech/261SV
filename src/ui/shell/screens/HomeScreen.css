@@ -61,6 +61,7 @@
 .ho-chip:hover { background: var(--surface-raise); color: var(--ink-strong); }
 .ho-chip[aria-pressed="true"] { background: var(--surface-active); border-color: var(--sel-line); color: var(--ink-strong); }
 .ho-result-count { margin-left: auto; color: var(--ink-faint); font-size: var(--text-caption); }
+.ho-clear { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-muted); font-size: var(--text-caption); }
 
 /* ---- workspace cards ------------------------------------------------------------------------ */
 

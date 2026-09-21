@@ -702,6 +702,7 @@ function RecentWorkspaces() {
   const [tags, setTags] = useState<string[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [problem, setProblem] = useState<{ path: string; because: string } | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
   useEffect(() => {
     if (shell) void shell.recent.list().then(setEntries);
   }, [shell]);
@@ -752,6 +753,12 @@ function RecentWorkspaces() {
     setEntries(await shell.recent.forget(path));
     if (problem?.path === path) setProblem(null);
   };
+  // The whole list, on the person's word and after a second one (XC-300): no file goes with it.
+  const clearAll = async () => {
+    setEntries(await shell.recent.clear());
+    setProblem(null);
+    setConfirmClear(false);
+  };
 
   return (
     <div className="ho-page">
@@ -759,7 +766,7 @@ function RecentWorkspaces() {
         <header className="ho-head">
           <div>
             <h1>ワークスペース一覧</h1>
-            <p className="ho-sub">このシェルで開いたワークスペース。名前とタグは開いたときにエンジンが答えたものです。</p>
+            <p className="ho-sub">このシェルで開いたワークスペース。名前とタグは開いたときにエンジンが答えたものです。一覧はこのシェルだけが持ち、診断情報には含まれず、この機械の外には出ません。</p>
           </div>
           <div className="ho-tools">
             <label className="ho-search">
@@ -817,6 +824,15 @@ function RecentWorkspaces() {
             </button>
           ))}
           <span className="ho-result-count">{visible.length} / {list.length} 件</span>
+          {list.length === 0 ? null : confirmClear ? (
+            <span className="ho-clear" role="group" aria-label="一覧の消去の確認">
+              <span>一覧を空にします。ファイルは残ります。</span>
+              <button className="btn ghost" onClick={() => void clearAll()}>消す</button>
+              <button className="btn ghost" onClick={() => setConfirmClear(false)}>やめる</button>
+            </span>
+          ) : (
+            <button className="btn ghost" onClick={() => setConfirmClear(true)} title="ファイルは消しません。一覧を空にするだけです">一覧をすべて消す</button>
+          )}
         </div>
 
         {entries === null ? (
