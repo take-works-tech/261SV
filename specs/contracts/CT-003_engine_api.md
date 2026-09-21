@@ -10,7 +10,13 @@ updated: 2026-09-21
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 3.17.0
+- version: 3.18.0
+- correction: 2026-09-21, version 3.17.0 to 3.18.0. `workspace.sample` is added: the shipped
+  sample generated where the person chose - a cantilever beam under two loads, from beam theory,
+  its data beside the document, its units declared by its author - then opened, answering what
+  `workspace.open` answers. Each case in that answer now carries `sources`: where each recorded
+  file is and whether it is there, so a caller can load a case's file without a second question
+  (XC-298). Additive
 - correction: 2026-09-21, version 3.16.0 to 3.17.0. `workspace.create` is added: a new document
   at a path the person chose - refused where a file is already there or the folder is not - with
   one case, then opened, answering what `workspace.open` answers. `workspace.open` answers the
@@ -199,8 +205,9 @@ no identifier to report.
 
 | Operation | Reads or writes | Parameters | Result |
 |---|---|---|---|
-| `workspace.open` | write | path, take over stale lock? | workspace id, unresolved cases, format version, the items the document holds (views, graphs, reports: id, name, dataset), whether it opened read-only, and what the lock said - state, holder, file (XC-241, XC-269); the cases the document holds, with their parents (XC-291); the document's name and the tags of its cases as one set (XC-297) |
+| `workspace.open` | write | path, take over stale lock? | workspace id, unresolved cases, format version, the items the document holds (views, graphs, reports: id, name, dataset), whether it opened read-only, and what the lock said - state, holder, file (XC-241, XC-269); the cases the document holds, with their parents (XC-291) and each one's recorded files - where each is now and whether it is there (XC-298); the document's name and the tags of its cases as one set (XC-297) |
 | `workspace.create` | write | path, name?, case name? | a new document with one case written at the path - refused where a file is already there or the folder is not - then opened: what `workspace.open` answers (XC-297) |
+| `workspace.sample` | write | path | the shipped sample generated at the path - a cantilever beam under two loads, its data beside the document, its units declared - refused where the document or its data folder already exists, then opened: what `workspace.open` answers (XC-298) |
 | `workspace.save` | write | workspace id, path? | path written, previous version kept |
 | `workspace.close` | write | workspace id | - |
 | `case.create` | write | workspace id, parent case id?, name | case id |

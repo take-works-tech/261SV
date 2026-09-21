@@ -2331,3 +2331,19 @@ Recorded so that nothing silently depends on them:
   measured: a physical printer, the browser's own print dialogue (the same engine, with margins and
   scaling as the person sets them), and browsers other than these two
 - justifies: XC-296
+
+### E-220 - What the generated sample holds, checked against its own formulas, measured here
+- tier: T1
+- url: tests/test_sample.py, tests/test_handlers.py::TestTheSample and the connected thread in
+  src/ui/state/engine.connected.test.ts, run on the development machine on 2026-09-21 (VTK 9.5.2)
+- verified: 2026-09-21
+- says: the beam written by `engine/sample.py` has 615 points and 320 hexahedra; read back through
+  the product's own reader, the maximum of `stress` is 1.2e6 under 100 N and 1.8e6 under 150 N -
+  `F L (h/2) / I` with L = 1 m, h = 0.1 m, b = 0.05 m - at float32's six digits, the minimum
+  -1.2e6, the largest displacement 4.0e-5 m (`F L^3 / (3 E I)` with E = 200 GPa) to a part in a
+  million, and every cell-centre stress is inside the surface values; the file carries no unit and
+  the sample document declares Pa and m, which the load applies. Through the interface's store
+  against a real engine, asking for the sample, writing it, opening it, loading the first case and
+  drawing it took 128 ms (the connected test prints the figure each run) - a segment of a launch
+  on this machine, not LIM-010's number, which needs a launch on the hardware class of E-063
+- justifies: XC-298

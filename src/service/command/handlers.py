@@ -41,7 +41,7 @@ from domain_core.parts import LoadedCase, Part
 from domain_core.recorded_time import STORED_FORMAT, RecordedTime, from_stored, record as record_time, record_instant
 from domain_core.reported_value import DIMENSIONLESS, Caveat, Provenance, ReportedValue
 from domain_core.units import UndeclaredUnitError, unit as known_unit
-from engine import reader
+from engine import reader, sample
 from domain_core.os_paths import for_os, for_people
 from engine.analysis import derived, nodal
 from engine.completeness import FileIncomplete, ResultsLost
@@ -492,6 +492,7 @@ def handlers(session: Session) -> tuple[Handler, ...]:
     return (
         Handler("workspace.open", lambda p, t: workspace_open(session, p)),
         Handler("workspace.create", lambda p, t: workspace_create(session, p)),
+        Handler("workspace.sample", lambda p, t: workspace_sample(session, p)),
         Handler("workspace.save", lambda p, t: workspace_save(session, p)),
         Handler("dataset.inspect", lambda p, t: dataset_inspect(session, p)),
         Handler("dataset.load", lambda p, t: dataset_load(session, p)),
@@ -585,12 +586,23 @@ def workspace_open(session: Session, parameters: Mapping[str, Any]) -> Effect | 
     session.datasets = {}
     session.revisions = {}
 
-    unresolved = [
-        resolution.case_id
+    resolutions = {
+        str(case.get("id", "")): sources.resolve_case(case, relative_to=location.parent)
         for case, _ in walk_cases(loaded.cases)
-        for resolution in (sources.resolve_case(case, relative_to=location.parent),)
-        if not resolution.is_resolved
-    ]
+    }
+    unresolved = [case_id for case_id, resolution in resolutions.items() if not resolution.is_resolved]
+    base = for_people(location.parent)
+
+    def sources_of(case_id: str) -> list[dict[str, Any]]:
+        # Where each recorded file is now and whether it is there, so a caller can load a case's
+        # file without a second question (XC-298). The path is the plain one (XC-294).
+        resolution = resolutions.get(case_id)
+        if resolution is None:
+            return []
+        return [
+            {"name": Path(one.path_relative).name, "path": str(base / one.path_relative), "present": one.is_resolved}
+            for one in resolution.sources
+        ]
 
     def undo() -> None:
         session.workspace, session.workspace_path, session.revisions = before
@@ -620,7 +632,11 @@ def workspace_open(session: Session, parameters: Mapping[str, Any]) -> Effect | 
             # The cases the document holds, flattened with their parents, so a file dropped on the
             # window knows where it may go without the interface guessing a case id (XC-291).
             "cases": [
-                {"id": str(case.get("id", "")), "name": str(case.get("name", case.get("id", ""))), **({"parentId": ancestors[-1]} if ancestors else {})}
+                {
+                    "id": str(case.get("id", "")), "name": str(case.get("name", case.get("id", ""))),
+                    **({"parentId": ancestors[-1]} if ancestors else {}),
+                    "sources": sources_of(str(case.get("id", ""))),
+                }
                 for case, ancestors in walk_cases(loaded.cases)
             ],
             "readOnly": not status.may_edit,
@@ -646,8 +662,8 @@ def workspace_create(session: Session, parameters: Mapping[str, Any]) -> Effect 
         return refused(f"{for_people(location.parent)} というフォルダがありません。あるフォルダを選んでください")
     name = str(parameters.get("name") or location.stem)
     document = fresh_document(
-        session.issue("ws"), name,
-        case_id=session.issue("case"), case_name=str(parameters.get("caseName") or "ケース 1"),
+        session.issue("ws"), name, created_by=product_version(),
+        cases=[{"id": session.issue("case"), "name": str(parameters.get("caseName") or "ケース 1"), "children": [], "sources": []}],
     )
     try:
         save_document(document, location)
@@ -657,6 +673,48 @@ def workspace_create(session: Session, parameters: Mapping[str, Any]) -> Effect 
     if isinstance(opened, Result):
         return opened
     return replace(opened, summary=f"{location.name} を作って開きました")
+
+
+#: What the sample's author declares about its fields (XC-003): the sample workspace is the
+#: author's document, and the units are its author's declaration, made once, here.
+SAMPLE_UNITS = {"stress": "Pa", "element_stress": "Pa", "displacement": "m"}
+SAMPLE_NAME = "片持ち梁（サンプル）"
+#: The two cases: the beam under a tip load, and under half as much again.
+SAMPLE_CASES = (("荷重 100 N", ("静荷重",), 100.0), ("荷重 150 N", ("静荷重", "1.5 倍"), 150.0))
+
+
+def workspace_sample(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
+    """The shipped sample, generated where the person chose, then opened (XC-129, XC-298).
+
+    A cantilever beam under two loads, written by this build from beam theory (engine/sample.py):
+    the data folder beside the document, one file per case, the units declared by the sample's
+    author. Refused where the document or its data folder already exists, because a sample a person
+    changed is theirs (XC-130); a newer build writes a newer sample under another name.
+    """
+    location = for_os(str(parameters["path"]))
+    data = location.with_name(location.stem + ".data")
+    for taken in (location, data):
+        if taken.exists():
+            return refused(f"{for_people(taken)} はすでにあります。上書きはしません — 別の名前か場所を選んでください")
+    if not location.parent.exists():
+        return refused(f"{for_people(location.parent)} というフォルダがありません。あるフォルダを選んでください")
+    try:
+        data.mkdir()
+        cases: list[dict[str, Any]] = []
+        for case_name, tags, force in SAMPLE_CASES:
+            file = data / f"cantilever_{int(force)}N.vtu"
+            sample.write_cantilever(file, force_newton=force)
+            entry = sources.record(file, relative_to=location.parent, where=session.clock())
+            entry["pathAbsolute"] = str(for_people(for_os(file).resolve()))
+            entry["declaredUnits"] = dict(SAMPLE_UNITS)
+            cases.append({"id": session.issue("case"), "name": case_name, "tags": list(tags), "children": [], "sources": [entry]})
+        save_document(fresh_document(session.issue("ws"), SAMPLE_NAME, cases=cases, created_by=product_version()), location)
+    except OSError as error:
+        return refused(f"サンプルを書けません：{error.strerror or error}")
+    opened = workspace_open(session, {"path": str(parameters["path"])})
+    if isinstance(opened, Result):
+        return opened
+    return replace(opened, summary=f"サンプル {location.name} を作って開きました")
 
 
 def items_of(workspace: WorkspaceDocument) -> dict[str, list[dict[str, str]]]:
