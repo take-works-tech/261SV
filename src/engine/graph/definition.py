@@ -38,6 +38,13 @@ class GraphError(Exception):
     """Raised for a definition that would draw something misleading."""
 
 
+#: The reductions a field series may plot (INV-017, graph/AC-022): the case-wide maximum - the one
+#: aggregate that is the same taken part by part as all at once (XC-234) - the minimum, and the
+#: weighted mean, whose weighting the answer states. A field series without one plots nothing, and
+#: says so, rather than a reduction this product chose for it (XC-290).
+REDUCTIONS = ("max", "min", "mean")
+
+
 class SourceKind(str, Enum):
     """CT-005's three source kinds."""
 
@@ -75,8 +82,14 @@ class Series:
     association: str | None = None
     expression: str | None = None
     path: str | None = None
+    #: Which single number of the field is plotted per case or per step (CT-005 2.1.0).
+    reduction: str | None = None
 
     def __post_init__(self) -> None:
+        if self.reduction is not None and self.reduction not in REDUCTIONS:
+            raise GraphError(
+                f"系列 '{self.label}' の縮約 '{self.reduction}' はありません（{list(REDUCTIONS)}）"
+            )
         if self.provenance is Provenance.COMPUTED and not self.expression:
             raise GraphError(
                 f"系列 '{self.label}' は計算値ですが式がありません。"
@@ -119,6 +132,7 @@ class Series:
             ("datasetId", self.dataset_id),
             ("fieldName", self.field_name),
             ("association", self.association),
+            ("reduction", self.reduction),
             ("expression", self.expression),
             ("path", self.path),
         ):
@@ -278,6 +292,7 @@ def read_series(graph: dict[str, Any]) -> list[Series]:
                 association=source.get("association"),
                 expression=source.get("expression"),
                 path=source.get("path"),
+                reduction=source.get("reduction"),
             )
         )
     return found

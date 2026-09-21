@@ -349,12 +349,12 @@ describe("the prototype thread from the interface's side", () => {
 
     const s = snapshot();
     expect(s.operations?.registered).toContain("system.operations");
-    expect(s.operations?.registered.length).toBe(29);
+    expect(s.operations?.registered.length).toBe(33);
     expect([...(s.operations?.registered ?? []), ...(s.operations?.unimplemented ?? [])].sort()).toEqual([...OPERATIONS].sort());
     const rows = commandGroups(s.operations, "").flatMap((group) => group.rows);
     expect(rows).toHaveLength(OPERATIONS.length);
     expect(rows.find((row) => row.operation === "dataset.load")).toMatchObject({ writes: true, parameters: "caseId、filePaths", status: "answers" });
-    expect(rows.find((row) => row.operation === "graph.data")?.status).toBe("unimplemented");
+    expect(rows.find((row) => row.operation === "graph.duplicate")?.status).toBe("unimplemented");
   });
 
   test("palette: what this screen can run is what its context supplies, a run answers as the engine did, and a refusal comes back as a reason (XC-278)", async () => {
@@ -368,7 +368,7 @@ describe("the prototype thread from the interface's side", () => {
     expect(runnable).not.toContain("output.prune");
     expect(rows.find((row) => row.operation === "view.render")?.because).toContain("width");
     expect(rows.find((row) => row.operation === "output.prune")?.because).toContain("確認");
-    expect(rows.find((row) => row.operation === "graph.data")?.because).toContain("実装なし");
+    expect(rows.find((row) => row.operation === "graph.duplicate")?.because).toContain("実装なし");
 
     const described = await engineState.run("dataset.describe", { datasetId: s.datasetId });
     expect(described.status).toBe("answered");
@@ -584,6 +584,37 @@ describe("the prototype thread from the interface's side", () => {
       step: 0, count: 1, kind: "none", value: null, unit: null, stated: "定常（結果軸なし・ステップ 1/1）",
     });
     expect(viewFooter(s, "単位未宣言")?.showing).not.toContain("ステップ");
+  });
+});
+
+describe("a graph over the result axis (XC-290)", () => {
+  test("one field's maximum per step, in the engine's numbers, and the definition read back", async () => {
+    if (!transientPath) throw new Error("the transient fixture was not written: h5py is missing from the engine environment");
+    expect(await engineState.loadDataset("case:1", transientPath)).toBe(true);
+
+    expect(await engineState.showGraph({ fieldName: "stress", reduction: "max", kind: "overTime" })).toBe(true);
+    let s = snapshot();
+    expect(s.graphId).toBeTruthy();
+    expect(s.graphData?.series[0]?.points.map((one) => [one.x, one.value])).toEqual([[0, 90], [0.5, 91]]);
+    expect(s.graphData?.series[0]?.points[1]?.resultPosition?.stated).toBe("ステップ 2/2（位置 0.5・軸の種類は宣言なし）");
+    expect(s.graphData?.axisLabel).toBe("単位未宣言");
+    expect(s.graphData?.series[0]?.reduction).toBe("max");
+    expect(s.graphData?.resultAxisNote).toContain("宣言されていない");
+
+    // A declaration changes the axis and the numbers, read again rather than relabelled.
+    expect(await engineState.declareUnit("stress", "MPa")).toBe(true);
+    expect(await engineState.showGraph({ fieldName: "stress", reduction: "mean", kind: "overTime" })).toBe(true);
+    s = snapshot();
+    expect(s.graphData?.series[0]?.unit).toBe("Pa");
+    expect(s.graphData?.series[0]?.declaredUnit).toBe("MPa");
+    expect(s.graphData?.series[0]?.reduction).toBe("mean");
+    // The same graph, updated in place: one item under this dataset's name.
+    expect(s.savedGraphs.filter((one) => one.id === s.graphId)).toHaveLength(1);
+
+    // The thread goes on with the cube.
+    expect(await engineState.loadDataset("case:1", cubePath)).toBe(true);
+    await engineState.refresh();
+    expect(snapshot().graphData).toBeNull();
   });
 });
 

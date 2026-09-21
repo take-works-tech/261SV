@@ -109,13 +109,14 @@ class TestWhatThisBuildRegisters:
         assert registered == {
             "workspace.open", "dataset.load", "dataset.describe", "dataset.parts",
             "field.declareUnit", "field.statistics", "field.derive", "view.create", "view.update", "view.get", "view.render",
+            "graph.create", "graph.update", "graph.get", "graph.data",
             "dataset.probe", "view.pick", "report.create", "report.update", "report.get",
             "report.export", "report.provenance",
             "workspace.save", "dataset.inspect", "history.list",
             "system.capabilities", "system.protocols", "system.audit", "system.operations", "system.log",
             "output.list", "output.plan", "output.prune",
         }
-        assert len(surface.unimplemented()) == len(OPERATIONS) - 29
+        assert len(surface.unimplemented()) == len(OPERATIONS) - 33
 
     def test_operations_list_what_this_build_answers_and_what_it_does_not(self) -> None:
         """XC-277: the list is the surface's own registry, and the two halves are the whole catalogue."""
@@ -125,7 +126,7 @@ class TestWhatThisBuildRegisters:
 
         assert result.status is Status.ANSWERED, result.reason
         registered, unimplemented = result.value["registered"], result.value["unimplemented"]
-        assert "system.operations" in registered and "graph.data" in unimplemented
+        assert "system.operations" in registered and "graph.duplicate" in unimplemented
         assert tuple(registered) == surface.registered()
         assert tuple(unimplemented) == surface.unimplemented()
         assert set(registered) | set(unimplemented) == set(OPERATIONS)
@@ -133,9 +134,9 @@ class TestWhatThisBuildRegisters:
 
     def test_an_unimplemented_operation_is_refused_and_named_as_such(self) -> None:
         surface, _ = a_surface()
-        assert "graph.data" in surface.unimplemented()
+        assert "graph.duplicate" in surface.unimplemented()
 
-        result = surface.submit(Command("graph.data", {"graphId": "g"}))
+        result = surface.submit(Command("graph.duplicate", {"graphId": "g", "newName": "copy"}))
 
         assert result.status is Status.REFUSED
         assert "実装がありません" in (result.reason or "")
@@ -2161,3 +2162,129 @@ class TestWhatACameraPathRefuses:
         result = surface.submit(Command("view.render", {"viewId": view_id, "width": 200, "height": 150, "format": "png", "cameraPath": {"id": "path:1", "at": 0.0}}))
 
         assert result.status is Status.REFUSED and "2 件以上" in (result.reason or "")
+
+
+def a_graph(surface: Surface, dataset_id: str, *, kind: str = "line", series=None, cases=None) -> str:
+    definition = {
+        "name": "温度の最大", "kind": kind,
+        "series": series if series is not None else [
+            {"label": "温度の最大", "source": {"kind": "field", "datasetId": dataset_id, "fieldName": "temperature", "association": "point", "reduction": "max"}, "unitDeclared": False},
+        ],
+    }
+    if cases is not None:
+        definition["caseSelection"] = {"caseIds": cases}
+    created = surface.submit(Command("graph.create", {"workspaceId": "ws:1", "definition": definition}))
+    assert created.status is Status.APPLIED, created.reason
+    return created.value["id"]
+
+
+class TestAGraphOverTheLoadedCase:
+    """XC-290, graph/AC-001, AC-002, AC-008, AC-013, AC-022: the definition's series as numbers, one
+    point per loaded case, with reduction, scope, weighting, digits and units stated."""
+
+    def test_a_field_s_maximum_is_one_point_per_loaded_case_and_the_axis_says_undeclared(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        graph_id = a_graph(surface, dataset_id)
+
+        result = surface.submit(Command("graph.data", {"graphId": graph_id}))
+
+        assert result.status is Status.ANSWERED, result.reason
+        assert result.value["cases"] == ["case:1"] and result.value["selection"] == "loaded"
+        series = result.value["series"][0]
+        assert series["points"] == [{"caseId": "case:1", "x": None, "value": 8.0}]
+        assert series["reduction"] == "max" and series["scope"] == "ケース全体（1 パート）" and series["digits"] == 6
+        assert series["unit"] is None and series["declaredUnit"] is None and series["provenance"] == "dataset"
+        assert result.value["axisLabel"] == "単位未宣言"
+        assert result.value["missing"] == []
+        got = surface.submit(Command("graph.get", {"graphId": graph_id}))
+        assert got.status is Status.ANSWERED and got.value["definition"]["kind"] == "line" and got.value["revision"] == 1
+
+    def test_a_declared_unit_puts_the_values_in_the_internal_unit_with_the_declared_one_beside(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path)
+        surface.submit(Command("field.declareUnit", {"datasetId": dataset_id, "fieldName": "stress", "unitSymbol": "MPa"}))
+        graph_id = a_graph(surface, dataset_id, series=[
+            {"label": "応力の最大", "source": {"kind": "field", "datasetId": dataset_id, "fieldName": "stress", "association": "point", "reduction": "max"}, "unit": "MPa", "unitDeclared": True},
+        ])
+
+        series = surface.submit(Command("graph.data", {"graphId": graph_id})).value["series"][0]
+
+        assert series["unit"] == "Pa" and series["declaredUnit"] == "MPa"
+        assert series["points"][0]["value"] == pytest.approx(40.0e6), "40 MPa plotted in pascal, as CT-005 labels the axis"
+
+    def test_the_mean_states_its_weighting(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        graph_id = a_graph(surface, dataset_id, series=[
+            {"label": "温度の平均", "source": {"kind": "field", "datasetId": dataset_id, "fieldName": "temperature", "association": "point", "reduction": "mean"}, "unitDeclared": False},
+        ])
+
+        series = surface.submit(Command("graph.data", {"graphId": graph_id})).value["series"][0]
+
+        assert series["reduction"] == "mean" and series["weighting"] == "dualVolume"
+        assert series["points"][0]["value"] == pytest.approx(4.5)
+
+    def test_a_field_of_several_components_is_no_data_with_the_reason_and_stays_in_the_legend(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path, write=write_fields, name="fields.vtu")
+        surface.submit(Command("field.derive", {"datasetId": dataset_id, "fieldName": "displacement", "quantity": "magnitude"}))
+        graph_id = a_graph(surface, dataset_id, series=[
+            {"label": "変位の大きさの最大", "source": {"kind": "field", "datasetId": dataset_id, "fieldName": "displacement.magnitude", "association": "point", "reduction": "max"}, "unitDeclared": False},
+            {"label": "変位そのもの", "source": {"kind": "field", "datasetId": dataset_id, "fieldName": "displacement", "association": "point", "reduction": "max"}, "unitDeclared": False},
+        ])
+
+        result = surface.submit(Command("graph.data", {"graphId": graph_id}))
+
+        assert result.status is Status.ANSWERED, result.reason
+        magnitude, vector = result.value["series"]
+        assert magnitude["points"][0]["value"] == pytest.approx(7.0)
+        assert vector["points"][0]["value"] is None and "3 成分" in vector["points"][0]["reason"]
+        assert any(line.startswith("変位そのもの / case:1") for line in result.value["missing"])
+
+    def test_a_series_without_a_reduction_is_refused_because_a_field_is_many_numbers(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        graph_id = a_graph(surface, dataset_id, series=[
+            {"label": "温度", "source": {"kind": "field", "datasetId": dataset_id, "fieldName": "temperature", "association": "point"}, "unitDeclared": False},
+        ])
+
+        result = surface.submit(Command("graph.data", {"graphId": graph_id}))
+
+        assert result.status is Status.REFUSED and "reduction" in (result.reason or "")
+
+    def test_two_series_whose_units_cannot_share_an_axis_are_refused_naming_both(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path)
+        surface.submit(Command("field.declareUnit", {"datasetId": dataset_id, "fieldName": "stress", "unitSymbol": "MPa"}))
+        surface.submit(Command("field.declareUnit", {"datasetId": dataset_id, "fieldName": "element_stress", "unitSymbol": "K"}))
+        graph_id = a_graph(surface, dataset_id, series=[
+            {"label": "応力", "source": {"kind": "field", "datasetId": dataset_id, "fieldName": "stress", "association": "point", "reduction": "max"}, "unit": "MPa", "unitDeclared": True},
+            {"label": "温度のふりをした要素値", "source": {"kind": "field", "datasetId": dataset_id, "fieldName": "element_stress", "association": "cell", "reduction": "max"}, "unit": "K", "unitDeclared": True},
+        ])
+
+        result = surface.submit(Command("graph.data", {"graphId": graph_id}))
+
+        assert result.status is Status.REFUSED
+        assert "MPa" in (result.reason or "") and "K" in (result.reason or "")
+
+    def test_a_case_that_is_not_loaded_is_a_missing_point_that_stays_in_the_series(self, tmp_path: Path) -> None:
+        surface, _, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")
+        graph_id = a_graph(surface, dataset_id, cases=["case:1", "case:9"])
+
+        result = surface.submit(Command("graph.data", {"graphId": graph_id}))
+
+        assert result.value["selection"] == "given" and result.value["cases"] == ["case:1", "case:9"]
+        points = result.value["series"][0]["points"]
+        assert points[0]["value"] == 8.0 and points[1]["value"] is None and "case:9" in points[1]["reason"]
+
+    def test_over_the_result_axis_each_point_is_a_step_and_says_which(self, tmp_path: Path) -> None:
+        requires_h5py()
+        from cgns_fixture import write_transient_cgns
+
+        surface, _, dataset_id = loaded(tmp_path, write=write_transient_cgns, name="t.cgns")
+        graph_id = a_graph(surface, dataset_id, kind="overTime", series=[
+            {"label": "応力の最大", "source": {"kind": "field", "datasetId": dataset_id, "fieldName": "stress", "association": "point", "reduction": "max"}, "unitDeclared": False},
+        ])
+
+        result = surface.submit(Command("graph.data", {"graphId": graph_id}))
+
+        assert result.status is Status.ANSWERED, result.reason
+        points = result.value["series"][0]["points"]
+        assert [(one["x"], one["value"]) for one in points] == [(0.0, 90.0), (0.5, 91.0)]
+        assert points[1]["resultPosition"]["stated"] == "ステップ 2/2（位置 0.5・軸の種類は宣言なし）"
+        assert "宣言されていない" in result.value.get("resultAxisNote", "")

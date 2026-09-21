@@ -70,6 +70,7 @@ READS = frozenset({
     "view.get",
     "view.render",
     "view.pick",
+    "graph.get",
     "graph.data",
     "report.get",
     "system.capabilities",
@@ -116,6 +117,7 @@ OPERATIONS = (
     "view.pick",
     "graph.create",
     "graph.update",
+    "graph.get",
     "graph.duplicate",
     "graph.rename",
     "graph.delete",
@@ -191,6 +193,7 @@ PARAMETERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "view.pick": (frozenset(['camera', 'cameraPath', 'height', 'viewId', 'width', 'x', 'y']), frozenset(['height', 'viewId', 'width', 'x', 'y'])),
     "graph.create": (frozenset(['definition', 'sourceTemplateId', 'sourceTemplateRevision', 'workspaceId']), frozenset(['definition', 'workspaceId'])),
     "graph.update": (frozenset(['definition', 'graphId']), frozenset(['definition', 'graphId'])),
+    "graph.get": (frozenset(['graphId']), frozenset(['graphId'])),
     "graph.duplicate": (frozenset(['graphId', 'newName']), frozenset(['graphId', 'newName'])),
     "graph.rename": (frozenset(['graphId', 'newName']), frozenset(['graphId', 'newName'])),
     "graph.delete": (frozenset(['graphId']), frozenset(['graphId'])),
@@ -267,10 +270,11 @@ RESULT_FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "view.pick": (frozenset(['association', 'cameraPath', 'part', 'resultPosition', 'value']), frozenset(['resultPosition', 'value'])),
     "graph.create": (frozenset(['id', 'revision']), frozenset(['id', 'revision'])),
     "graph.update": (frozenset(['id', 'revision']), frozenset(['id', 'revision'])),
+    "graph.get": (frozenset(['definition', 'id', 'revision']), frozenset(['definition', 'id', 'revision'])),
     "graph.duplicate": (frozenset(['id']), frozenset(['id'])),
     "graph.rename": (frozenset(['id', 'revision']), frozenset(['id', 'revision'])),
     "graph.delete": (frozenset(['deletedId', 'unresolvedUnitIds']), frozenset(['deletedId', 'unresolvedUnitIds'])),
-    "graph.data": (frozenset(['resultAxisNote', 'series']), frozenset(['series'])),
+    "graph.data": (frozenset(['axisLabel', 'cases', 'missing', 'resultAxisNote', 'selection', 'series']), frozenset(['axisLabel', 'cases', 'missing', 'selection', 'series'])),
     "diff.create": (frozenset(['diffId', 'disclosure', 'outsideCount', 'outsideFraction', 'roundTripError']), frozenset(['diffId', 'disclosure', 'outsideCount', 'outsideFraction', 'roundTripError'])),
     "report.create": (frozenset(['id', 'revision']), frozenset(['id', 'revision'])),
     "report.update": (frozenset(['id', 'revision']), frozenset(['id', 'revision'])),
@@ -344,6 +348,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
     "view.pick": {'value': frozenset(['digits', 'provenance', 'unit', 'value'])},
     "graph.create": {},
     "graph.update": {},
+    "graph.get": {},
     "graph.duplicate": {},
     "graph.rename": {},
     "graph.delete": {},
@@ -392,7 +397,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
 
 #: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below
 #: the engine's floor is refused politely rather than answered in a shape it cannot read.
-PROTOCOL_VERSION = "3.12.0"
+PROTOCOL_VERSION = "3.13.0"
 
 #: The wire's own names, from CT-003's `$defs.transport` (XC-258). The interface generates
 #: the same values from the same place; neither side is derived from the other (XC-252).

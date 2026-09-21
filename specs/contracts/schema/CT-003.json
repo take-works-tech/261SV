@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "3.12.0",
+  "version": "3.13.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -43,6 +43,7 @@
         "view.pick",
         "graph.create",
         "graph.update",
+        "graph.get",
         "graph.duplicate",
         "graph.rename",
         "graph.delete",
@@ -703,6 +704,19 @@
             "definition": {
               "type": "object",
               "description": "CT-005"
+            }
+          }
+        },
+        "graph.get": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "graphId"
+          ],
+          "properties": {
+            "graphId": {
+              "type": "string",
+              "description": "グラフ の識別子（CT-001）"
             }
           }
         },
@@ -2745,6 +2759,28 @@
             }
           }
         },
+        "graph.get": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "revision",
+            "definition"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "definition": {
+              "type": "object",
+              "description": "文書が今持っている CT-005 の定義。書く前に読む（XC-274 と同じ理由）"
+            }
+          }
+        },
         "graph.duplicate": {
           "type": "object",
           "additionalProperties": false,
@@ -2802,6 +2838,10 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
+            "axisLabel",
+            "cases",
+            "missing",
+            "selection",
             "series"
           ],
           "properties": {
@@ -2844,6 +2884,17 @@
                         "reason": {
                           "type": "string",
                           "description": "値が無い理由"
+                        },
+                        "x": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "description": "横軸の値：overTime なら結果軸の位置（宣言がなければ null でステップ番号は resultPosition に）、ケースごとの図なら null"
+                        },
+                        "resultPosition": {
+                          "$ref": "#/$defs/resultPosition",
+                          "description": "overTime のとき、その点がどのステップか（view/AC-032）"
                         }
                       }
                     },
@@ -2869,6 +2920,35 @@
                   "expression": {
                     "type": "string",
                     "description": "計算系列ならその式（AC-006）"
+                  },
+                  "declaredUnit": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "場に宣言された単位の記号。値は unit（その量の内部単位）で答える（CT-005）"
+                  },
+                  "reduction": {
+                    "type": "string",
+                    "enum": [
+                      "max",
+                      "min",
+                      "mean"
+                    ],
+                    "description": "場の系列がどの一つの数か（INV-017）"
+                  },
+                  "scope": {
+                    "type": "string",
+                    "description": "縮約の範囲（INV-017）"
+                  },
+                  "weighting": {
+                    "type": "string",
+                    "description": "縮約の重み（INV-017）"
+                  },
+                  "digits": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "値が正直に持つ有効桁（INV-014）"
                   }
                 }
               },
@@ -2877,6 +2957,32 @@
             "resultAxisNote": {
               "type": "string",
               "description": "結果軸が異なるときに言うべきこと（XC-131）"
+            },
+            "axisLabel": {
+              "type": "string",
+              "description": "値軸の表示：量の内部単位の記号か、未宣言の印（graph/AC-002, XC-003）"
+            },
+            "cases": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "描いたケースの id（graph/AC-008, AC-009）"
+            },
+            "selection": {
+              "type": "string",
+              "enum": [
+                "loaded",
+                "given"
+              ],
+              "description": "ケースの選び方：選択がなければ読み込まれているケースで、そう言う（AC-008）"
+            },
+            "missing": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "描けなかった点、一行ずつ理由付き（AC-007, AC-013）"
             }
           }
         },

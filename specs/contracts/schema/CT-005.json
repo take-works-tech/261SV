@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-005 graph definition",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "type": "object",
   "additionalProperties": true,
   "required": [
@@ -78,6 +78,15 @@
               },
               "path": {
                 "type": "string"
+              },
+              "reduction": {
+                "type": "string",
+                "enum": [
+                  "max",
+                  "min",
+                  "mean"
+                ],
+                "description": "which single number of the field the series plots per case or per step (INV-017, XC-290): the case-wide maximum or minimum, or the weighted mean - whose weighting the data answer states. A field series without one plots nothing and says so"
               }
             }
           },

@@ -10,7 +10,13 @@ updated: 2026-09-21
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 3.12.0
+- version: 3.13.0
+- correction: 2026-09-21, version 3.12.0 to 3.13.0. `graph.get` is added, the graph's counterpart of
+  `view.get`. `graph.data` says what each point is: the series' `reduction`, `scope`, `weighting`
+  and `digits` (INV-017, INV-014), the `declaredUnit` beside the internal `unit` the values are in
+  (CT-005), and per point the `x` and the `resultPosition` for a graph over the result axis; the
+  answer names the `cases` drawn and how they were chosen, the value axis's label, and every point
+  that could not be drawn with its reason (graph/AC-002, graph/AC-008, graph/AC-013, XC-290). Additive
 - correction: 2026-09-21, version 3.11.0 to 3.12.0. `view.render` and `view.pick` take `cameraPath`
   - one of the view definition's camera paths (CT-004 3.3.0) and a parameter on it - and answer
   the pose the path's rule gave, with the rule, so a frame drawn from a computed pose carries how it
@@ -199,10 +205,11 @@ no identifier to report.
 | `view.pick` | read | view id, width, height, pixel x and y, camera? or cameraPath? | the value under that pixel with its unit, digits, provenance and location, which point or cell it is, which part answered and which step it is of - or nothing, where the pixel is off the model or on a hidden part (view/AC-027, view/AC-029, view/AC-032, view/AC-055) |
 | `graph.create` | write | workspace id, definition (CT-005), source template id and revision? | workspace graph id and revision (XC-109) |
 | `graph.update` | write | graph id, definition | new graph revision |
+| `graph.get` | read | graph id | the definition the document holds now, and its revision (XC-290) |
 | `graph.duplicate` | write | graph id, new name | new independent workspace graph id |
 | `graph.rename` | write | graph id, new name | new revision; stored id references unchanged |
 | `graph.delete` | write | graph id | deleted id; dependent pipeline units retained as unresolved |
-| `graph.data` | read | graph id | the series as numbers, with units and provenance |
+| `graph.data` | read | graph id | the series as numbers in the internal unit of their quantity with the declared unit beside, provenance, reduction, scope, weighting and digits; one point per case, or per step of the result axis for `overTime`, each missing point with its reason; the cases drawn and how they were chosen, the value axis's label, and the note where series come from different result axes (INV-017, graph/AC-002, graph/AC-008, graph/AC-013, XC-131, XC-290) |
 | `diff.create` | write | case id a, case id b, basis case id | diff id, outside-point count and proportion, round-trip error |
 | `report.create` | write | workspace id, definition (CT-006), source template id and revision? | workspace report id and revision (XC-109) |
 | `report.update` | write | report id, definition | new report revision |

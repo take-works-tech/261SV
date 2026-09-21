@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-08-25
+updated: 2026-09-21
 ---
 
 # Tasks: graph
@@ -255,3 +255,16 @@ updated: 2026-08-25
 - done_when: the central Graph heading contains no global Apply action, right property edits use shared
   Undo, material-library Apply remains available as the non-drag resource path, and recommendations do
   not auto-apply
+
+### TASK-024 - The graph's numbers from the engine
+- satisfies: AC-001, AC-002, AC-004, AC-008, AC-013, AC-022
+- depends_on: TASK-001, TASK-007
+- done_when: a graph written to the document is answered as numbers by the engine, one point per
+  loaded case or per step of the result axis, each series with its unit, provenance, reduction,
+  scope and weighting, each missing point with its reason; the interface draws only what was answered
+- done: 2026-09-21 (XC-290, CT-005 2.1.0, CT-003 3.13.0). `graph.create`, `graph.update`, `graph.get`
+  and `graph.data` are answered; a field series names its reduction; `CaseQuantities` in
+  `service/command/handlers.py` hands MOD-005's `plot` the same numbers `field.statistics` reports,
+  computed when asked for, and a number a field cannot give is an `Absent` with the reason. The
+  interface's graph screen draws the engine's series with an SVG of its own and copies the points
+  as rows. Templates, styles, expressions over cases and the export wait as before

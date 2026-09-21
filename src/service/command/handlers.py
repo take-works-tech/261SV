@@ -35,6 +35,7 @@ from domain_core.association import Association
 from domain_core.case_contents import AxisKind, PositionError, ResultAxis, ResultPosition, axis_word
 from domain_core.locale_format import bytes_as_text
 from domain_core.dataset import Dataset, Field
+from domain_core.dimension import DIMENSIONLESS as NO_DIMENSION, parse_symbol
 from domain_core.identifiers import location_of
 from domain_core.parts import LoadedCase, Part
 from domain_core.recorded_time import STORED_FORMAT, RecordedTime, from_stored, record as record_time, record_instant
@@ -44,7 +45,10 @@ from engine import reader
 from engine.analysis import derived, nodal
 from engine.completeness import FileIncomplete, ResultsLost
 from engine.analysis import weights as field_weights
+from engine.analysis.expression import Value
 from engine.analysis.summary import Reduction, Summary, SummaryError, Weighting, summarise
+from engine.graph import definition as graph_definition
+from engine.graph import series as graph_series
 from engine.limits import MachineClass
 from engine.report import document as document_module, html
 from engine.report.document import (
@@ -497,6 +501,10 @@ def handlers(session: Session) -> tuple[Handler, ...]:
         Handler("view.create", lambda p, t: item_create(session, "views", p)),
         Handler("view.update", lambda p, t: item_update(session, "views", "viewId", p)),
         Handler("view.get", lambda p, t: item_get(session, "views", "viewId", p)),
+        Handler("graph.create", lambda p, t: item_create(session, "graphs", p)),
+        Handler("graph.update", lambda p, t: item_update(session, "graphs", "graphId", p)),
+        Handler("graph.get", lambda p, t: item_get(session, "graphs", "graphId", p)),
+        Handler("graph.data", lambda p, t: graph_data(session, p)),
         Handler("view.render", lambda p, t: view_render(session, p)),
         Handler("dataset.probe", lambda p, t: dataset_probe(session, p)),
         Handler("view.pick", lambda p, t: view_pick(session, p)),
@@ -1727,6 +1735,226 @@ def view_pick(session: Session, parameters: Mapping[str, Any]) -> Effect | Resul
         f"画素 {pixel} の値を読みました" if not value.is_missing else f"画素 {pixel} の先には何もありません",
         value=answered,
     )
+
+
+# ---- graphs: the definition's series as numbers, computed by MOD-004 and arranged by MOD-005 ---------
+
+
+@dataclass(frozen=True, slots=True)
+class Reduced:
+    """One number of a field over a case or a step, with what a graph must say about it."""
+
+    value: ReportedValue
+    scope: str
+    weighting: str | None
+
+
+def reduce_field(loaded: Loaded, case: LoadedCase, name: str, reduction: str) -> Reduced:
+    """A field's maximum, minimum or weighted mean over the whole case, as `field.statistics` would
+    answer it - the same arithmetic, so a graph and a table cannot disagree (INV-017, XC-290)."""
+    holders = loaded.holders(name, case)
+    scope = f"ケース全体（{len(holders)} パート）"
+    fields = [part.dataset.fields[name] for part in holders if part.dataset is not None]
+    if not fields:
+        return Reduced(ReportedValue.unavailable(f"'{name}' というフィールドはこのデータセットにありません", unit=None, digits=1,
+                                                 provenance=Provenance.COMPUTED, formula=f"{reduction}({name})"), scope, None)
+    unit = fields[0].unit
+    digits = min(field.significant_digits for field in fields)
+    if fields[0].components != 1:
+        return Reduced(ReportedValue.unavailable(
+            f"'{name}' は {fields[0].components} 成分の場です。一つの数は導出量から求めてください（field.derive, XC-282）",
+            unit=unit, digits=digits, provenance=Provenance.COMPUTED, formula=f"{reduction}({name})"), scope, None)
+    association = fields[0].association
+    caveats: frozenset[Caveat] = frozenset({Caveat.PARTIAL_DATASET}) if case.is_partial else frozenset()
+    if reduction == "max":
+        return Reduced(case.maximum(name), scope, "none")
+    values = np.concatenate([field.values for field in fields])
+    if reduction == "min":
+        try:
+            summary = summarise(values, reduction=Reduction.MIN, association=association, scope=scope, weighting=Weighting.NONE, unit=unit)
+        except SummaryError as error:
+            return Reduced(ReportedValue.unavailable(str(error), unit=unit, digits=digits, provenance=Provenance.COMPUTED,
+                                                     formula=f"min({name})", caveats=caveats), scope, "none")
+        return Reduced(as_reported(summary, digits=digits, formula=f"min({name})", caveats=caveats), scope, "none")
+    mean, weighting = weighted_mean(holders, name, values, association, scope, unit, digits, caveats)
+    return Reduced(mean, scope, weighting.value)
+
+
+class CaseQuantities(Mapping[str, "Value | graph_series.Absent"]):
+    """The quantities of one case (or one step of it) as the graph module reads them: `field.max`,
+    `field.min` and `field.mean` for every field, each computed when first asked for. A number the
+    field cannot give is an `Absent` with the reason, so the point says why (graph/AC-013)."""
+
+    def __init__(self, loaded: Loaded, case: LoadedCase) -> None:
+        self._loaded = loaded
+        self._case = case
+        names: list[str] = []
+        for dataset in loaded.datasets(case):
+            for name in dataset.fields:
+                if name not in names:
+                    names.append(name)
+        self._keys = [f"{name}.{reduction}" for name in names for reduction in graph_definition.REDUCTIONS]
+        self._reduced: dict[str, Reduced] = {}
+
+    def reduced(self, key: str) -> Reduced:
+        if key not in self._reduced:
+            name, _, reduction = key.rpartition(".")
+            self._reduced[key] = reduce_field(self._loaded, self._case, name, reduction)
+        return self._reduced[key]
+
+    def __getitem__(self, key: str) -> Value | graph_series.Absent:
+        if key not in self._keys:
+            raise KeyError(key)
+        reduced = self.reduced(key)
+        if reduced.value.value is None:
+            return graph_series.Absent(reduced.value.missing_because or "値なし")
+        if reduced.value.unit is None:
+            return Value(float(reduced.value.value), NO_DIMENSION, None)
+        composed = parse_symbol(reduced.value.unit)
+        # In the internal unit of the quantity, as the axis is labelled (CT-005): MPa and kPa on one
+        # axis are plotted as Pa. The declared symbol travels beside it.
+        return Value(float(reduced.value.value) * composed.to_internal, composed.dimension, reduced.value.unit)
+
+    def __iter__(self):
+        return iter(self._keys)
+
+    def __len__(self) -> int:
+        return len(self._keys)
+
+
+def graph_data(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
+    """The graph's series as numbers (graph/AC-001, AC-002, AC-008, AC-013, INV-017, XC-290).
+
+    One point per loaded case, or - for a graph `overTime` - one per step of the result axis of the
+    one loaded case, each step read through the same door the view uses (XC-283). A point that
+    cannot be made is drawn as no data with the reason, and stays in the legend. Two series whose
+    units cannot share an axis are refused naming both (AC-003); a series over a field is refused
+    without its reduction, because which number of a field to plot is not this product's to choose.
+    """
+    workspace = session.open_workspace()
+    if isinstance(workspace, Result):
+        return workspace
+    try:
+        item = items.find(workspace.raw, "graphs", str(parameters["graphId"]))
+    except ItemError as error:
+        return refused(str(error))
+    definition = item["definition"]
+    try:
+        stored_series = graph_definition.read_series(definition)
+    except graph_definition.GraphError as error:
+        return refused(str(error))
+    if not stored_series:
+        return refused("この グラフ に系列がありません（CT-005 series）")
+    for one in stored_series:
+        if one.source is graph_definition.SourceKind.FIELD and not one.expression and one.reduction is None:
+            return refused(
+                f"系列 '{one.label}' は場 '{one.field_name}' を描きますが、どの一つの数か（reduction: {list(graph_definition.REDUCTIONS)}）が"
+                "ありません。場は多くの数で、点は一つです：どれを描くかはこちらでは選びません（INV-017, XC-290）"
+            )
+    if not session.datasets:
+        return refused("データセットが読み込まれていません。グラフの点は読み込まれたケースから作ります")
+
+    # Which cases: the given ones, or every loaded one - and the answer says which (AC-008, AC-009).
+    selection = definition.get("caseSelection") or {}
+    given = [str(one) for one in (selection.get("caseIds") or [])] if isinstance(selection, Mapping) else []
+    by_case: dict[str, Loaded] = {}
+    for loaded in session.datasets.values():
+        by_case[loaded.case_id] = loaded
+    cases = given if given else list(by_case)
+
+    # The series with the units the fields carry **now**: a definition written before a declaration
+    # would otherwise label the axis with a unit the numbers are no longer in (XC-003).
+    live_series: list[graph_definition.Series] = []
+    for one in stored_series:
+        unit = one.unit
+        if one.source is graph_definition.SourceKind.FIELD and one.field_name and not one.expression:
+            found = next((loaded for loaded in by_case.values() if loaded.holders(one.field_name)), None)
+            unit = found.holders(one.field_name)[0].dataset.fields[one.field_name].unit if found else None  # type: ignore[union-attr]
+        try:
+            live_series.append(replace(one, unit=unit))
+        except graph_definition.GraphError as error:
+            return refused(str(error))
+    refusal = graph_definition.refusal_for(live_series)
+    if refusal:
+        return refused(refusal)
+
+    over_time = str(definition.get("kind")) == "overTime"
+    answered: list[dict[str, Any]] = []
+    missing: list[str] = []
+    axes = []
+    for one in live_series:
+        points: list[dict[str, Any]] = []
+        reduced_seen: Reduced | None = None
+        key = f"{one.field_name}.{one.reduction}" if one.reduction else None
+        if over_time:
+            if len(cases) != 1 or cases[0] not in by_case:
+                return refused(
+                    f"結果軸に沿ったグラフ（overTime）は読み込まれた一つのケースの上に描きます（対象 {cases}）"
+                )
+            loaded = by_case[cases[0]]
+            axes.append(loaded.axis)
+            for step in range(loaded.axis.count):
+                position = loaded.axis.at(step)
+                case = case_at(loaded, position)
+                if isinstance(case, Result):
+                    points.append({"caseId": loaded.case_id, "x": position.value, "value": None, "reason": case.reason or "読めません", "resultPosition": stated_position(position)})
+                    continue
+                quantities = CaseQuantities(loaded, case)
+                plotted = graph_series.plot(one, [loaded.case_id], lambda _case, q=quantities: q)
+                point = plotted.points[0]
+                if key and key in quantities:
+                    reduced_seen = quantities.reduced(key)
+                entry: dict[str, Any] = {"caseId": loaded.case_id, "x": position.value if position.value is not None else float(step), "value": point.value, "resultPosition": stated_position(position)}
+                if point.reason:
+                    entry["reason"] = point.reason
+                points.append(entry)
+        else:
+            for case_id in cases:
+                loaded = by_case.get(case_id)
+                if loaded is None:
+                    points.append({"caseId": case_id, "x": None, "value": None, "reason": f"ケース '{case_id}' は読み込まれていません"})
+                    continue
+                axes.append(loaded.axis)
+                quantities = CaseQuantities(loaded, loaded.case)
+                plotted = graph_series.plot(one, [case_id], lambda _case, q=quantities: q)
+                point = plotted.points[0]
+                if key and key in quantities:
+                    reduced_seen = quantities.reduced(key)
+                entry = {"caseId": case_id, "x": None, "value": point.value}
+                if point.reason:
+                    entry["reason"] = point.reason
+                points.append(entry)
+        series_answer: dict[str, Any] = {
+            "label": one.label,
+            "points": points,
+            "unit": parse_symbol(one.unit).canonical if one.unit else None,
+            "declaredUnit": one.unit,
+            "provenance": one.provenance.value,
+        }
+        if one.expression:
+            series_answer["expression"] = one.expression
+        if one.reduction:
+            series_answer["reduction"] = one.reduction
+        if reduced_seen is not None:
+            series_answer["scope"] = reduced_seen.scope
+            if reduced_seen.weighting:
+                series_answer["weighting"] = reduced_seen.weighting
+            series_answer["digits"] = reduced_seen.value.digits
+        answered.append(series_answer)
+        for point in points:
+            if point["value"] is None:
+                missing.append(f"{one.label} / {point['caseId']}：{point.get('reason', '理由不明')}")
+    value: dict[str, Any] = {
+        "series": answered,
+        "axisLabel": graph_definition.axis_label(live_series),
+        "cases": cases,
+        "selection": "given" if given else "loaded",
+        "missing": missing,
+    }
+    note = graph_definition.note_result_axes(dict(definition), axes)
+    if note:
+        value["resultAxisNote"] = note
+    return Effect(f"グラフの系列 {len(answered)} 本（対象 {len(cases)} ケース）", value=value)
 
 
 def rows_for_report(session: Session, definition: Mapping[str, Any]) -> tuple[dict[str, list[ValueRow]], list[Loaded]]:
