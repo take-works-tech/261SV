@@ -100,15 +100,49 @@ def _files_of(location: Path) -> list[Path]:
 
 def snapshot(path: str | Path) -> Fingerprint:
     """The fingerprint of a file and of every file it names, taken now. Raises `UnreadableFileError`
-    where the file is not there."""
+    where the file is not there or the operating system will not say what it is."""
     location = Path(path)
     if not location.exists():
         raise UnreadableFileError(f"{location} does not exist")
     found: Fingerprint = {}
     for one in _files_of(location):
-        stat = one.stat()
+        try:
+            stat = one.stat()
+        except OSError as error:
+            raise UnreadableFileError(f"{one.name} の状態を読めません（{error.strerror or error}）") from error
         found[one.name] = (stat.st_size, stat.st_mtime_ns)
     return found
+
+
+def _readable(location: Path) -> None:
+    """Refuse, naming the operating system's reason, a file that cannot be opened or read at all.
+
+    A file another process holds without sharing - a solver writing on Windows - or one this user may
+    not read reaches the toolkit's reader as an empty result, which it reports as "no part is there"
+    (E-213). Asking the operating system first gives the reason that is true.
+    """
+    try:
+        with location.open("rb") as handle:
+            handle.read(4096)
+    except OSError as error:
+        raise UnreadableFileError(
+            f"{location.name} を開けません、または読めません（{error.strerror or error}）。"
+            "別のプロセスが書き込み中に握っているか、読む権限がないファイルです"
+        ) from error
+
+
+def _vanished(location: Path, before: Fingerprint, *, during: bool) -> FileChanged:
+    was = before.get(location.name)
+    size = f"{was[0]} バイト、更新時刻 {_when(was[1])}" if was else "記録なし"
+    if during:
+        return FileChanged(
+            f"{location.name} は読んでいる間に消えました（読み込み前は {size}）。"
+            "読めた分を結果として返す代わりに拒みます（ingest/AC-046）"
+        )
+    return FileChanged(
+        f"{location.name} は読み込んだあとに消えました（読み込み時は {size}）。今ある数は読み込んだ時点のファイルのもので、"
+        "無くなったファイルからは読みません（ingest/AC-046）"
+    )
 
 
 def _when(mtime_ns: int) -> str:
@@ -140,6 +174,8 @@ def _changed(location: Path, before: Fingerprint, after: Fingerprint, *, during:
 
 
 def _held_still(location: Path, before: Fingerprint) -> None:
+    if not location.exists():
+        raise _vanished(location, before, during=True)
     after = snapshot(location)
     if after != before:
         raise _changed(location, before, after, during=True)
@@ -458,6 +494,7 @@ def read(path: str | Path) -> Dataset:
     if not location.exists():
         raise UnreadableFileError(f"{location} does not exist")
     before = snapshot(location)
+    _readable(location)
 
     reader = choice.factory()
     reader.SetFileName(str(location))
@@ -583,10 +620,13 @@ def read_case(path: str | Path, *, step: int = 0, expected: Fingerprint | None =
             f"'{location.suffix}' is not a format this build reads; it reads {supported_suffixes()}"
         )
     if not location.exists():
+        if expected is not None:
+            raise _vanished(location, expected, during=False)
         raise UnreadableFileError(f"{location} does not exist")
     before = snapshot(location)
     if expected is not None and before != expected:
         raise _changed(location, expected, before, during=False)
+    _readable(location)
 
     reader = choice.factory()
     reader.SetFileName(str(location))
