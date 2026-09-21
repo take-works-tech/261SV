@@ -63,6 +63,7 @@ class TestWhatAgrees:
         ("box", "mean(f = x), dual-volume weights, against the integrator"),
         ("box", "mean(f = x), dual-volume weights, against the trilinear interpolant"),
         ("box", "volume"),
+        ("skewed hexahedron", "mean(f = x), dual-volume weights, against the trilinear interpolant"),
     )
 
     @pytest.mark.parametrize("key", AGREE, ids=[f"{case}: {quantity}" for case, quantity in AGREE])
@@ -72,8 +73,10 @@ class TestWhatAgrees:
 
     def test_the_numbers_are_the_ones_the_hand_answers_say(self, record: dict) -> None:
         rows = by_quantity(record)
-        assert rows[("cube", "mean(temperature), dual-volume weights")]["ours"] == 4.5
-        assert rows[("bar", "mean(stress), volume weights")]["ours"] == 52.0
+        # To one ulp: the shares come from quadrature at irrational points (XC-288), and 4.5 arrives as
+        # 4.499999999999999, which INV-014's digits show as 4.5 - the source has six.
+        assert rows[("cube", "mean(temperature), dual-volume weights")]["ours"] == pytest.approx(4.5, rel=1e-15)
+        assert rows[("bar", "mean(stress), volume weights")]["ours"] == pytest.approx(52.0, rel=1e-15)
         assert rows[("bar", "max(nodal average of stress)")]["ours"] == 110.0, "E-144"
         assert rows[("two parts", "max(nodal average) in the part holding the concentration")]["ours"] == 200.0
 
@@ -92,14 +95,16 @@ class TestWhatDiffersAndWhy:
         assert row["verdict"] == "differs"
         assert row["ours"] == 200.0 and row["reference"] == 110.0, "INV-022, E-074: this product never averages across a part"
 
-    def test_the_dual_volume_mean_is_exact_on_a_box_and_not_on_a_skewed_cell(self, record: dict) -> None:
+    def test_on_a_skewed_cell_this_product_reaches_the_interpolant_and_the_integrator_does_not(self, record: dict) -> None:
+        """XC-288 (#402): the shape-function shares give the trilinear element's own average and
+        volume; the integrator's planar tetrahedra give another number, and the difference is its."""
         rows = by_quantity(record)
         against_integrator = rows[("skewed hexahedron", "mean(f = x), dual-volume weights, against the integrator")]
         against_exact = rows[("skewed hexahedron", "mean(f = x), dual-volume weights, against the trilinear interpolant")]
-        assert against_integrator["verdict"] == "differs" and against_exact["verdict"] == "differs"
-        assert against_exact["ours"] == pytest.approx(0.625)
-        assert against_integrator["reference"] == pytest.approx(0.75)
-        assert against_exact["reference"] == pytest.approx(5.0 / 7.0), "the trilinear interpolant's own volume average (#402)"
+        volume = rows[("skewed hexahedron", "volume")]
+        assert against_exact["verdict"] == "agrees" and against_exact["ours"] == pytest.approx(5.0 / 7.0)
+        assert against_integrator["verdict"] == "differs" and against_integrator["reference"] == pytest.approx(0.75)
+        assert volume["verdict"] == "differs" and volume["ours"] == pytest.approx(1.75) and volume["reference"] == pytest.approx(2.0)
 
     def test_the_spread_has_no_reference_and_says_so(self, record: dict) -> None:
         row = by_quantity(record)[("bar", "spread at the averaged maximum")]
