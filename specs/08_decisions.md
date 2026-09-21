@@ -6598,3 +6598,37 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a library that takes the plain long path and not the extended one - none
   measured - or a Windows that lifts the limit unconditionally, which `tests/test_long_paths.py`
   notices by asserting that the plain form still fails where the policy is off
+
+### XC-295 - An exported document opens the same from a download, a share and a local file, and a test opens it that way
+- decided: 2026-09-21
+- status: active
+- decision: an exported document carries every dependency inline - style, images and fonts as data
+  URIs, and, when the interactive view comes (report/AC-001), its script inline as a classic or a
+  module script - and references nothing outside itself, which the writer refuses rather than
+  trusts (`EXTERNAL`, report/AC-001, INV-007). What that buys is measured, not assumed (E-218):
+  opened in the Chromium browsers present - Edge and Chrome, headless, each run with a profile of
+  its own - from a local file, from the same file carrying the Internet-zone mark Windows puts on a
+  download or a saved mail attachment (`Zone.Identifier`, `ZoneId=3`), and through a network share,
+  an inline classic script, an inline module script, inline style and a data-URI image all run and
+  load, and the exported document renders the identical DOM the three ways.
+  `tests/test_exported_document_opens.py` keeps that measurement as a test that skips, saying so,
+  where no browser or no share is present, and prints the versions it used. Not measured, and said
+  so: a mail client's own preview pane, SmartScreen, a double-click from a folder, Firefox and
+  Safari - the browser range is #256's question (report/AC-036)
+- decided_by: engineering judgement, from #255's condition and the measurement
+- rationale: the product's claim is a deliverable that opens where it arrives, and a script blocked
+  by a zone mark would fail that claim on the receiving screen, silently. The classic Mark-of-the-Web
+  block was Internet Explorer's, which Windows 11 no longer ships; the Chromium engines were
+  measured to ignore the mark for a local file. A document with no external reference has nothing a
+  zone can block, which is why the writer refuses the reference rather than the zone
+- alternatives: **writing Internet Explorer's mark-of-the-web comment** (`saved from url=(0014)
+  about:internet`) into the document - it would put the document into the Internet zone in the one
+  browser that would block it, and does nothing for the browsers a reader has. **Trusting the
+  specification's "self-contained"** - the writer already refuses an external reference; what was
+  untested was the receiving machine, and that is what this measures
+- basis: E-218 (T1)
+- affects: MOD-006, report/REQ-001
+- decidedness: Fixed
+- reversal_trigger: a supported browser (once #256 names them) that blocks an inline script or a
+  data URI from a marked local file - at which point the interactive view needs a way that browser
+  allows, and the test says which
