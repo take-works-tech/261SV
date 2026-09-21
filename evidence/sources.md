@@ -2175,3 +2175,24 @@ Recorded so that nothing silently depends on them:
   short included. Not measured: an Exodus file in HDF5 form (the writer here makes NetCDF classic);
   a file cut while a reader holds it open
 - justifies: XC-284
+
+### E-213 - UNC paths, vanishing files and held files through the real handlers, measured here
+- tier: T1
+- url: tests/test_paths.py, from a probe run on the development machine on 2026-09-21 (Windows 11,
+  VTK 9.5.2) through the administrative share `\\localhost\C$` of the drive holding the temporary
+  directory
+- verified: 2026-09-21
+- says: through the UNC path, `reader.read_case` read the eight-point cube, `snapshot` fingerprinted
+  it, `dataset.inspect` answered, `dataset.load` into a local workspace applied and recorded the
+  source with `pathRelative` `//localhost/C$/.../cube.vtu` and `pathAbsolute` the same in platform
+  form, `field.declareUnit` and `workspace.save` applied, and a second session reopened the document
+  and reloaded the file with the saved declaration re-applied and no second source entry. A workspace
+  opened by its UNC path took its lock (`beam.svw.lock` beside it on the share), loaded a UNC file
+  with `pathRelative` `cube.vtu`, saved, and answered `output.list`. A file deleted by the reader
+  during its own `Update()` was refused as "does not exist"; so was a re-read of a deleted file with
+  the load's fingerprint; both before XC-285 named the disappearance. A file on which another handle
+  held a mandatory byte-range lock (`msvcrt.locking`) was refused by `read_case` and `dataset.load`
+  as "named 1 part(s) and none of them is there": the toolkit's reader returned an empty output and
+  no error. Not measured: a share on another machine, a mapped drive letter, the desktop shell's
+  file dialogs with a UNC path
+- justifies: XC-285

@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-20
+updated: 2026-09-21
 ---
 
 # Contract: workspace document
@@ -68,7 +68,11 @@ no place for it either.
 - the result files themselves - only references with a recorded modification time and size, so a
   changed input is detected rather than silently re-read (workspace/AC-012)
 - rendered images or reports - both are regenerated from definitions (XC-012)
-- any absolute path that is not also recorded relative to the document, so a moved project still opens
+- any absolute path that is not also recorded relative to the document, so a moved project still opens.
+  **Except** a file on another drive or share, to which no relative path exists: its `pathRelative`
+  carries the absolute path in POSIX form and `pathAbsolute` the platform's form, the record says so
+  by being absolute, and a moved project reports such a file missing rather than finding it. A UNC
+  path is otherwise a path like any other (XC-285, E-213)
 
 Version 3.0.0 added what a @Case turned out to need beyond its files: its **state** (GL-039) and why it
 is in it, its **@Result axis** - which may be a time, a mode number, or a frequency (XC-131) - and

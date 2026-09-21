@@ -6236,3 +6236,38 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a format whose container declares no length and whose reader fills silently,
   which would need a reader-side check this design does not have; and an Exodus file in HDF5 form,
   for which the HDF5 measurement on CGNS is the evidence rather than one on Exodus itself
+
+### XC-285 - A network path is a path, and a file that goes away or is held is refused for that reason
+- decided: 2026-09-21
+- status: active
+- decision: a UNC path or a mapped network drive is read, inspected, recorded, saved to and locked on
+  exactly as a local path - nothing in the product tests for one. A file on a drive or share other
+  than the document's has no relative path, and its record says so by carrying the absolute path in
+  `pathRelative` and in `pathAbsolute` (CT-001); a moved project reports it missing rather than
+  finding it. A file that vanishes while it is read, or has vanished since the @Dataset was loaded
+  from it when another step is asked for, is refused naming the disappearance and what the file was;
+  what was read stays what it was. A file the operating system will not let this process open or
+  read - held by another process without sharing, or not this user's to read - is refused with the
+  operating system's own reason, asked before the toolkit's reader is, because that reader reports
+  such a file as one with nothing in it
+- decided_by: engineering judgement, from #264's condition, ingest/AC-022, ingest/AC-046 and a measurement
+  taken here
+- rationale: measured on 2026-09-21 through the drive's administrative share (E-213): every operation
+  in the loading, saving and reopening thread passed through a UNC path, so the release list's item
+  was not a defect in reading but three in saying. The record put an absolute path where the contract
+  promised a relative one and said nothing; the contract now states the case. A vanished file was
+  refused as "does not exist" - true, and not the fact that matters, which is that it was there
+  when the dataset was loaded. A file held by another process was refused as "no part is there" -
+  the toolkit's reading of an empty result, and false about the file. A watched share produces all
+  three daily, and a refusal that names the wrong cause sends the person to fix the wrong thing
+- alternatives: **mapping UNC paths to something local first** - a layer with its own failures for no
+  gain, since every operation already passed. **Refusing files outside the document's directory** -
+  what a shared-folder workflow does on every load. **A retry on a vanished file** - a guess at a
+  cause; the fact is stated and the person decides. **Detecting a held file by its reader's empty
+  result** - the reason would still be the toolkit's guess
+- basis: E-213 (T1)
+- affects: MOD-002, MOD-012, CT-001
+- decidedness: Fixed
+- reversal_trigger: a platform where a mandatory lock is not visible to a read of the first bytes,
+  which would need a second probe; and a share whose metadata lies about size or time, which the
+  fingerprint would then miss and a checksum would not

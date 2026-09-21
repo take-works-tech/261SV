@@ -436,3 +436,16 @@ is either missing a requirement or is not work this specification asked for.
   the fingerprint and another step is read only from the same file. `tests/test_incomplete_files.py`
   cuts every format at six places and one byte short on every run. Found on the way: a `.pvtu`
   manifest cut in half reached the caller as the XML parser's own exception; it is refused by name
+
+### TASK-036 - Network paths, and files that go away or are held
+- satisfies: AC-022, AC-046
+- depends_on: TASK-035
+- done_when: a UNC path reads, records and reopens like any path; a file that vanishes while it is
+  read or since it was loaded is refused naming that; a file the operating system will not let this
+  process read is refused with the operating system's reason
+- done: 2026-09-21 (XC-285, #264). Measured on the drive's administrative share (E-213): reading,
+  inspecting, loading, saving and reopening through a UNC path, and a workspace on one with its lock,
+  all pass; the one defect was a record with an absolute path in `pathRelative` and nothing saying so,
+  which CT-001 now states. A vanished file said "does not exist" and a locked one "no part is there";
+  each now names the fact. `tests/test_paths.py`; the UNC half skips, saying so, where no share is
+  reachable - CI runs on Linux and cannot take this measurement
