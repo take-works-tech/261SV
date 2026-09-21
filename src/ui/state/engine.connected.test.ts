@@ -27,6 +27,7 @@ import { moveBlock } from "../logic/report";
 import { viewFooter } from "../logic/showing";
 import { HEADER, probeRows, statisticsRows, tsv } from "../logic/copy";
 import { engineState, FRAME, snapshot } from "./engine";
+import { session } from "./session";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const PYTHON = process.env.SOLVIA_PYTHON ?? "python";
@@ -716,10 +717,118 @@ describe("the log area (XC-286)", () => {
   });
 });
 
+describe("each area says which case it shows (XC-292)", () => {
+  test("the tree is the document's; selecting a case moves the following areas, a pinned one stays, and a drop goes to the case on screen", async () => {
+    // A document with two cases: the demo's, and a variant under it.
+    const twoCasesPath = join(directory, "two-cases.svw");
+    const document = JSON.parse(readFileSync(workspacePath, "utf-8")) as { cases: unknown[] };
+    document.cases = [{ id: "case:1", name: "baseline", children: [{ id: "case:2", name: "variant" }] }];
+    writeFileSync(twoCasesPath, JSON.stringify(document));
+    expect(await engineState.openWorkspace(twoCasesPath)).toBe(true);
+    let s = snapshot();
+    expect(s.cases).toEqual([{ id: "case:1", name: "baseline" }, { id: "case:2", name: "variant", parentId: "case:1" }]);
+    // Opening selects the first case, and every area follows it: nothing is loaded, and it says so.
+    expect(session.current().selectedCaseId).toBe("case:1");
+    expect(engineState.subjectOf("view")).toMatchObject({ caseId: "case:1", source: "tree", label: "ケース baseline（case:1）", because: "ツリーの選択に追従" });
+    expect(s.caseId).toBe("case:1");
+    expect(s.datasetId).toBeNull();
+
+    // A drop goes to the case the View area shows.
+    const dropped = await engineState.dropFiles([cubePath]);
+    expect(dropped).toEqual({ kind: "loaded", path: cubePath, caseId: "case:1" });
+    s = snapshot();
+    expect(s.imageUrl).toMatch(/^blob:/);
+    expect(Object.keys(s.loaded)).toEqual(["case:1"]);
+    const cubeDataset = s.datasetId;
+
+    // A graph over the area's case: asked with that case as the context, and the answer says so.
+    expect(await engineState.showGraph({ fieldName: "temperature", reduction: "max", kind: "line" })).toBe(true);
+    expect(snapshot().graphData?.selection).toBe("context");
+    expect(snapshot().graphData?.cases).toEqual(["case:1"]);
+    expect(snapshot().graphData?.series[0]?.points[0]?.value).toBe(8);
+
+    // Pin the Graph area to the first case, then select the second in the tree.
+    session.pinArea("graph", "case:1");
+    session.selectCase("case:2");
+    await engineState.settled();
+    s = snapshot();
+    // The View area follows: nothing is loaded for the variant, and the area says so - no picture
+    // and no numbers, rather than the first case's under the variant's name.
+    expect(engineState.subjectOf("view")).toMatchObject({ caseId: "case:2", source: "tree", label: "ケース variant（case:2）" });
+    expect(s.caseId).toBe("case:2");
+    expect(s.datasetId).toBeNull();
+    expect(s.imageUrl).toBeNull();
+    expect(s.statistics).toBeNull();
+    expect(viewFooter(s, "単位未宣言")?.showing).toContain("ケース variant（case:2）・データセット未読込");
+    // The Graph area is pinned: its numbers are still the first case's.
+    expect(engineState.subjectOf("graph")).toMatchObject({ caseId: "case:1", source: "pinned", because: "この領域に固定" });
+    expect(s.graphData?.cases).toEqual(["case:1"]);
+    // The first case's dataset is kept, not dropped.
+    expect(Object.keys(s.loaded)).toEqual(["case:1"]);
+
+    // A file dropped now goes to the variant, and the View area shows it; the pinned graph is unmoved.
+    const second = await engineState.dropFiles([barPath]);
+    expect(second).toEqual({ kind: "loaded", path: barPath, caseId: "case:2" });
+    s = snapshot();
+    expect(s.caseId).toBe("case:2");
+    expect(s.sourceName).toBe("bar.vtu");
+    expect(s.imageUrl).toMatch(/^blob:/);
+    expect(Object.keys(s.loaded).sort()).toEqual(["case:1", "case:2"]);
+    expect(s.graphData?.cases).toEqual(["case:1"]);
+
+    // Back to the first case: its dataset comes back as a switch, not a second read.
+    session.selectCase("case:1");
+    await engineState.settled();
+    s = snapshot();
+    expect(s.caseId).toBe("case:1");
+    expect(s.datasetId).toBe(cubeDataset);
+    expect(s.sourceName).toBe("cube.vtu");
+    expect(s.imageUrl).toMatch(/^blob:/);
+    expect(s.statistics?.maximum?.value).toBe(8);
+
+    // The Graph area follows again; the variant has no temperature, so its point is no data with
+    // the reason, in the legend - never the first case's number under the variant's name.
+    session.followArea("graph");
+    session.selectCase("case:2");
+    await engineState.settled();
+    s = snapshot();
+    expect(engineState.subjectOf("graph")).toMatchObject({ caseId: "case:2", source: "tree" });
+    expect(s.graphData?.selection).toBe("context");
+    expect(s.graphData?.cases).toEqual(["case:2"]);
+    expect(s.graphData?.series[0]?.points[0]?.value).toBeNull();
+    expect(s.graphData?.series[0]?.points[0]?.reason).toContain("temperature");
+    expect(s.graphData?.missing).toHaveLength(1);
+
+    // Pin the View area to the variant: selecting the first case moves the tree and not the picture.
+    session.pinArea("view", "case:2");
+    session.selectCase("case:1");
+    await engineState.settled();
+    s = snapshot();
+    expect(engineState.subjectOf("view")).toMatchObject({ caseId: "case:2", source: "pinned" });
+    expect(s.caseId).toBe("case:2");
+    expect(s.sourceName).toBe("bar.vtu");
+    expect(s.graphData?.cases).toEqual(["case:1"]);
+    // The Report area's binding is its view block's case, which the tree cannot override.
+    expect(await engineState.ensureReport()).toBeTruthy();
+    expect(engineState.subjectOf("report")).toMatchObject({ source: "item", caseIds: ["case:2"], because: "この項目自身の束縛（ツリーでは変わりません）" });
+
+    // The thread goes on with the demo workspace and the cube.
+    session.followArea("view");
+    await engineState.settled();
+    expect(snapshot().sourceName).toBe("cube.vtu");
+    expect(await engineState.openWorkspace(workspacePath)).toBe(true);
+    expect(session.current().subjects.view).toEqual({ mode: "follow" });
+    expect(await engineState.loadDataset("case:1", cubePath)).toBe(true);
+    await engineState.refresh();
+    expect(snapshot().imageUrl).toMatch(/^blob:/);
+  });
+});
+
 describe("when the engine ends", () => {
   test("what was saved is opened again, and what was not is listed as lost - not rebuilt", async () => {
     // A second declaration, applied and not saved. MPa on a temperature is a person's choice the
     // engine does not judge; it is here so that saved (K) and lost (MPa) are told apart.
+    expect({ refusal: snapshot().refusal, dataset: snapshot().datasetId, readOnly: snapshot().readOnly, subject: engineState.subjectOf("view").caseId }).toEqual({ refusal: null, dataset: expect.any(String), readOnly: false, subject: "case:1" });
     expect(await engineState.declareUnit("temperature", "MPa")).toBe(true);
     expect(snapshot().journal.map((one) => one.operation)).toContain("field.declareUnit");
     expect(snapshot().fields[0]?.unit).toBe("MPa");

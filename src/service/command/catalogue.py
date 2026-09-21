@@ -197,7 +197,7 @@ PARAMETERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "graph.duplicate": (frozenset(['graphId', 'newName']), frozenset(['graphId', 'newName'])),
     "graph.rename": (frozenset(['graphId', 'newName']), frozenset(['graphId', 'newName'])),
     "graph.delete": (frozenset(['graphId']), frozenset(['graphId'])),
-    "graph.data": (frozenset(['graphId']), frozenset(['graphId'])),
+    "graph.data": (frozenset(['contextCaseIds', 'graphId']), frozenset(['graphId'])),
     "diff.create": (frozenset(['basisCaseId', 'caseIdA', 'caseIdB']), frozenset(['basisCaseId', 'caseIdA', 'caseIdB'])),
     "report.create": (frozenset(['definition', 'sourceTemplateId', 'sourceTemplateRevision', 'workspaceId']), frozenset(['definition', 'workspaceId'])),
     "report.update": (frozenset(['definition', 'reportId']), frozenset(['definition', 'reportId'])),
@@ -397,7 +397,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
 
 #: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below
 #: the engine's floor is refused politely rather than answered in a shape it cannot read.
-PROTOCOL_VERSION = "3.14.0"
+PROTOCOL_VERSION = "3.15.0"
 
 #: The wire's own names, from CT-003's `$defs.transport` (XC-258). The interface generates
 #: the same values from the same place; neither side is derived from the other (XC-252).

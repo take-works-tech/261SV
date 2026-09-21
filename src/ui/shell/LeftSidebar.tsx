@@ -3,26 +3,11 @@
  * filter (XC-217). Resizable by pointer and keyboard alike. */
 import { useCallback } from "react";
 import { session, useSession } from "../state/session";
+import { useEngine } from "../state/engine";
+import { caseTree } from "../logic/subject";
 import { CaseTree, type CaseNode } from "../shared/CaseTree";
+import { FIXTURE_CASE_TREE } from "../shared/fixtureCases";
 import { VariableRow } from "../shared/VariableRow";
-
-const CASES: CaseNode[] = [
-  {
-    id: "study-a", name: "ブラケット改訂C", tags: ["構造"],
-    children: [
-      { id: "case-011", name: "Run 11（基準）", axis: "時間 21", tags: ["基準"] },
-      { id: "case-012", name: "Run 12", axis: "時間 21" },
-      { id: "case-013", name: "Run 13（荷重1.5倍）", axis: "時間 21" },
-    ],
-  },
-  {
-    id: "study-b", name: "熱連成", tags: ["熱"],
-    children: [
-      { id: "case-021", name: "Run 21", axis: "定常" },
-      { id: "case-022", name: "Run 22", axis: "定常" },
-    ],
-  },
-];
 
 const CONVERSATIONS = [
   { id: "c1", name: "最大応力のビューを作る", meta: "10:21" },
@@ -31,6 +16,10 @@ const CONVERSATIONS = [
 
 export function LeftSidebar() {
   const s = useSession();
+  const e = useEngine();
+  // With a document open the tree is the document's cases, each marked where this session loaded
+  // something for it (XC-292); without an engine it is the design states' fixture.
+  const cases: CaseNode[] = e.reachability.kind === "reachable" && e.workspaceId ? caseTree(e.cases, Object.keys(e.loaded)) : FIXTURE_CASE_TREE;
 
   const onSplitterKey = useCallback((event: React.KeyboardEvent) => {
     if (event.key === "ArrowLeft") session.setLeftWidth(s.leftWidth - 12);
@@ -67,7 +56,7 @@ export function LeftSidebar() {
             <section className="side-section">
               <header>ケース</header>
               <CaseTree
-                cases={CASES}
+                cases={cases}
                 selectedId={s.selectedCaseId}
                 onSelect={(id) => session.selectCase(id)}
               />

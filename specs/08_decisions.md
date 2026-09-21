@@ -6486,3 +6486,43 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a second loaded case in one session, at which point several dropped files may
   each go to their own case and the plan gains that rule; and a home screen that lists the cases, at
   which point the refusal for several cases becomes a choice
+
+### XC-292 - An area says which case it shows and either follows the tree or is pinned; an item that names its cases is the authority
+- decided: 2026-09-21
+- status: active
+- decision: each artefact area - View, Graph, Report - shows in its header (the `header` region of
+  16_application_model §3, whose job includes the subject selector) which case it is showing and
+  why, in the document's own names. The why is one of three, in this order: **the open item names
+  its cases** (a graph's `caseSelection`, a report's view blocks) and the tree cannot override it
+  by clicking (11_ui.md); **the area is pinned** to a case a person chose - session state, the
+  `pinned` binding of §8.2; or **the area follows the tree**, the default, and the selected case is
+  what it shows. Pinning and following are one control beside the badge, disabled with the reason
+  where the item is the authority. Following is real: with an engine, selecting a case in the tree
+  moves every following area to that case - the View area to the dataset loaded for it, or to an
+  empty state naming the case when nothing is loaded for it, never to another case's picture under
+  this case's name; the Graph area asks `graph.data` with its case as the context (CT-003 3.15.0)
+  and the answer says the selection was the context's. Loading a dataset selects its case; opening a
+  workspace selects its first case and forgets the previous document's pins. A file dropped on the
+  window goes to the case the View area shows (XC-291), which is now a chosen case rather than the
+  one a dataset happened to be loaded into. The working view of a case is found by its name and its
+  dataset, and where another loaded case already holds a view under the field's name the new one is
+  named with its case, because the document refuses two items under one name (workspace/AC-030)
+- decided_by: engineering judgement, from #299's condition and the rule 11_ui.md and
+  16_application_model §6 and §8.2 already state
+- rationale: a tool for forty cases in which the reader cannot tell which one is on screen is the
+  wrong-number-shown-confidently failure at the level of the whole area (04_principles). The model
+  already had the answer - one tree selection, a per-area binding, an item that may bind its own
+  cases - and what was missing was the surface that says it and the plumbing that makes following
+  true rather than nominal: until this change the interface held one dataset, the tree was a
+  fixture, and selecting in it changed nothing
+- alternatives: **a second selection per area** - rejected by §8.2 itself: two viewport areas
+  showing two cases need one tree selection and one pin, not two selection models. **Following by
+  re-binding the view's dataset** - a tree click would write the document, the class confusion
+  XC-270 removed for the camera. **Keeping the previous case's picture while the badge names the
+  new case** - the failure this decision exists to refuse
+- basis: E-001 (T1), E-120 (T1)
+- affects: MOD-009, MOD-016, CT-003, operations/REQ-007, graph/REQ-003
+- decidedness: Fixed
+- reversal_trigger: a pin that must survive the session - at which point the binding becomes an
+  explicit case binding on the item, which 11_ui.md already names as the way to change which cases
+  an item uses

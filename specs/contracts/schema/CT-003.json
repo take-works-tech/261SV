@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "3.14.0",
+  "version": "3.15.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -779,6 +779,15 @@
             "graphId": {
               "type": "string",
               "description": "グラフ の識別子（CT-001）"
+            },
+            "contextCaseIds": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "その領域の対象ケース - ツリーの選択か、領域に固定したケース（16_application_model §8.2、XC-292）。定義が caseSelection で自分のケースを名指ししていればそちらが勝ち、無ければこれ、それも無ければ読み込まれた全ケース。答えの selection がどれだったかを言う（graph/AC-008）"
             }
           }
         },
@@ -2998,9 +3007,10 @@
               "type": "string",
               "enum": [
                 "loaded",
-                "given"
+                "given",
+                "context"
               ],
-              "description": "ケースの選び方：選択がなければ読み込まれているケースで、そう言う（AC-008）"
+              "description": "ケースの選び方：定義が名指しした（given）、呼び手が対象ケースを渡した（context）、どちらも無く読み込まれているケース（loaded）。どれかを必ず言う（AC-008、XC-292）"
             },
             "missing": {
               "type": "array",

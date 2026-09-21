@@ -10,6 +10,8 @@ export type GraphSeries = GraphData["series"][number];
 export type GraphPoint = GraphSeries["points"][number];
 
 export const REDUCTION_LABEL: Record<string, string> = { max: "最大", min: "最小", mean: "平均" };
+/** How the engine chose the cases, as `graph.data` states it (graph/AC-008, XC-292). */
+export const SELECTION_LABEL: Record<string, string> = { given: "グラフ自身の束縛", context: "この領域の対象ケース", loaded: "読み込まれた全ケース" };
 const WEIGHTING_LABEL: Record<string, string> = { none: "重みなし", volume: "体積重み", dualVolume: "節点まわりの体積重み" };
 const PROVENANCE_LABEL: Record<string, string> = { declared: "宣言値", dataset: "ファイル由来", computed: "計算値", measured: "実測値", reference: "参考資料由来" };
 
