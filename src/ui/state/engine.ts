@@ -22,7 +22,7 @@ import { OPERATION_FACTS, type CameraDefinition, type RecordedTime } from "../cl
 import { recordNow } from "../client/time";
 import { shellApi } from "../client/shell";
 import { FIRST_PATH, withKeyframe, withoutKeyframe, type CameraPathDefinition, type Interpolation } from "../logic/cameraPath";
-import { dropPlan, fileName, inspectionAllowsLoad } from "../logic/drop";
+import { dropPlan, fileName, inspectionAllowsLoad, LOAD_REASON_WORD, type CaseRecord } from "../logic/drop";
 import { areaSubject, reportItemCases, workingView, type Area, type AreaSubject, type CaseSummary } from "../logic/subject";
 import { session } from "./session";
 
@@ -74,6 +74,7 @@ export type PathPreview = NonNullable<Results["view.render"]["cameraPath"]>;
 export type DropOutcome =
   | { kind: "opened"; path: string }
   | { kind: "loaded"; path: string; caseId: string }
+  | { kind: "loadedEach"; loads: readonly { path: string; caseId: string }[] }
   | { kind: "refused"; reason: string };
 
 /** A notice this window raised - a refusal, a failure, a warning beside an answer - kept after
@@ -471,6 +472,20 @@ let showSequence = 0;
 /** The View area moves to `caseId` (XC-292): the dataset this session loaded for it, with its own
  *  view found or made, or - where nothing is loaded for it - an area that says so, and never
  *  another case's picture under this case's name. A later move wins over one still in flight. */
+/** What a drop is planned from (XC-301): every file the document records for a case, as the open
+ *  answer gave it, and every file this session read into a case - path for path. */
+function caseRecords(): CaseRecord[] {
+  const records: CaseRecord[] = [];
+  for (const one of state.cases) for (const source of one.sources ?? []) records.push({ caseId: one.id, path: source.path });
+  for (const load of state.opened?.loads ?? []) records.push({ caseId: load.caseId, path: load.filePath });
+  return records;
+}
+
+function describeCase(caseId: string): string {
+  const found = state.cases.find((one) => one.id === caseId);
+  return found ? `${found.name}（${found.id}）` : caseId;
+}
+
 async function showCase(caseId: string | null): Promise<void> {
   const mine = ++showSequence;
   const summary = caseId ? state.loaded[caseId] : undefined;
@@ -728,7 +743,14 @@ export const engineState = {
       readOnly: opened.readOnly ?? false,
       lock: opened.lock ?? null,
       unresolvedCases: opened.unresolvedCases ?? [],
-      cases: (opened.cases ?? []).map((one) => ({ id: one.id, name: one.name, ...(one.parentId ? { parentId: one.parentId } : {}) })),
+      cases: (opened.cases ?? []).map((one) => ({
+        id: one.id,
+        name: one.name,
+        ...(one.parentId ? { parentId: one.parentId } : {}),
+        // The files the document records for the case, kept as answered: what a drop is planned
+        // from, path for path (XC-298, XC-301). Absent where the document records none.
+        ...(one.sources && one.sources.length > 0 ? { sources: one.sources.map((source) => ({ name: source.name, path: source.path, present: source.present })) } : {}),
+      })),
       loaded: {},
       caseId: null,
       datasetId: null,
@@ -1415,14 +1437,17 @@ export const engineState = {
     return data !== null;
   },
 
-  /** Files dropped on the window (XC-291, ingest/AC-020, AC-021): one workspace opens; one result
-   *  file is inspected first - the engine names its format's support - and loaded into the case
-   *  the plan decided; everything else is refused with the reason, as a notice, and nothing is
-   *  read. The outcome is returned for the screen that showed the drop. */
+  /** Files dropped on the window (XC-301, ingest/AC-020, AC-021, AC-049): one workspace opens; one
+   *  result file is inspected first - the engine names its format's support - and loaded into the
+   *  case the plan decided; several go each to the case whose record holds that very file, after
+   *  every one has been inspected; everything else is refused with the reason, as a notice, and
+   *  nothing is read. The outcome is returned for the screen that showed the drop. */
   async dropFiles(paths: readonly string[]): Promise<DropOutcome> {
-    // The file goes to the case the View area shows - the tree's selection or the pinned case - and
-    // to the one a dataset was loaded into only where nothing is selected (XC-291, XC-292).
-    const plan = dropPlan(paths, { workspaceOpen: state.workspaceId !== null, cases: state.cases, caseId: engineState.subjectOf("view").caseId ?? state.caseId });
+    // One file goes to the case whose record holds it, else to the case the View area shows - the
+    // tree's selection or the pinned case (XC-292) - and to the one a dataset was loaded into only
+    // where nothing is selected. The records are the document's sources and this session's loads.
+    const shown = engineState.subjectOf("view").caseId ?? state.caseId;
+    const plan = dropPlan(paths, { workspaceOpen: state.workspaceId !== null, cases: state.cases, caseId: shown, records: caseRecords() });
     if (plan.kind === "refused") {
       setState({ refusal: plan.reason });
       notice("refusal", "ドロップを受け付けません", plan.reason);
@@ -1432,19 +1457,54 @@ export const engineState = {
       const opened = await engineState.openWorkspace(plan.path);
       return opened ? { kind: "opened", path: plan.path } : { kind: "refused", reason: state.refusal ?? `${fileName(plan.path)} を開けませんでした` };
     }
-    const inspection = await engineState.inspect(plan.path);
-    if (!inspection) return { kind: "refused", reason: state.refusal ?? `${fileName(plan.path)} を調べられませんでした` };
-    const because = inspectionAllowsLoad(inspection, plan.path);
-    if (because) {
-      setState({ refusal: because, inspection: null });
-      notice("refusal", `${fileName(plan.path)} は読み込みません`, because);
-      return { kind: "refused", reason: because };
+    if (plan.kind === "load") {
+      const inspection = await engineState.inspect(plan.path);
+      if (!inspection) return { kind: "refused", reason: state.refusal ?? `${fileName(plan.path)} を調べられませんでした` };
+      const because = inspectionAllowsLoad(inspection, plan.path);
+      if (because) {
+        setState({ refusal: because, inspection: null });
+        notice("refusal", `${fileName(plan.path)} は読み込みません`, because);
+        return { kind: "refused", reason: because };
+      }
+      const loaded = await engineState.loadDataset(plan.caseId, plan.path);
+      if (!loaded) return { kind: "refused", reason: state.refusal ?? `${fileName(plan.path)} を読み込めませんでした` };
+      await engineState.refresh();
+      notice("info", `${fileName(plan.path)} を読み込みました`, `ケース ${describeCase(plan.caseId)}（${LOAD_REASON_WORD[plan.because]}）・対応水準 ${inspection.supportLevel}${inspection.gaps.length > 0 ? `・既知の欠け ${inspection.gaps.length} 件` : ""}`, "dataset.load");
+      return { kind: "loaded", path: plan.path, caseId: plan.caseId };
     }
-    const loaded = await engineState.loadDataset(plan.caseId, plan.path);
-    if (!loaded) return { kind: "refused", reason: state.refusal ?? `${fileName(plan.path)} を読み込めませんでした` };
+    // Several: every file is inspected before any is read, and one the engine will not take
+    // refuses the whole drop by name - a drop is one act (XC-301).
+    for (const load of plan.loads) {
+      const inspection = await engineState.inspect(load.path);
+      const because = inspection ? inspectionAllowsLoad(inspection, load.path) : (state.refusal ?? `${fileName(load.path)} を調べられませんでした`);
+      if (because) {
+        const reason = `${plan.loads.length} 件のうち ${fileName(load.path)} を読み込めないので、何も読み込みません：${because}`;
+        setState({ refusal: reason, inspection: null });
+        notice("refusal", "ドロップを受け付けません", reason);
+        return { kind: "refused", reason };
+      }
+    }
+    const done: { path: string; caseId: string }[] = [];
+    for (const load of plan.loads) {
+      const loaded = await engineState.loadDataset(load.caseId, load.path);
+      if (!loaded) {
+        // A load refused after its inspection passed - a file changed in between (XC-284). What was
+        // read stays read, and the notice says exactly how far the drop got.
+        const reason = `${fileName(load.path)} を読み込めませんでした：${state.refusal ?? "理由は示されませんでした"}`;
+        notice("refusal", `${plan.loads.length} 件のうち ${done.length} 件を読み込んだところで止まりました`, `${done.map((one) => fileName(one.path)).join("、") || "なし"} は読み込み済み。${reason}`);
+        setState({ refusal: reason });
+        return { kind: "refused", reason };
+      }
+      done.push(load);
+    }
+    // The View area shows the case it showed before the drop if that case received a file, else
+    // the first loaded case in the document's order; a pinned area was put back by each load.
+    const target = done.some((one) => one.caseId === shown) && shown ? shown : done[0]!.caseId;
+    if (engineState.subjectOf("view").source !== "pinned") session.selectCase(target);
+    await engineState.settled();
     await engineState.refresh();
-    notice("info", `${fileName(plan.path)} を読み込みました`, `ケース ${plan.caseId}・対応水準 ${inspection.supportLevel}${inspection.gaps.length > 0 ? `・既知の欠け ${inspection.gaps.length} 件` : ""}`, "dataset.load");
-    return { kind: "loaded", path: plan.path, caseId: plan.caseId };
+    notice("info", `${done.length} 件を読み込みました`, done.map((one) => `${fileName(one.path)} → ケース ${describeCase(one.caseId)}`).join("、"), "dataset.load");
+    return { kind: "loadedEach", loads: done };
   },
 
   /** A drop in a browser build: the page has the files' names and not their paths, and the engine

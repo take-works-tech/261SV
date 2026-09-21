@@ -14,10 +14,20 @@ export type SubjectBinding = { readonly mode: "follow" } | { readonly mode: "pin
 export const FOLLOW: SubjectBinding = { mode: "follow" };
 
 /** A case of the open document, as `workspace.open` lists them (CT-003 3.14.0). */
+/** A file the document records for a case, as `workspace.open` answered it (XC-298): where it
+ *  was recorded to be, and whether it is there now. */
+export interface CaseSource {
+  readonly name: string;
+  readonly path: string;
+  readonly present: boolean;
+}
+
 export interface CaseSummary {
   readonly id: string;
   readonly name: string;
   readonly parentId?: string;
+  /** Present when the document records files for the case; a drop is planned from them (XC-301). */
+  readonly sources?: readonly CaseSource[];
 }
 
 export type SubjectSource = "item" | "pinned" | "tree" | "none";

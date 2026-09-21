@@ -205,7 +205,7 @@ export function App() {
     >
       {dragging ? (
         <div className="drop-hint" role="status" aria-live="polite">
-          ここに落とすと読み込みます（ワークスペース .svw か、結果ファイル 1 件）。対応可否は読み込む前に形式ごとに示します
+          ここに落とすと読み込みます（ワークスペース .svw か、結果ファイル。複数の結果ファイルは、この文書が記録しているものだけをそれぞれのケースへ）。対応可否は読み込む前に形式ごとに示します
         </div>
       ) : null}
       <header className="app-header">

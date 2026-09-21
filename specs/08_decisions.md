@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-21
+updated: 2026-09-22
 ---
 
 # Decisions and open questions
@@ -6460,7 +6460,8 @@ model or the prompt, never in a description that quietly went stale.
 
 ### XC-291 - A drop on the window is one file, inspected before it is read, into a case the document names
 - decided: 2026-09-21
-- status: active
+- status: superseded
+- superseded_by: XC-301
 - decision: the whole window takes a drop. What it takes is decided from the paths before anything
   is read: one `.svw` opens that workspace; one result file is inspected - the engine states the
   format's support level and the reader's known gaps (ingest/AC-032) - and, unless the level is
@@ -6809,3 +6810,45 @@ model or the prompt, never in a description that quietly went stale.
   machine and so needs a consent of its own; or a bundle that packages a directory rather than
   named items, at which point the layout test is the one thing between the list and the bundle,
   and the bundle's manifest must name the list or exclude it in so many words
+
+### XC-301 - A drop is one file into the case that records it or the case on screen, or several files each into the case whose record holds that very file, and nothing is guessed from a name
+- decided: 2026-09-22
+- status: active
+- decision: the whole window takes a drop, and what it takes is decided from the paths and the
+  document's records before anything is read (XC-291's trigger fired with XC-292; this restates
+  the whole rule). One `.svw` alone opens that workspace; a `.svw` among result files is refused by
+  name. **One result file goes to the case whose record holds that very file** - recorded in the
+  document when it was opened, or read into the case in this session - and otherwise to the case
+  the View area shows, or the one case, or is refused naming the cases; a file two cases record
+  goes to the shown one if it is among them and is otherwise refused naming both. **Several result
+  files are loaded only when every one of them is recorded under exactly one case and no two fall
+  on the same case**; otherwise nothing is loaded and each file that fails is named with why - not
+  recorded, recorded twice, or the second file for one case. **A record is a path and never a
+  name**: a file whose name matches a recorded one at another path is not sent anywhere on that
+  account. Every file is inspected before any is read - the engine names the format's support -
+  and one the engine will not take refuses the whole drop by name. Loads run in the document's
+  order of cases and not the drop's, and afterwards the View area shows the case it showed before
+  if that case received a file, and otherwise the first loaded case; a pinned area stays where it
+  was pinned. A page in a browser has the files' names and not their paths, and says so
+- decided_by: engineering judgement, from #409's condition, XC-291's reversal trigger and the
+  principles' order (XC-011 before convenience)
+- rationale: a drop of several files has two honest outcomes and one plausible one. Honest: each
+  file goes where the document already says it belongs, or nothing happens and the reason names
+  the file. Plausible: files are matched to cases by name, or dealt out in the order the operating
+  system handed them over, and the 150 N result lands under the 100 N case with the 100 N label -
+  a wrong number shown confidently, which this product exists not to do. The path is evidence the
+  document holds; a name is a guess about intent, and the moved-project case a name would serve
+  (recorded files found at new paths) is a relinking of sources that deserves its own screen, not
+  a side effect of a drop. All-or-nothing because a drop is one act: a half-done one leaves the
+  person to work out which half, and dropping the good files again costs one gesture
+- alternatives: **matching by file name** - the guess above. **Dealing files to cases in order** -
+  the order nobody chose (XC-291). **Loading what can be and refusing the rest** - a state the
+  notice has to explain file by file. **A case chooser on drop** - still the next piece for a home
+  screen that lists cases; today's refusal names them
+- basis: E-001 (T1)
+- affects: MOD-012, MOD-016, MOD-017, ingest/REQ-010, XC-291
+- decidedness: Fixed
+- reversal_trigger: a source relinking screen (recorded files found at new paths), at which point a
+  dropped file whose name a case records at a missing path is offered for relinking rather than
+  refused; or a case made of several files (`dataset.load` with several paths), at which point
+  several files may be one load
