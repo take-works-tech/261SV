@@ -8,7 +8,7 @@
  * A `.cts` file, so it compiles to CommonJS (`preload.cjs`): the renderer is sandboxed, and
  * "sandboxed preload scripts are run as plain JavaScript without an ESM context" (E-201).
  */
-import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from "electron";
 
 import type { EngineProcessStatus, ShellApi } from "../ui/client/shell.js" with { "resolution-mode": "import" };
 
@@ -40,6 +40,11 @@ const api: ShellApi = {
     },
     orphans: () => ipcRenderer.invoke("app:orphans"),
     removeOrphans: (ids: readonly string[]) => ipcRenderer.invoke("app:removeOrphans", [...ids]),
+  },
+  files: {
+    // The path of a file dropped on the window. A renderer sees a `File` and never its path; the
+    // bridge asks Electron for it here, and the path goes to the engine as any path does (XC-291).
+    pathOf: (file: File) => webUtils.getPathForFile(file),
   },
   dialog: {
     openWorkspace: () => ipcRenderer.invoke("dialog:openWorkspace"),

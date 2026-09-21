@@ -11,6 +11,8 @@
  *   unreadable-file - the named rejection with its reason; no partial case exists (XC-007)
  */
 import { EngineOpen } from "../../shared/EngineOpen";
+import { engineState } from "../../state/engine";
+import { shellApi } from "../../client/shell";
 import { useState } from "react";
 import { session } from "../../state/session";
 import { submit } from "../../client/operations";
@@ -369,6 +371,13 @@ function FirstRun() {
     session.openWorkspace();
   };
   const pickFiles = () => {
+    // With a shell the dialog gives a path and the drop plan takes it from there (XC-291); without
+    // one this is the design state it has always been.
+    const shell = shellApi();
+    if (shell && engineState.isConnected()) {
+      void shell.dialog.openResult().then((path) => (path ? engineState.dropFiles([path]) : null));
+      return;
+    }
     submit({ operation: "dataset.inspect", parameters: { path: "bracket_run12.cgns" } });
     session.navigate("home", "import-review");
   };

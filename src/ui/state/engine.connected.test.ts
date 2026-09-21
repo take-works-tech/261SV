@@ -12,7 +12,7 @@
  * connected screens are still judged by a person.
  */
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -584,6 +584,37 @@ describe("the prototype thread from the interface's side", () => {
       step: 0, count: 1, kind: "none", value: null, unit: null, stated: "定常（結果軸なし・ステップ 1/1）",
     });
     expect(viewFooter(s, "単位未宣言")?.showing).not.toContain("ステップ");
+  });
+});
+
+describe("a drop on the window (XC-291)", () => {
+  test("one result file is inspected, then loaded into the one case; an unsupported one and two at once are refused by name", async () => {
+    expect(snapshot().cases.map((one) => one.id)).toEqual(["case:1"]);
+
+    const loaded = await engineState.dropFiles([cubePath]);
+    expect(loaded).toEqual({ kind: "loaded", path: cubePath, caseId: "case:1" });
+    let s = snapshot();
+    expect(s.datasetId).toBeTruthy();
+    expect(s.imageUrl).toMatch(/^blob:/);
+    expect(s.notices.some((one) => one.severity === "info" && one.title.includes("cube.vtu"))).toBe(true);
+
+    writeFileSync(join(directory, "result.sim"), "not a mesh");
+    const unsupported = await engineState.dropFiles([join(directory, "result.sim")]);
+    expect(unsupported.kind).toBe("refused");
+    if (unsupported.kind === "refused") expect(unsupported.reason).toContain("'.sim'");
+    s = snapshot();
+    expect(s.datasetId).toBeTruthy();
+    expect(s.notices.some((one) => one.severity === "refusal" && one.detail.includes("'.sim'"))).toBe(true);
+
+    const two = await engineState.dropFiles([cubePath, barPath]);
+    expect(two.kind === "refused" && two.reason).toContain("1 件ずつ");
+
+    const opened = await engineState.dropFiles([workspacePath]);
+    expect(opened).toEqual({ kind: "opened", path: workspacePath });
+    expect(snapshot().datasetId).toBeNull();
+    // The thread goes on with the cube.
+    expect(await engineState.loadDataset("case:1", cubePath)).toBe(true);
+    await engineState.refresh();
   });
 });
 

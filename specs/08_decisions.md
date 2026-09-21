@@ -6454,3 +6454,35 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a second loaded case in one session, at which point the per-case graph has its
   second point and the selection (CT-007) decides which cases; and an expression series over the
   reductions, which MOD-005 evaluates already and the interface cannot yet write
+
+### XC-291 - A drop on the window is one file, inspected before it is read, into a case the document names
+- decided: 2026-09-21
+- status: active
+- decision: the whole window takes a drop. What it takes is decided from the paths before anything
+  is read: one `.svw` opens that workspace; one result file is inspected - the engine states the
+  format's support level and the reader's known gaps (ingest/AC-032) - and, unless the level is
+  Absent or the file is not there, loaded into the case the open workspace's answer names (`cases`,
+  CT-003 3.14.0): the one case, or the one a dataset was already loaded into, and otherwise a refusal
+  naming the cases. Several files at once are refused by name - a session reads one dataset into one
+  case, and an order nobody chose is a guess - and so is a result file with no workspace open. Every
+  refusal is a notice with its reason, and an unsupported format creates nothing (ingest/AC-021). A page in
+  a browser has the files' names and not their paths, and says so rather than pretending
+- decided_by: engineering judgement, from #266's condition, ingest/REQ-010 and the bridge's rule
+  that the shell carries what only it can know (MOD-017)
+- rationale: the first experience of the product is a file dropped on it, and the two ways to get it
+  wrong are to read before saying what will be read, and to guess where it goes. Inspecting first is
+  the review the home screen's design state has always shown; naming the case is the one fact the
+  interface could not have, so the open answer now carries it. One file at a time is not a limit of
+  the drop but of the session: the report refuses two datasets, and a second one loaded silently
+  would be read as the first
+- alternatives: **loading every dropped file in turn** - the last would be the one on screen and the
+  others would exist only in the engine. **A case chooser on drop** - a dialogue for a case that is
+  usually the only one; the refusal names the cases and the next piece can offer them. **Reading the
+  path from `File.path`** - gone since Electron 32; the bridge asks `webUtils` for it, in the
+  preload, where the shell's knowledge belongs
+- basis: E-001 (T1)
+- affects: MOD-012, MOD-016, MOD-017, MOD-018, CT-003, ingest/REQ-010
+- decidedness: Fixed
+- reversal_trigger: a second loaded case in one session, at which point several dropped files may
+  each go to their own case and the plan gains that rule; and a home screen that lists the cases, at
+  which point the refusal for several cases becomes a choice

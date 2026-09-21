@@ -53,13 +53,19 @@ is either missing a requirement or is not work this specification asked for.
 - satisfies: AC-020
 - depends_on: TASK-001
 - done_when: dropping supported files on the window creates or updates a @Case and lists its fields
-- blocked: there is no shell. The engine half is `reader.read_case`; the drop target is UI work and the mockup is a design state, never evidence of implemented behaviour.
+- done: 2026-09-21 (XC-291, CT-003 3.14.0, #266). The whole window is the target: the shell's bridge
+  gives a dropped file's path, the logic layer plans the drop from the paths alone - a `.svw` opens,
+  one result file is inspected and then loaded into the case the open answer names - and the store
+  executes it, with a notice for what happened. A browser build says a drop cannot carry a path
 ### TASK-008 - Unsupported and unreadable files
 - satisfies: AC-021
 - depends_on: TASK-007
 - done_when: an unsupported format names itself and creates no partial @Case; a truncated file reports
   the failure and leaves the @Workspace unchanged (AC-022)
 - partly done: recorded 2026-08-24. The engine half is in place - `UnsupportedFormatError` names the format and `UnreadableFileError` the failure, both covered by tests. "Creates no partial @Case" needs the shell that TASK-007 waits for.
+- done: 2026-09-21 (XC-291). A dropped file is inspected before it is read: a format the engine has
+  no reader for is refused in the engine's words and nothing is loaded; the dataset on screen, if
+  any, stays what it was. A truncated file is the reader's refusal (XC-284)
 ### TASK-009 - Support level table and its display
 - satisfies: AC-032
 - depends_on: TASK-007

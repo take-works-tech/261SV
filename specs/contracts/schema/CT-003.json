@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "3.13.0",
+  "version": "3.14.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -1792,11 +1792,12 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
+            "cases",
             "formatVersion",
-            "unresolvedCases",
-            "workspaceId",
+            "lock",
             "readOnly",
-            "lock"
+            "unresolvedCases",
+            "workspaceId"
           ],
           "properties": {
             "workspaceId": {
@@ -1946,6 +1947,30 @@
                 "detail": {
                   "type": "string",
                   "description": "unreadable のとき、何が読めなかったか"
+                }
+              }
+            },
+            "cases": {
+              "type": "array",
+              "description": "文書が持つケース、親を添えて平らに（XC-291）。窓に落としたファイルの行き先を、界面が推測せずに決めるため",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "parentId": {
+                    "type": "string",
+                    "description": "親ケースの id。最上位にはない"
+                  }
                 }
               }
             }

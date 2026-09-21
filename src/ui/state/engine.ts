@@ -21,6 +21,7 @@ import type { Connection, Operation, Options, Parameters, Response, Results } fr
 import { OPERATION_FACTS, type CameraDefinition, type RecordedTime } from "../client/generated";
 import { recordNow } from "../client/time";
 import { FIRST_PATH, withKeyframe, withoutKeyframe, type CameraPathDefinition, type Interpolation } from "../logic/cameraPath";
+import { dropPlan, fileName, inspectionAllowsLoad, type DroppedCase } from "../logic/drop";
 
 /** Whether an engine is reachable, and what it said if it is not. */
 export type Reachability =
@@ -65,6 +66,12 @@ export interface GraphSpec {
 }
 /** What the engine answered about a frame drawn from a camera path (CT-003 3.12.0). */
 export type PathPreview = NonNullable<Results["view.render"]["cameraPath"]>;
+
+/** What a drop on the window came to (XC-291). */
+export type DropOutcome =
+  | { kind: "opened"; path: string }
+  | { kind: "loaded"; path: string; caseId: string }
+  | { kind: "refused"; reason: string };
 
 /** A notice this window raised - a refusal, a failure, a warning beside an answer - kept after
  *  dismissal with the time it was dismissed (16_application_model §12, XC-286). The engine's log
@@ -192,6 +199,8 @@ export interface EngineState {
   /** Every notice this window raised, in order, dismissed ones included (XC-286). */
   readonly notices: readonly Notice[];
   readonly unresolvedCases: readonly string[];
+  /** The cases the open document holds, as `workspace.open` listed them (XC-291). */
+  readonly cases: readonly DroppedCase[];
   readonly caseId: string | null;
   readonly datasetId: string | null;
   readonly sourceName: string | null;
@@ -324,6 +333,7 @@ const EMPTY: EngineState = {
   warnings: [],
   notices: [],
   unresolvedCases: [],
+  cases: [],
   caseId: null,
   datasetId: null,
   sourceName: null,
@@ -580,6 +590,7 @@ export const engineState = {
       readOnly: opened.readOnly ?? false,
       lock: opened.lock ?? null,
       unresolvedCases: opened.unresolvedCases ?? [],
+      cases: (opened.cases ?? []).map((one) => ({ id: one.id, name: one.name })),
       caseId: null,
       datasetId: null,
       sourceName: null,
@@ -1184,6 +1195,44 @@ export const engineState = {
     const data = await ask("graph.data", { graphId: state.graphId });
     setState({ graphData: data });
     return data !== null;
+  },
+
+  /** Files dropped on the window (XC-291, ingest/AC-020, AC-021): one workspace opens; one result
+   *  file is inspected first - the engine names its format's support - and loaded into the case
+   *  the plan decided; everything else is refused with the reason, as a notice, and nothing is
+   *  read. The outcome is returned for the screen that showed the drop. */
+  async dropFiles(paths: readonly string[]): Promise<DropOutcome> {
+    const plan = dropPlan(paths, { workspaceOpen: state.workspaceId !== null, cases: state.cases, caseId: state.caseId });
+    if (plan.kind === "refused") {
+      setState({ refusal: plan.reason });
+      notice("refusal", "ドロップを受け付けません", plan.reason);
+      return { kind: "refused", reason: plan.reason };
+    }
+    if (plan.kind === "openWorkspace") {
+      const opened = await engineState.openWorkspace(plan.path);
+      return opened ? { kind: "opened", path: plan.path } : { kind: "refused", reason: state.refusal ?? `${fileName(plan.path)} を開けませんでした` };
+    }
+    const inspection = await engineState.inspect(plan.path);
+    if (!inspection) return { kind: "refused", reason: state.refusal ?? `${fileName(plan.path)} を調べられませんでした` };
+    const because = inspectionAllowsLoad(inspection, plan.path);
+    if (because) {
+      setState({ refusal: because, inspection: null });
+      notice("refusal", `${fileName(plan.path)} は読み込みません`, because);
+      return { kind: "refused", reason: because };
+    }
+    const loaded = await engineState.loadDataset(plan.caseId, plan.path);
+    if (!loaded) return { kind: "refused", reason: state.refusal ?? `${fileName(plan.path)} を読み込めませんでした` };
+    await engineState.refresh();
+    notice("info", `${fileName(plan.path)} を読み込みました`, `ケース ${plan.caseId}・対応水準 ${inspection.supportLevel}${inspection.gaps.length > 0 ? `・既知の欠け ${inspection.gaps.length} 件` : ""}`, "dataset.load");
+    return { kind: "loaded", path: plan.path, caseId: plan.caseId };
+  },
+
+  /** A drop in a browser build: the page has the files' names and not their paths, and the engine
+   *  reads from disk - said rather than pretended (XC-291). */
+  noteDropWithoutShell(names: readonly string[]) {
+    const reason = `ブラウザで動く開発ビルドには経路が渡らないため、ドロップでは開けません（${names.join("、")}）。デスクトップのシェルで落とすか、上の欄に経路を書いてください`;
+    setState({ refusal: reason });
+    notice("refusal", "ドロップを受け付けません", reason);
   },
 
   /** Class 1: a dismissed notice is hidden, never deleted (16_application_model §12). */

@@ -4,7 +4,7 @@
  * composes its own navigation without workspace sidebars (XC-165); chat swaps the navigator for the
  * conversation list and owns its composer (XC-150); network hides the case tree because permission
  * is workspace-wide. */
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { session, useSession, type ScreenId } from "../state/session";
 import { connectionFromEnvironment, engineState, useEngine } from "../state/engine";
 import { shellApi } from "../client/shell";
@@ -75,6 +75,7 @@ const SHELF_ASSETS: Partial<Record<ScreenId, ShelfAsset[]>> = {
 };
 
 export function App() {
+  const [dragging, setDragging] = useState(false);
   const s = useSession();
   const e = useEngine();
 
@@ -177,7 +178,35 @@ export function App() {
   ].filter(Boolean).join(" ");
 
   return (
-    <section className="product-shell">
+    <section
+      className="product-shell"
+      onDragOver={(event) => {
+        if (event.dataTransfer.types.includes("Files")) {
+          event.preventDefault();
+          if (!dragging) setDragging(true);
+        }
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        setDragging(false);
+        const shell = shellApi();
+        const files = Array.from(event.dataTransfer.files);
+        if (!shell) {
+          // A browser hands the page a File and never its path, and the engine reads from disk.
+          engineState.noteDropWithoutShell(files.map((one) => one.name));
+          return;
+        }
+        void engineState.dropFiles(files.map((one) => shell.files.pathOf(one)));
+      }}
+    >
+      {dragging ? (
+        <div className="drop-hint" role="status" aria-live="polite">
+          ここに落とすと読み込みます（ワークスペース .svw か、結果ファイル 1 件）。対応可否は読み込む前に形式ごとに示します
+        </div>
+      ) : null}
       <header className="app-header">
         <Topbar />
         <WorkToolbar />

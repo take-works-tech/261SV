@@ -10,7 +10,10 @@ updated: 2026-09-21
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 3.13.0
+- version: 3.14.0
+- correction: 2026-09-21, version 3.13.0 to 3.14.0. `workspace.open` answers `cases` - the document's
+  cases, flattened with their parents - so a file dropped on the window knows where it may go and
+  the interface guesses no case id (XC-291, ingest/AC-020). Additive
 - correction: 2026-09-21, version 3.12.0 to 3.13.0. `graph.get` is added, the graph's counterpart of
   `view.get`. `graph.data` says what each point is: the series' `reduction`, `scope`, `weighting`
   and `digits` (INV-017, INV-014), the `declaredUnit` beside the internal `unit` the values are in
@@ -180,7 +183,7 @@ no identifier to report.
 
 | Operation | Reads or writes | Parameters | Result |
 |---|---|---|---|
-| `workspace.open` | write | path, take over stale lock? | workspace id, unresolved cases, format version, the items the document holds (views, graphs, reports: id, name, dataset), whether it opened read-only, and what the lock said - state, holder, file (XC-241, XC-269) |
+| `workspace.open` | write | path, take over stale lock? | workspace id, unresolved cases, format version, the items the document holds (views, graphs, reports: id, name, dataset), whether it opened read-only, and what the lock said - state, holder, file (XC-241, XC-269); the cases the document holds, with their parents (XC-291) |
 | `workspace.save` | write | workspace id, path? | path written, previous version kept |
 | `workspace.close` | write | workspace id | - |
 | `case.create` | write | workspace id, parent case id?, name | case id |
