@@ -111,20 +111,25 @@ class WorkspaceDocument:
         return tuple(sorted(set(self.raw) - known))
 
 
-def fresh(identifier: str, name: str, *, case_id: str, case_name: str) -> WorkspaceDocument:
-    """A new document in this build's shape: one case, nothing else, every required field present.
+def fresh(identifier: str, name: str, *, cases: list[dict[str, Any]], created_by: str | None = None) -> WorkspaceDocument:
+    """A new document in this build's shape: the cases given, nothing else, every required field present.
 
-    One case rather than none, because a workspace with no case has nowhere to load a file into
-    (XC-291); its name is the caller's, and the document's name is what the list shows (XC-297).
-    """
-    return WorkspaceDocument(raw={
+    At least one case, because a workspace with no case has nowhere to load a file into (XC-291);
+    the names are the caller's, and the document's name is what the list shows (XC-297).
+"""
+    if not cases:
+        raise ValueError("a workspace needs at least one case (XC-291)")
+    raw: dict[str, Any] = {
         "formatVersion": FORMAT_VERSION,
         "id": identifier,
         "name": name,
-        "cases": [{"id": case_id, "name": case_name, "children": [], "sources": []}],
+        "cases": cases,
         "variables": [],
         "workspaceItems": {"simulations": [], "views": [], "graphs": [], "reports": []},
-    })
+    }
+    if created_by:
+        raw["createdBy"] = created_by
+    return WorkspaceDocument(raw=raw)
 
 
 def load(path: str | Path) -> WorkspaceDocument:

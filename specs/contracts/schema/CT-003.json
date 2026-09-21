@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "3.17.0",
+  "version": "3.18.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -20,6 +20,7 @@
       "enum": [
         "workspace.open",
         "workspace.create",
+        "workspace.sample",
         "workspace.save",
         "workspace.close",
         "case.create",
@@ -263,6 +264,19 @@
               "type": "string",
               "minLength": 1,
               "description": "最初の一つのケースの名前。無ければ「ケース 1」"
+            }
+          }
+        },
+        "workspace.sample": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "サンプルの文書を書く先（.svw）。データはその隣の <名前>.data/ に書く。文書かデータのフォルダがすでにあれば拒む"
             }
           }
         },
@@ -2005,6 +2019,32 @@
                   "parentId": {
                     "type": "string",
                     "description": "親ケースの id。最上位にはない"
+                  },
+                  "sources": {
+                    "type": "array",
+                    "description": "そのケースが記録している結果ファイル：いまどこにあるか、あるか（XC-298）。呼び手はこれでケースのファイルを読み込める",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "name",
+                        "path",
+                        "present"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "path": {
+                          "type": "string",
+                          "description": "通常形の絶対パス（XC-294）"
+                        },
+                        "present": {
+                          "type": "boolean",
+                          "description": "記録どおりにそこにあるか。無い・変わったなら false で、unresolvedCases にも載る"
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -2206,6 +2246,32 @@
                   "parentId": {
                     "type": "string",
                     "description": "親ケースの id。最上位にはない"
+                  },
+                  "sources": {
+                    "type": "array",
+                    "description": "そのケースが記録している結果ファイル：いまどこにあるか、あるか（XC-298）。呼び手はこれでケースのファイルを読み込める",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "name",
+                        "path",
+                        "present"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "path": {
+                          "type": "string",
+                          "description": "通常形の絶対パス（XC-294）"
+                        },
+                        "present": {
+                          "type": "boolean",
+                          "description": "記録どおりにそこにあるか。無い・変わったなら false で、unresolvedCases にも載る"
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -2223,6 +2289,234 @@
             }
           },
           "description": "workspace.open と同じ：作った文書をそのまま開いた答え（XC-297）"
+        },
+        "workspace.sample": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cases",
+            "formatVersion",
+            "lock",
+            "name",
+            "readOnly",
+            "tags",
+            "unresolvedCases",
+            "workspaceId"
+          ],
+          "properties": {
+            "workspaceId": {
+              "type": "string",
+              "description": "開いたワークスペース"
+            },
+            "formatVersion": {
+              "type": "string",
+              "description": "文書の形式版（CT-001）"
+            },
+            "unresolvedCases": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "ファイルが見つからない、または変わったケース"
+            },
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "開いた文書が持つ項目。名前は文書の中で一意なので（AC-030）、同じ名前で作り直さず更新するために要る",
+              "properties": {
+                "views": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "datasetId": {
+                        "type": "string",
+                        "description": "ビューが指すデータセット。前のセッションの識別子であり、読み直した後は別の識別子になる"
+                      }
+                    }
+                  }
+                },
+                "graphs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "datasetId": {
+                        "type": "string",
+                        "description": "ビューが指すデータセット。前のセッションの識別子であり、読み直した後は別の識別子になる"
+                      }
+                    }
+                  }
+                },
+                "reports": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "datasetId": {
+                        "type": "string",
+                        "description": "ビューが指すデータセット。前のセッションの識別子であり、読み直した後は別の識別子になる"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "readOnly": {
+              "type": "boolean",
+              "description": "true なら文書は書き戻せない：他がロックを持っている。窓はメモリ上で動き、保存は持ち主を名指しして拒まれる（XC-241）"
+            },
+            "lock": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "state",
+                "lockFile"
+              ],
+              "description": "文書のロックについて見つかったこと（XC-269）",
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "free",
+                    "held",
+                    "stale",
+                    "unreadable"
+                  ],
+                  "description": "free ならこのセッションが持っている"
+                },
+                "lockFile": {
+                  "type": "string",
+                  "description": "ロックファイルの場所。人が壊すと決めたとき、どのファイルかが分かるように"
+                },
+                "holder": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "processId",
+                    "host",
+                    "user",
+                    "takenAt"
+                  ],
+                  "description": "誰が持っているか。free ならこのセッション自身",
+                  "properties": {
+                    "processId": {
+                      "type": "integer"
+                    },
+                    "host": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "type": "string"
+                    },
+                    "takenAt": {
+                      "$ref": "CT-001.json#/$defs/recordedTime",
+                      "description": "取った時刻"
+                    }
+                  }
+                },
+                "detail": {
+                  "type": "string",
+                  "description": "unreadable のとき、何が読めなかったか"
+                }
+              }
+            },
+            "cases": {
+              "type": "array",
+              "description": "文書が持つケース、親を添えて平らに（XC-291）。窓に落としたファイルの行き先を、界面が推測せずに決めるため",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "parentId": {
+                    "type": "string",
+                    "description": "親ケースの id。最上位にはない"
+                  },
+                  "sources": {
+                    "type": "array",
+                    "description": "そのケースが記録している結果ファイル：いまどこにあるか、あるか（XC-298）。呼び手はこれでケースのファイルを読み込める",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "name",
+                        "path",
+                        "present"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "path": {
+                          "type": "string",
+                          "description": "通常形の絶対パス（XC-294）"
+                        },
+                        "present": {
+                          "type": "boolean",
+                          "description": "記録どおりにそこにあるか。無い・変わったなら false で、unresolvedCases にも載る"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "name": {
+              "type": "string",
+              "description": "文書の名前。無ければファイル名（XC-297）"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "文書のケースが持つタグを一つの集合にしたもの。ワークスペース一覧の絞り込みに使う（XC-297）"
+            }
+          },
+          "description": "workspace.open と同じ：生成したサンプルをそのまま開いた答え（XC-298）"
         },
         "workspace.save": {
           "type": "object",

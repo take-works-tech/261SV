@@ -16,6 +16,7 @@ from __future__ import annotations
 WRITES = frozenset({
     "workspace.open",
     "workspace.create",
+    "workspace.sample",
     "workspace.save",
     "workspace.close",
     "case.create",
@@ -95,6 +96,7 @@ READS = frozenset({
 OPERATIONS = (
     "workspace.open",
     "workspace.create",
+    "workspace.sample",
     "workspace.save",
     "workspace.close",
     "case.create",
@@ -172,6 +174,7 @@ OPERATIONS = (
 PARAMETERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "workspace.open": (frozenset(['path', 'takeOverStaleLock']), frozenset(['path'])),
     "workspace.create": (frozenset(['caseName', 'name', 'path']), frozenset(['path'])),
+    "workspace.sample": (frozenset(['path']), frozenset(['path'])),
     "workspace.save": (frozenset(['path', 'workspaceId']), frozenset(['workspaceId'])),
     "workspace.close": (frozenset(['workspaceId']), frozenset(['workspaceId'])),
     "case.create": (frozenset(['name', 'parentCaseId', 'workspaceId']), frozenset(['name', 'workspaceId'])),
@@ -250,6 +253,7 @@ PARAMETERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
 RESULT_FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "workspace.open": (frozenset(['cases', 'formatVersion', 'items', 'lock', 'name', 'readOnly', 'tags', 'unresolvedCases', 'workspaceId']), frozenset(['cases', 'formatVersion', 'lock', 'name', 'readOnly', 'tags', 'unresolvedCases', 'workspaceId'])),
     "workspace.create": (frozenset(['cases', 'formatVersion', 'items', 'lock', 'name', 'readOnly', 'tags', 'unresolvedCases', 'workspaceId']), frozenset(['cases', 'formatVersion', 'lock', 'name', 'readOnly', 'tags', 'unresolvedCases', 'workspaceId'])),
+    "workspace.sample": (frozenset(['cases', 'formatVersion', 'items', 'lock', 'name', 'readOnly', 'tags', 'unresolvedCases', 'workspaceId']), frozenset(['cases', 'formatVersion', 'lock', 'name', 'readOnly', 'tags', 'unresolvedCases', 'workspaceId'])),
     "workspace.save": (frozenset(['path', 'previousKept']), frozenset(['path'])),
     "workspace.close": (frozenset([]), frozenset([])),
     "case.create": (frozenset(['id']), frozenset(['id'])),
@@ -329,6 +333,7 @@ RESULT_FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
 REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
     "workspace.open": {},
     "workspace.create": {},
+    "workspace.sample": {},
     "workspace.save": {},
     "workspace.close": {},
     "case.create": {},
@@ -402,7 +407,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
 
 #: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below
 #: the engine's floor is refused politely rather than answered in a shape it cannot read.
-PROTOCOL_VERSION = "3.17.0"
+PROTOCOL_VERSION = "3.18.0"
 
 #: The wire's own names, from CT-003's `$defs.transport` (XC-258). The interface generates
 #: the same values from the same place; neither side is derived from the other (XC-252).

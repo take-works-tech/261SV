@@ -352,7 +352,7 @@ describe("the prototype thread from the interface's side", () => {
 
     const s = snapshot();
     expect(s.operations?.registered).toContain("system.operations");
-    expect(s.operations?.registered.length).toBe(34);
+    expect(s.operations?.registered.length).toBe(35);
     expect([...(s.operations?.registered ?? []), ...(s.operations?.unimplemented ?? [])].sort()).toEqual([...OPERATIONS].sort());
     const rows = commandGroups(s.operations, "").flatMap((group) => group.rows);
     expect(rows).toHaveLength(OPERATIONS.length);
@@ -849,6 +849,38 @@ describe("a new workspace (XC-297)", () => {
     expect(await engineState.openWorkspace(workspacePath)).toBe(true);
     s = snapshot();
     expect(s.workspaceName).toBe("梁の検討");
+    expect(await engineState.loadDataset("case:1", cubePath)).toBe(true);
+    await engineState.refresh();
+    expect(snapshot().imageUrl).toMatch(/^blob:/);
+  });
+});
+
+describe("the shipped sample (XC-298)", () => {
+  test("is generated where it was asked for, opened, and its first case is on screen with its declared units", async () => {
+    const folder = join(directory, "サンプル");
+    mkdirSync(folder);
+    const started = performance.now();
+    expect(await engineState.openSample(join(folder, "片持ち梁.svw"))).toBe(true);
+    const elapsed = performance.now() - started;
+    const s = snapshot();
+    expect(s.workspaceName).toBe("片持ち梁（サンプル）");
+    expect(s.cases.map((one) => one.name)).toEqual(["荷重 100 N", "荷重 150 N"]);
+    expect(s.caseTags).toEqual(["1.5 倍", "静荷重"]);
+    expect(s.caseId).toBe(s.cases[0]?.id);
+    expect(s.sourceName).toBe("cantilever_100N.vtu");
+    expect(s.fields.map((one) => `${one.name}:${one.unit ?? "-"}`)).toEqual(["stress:Pa", "displacement:m", "element_stress:Pa"]);
+    expect(s.imageUrl).toMatch(/^blob:/);
+    expect(s.statistics?.maximum?.value).toBeCloseTo(1.2e6, 0);
+    expect(s.statistics?.maximum?.unit).toBe("Pa");
+    expect(existsSync(join(folder, "片持ち梁.data", "cantilever_150N.vtu"))).toBe(true);
+    console.log(`sample: asked for, written, opened, loaded and drawn in ${elapsed.toFixed(0)} ms (this machine, not a launch)`);
+    // Asked again at the same place, nothing is written over.
+    expect(await engineState.openSample(join(folder, "片持ち梁.svw"))).toBe(false);
+    expect(snapshot().refusal).toContain("すでにあります");
+    engineState.clearRefusal();
+
+    // The thread goes on with the demo workspace and the cube.
+    expect(await engineState.openWorkspace(workspacePath)).toBe(true);
     expect(await engineState.loadDataset("case:1", cubePath)).toBe(true);
     await engineState.refresh();
     expect(snapshot().imageUrl).toMatch(/^blob:/);

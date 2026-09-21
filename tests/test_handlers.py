@@ -151,6 +151,59 @@ class TestANewWorkspace:
         assert opened.value["name"] == "梁の検討" and opened.value["tags"] == ["基準", "構造", "熱"]
 
 
+class TestTheSample:
+    """XC-298, operations/AC-002: the shipped sample, generated where the person chose and opened."""
+
+    def test_it_is_written_beside_its_document_with_two_cases_and_their_declared_units(self, tmp_path: Path) -> None:
+        surface, session = a_surface()
+        target = tmp_path / "片持ち梁.svw"
+
+        made = surface.submit(Command("workspace.sample", {"path": str(target)}))
+
+        assert made.status is Status.APPLIED, made.reason
+        assert made.value["name"] == "片持ち梁（サンプル）" and made.value["tags"] == ["1.5 倍", "静荷重"]
+        assert [one["name"] for one in made.value["cases"]] == ["荷重 100 N", "荷重 150 N"]
+        assert made.value["unresolvedCases"] == []
+        first = made.value["cases"][0]
+        assert first["sources"] == [{"name": "cantilever_100N.vtu", "path": str(tmp_path / "片持ち梁.data" / "cantilever_100N.vtu"), "present": True}]
+        assert (tmp_path / "片持ち梁.data" / "cantilever_150N.vtu").exists()
+        # Loading a case applies the units its author declared, and the maximum is the formula's.
+        loaded = surface.submit(Command("dataset.load", {"caseId": first["id"], "filePaths": [first["sources"][0]["path"]]}))
+        assert loaded.status is Status.APPLIED, loaded.reason
+        units = {field["name"]: field["unit"] for field in loaded.value["fields"]}
+        assert units == {"stress": "Pa", "element_stress": "Pa", "displacement": "m"}
+        statistics = surface.submit(Command("field.statistics", {"datasetId": loaded.value["datasetId"], "fieldName": "stress"}))
+        assert statistics.value["maximum"]["value"] == pytest.approx(1.2e6) and statistics.value["maximum"]["unit"] == "Pa"
+        on_disk = json.loads(target.read_text(encoding="utf-8"))
+        assert on_disk["createdBy"] and on_disk["cases"][1]["sources"][0]["pathRelative"] == "片持ち梁.data/cantilever_150N.vtu"
+        assert session.workspace is not None and session.workspace.identifier == made.value["workspaceId"]
+
+    def test_a_document_or_a_data_folder_already_there_is_refused_and_nothing_is_written(self, tmp_path: Path) -> None:
+        surface, session = a_surface()
+        (tmp_path / "梁.data").mkdir()
+
+        folder = surface.submit(Command("workspace.sample", {"path": str(tmp_path / "梁.svw")}))
+        existing = surface.submit(Command("workspace.sample", {"path": str(a_workspace(tmp_path))}))
+
+        assert folder.status is Status.REFUSED and "梁.data" in (folder.reason or "")
+        assert existing.status is Status.REFUSED and "すでにあります" in (existing.reason or "")
+        assert not (tmp_path / "梁.svw").exists() and session.workspace is None
+
+    def test_the_open_answer_says_where_each_case_s_file_is_and_whether_it_is_there(self, tmp_path: Path) -> None:
+        surface, _ = a_surface()
+        made = surface.submit(Command("workspace.sample", {"path": str(tmp_path / "s.svw")}))
+        assert made.status is Status.APPLIED, made.reason
+        gone = Path(made.value["cases"][1]["sources"][0]["path"])
+        gone.unlink()
+
+        again, _ = a_surface()
+        reopened = again.submit(Command("workspace.open", {"path": str(tmp_path / "s.svw")}))
+
+        assert reopened.status is Status.APPLIED, reopened.reason
+        assert [one["sources"][0]["present"] for one in reopened.value["cases"]] == [True, False]
+        assert reopened.value["unresolvedCases"] == [reopened.value["cases"][1]["id"]]
+
+
 class TestWhatThisBuildRegisters:
     def test_every_operation_on_the_path_has_a_handler(self) -> None:
         surface, _ = a_surface()
@@ -158,7 +211,7 @@ class TestWhatThisBuildRegisters:
         registered = set(surface.registered())
 
         assert registered == {
-            "workspace.open", "workspace.create", "dataset.load", "dataset.describe", "dataset.parts",
+            "workspace.open", "workspace.create", "workspace.sample", "dataset.load", "dataset.describe", "dataset.parts",
             "field.declareUnit", "field.statistics", "field.derive", "view.create", "view.update", "view.get", "view.render",
             "graph.create", "graph.update", "graph.get", "graph.data",
             "dataset.probe", "view.pick", "report.create", "report.update", "report.get",
@@ -167,7 +220,7 @@ class TestWhatThisBuildRegisters:
             "system.capabilities", "system.protocols", "system.audit", "system.operations", "system.log",
             "output.list", "output.plan", "output.prune",
         }
-        assert len(surface.unimplemented()) == len(OPERATIONS) - 34
+        assert len(surface.unimplemented()) == len(OPERATIONS) - 35
 
     def test_operations_list_what_this_build_answers_and_what_it_does_not(self) -> None:
         """XC-277: the list is the surface's own registry, and the two halves are the whole catalogue."""
@@ -2384,7 +2437,7 @@ class TestTheOpenAnswerNamesTheCases:
         result = surface.submit(Command("workspace.open", {"path": str(workspace)}))
 
         assert result.status is Status.APPLIED, result.reason
-        assert result.value["cases"] == [{"id": "case:1", "name": "baseline"}]
+        assert result.value["cases"] == [{"id": "case:1", "name": "baseline", "sources": []}]
 
     def test_a_nested_case_names_its_parent(self, tmp_path: Path) -> None:
         document = a_workspace(tmp_path, cases=[{"id": "case:1", "name": "study", "children": [{"id": "case:1a", "name": "variant"}]}])
@@ -2394,4 +2447,4 @@ class TestTheOpenAnswerNamesTheCases:
         result = surface.submit(Command("workspace.open", {"path": str(document)}))
 
         assert result.status is Status.APPLIED, result.reason
-        assert result.value["cases"] == [{"id": "case:1", "name": "study"}, {"id": "case:1a", "name": "variant", "parentId": "case:1"}]
+        assert result.value["cases"] == [{"id": "case:1", "name": "study", "sources": []}, {"id": "case:1a", "name": "variant", "parentId": "case:1", "sources": []}]

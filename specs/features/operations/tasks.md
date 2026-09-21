@@ -50,11 +50,18 @@ updated: 2026-09-21
 - satisfies: AC-002
 - depends_on: ingest/TASK-001
 - done_when: the sample ships with data this project generated, carrying no third-party terms
+- done: 2026-09-21 (XC-298, #237). The sample is code: `engine/sample.py` generates a cantilever
+  beam from beam theory and `workspace.sample` writes it, with two cases and the units its author
+  declares, where the person chose; nothing is shipped as data and nothing is copied from the
+  installation. `tests/test_sample.py` checks the file against the formulas (E-220).
 
 ### TASK-006 - First run opens a View
 - satisfies: AC-001
 - depends_on: TASK-005
 - done_when: a first launch opens the View area with the sample offered first
+- partly done: 2026-09-21 (XC-298). The Workspace list offers the sample first while nothing was
+  opened yet, and opening it lands in the View area with the first case drawn. The launch itself
+  still lands on the Workspace list rather than the View area; that landing is what remains.
 
 ### TASK-007 - Empty workspace still opens a View
 - satisfies: AC-003
