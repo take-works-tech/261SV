@@ -121,7 +121,11 @@ the two objects the same thing (XC-109).
 ### CT-005 - Graph definition
 - purpose: the reproducible description of one @Graph - which values, over what, in what style
 - schema: schema/CT-005.json
-- version: 2.0.0
+- version: 2.1.0
+- correction: 2026-09-21, version 2.0.0 to 2.1.0. A field series names its `reduction` - `max`,
+  `min` or `mean` - because a field is many numbers and a point on a graph is one, and which one
+  was this product's to choose until now (XC-290). Additive; a series without one plots nothing
+  and says so
 - strictness: unknown fields are preserved
 - compatibility: as CT-004
 - migration: as CT-004

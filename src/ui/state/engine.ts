@@ -56,6 +56,13 @@ export interface Derivation {
 /** A number the engine reported, carried whole. Never unpacked into a bare value: a value without
  *  its unit, digits and provenance is a value in whatever unit the reader assumed (XC-003). */
 export type Reported = Results["dataset.probe"]["value"];
+
+/** What a person asked a graph to plot: one field, one reduction, over the cases or the result axis. */
+export interface GraphSpec {
+  readonly fieldName: string;
+  readonly reduction: "max" | "min" | "mean";
+  readonly kind: "line" | "overTime";
+}
 /** What the engine answered about a frame drawn from a camera path (CT-003 3.12.0). */
 export type PathPreview = NonNullable<Results["view.render"]["cameraPath"]>;
 
@@ -145,6 +152,11 @@ export interface EngineState {
   /** The reports the document held when it was opened; the working report is adopted when one has
    *  its name (AC-030), as views are. */
   readonly savedReports: readonly SavedView[];
+  readonly savedGraphs: readonly SavedView[];
+  /** The graph this session shows, its definition as written, and the engine's data for it (XC-290). */
+  readonly graphId: string | null;
+  readonly graphSpec: GraphSpec | null;
+  readonly graphData: Results["graph.data"] | null;
   /** The document's report this session works on: its id, its definition as last read back, and
    *  the revision the document holds (XC-275). Null until a report is made or adopted. */
   readonly reportId: string | null;
@@ -276,6 +288,8 @@ function cameraFrom(turntable: Turntable, bounds: readonly [number[], number[]] 
   };
 }
 
+const REDUCTION_WORD: Record<GraphSpec["reduction"], string> = { max: "最大", min: "最小", mean: "平均" };
+
 /** How many steps the described case has: the engine's count, or the length of its positions, or
  *  one. What `moveToStep` checks a request against before the definition is written. */
 function stepCount(described: Results["dataset.describe"] | null): number {
@@ -289,6 +303,10 @@ const EMPTY: EngineState = {
   inspection: null,
   savedViews: [],
   savedReports: [],
+  savedGraphs: [],
+  graphId: null,
+  graphSpec: null,
+  graphData: null,
   reportId: null,
   report: null,
   reportRevision: null,
@@ -546,6 +564,10 @@ export const engineState = {
       opened: { workspacePath: path, caseId: null, filePath: null },
       savedViews: (opened.items?.views ?? []) as readonly SavedView[],
       savedReports: (opened.items?.reports ?? []) as readonly SavedView[],
+      savedGraphs: (opened.items?.graphs ?? []) as readonly SavedView[],
+      graphId: null,
+      graphSpec: null,
+      graphData: null,
       reportId: null,
       report: null,
       reportRevision: null,
@@ -622,6 +644,9 @@ export const engineState = {
       savedCamera: null,
       cameraPaths: [],
       pathPreview: null,
+      graphId: null,
+      graphSpec: null,
+      graphData: null,
       partial: false,
       partVisibility: {},
       selectedPart: null,
@@ -1113,6 +1138,52 @@ export const engineState = {
    *  sent, from the files where the engine writes them - which the answer says. Read, never kept. */
   async log(parameters: Parameters["system.log"] = {}): Promise<Results["system.log"] | null> {
     return ask("system.log", parameters);
+  },
+
+  /** A graph of one field's reduction over the loaded case - per case, or per step of the result
+   *  axis - written to the document as a definition (graph/AC-004) and read back as numbers from
+   *  the engine (XC-290). One graph per session under this dataset's name, updated in place. */
+  async showGraph(spec: GraphSpec): Promise<boolean> {
+    if (!state.datasetId || !state.workspaceId) return false;
+    setState({ refusal: null, graphSpec: spec });
+    const field = state.fields.find((one) => one.name === spec.fieldName);
+    const name = `${state.sourceName ?? "グラフ"}：${spec.fieldName}`;
+    const definition = {
+      id: state.graphId ?? "graph:pending",
+      name,
+      kind: spec.kind,
+      series: [
+        {
+          label: `${spec.fieldName} の${REDUCTION_WORD[spec.reduction]}`,
+          source: { kind: "field", datasetId: state.datasetId, fieldName: spec.fieldName, association: field?.association ?? "point", reduction: spec.reduction },
+          ...(field?.unit ? { unit: field.unit, unitDeclared: true } : { unitDeclared: false }),
+        },
+      ],
+    };
+    let graphId = state.graphId;
+    if (!graphId) {
+      const saved = state.savedGraphs.find((one) => one.name === name);
+      if (saved) graphId = saved.id;
+    }
+    if (graphId) {
+      const updated = await ask("graph.update", { graphId, definition: { ...definition, id: graphId } });
+      if (!updated) return false;
+    } else {
+      const created = await ask("graph.create", { workspaceId: state.workspaceId, definition });
+      if (!created) return false;
+      graphId = created.id;
+      setState({ savedGraphs: [...state.savedGraphs, { id: graphId, name }] });
+    }
+    setState({ graphId });
+    return engineState.refreshGraph();
+  },
+
+  /** The graph's numbers, read again from the engine: after a declaration, a step, a change. */
+  async refreshGraph(): Promise<boolean> {
+    if (!state.graphId) return false;
+    const data = await ask("graph.data", { graphId: state.graphId });
+    setState({ graphData: data });
+    return data !== null;
   },
 
   /** Class 1: a dismissed notice is hidden, never deleted (16_application_model §12). */

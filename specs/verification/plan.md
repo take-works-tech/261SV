@@ -154,19 +154,19 @@ honestly is better than an automated check that passes while the proposal is use
 
 | Acceptance ID | Method | Test | Fixture or sample data | Where the data came from | Tolerance | Pass condition |
 |---|---|---|---|---|---|---|
-| graph/AC-001 | integration (planned) | - | series of each provenance | authored here | exact | each series records quantity, unit and provenance |
-| graph/AC-002 | integration (planned) | - | a quantity with no declared unit | authored here | exact | axis carries the undeclared marker |
-| graph/AC-003 | unit (planned) | - | two series with incompatible units | authored here | exact | refused, both units named |
-| graph/AC-004 | integration (planned) | - | a saved graph | authored here | exact | definition stored, not the plotted values |
+| graph/AC-001 | integration | tests/test_graph_definition.py::TestASeriesSaysWhatItIs and tests/test_handlers.py::TestAGraphOverTheLoadedCase | series of each provenance | authored here | exact | each series records quantity, unit and provenance |
+| graph/AC-002 | integration | tests/test_graph_definition.py::TestAnUndeclaredUnitIsMarkedRatherThanAssumed and tests/test_handlers.py::TestAGraphOverTheLoadedCase | a quantity with no declared unit | authored here | exact | axis carries the undeclared marker |
+| graph/AC-003 | unit plus integration | tests/test_graph_definition.py::TestIncompatibleUnitsAreRefusedNamingBoth and tests/test_handlers.py::TestAGraphOverTheLoadedCase | two series with incompatible units | authored here | exact | refused, both units named |
+| graph/AC-004 | integration | tests/test_graph_definition.py::TestTheDefinitionIsWhatIsSaved and src/ui/state/engine.connected.test.ts against a real engine | a saved graph | authored here | exact | definition stored, not the plotted values |
 | graph/AC-005 | integration (planned) | - | a case plus a reference file | authored here | exact | every available quantity offered |
 | graph/AC-006 | integration (planned) | - | a computed series | authored here | exact | expression shown; computation happens in the analysis module |
 | graph/AC-007 | integration (planned) | - | an expression failing on one case | authored here | exact | that case drawn as no data with a reason |
-| graph/AC-008 | integration (planned) | - | no selection given | authored here | exact | selected case plotted and stated |
+| graph/AC-008 | integration | tests/test_handlers.py::TestAGraphOverTheLoadedCase | no selection given | authored here | exact | the loaded cases are plotted and the answer says the selection was theirs |
 | graph/AC-009 | integration (planned) | - | a declarative selection | authored here | exact | exactly the resolved cases plotted and listed |
 | graph/AC-010 | integration (planned) | - | a selection matching nothing | authored here | exact | the emptying condition is named |
 | graph/AC-011 | integration (planned) | - | failing selection code | authored here | exact | nothing selected, failure reported (XC-089) |
 | graph/AC-012 | integration (planned) | - | a repeated study | authored here | exact | per-repeat and combined both available, choice stated |
-| graph/AC-013 | integration (planned) | - | a set with one case lacking the quantity | authored here | exact | drawn as no data and kept in the legend |
+| graph/AC-013 | integration | tests/test_graph_series.py::TestAMissingQuantityStaysVisible and tests/test_handlers.py::TestAGraphOverTheLoadedCase | a set with one case lacking the quantity | authored here | exact | drawn as no data and kept in the legend |
 | graph/AC-014 | manual | - | `fixtures/case_small` | as ingest | - | proposals are reasonable to an engineer and name their signal |
 | graph/AC-015 | integration (planned) | - | recorded model responses | captured with the fixture | exact | proposals marked as inferred |
 | graph/AC-016 | integration (planned) | - | a rejected proposal | authored here | exact | not repeated in the session |

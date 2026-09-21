@@ -14,6 +14,12 @@
  */
 import { useState, type ReactNode } from "react";
 import { session } from "../../state/session";
+import { engineState, useEngine, type GraphSpec } from "../../state/engine";
+import { SeriesChart } from "../../shared/SeriesChart";
+import { CopyValues } from "../../shared/CopyValues";
+import { UNDECLARED } from "../../shared/primitives";
+import { graphCopyRows } from "../../logic/graphs";
+import { axisSteps, hasSteps } from "../../logic/resultPosition";
 import { submit } from "../../client/operations";
 import { formatValue, disabledBecause } from "../../logic/format";
 import { QuantityChip } from "../../shared/QuantityChip";
@@ -413,9 +419,63 @@ function Row(props: { label: string; children: ReactNode }): ReactNode {
 /* ---- canvas -------------------------------------------------------------------------------- */
 
 export function GraphScreen(props: { variant: string }): ReactNode {
+  const e = useEngine();
+  if (props.variant === "default" && e.reachability.kind === "reachable" && e.datasetId) return <LiveGraph />;
   if (props.variant === "empty") return <GraphEmpty />;
   if (props.variant === "no-points") return <GraphNoPoints />;
   return <GraphFigure variant={props.variant} />;
+}
+
+/* The graph with an engine (XC-290): one field, one reduction, over the loaded case - per step of the
+ * result axis where the case has steps - written as a definition and drawn from the engine's numbers.
+ * Everything on the figure is the engine's: the values in the internal unit with the declared one
+ * beside, the reduction with its scope and weighting, each missing point with its reason. */
+function LiveGraph(): ReactNode {
+  const e = useEngine();
+  const steps = axisSteps(e.described);
+  const scalar = e.fields.filter((one) => (one.components ?? 1) === 1);
+  const [fieldName, setFieldName] = useState<string>(e.graphSpec?.fieldName ?? e.fieldName ?? scalar[0]?.name ?? "");
+  const [reduction, setReduction] = useState<GraphSpec["reduction"]>(e.graphSpec?.reduction ?? "max");
+  const overAxis = hasSteps(steps);
+  const spec: GraphSpec = { fieldName, reduction, kind: overAxis ? "overTime" : "line" };
+  const shown = e.graphSpec && e.graphSpec.fieldName === spec.fieldName && e.graphSpec.reduction === spec.reduction && e.graphSpec.kind === spec.kind;
+  return (
+    <div className="gr-root" style={{ display: "grid", gap: 12, padding: 16, alignContent: "start" }}>
+      <header style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <b>グラフ：{e.sourceName ?? "データセット"}</b>
+        <span className="type-caption" style={{ color: "var(--ink-muted)" }}>
+          {overAxis ? `結果軸に沿って（${steps.count} ステップ）` : "読み込まれたケースごとに（1 ケース）"}
+        </span>
+      </header>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <label className="type-caption">
+          場
+          <select className="field-input" value={fieldName} onChange={(event) => setFieldName(event.target.value)} style={{ marginLeft: 4 }}>
+            {scalar.map((one) => (
+              <option key={one.name} value={one.name}>{one.name}（{one.unit ?? UNDECLARED}）</option>
+            ))}
+          </select>
+        </label>
+        <span role="radiogroup" aria-label="縮約" style={{ display: "flex", gap: 2 }}>
+          {(["max", "min", "mean"] as const).map((one) => (
+            <button key={one} role="radio" aria-checked={reduction === one} className={reduction === one ? "btn" : "btn ghost"} onClick={() => setReduction(one)}>
+              {one === "max" ? "最大" : one === "min" ? "最小" : "平均"}
+            </button>
+          ))}
+        </span>
+        <button className="btn primary" disabled={!fieldName} onClick={() => void engineState.showGraph(spec)} title="定義を文書に書き、エンジンの数で描きます（graph/AC-004）">
+          {shown ? "描き直す" : "描く"}
+        </button>
+        {e.graphData ? <CopyValues rows={graphCopyRows(e.graphData, UNDECLARED)} label="点を写す" title="系列・位置・値・単位・縮約・来歴をタブ区切りで写します" /> : null}
+      </div>
+      {e.graphData ? (
+        <SeriesChart data={e.graphData} undeclared={UNDECLARED} />
+      ) : (
+        <p className="prop-note">場と縮約を選んで「描く」と、エンジンが答えた数だけで図を描きます。場は多くの数なので、どの一つを描くかはここで選びます（INV-017）。</p>
+      )}
+      {e.refusal ? <div className="notice error" role="alert"><b>エンジンの拒否</b><span className="why">{e.refusal}</span></div> : null}
+    </div>
+  );
 }
 
 function GraphFigure({ variant }: { variant: string }): ReactNode {

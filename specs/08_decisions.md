@@ -6419,3 +6419,38 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a video output (#276), at which point the path's parameter is mapped to the
   timeline's frames and the playback speed is recorded on the output (view/AC-041); and a request
   for a rule the two cannot express, which is a third named rule rather than a parameter on these
+
+### XC-290 - A graph's points are the engine's statistics, one per case or per step, and a field series names its reduction
+- decided: 2026-09-21
+- status: active
+- decision: `graph.data` answers a graph definition as numbers: for each series, one point per loaded
+  case - or, for a graph `overTime`, one per step of the one loaded case's result axis, each step read
+  through the same door the view uses (XC-283) - with the value in the internal unit of its quantity
+  and the declared unit beside (CT-005), the provenance, and for a field series its reduction, scope,
+  weighting and digits, the same arithmetic `field.statistics` answers (INV-017). A field series names
+  its reduction - `max`, `min` or `mean` (CT-005 2.1.0) - because a field is many numbers and a point
+  is one, and which one was this product's to choose until now; a series without one is refused. A
+  point a case cannot give is drawn as no data with the reason and stays in the legend; two series
+  whose units cannot share an axis are refused naming both; the answer names the cases drawn and
+  how they were chosen, labels the value axis, and carries the statement where series come from
+  different result axes. The interface writes the definition, reads the numbers and draws only those
+- decided_by: engineering judgement, from #281's condition, CT-005, graph/REQ-001, graph/REQ-003, graph/REQ-008
+  and the graph module built on 2026-08-25 with nothing calling it
+- rationale: MOD-005 had plotted quantities per case for four weeks with no engine handing it a
+  quantity: every graph on screen was a design state. The quantities a case offers here are the
+  reductions of its fields, and those already exist as `field.statistics` - computed once, in one
+  place, so a graph and a table cannot disagree on a number. Plotting in the internal unit is
+  CT-005's rule for an axis, kept rather than re-decided; the declared symbol travels beside the
+  values so nothing is lost in the relabelling. The reduction is on the series because leaving it to
+  the engine would put a number on a figure that nobody asked for by name (XC-001's shape)
+- alternatives: **a default reduction of max** - the plausible default XC-001 forbids: a mean and a
+  maximum are different figures under one label. **Plotting in the declared unit** - CT-005 says the
+  axis carries the internal unit so two declarations of one quantity share an axis; changing that is
+  a change to the contract's rule, not to this operation. **One graph object per screen visit** - the
+  interface updates its one graph in place, as it does the view and the report (XC-274, XC-275)
+- basis: E-001 (T1)
+- affects: MOD-005, MOD-012, MOD-016, CT-003, CT-005, graph/REQ-001, graph/REQ-003, graph/REQ-008
+- decidedness: Fixed
+- reversal_trigger: a second loaded case in one session, at which point the per-case graph has its
+  second point and the selection (CT-007) decides which cases; and an expression series over the
+  reductions, which MOD-005 evaluates already and the interface cannot yet write

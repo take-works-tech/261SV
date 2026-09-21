@@ -38,6 +38,16 @@ from engine.graph.definition import (
 )
 
 
+@dataclass(frozen=True, slots=True)
+class Absent:
+    """A quantity the case has and cannot report - a mean over a surface, a field of several
+    components - with the reason. Offered in a case's quantities in place of a `Value`, so the point
+    it would have made is drawn as no data with that reason and not with a guess about why (AC-013,
+    AC-024)."""
+
+    reason: str
+
+
 class Repeats(str, Enum):
     """How a repeated study is plotted (AC-012). Stated, never assumed."""
 
@@ -165,7 +175,7 @@ def available_quantities(
 def plot(
     series: Series,
     cases: Sequence[str],
-    quantities_of: Callable[[str], Mapping[str, Value]],
+    quantities_of: Callable[[str], Mapping[str, Value | Absent]],
     *,
     repeat_of: Callable[[str], str] | None = None,
 ) -> Plotted:
@@ -190,14 +200,20 @@ class _NoValue(Exception):
     """One case has no value for this series, with the reason it has none."""
 
 
-def _value_for(series: Series, quantities: Mapping[str, Value]) -> float:
+def _value_for(series: Series, quantities: Mapping[str, Value | Absent]) -> float:
     if series.source is SourceKind.DERIVED or series.expression:
-        return _evaluated(series, quantities)
+        return _evaluated(series, {name: one for name, one in quantities.items() if isinstance(one, Value)})
     name = series.field_name or series.label
+    # A field series with a reduction plots that one number of the field: the quantities of a case
+    # name each as `field.reduction` (XC-290).
+    if series.reduction:
+        name = f"{name}.{series.reduction}"
     held = quantities.get(name)
     if held is None:
         offered = "、".join(sorted(quantities)) or "（このケースには量がありません）"
         raise _NoValue(f"このケースに量 '{name}' がありません。あるのは：{offered}")
+    if isinstance(held, Absent):
+        raise _NoValue(held.reason)
     return _number(held, name)
 
 
@@ -225,7 +241,7 @@ def _number(value: Value, name: str) -> float:
 def figure(
     series: Iterable[Series],
     cases: Sequence[str],
-    quantities_of: Callable[[str], Mapping[str, Value]],
+    quantities_of: Callable[[str], Mapping[str, Value | Absent]],
     *,
     repeats: Repeats,
     repeat_of: Callable[[str], str] | None = None,

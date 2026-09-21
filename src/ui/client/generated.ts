@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "3.12.0";
+export const PROTOCOL_VERSION = "3.13.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -40,6 +40,7 @@ export type Operation =
   | "view.render"
   | "graph.create"
   | "graph.update"
+  | "graph.get"
   | "graph.duplicate"
   | "graph.rename"
   | "graph.delete"
@@ -112,6 +113,7 @@ export const OPERATIONS: readonly Operation[] = [
   "view.render",
   "graph.create",
   "graph.update",
+  "graph.get",
   "graph.duplicate",
   "graph.rename",
   "graph.delete",
@@ -194,10 +196,11 @@ export const OPERATION_FACTS: Readonly<Record<Operation, OperationFacts>> = {
   "view.render": { writes: false, required: ["format", "height", "viewId", "width"], optional: ["legend", "camera", "cameraPath"], answers: ["handle", "reduced", "resultPosition", "cameraPath"] },
   "graph.create": { writes: true, required: ["definition", "workspaceId"], optional: ["sourceTemplateId", "sourceTemplateRevision"], answers: ["id", "revision"] },
   "graph.update": { writes: true, required: ["definition", "graphId"], optional: [], answers: ["id", "revision"] },
+  "graph.get": { writes: false, required: ["graphId"], optional: [], answers: ["id", "revision", "definition"] },
   "graph.duplicate": { writes: true, required: ["graphId", "newName"], optional: [], answers: ["id"] },
   "graph.rename": { writes: true, required: ["graphId", "newName"], optional: [], answers: ["id", "revision"] },
   "graph.delete": { writes: true, required: ["graphId"], optional: [], answers: ["deletedId", "unresolvedUnitIds"] },
-  "graph.data": { writes: false, required: ["graphId"], optional: [], answers: ["series", "resultAxisNote"] },
+  "graph.data": { writes: false, required: ["graphId"], optional: [], answers: ["series", "resultAxisNote", "axisLabel", "cases", "selection", "missing"] },
   "diff.create": { writes: true, required: ["basisCaseId", "caseIdA", "caseIdB"], optional: [], answers: ["diffId", "outsideCount", "outsideFraction", "roundTripError", "disclosure"] },
   "report.create": { writes: true, required: ["definition", "workspaceId"], optional: ["sourceTemplateId", "sourceTemplateRevision"], answers: ["id", "revision"] },
   "report.update": { writes: true, required: ["definition", "reportId"], optional: [], answers: ["id", "revision"] },
@@ -347,6 +350,9 @@ export interface Parameters {
   "graph.update": {
     graphId: string;
     definition: Record<string, unknown>;
+  };
+  "graph.get": {
+    graphId: string;
   };
   "graph.duplicate": {
     graphId: string;
@@ -747,6 +753,11 @@ export interface Results {
     id: string;
     revision: number;
   };
+  "graph.get": {
+    id: string;
+    revision: number;
+    definition: Record<string, unknown>;
+  };
   "graph.duplicate": {
     id: string;
   };
@@ -765,12 +776,30 @@ export interface Results {
         caseId: string;
         value?: number | null;
         reason?: string;
+        x?: number | null;
+        resultPosition?: {
+          step: number;
+          count: number;
+          kind: "time" | "mode" | "frequency" | "undeclared" | "none";
+          value: number | null;
+          unit: string | null;
+          stated: string;
+        };
       })[];
       unit: string | null;
       provenance: "declared" | "dataset" | "computed" | "measured" | "reference";
       expression?: string;
+      declaredUnit?: string | null;
+      reduction?: "max" | "min" | "mean";
+      scope?: string;
+      weighting?: string;
+      digits?: number;
     })[];
     resultAxisNote?: string;
+    axisLabel: string;
+    cases: readonly (string)[];
+    selection: "loaded" | "given";
+    missing: readonly (string)[];
   };
   "diff.create": {
     diffId: string;
