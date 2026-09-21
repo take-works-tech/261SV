@@ -2347,3 +2347,24 @@ Recorded so that nothing silently depends on them:
   drawing it took 128 ms (the connected test prints the figure each run) - a segment of a launch
   on this machine, not LIM-010's number, which needs a launch on the hardware class of E-063
 - justifies: XC-298
+
+### E-221 - The product's numbers on the sample beam against beam theory, through every reporting path, measured here
+- tier: T1
+- url: tests/test_known_solution.py, run on the development machine on 2026-09-21 (VTK 9.5.2), on
+  the sample of XC-298 under 100 N: L = 1 m, h = 0.1 m, b = 0.05 m, E = 200 GPa, 40 x 4 x 2 hexahedra
+- verified: 2026-09-21
+- says: `field.statistics` on the point stress reports the maximum 1200000 and the minimum -1200000
+  exactly (the formula's 1.2e6 reaches float64's last place and float32 holds it exactly), in
+  pascal at six digits, with a dual-volume-weighted mean within a pascal of the analytic zero; on the
+  cell stress it reports the unaveraged maximum 888750 - the formula at the cell centre nearest the
+  clamped end's top - and the nodal-averaged maximum the same with a spread of zero, because the
+  cells meeting at that node hold one value; `dataset.probe` at three surface nodes reads the
+  formula's value at each (600000, -900000, 0), and a point inside the body is a stated absence;
+  `view.pick` at the centre of a 400 x 300 frame looking down z reads a value the field takes at a
+  node; the derived displacement magnitude has the tip deflection 4.0e-5 m as its maximum to a part in
+  a million and a weighted mean of 1.50031e-5 m - the analytic 1.5e-5 plus the trapezoid rule's
+  3.125e-9 on this grid, to a part in a hundred thousand, and not the analytic mean; `graph.data`
+  over the two cases plots 1200000 and 1800000; the deliverable's value table prints `1.20000e+6` and
+  not a seventh digit. The prediction the mean rests on was checked on the same grid without the
+  product: the trapezoid rule over the nodes gives the predicted value to a part in a trillion
+- justifies: XC-299
