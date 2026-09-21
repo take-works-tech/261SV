@@ -10,7 +10,13 @@ updated: 2026-09-21
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 3.10.0
+- version: 3.11.0
+- correction: 2026-09-21, version 3.10.0 to 3.11.0. `system.log` is added: the diagnostic log of
+  XC-263 read back - commands with their outcomes and reasons, the warnings an answer carried, and
+  the egress decisions, from the files that outlive the process where there are files, and the
+  answer says which (`source`). The `log` area's three kinds are one place with this: what a
+  person dismissed, what ran and what left the machine are all read again after the window that
+  showed them has closed (XC-286). Additive
 - correction: 2026-09-21, version 3.9.0 to 3.10.0. Every number says which step it came from
   (view/AC-032): `field.statistics`, `dataset.probe`, `view.pick` and `view.render` answer
   `resultPosition` - the step, of how many, on what kind of axis, with the value the file declared
@@ -203,6 +209,7 @@ no identifier to report.
 | `system.capabilities` | read | - | machine class, renderer backends available, formats and levels |
 | `system.protocols` | read | - | protocol versions this engine speaks |
 | `system.operations` | read | - | the catalogue operations this build answers, and those it does not (XC-277) |
+| `system.log` | read | level? (default warning), since?, limit? | the diagnostic log read back, oldest first: each line's time, level, event and context - names and outcomes, never a value (XC-126) - with where it came from (file or memory), the directory, the file count, the retention, and what the limit or an unreadable line left out (XC-263, XC-286) |
 | `history.undo` | write | undo id | ids restored |
 | `history.list` | read | workspace id | operations with origin, time and outcome |
 | `dataset.probe` | read | dataset id, field name, point in metres, result position - a step's ordinal from 0 along the sequence the file declared | value, association, unit, significant digits, provenance - missing where there is none (view/AC-027) - and which step it is of; a step the case lacks is refused, never the nearest one (view/AC-032, view/AC-033) |

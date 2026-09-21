@@ -7,9 +7,9 @@ import { shellApi } from "../client/shell";
 import { engineState } from "../state/engine";
 import { useEffect, useRef, useState } from "react";
 import { session, useSession } from "../state/session";
-import { NotificationHistory, type Notice } from "../shared/NotificationHistory";
-import { ScriptView, type ScriptLine } from "../shared/ScriptView";
-import { EngineHistory } from "../shared/EngineHistory";
+import type { Notice } from "../shared/NotificationHistory";
+import type { ScriptLine } from "../shared/ScriptView";
+import { LogArea, type LogTab } from "../shared/LogArea";
 import { CommandPalette } from "../shared/CommandPalette";
 
 type MenuItem = { label: string; key?: string; noKeyBecause?: string; disabled?: string };
@@ -70,22 +70,17 @@ export function Topbar() {
   const e = useEngine();
   const s = useSession();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [showNotices, setShowNotices] = useState(false);
-  const [showScript, setShowScript] = useState(false);
+  // The log area (XC-286): one popover, opened on the tab a button names. The lists are read when a
+  // tab opens - they are the engine's, bounded there (#315).
+  const [logTab, setLogTab] = useState<LogTab | null>(null);
   const [showPalette, setShowPalette] = useState(false);
-  // The engine's record is read when the popover opens: it is the engine's, bounded there, and a
-  // copy kept here would be a second history to keep in step (#315).
-  useEffect(() => {
-    if (showScript && engineState.isConnected()) void engineState.history();
-  }, [showScript]);
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onDown = (event: MouseEvent) => {
       if (!barRef.current?.contains(event.target as Node)) {
         setOpenMenu(null);
-        setShowNotices(false);
-        setShowScript(false);
+        setLogTab(null);
         setShowPalette(false);
       }
     };
@@ -146,47 +141,30 @@ export function Topbar() {
           <span className="dot" aria-hidden />
           オフライン
         </span>
-        <span style={{ position: "relative" }}>
+        <span style={{ position: "relative", display: "inline-flex", gap: 2 }}>
           <button
             className="icon-button"
-            aria-pressed={showNotices}
+            aria-pressed={logTab === "notices"}
             aria-label="通知履歴"
-            title="通知履歴（閉じても記録は残ります）"
-            onClick={() => setShowNotices(!showNotices)}
+            title="記録：通知（閉じても残ります）・操作の記録・通信監査・診断ログ（XC-286）"
+            onClick={() => setLogTab(logTab === "notices" ? null : "notices")}
           >
             ◷
           </button>
-          {showNotices ? (
-            <div className="popover" style={{ right: 0, top: "calc(100% + 6px)" }}>
-              <header>通知履歴</header>
-              <div className="body">
-                <NotificationHistory notices={NOTICES} />
-              </div>
-            </div>
-          ) : null}
-        </span>
-        <span style={{ position: "relative" }}>
           <button
             className="icon-button"
-            aria-pressed={showScript}
+            aria-pressed={logTab === "record"}
             aria-label="操作の記録"
             title="いま行った操作を、同じことをするコマンドとして読む（XC-046）"
-            onClick={() => setShowScript(!showScript)}
+            onClick={() => setLogTab(logTab === "record" ? null : "record")}
           >
             {"{ }"}
           </button>
-          {showScript ? (
-            <div className="popover" style={{ right: 0, top: "calc(100% + 6px)" }}>
-              <header>操作の記録</header>
-              <div className="body">
-                {e.reachability.kind === "reachable" ? (
-                  <EngineHistory history={e.history} workspaceOpen={e.workspaceId !== null} onRefresh={() => void engineState.history()} />
-                ) : (
-                  <ScriptView
-                    lines={RECENT}
-                    onCopy={(text) => void navigator.clipboard?.writeText(text)}
-                  />
-                )}
+          {logTab !== null ? (
+            <div className="popover" style={{ right: 0, top: "calc(100% + 6px)", width: "min(520px, calc(100vw - 24px))" }}>
+              <header>記録</header>
+              <div className="body" style={{ maxHeight: 480 }}>
+                <LogArea tab={logTab} onTab={setLogTab} fixtureNotices={NOTICES} fixtureRecord={RECENT} />
               </div>
             </div>
           ) : null}

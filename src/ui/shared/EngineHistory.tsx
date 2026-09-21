@@ -7,12 +7,12 @@
  * script view of real commands waits on the contract carrying them. Saying so here rather than
  * rendering a command with the parameters left blank, which would be a written form nobody can run. */
 import type { Results } from "../client/engine";
+import { COMMAND_OUTCOME_LABEL as OUTCOME_LABEL } from "../logic/logArea";
 import { describeRecorded } from "../logic/time";
 
 type History = Results["history.list"];
 
 const ORIGIN_LABEL = { interface: "画面", assistant: "アシスタント", script: "スクリプト", pipeline: "パイプライン" } as const;
-const OUTCOME_LABEL: Record<string, string> = { applied: "適用", answered: "応答", refused: "拒否", failed: "失敗" };
 
 export function EngineHistory(props: { history: History | null; workspaceOpen: boolean; onRefresh: () => void }) {
   if (!props.workspaceOpen) {

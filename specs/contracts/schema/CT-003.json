@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "3.10.0",
+  "version": "3.11.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -81,6 +81,7 @@
         "script.run",
         "report.provenance",
         "system.audit",
+        "system.log",
         "system.supportBundle",
         "workspace.pack",
         "output.list",
@@ -1447,6 +1448,32 @@
             "since": {
               "type": "string",
               "description": "この時刻より後の記録に限る。ISO 8601 の UTC"
+            }
+          }
+        },
+        "system.log": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {
+            "level": {
+              "type": "string",
+              "enum": [
+                "debug",
+                "info",
+                "warning",
+                "error"
+              ],
+              "description": "この水準以上の行を返す。省略時は warning：拒否と失敗の一覧（XC-263）"
+            },
+            "since": {
+              "type": "string",
+              "description": "この時刻以降の行に限る。ISO 8601 の UTC"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "返す行数の上限（新しい方から）。省略時と上限はエンジンが定め、超えた分は omitted に数える"
             }
           }
         },
@@ -4150,6 +4177,101 @@
                 }
               },
               "description": "外に出た要求（AC-021）"
+            }
+          }
+        },
+        "system.log": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "entries",
+            "source",
+            "logDirectory",
+            "files",
+            "retainDays",
+            "omitted",
+            "unreadable"
+          ],
+          "properties": {
+            "entries": {
+              "type": "array",
+              "description": "診断ログの行、古い順（XC-263, XC-286）。命令とその結果・理由、答えに添えた警告、外への要求の可否。フィールド値は書かれた時点で拒まれている（XC-126）",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "at",
+                  "level",
+                  "event",
+                  "context"
+                ],
+                "properties": {
+                  "at": {
+                    "$ref": "CT-001.json#/$defs/recordedTime",
+                    "description": "いつ。記録された時刻（XC-142）"
+                  },
+                  "level": {
+                    "type": "string",
+                    "enum": [
+                      "debug",
+                      "info",
+                      "warning",
+                      "error"
+                    ]
+                  },
+                  "event": {
+                    "type": "string",
+                    "description": "何が起きたか：command、warning、egress、engine.start など"
+                  },
+                  "context": {
+                    "type": "object",
+                    "description": "名前と件数だけ：operation, origin, status, reason, text, host, purpose, outcome …",
+                    "additionalProperties": {
+                      "type": [
+                        "string",
+                        "integer",
+                        "boolean",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "source": {
+              "type": "string",
+              "enum": [
+                "file",
+                "memory"
+              ],
+              "description": "file はプロセスを閉じても残る。memory は閉じると消える（--log-directory なしの起動）"
+            },
+            "logDirectory": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "ファイルの置き場所。memory なら null"
+            },
+            "files": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "今あるログファイルの数（回転分を含む）"
+            },
+            "retainDays": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "回転したファイルを残す日数（XC-263）"
+            },
+            "omitted": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "limit で返さなかった古い行の数"
+            },
+            "unreadable": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "読めなかった行の数（途中で切れた書き込み）。推測はしない"
             }
           }
         },

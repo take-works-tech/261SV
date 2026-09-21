@@ -174,6 +174,9 @@ class LogEntry:
     undo_id: str | None = None
     group_id: str | None = None
     dry_run: bool = False
+    #: What the answer warned about beside its result - a lock held, a case partial - so the log
+    #: keeps the notice a person dismissed (XC-286, 16_application_model §12).
+    warnings: tuple[str, ...] = ()
 
     def describe(self) -> str:
         line = f"{self.at.describe_where_recorded()} {self.origin.value} {self.operation} → {self.status.value}"
@@ -491,6 +494,7 @@ class Surface:
             undo_id=result.undo_id,
             group_id=command.group_id,
             dry_run=command.dry_run,
+            warnings=tuple(result.warnings),
         )
         self._log.append(entry)
         if len(self._log) > MAX_HISTORY_ENTRIES:

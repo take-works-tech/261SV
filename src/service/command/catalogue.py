@@ -75,6 +75,7 @@ READS = frozenset({
     "system.capabilities",
     "system.protocols",
     "system.operations",
+    "system.log",
     "history.list",
     "dataset.probe",
     "dataset.parts",
@@ -130,6 +131,7 @@ OPERATIONS = (
     "system.capabilities",
     "system.protocols",
     "system.operations",
+    "system.log",
     "history.undo",
     "history.list",
     "dataset.probe",
@@ -204,6 +206,7 @@ PARAMETERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "system.capabilities": (frozenset([]), frozenset([])),
     "system.protocols": (frozenset([]), frozenset([])),
     "system.operations": (frozenset([]), frozenset([])),
+    "system.log": (frozenset(['level', 'limit', 'since']), frozenset([])),
     "history.undo": (frozenset(['undoId']), frozenset(['undoId'])),
     "history.list": (frozenset(['workspaceId']), frozenset(['workspaceId'])),
     "dataset.probe": (frozenset(['datasetId', 'fieldName', 'pointM', 'resultPosition']), frozenset(['datasetId', 'fieldName', 'pointM', 'resultPosition'])),
@@ -279,6 +282,7 @@ RESULT_FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "system.capabilities": (frozenset(['diagnostics', 'egress', 'formats', 'machineClass', 'renderers']), frozenset(['formats', 'machineClass', 'renderers'])),
     "system.protocols": (frozenset(['versions']), frozenset(['versions'])),
     "system.operations": (frozenset(['registered', 'unimplemented']), frozenset(['registered', 'unimplemented'])),
+    "system.log": (frozenset(['entries', 'files', 'logDirectory', 'omitted', 'retainDays', 'source', 'unreadable']), frozenset(['entries', 'files', 'logDirectory', 'omitted', 'retainDays', 'source', 'unreadable'])),
     "history.undo": (frozenset(['restoredIds']), frozenset(['restoredIds'])),
     "history.list": (frozenset(['entries', 'historyLimit', 'omitted', 'undoDropped', 'undoLimit']), frozenset(['entries'])),
     "dataset.probe": (frozenset(['association', 'resultPosition', 'value']), frozenset(['resultPosition', 'value'])),
@@ -355,6 +359,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
     "system.capabilities": {},
     "system.protocols": {},
     "system.operations": {},
+    "system.log": {},
     "history.undo": {},
     "history.list": {},
     "dataset.probe": {'value': frozenset(['digits', 'provenance', 'unit', 'value'])},
@@ -387,7 +392,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
 
 #: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below
 #: the engine's floor is refused politely rather than answered in a shape it cannot read.
-PROTOCOL_VERSION = "3.10.0"
+PROTOCOL_VERSION = "3.11.0"
 
 #: The wire's own names, from CT-003's `$defs.transport` (XC-258). The interface generates
 #: the same values from the same place; neither side is derived from the other (XC-252).

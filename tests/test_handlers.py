@@ -112,10 +112,10 @@ class TestWhatThisBuildRegisters:
             "dataset.probe", "view.pick", "report.create", "report.update", "report.get",
             "report.export", "report.provenance",
             "workspace.save", "dataset.inspect", "history.list",
-            "system.capabilities", "system.protocols", "system.audit", "system.operations",
+            "system.capabilities", "system.protocols", "system.audit", "system.operations", "system.log",
             "output.list", "output.plan", "output.prune",
         }
-        assert len(surface.unimplemented()) == len(OPERATIONS) - 28
+        assert len(surface.unimplemented()) == len(OPERATIONS) - 29
 
     def test_operations_list_what_this_build_answers_and_what_it_does_not(self) -> None:
         """XC-277: the list is the surface's own registry, and the two halves are the whole catalogue."""
@@ -1998,3 +1998,73 @@ class TestAFileThatIsNotAllThere:
         assert first.value["maximum"]["value"] == 90.0
         assert second.status is Status.REFUSED
         assert "読み込んだあとに変わりました" in (second.reason or "") and "t.cgns" in (second.reason or "")
+
+
+class TestTheLogArea:
+    """XC-286 (#292): the three kinds - what was refused or warned, what ran, what left the machine -
+    are one log, read back by `system.log`, from the files where there are files."""
+
+    def test_a_refusal_and_a_warning_are_read_back_with_where_they_came_from(self, tmp_path: Path) -> None:
+        surface, session, dataset_id = loaded(tmp_path)
+        surface.submit(Command("dataset.describe", {"datasetId": "dataset:none"}))
+        surface.submit(Command("workspace.open", {"path": str(session.workspace_path)}))  # a lock this process holds: a warning
+
+        result = surface.submit(Command("system.log", {}))
+
+        assert result.status is Status.ANSWERED, result.reason
+        assert result.value["source"] == "memory" and result.value["logDirectory"] is None
+        events = [(one["event"], one["level"]) for one in result.value["entries"]]
+        assert ("command", "warning") in events, events
+        refused = next(one for one in result.value["entries"] if one["event"] == "command" and one["context"].get("status") == "refused")
+        assert refused["context"]["operation"] == "dataset.describe" and refused["context"]["reason"]
+        assert all(one["level"] in ("warning", "error") for one in result.value["entries"]), "warning is the default level"
+        assert result.value["omitted"] == 0 and result.value["unreadable"] == 0
+
+    def test_the_answers_warnings_reach_the_log_as_their_own_lines(self, tmp_path: Path) -> None:
+        requires_h5py()
+        from demo_case import write_partial_case
+
+        surface, _, workspace = opened(tmp_path)
+        partial = write_partial_case(workspace.parent)
+        assert partial is not None
+        loaded_result = surface.submit(Command("dataset.load", {"caseId": "case:1", "filePaths": [str(partial)]}))
+        assert loaded_result.status is Status.APPLIED and loaded_result.warnings
+
+        entries = surface.submit(Command("system.log", {"level": "warning"})).value["entries"]
+
+        warned = [one for one in entries if one["event"] == "warning"]
+        assert warned and warned[0]["context"]["operation"] == "dataset.load"
+        assert "不完全" in warned[0]["context"]["text"]
+
+    def test_an_egress_decision_is_a_log_line_without_the_content(self, tmp_path: Path) -> None:
+        surface, session, _ = opened(tmp_path)
+        session.gate.search(SearchRequest("stress 200 MPa", "search.example.test"), workspace_id="ws:1")
+
+        entries = surface.submit(Command("system.log", {"level": "info"})).value["entries"]
+
+        egress = [one for one in entries if one["event"] == "egress"]
+        assert len(egress) == 1 and egress[0]["level"] == "warning"
+        assert egress[0]["context"]["outcome"] == "refused" and egress[0]["context"]["purpose"] == "webSearch"
+        assert "200" not in str(egress[0]["context"]), "the content stays in the audit; the log keeps names and outcomes"
+        audit = surface.submit(Command("system.audit", {})).value["entries"]
+        assert len(audit) == 1 and audit[0]["outcome"] == "refused"
+
+    def test_a_directory_makes_it_a_file_that_a_new_session_reads(self, tmp_path: Path) -> None:
+        from service.egress.diagnostics import Log
+
+        first = Session(clock=at(9), issue=counting_issuer(), log=Log(directory=tmp_path / "logs"))
+        build_surface(first).submit(Command("dataset.describe", {"datasetId": "dataset:none"}))
+        second = Session(clock=at(10), issue=counting_issuer(), log=Log(directory=tmp_path / "logs"))
+
+        result = build_surface(second).submit(Command("system.log", {"level": "warning"}))
+
+        assert result.value["source"] == "file" and result.value["logDirectory"] == str(tmp_path / "logs")
+        assert result.value["files"] == 1 and result.value["retainDays"] == 7
+        assert [one["context"]["operation"] for one in result.value["entries"]] == ["dataset.describe"]
+
+    def test_what_is_asked_for_wrongly_is_refused_by_name(self, tmp_path: Path) -> None:
+        surface, _, _ = opened(tmp_path)
+
+        assert surface.submit(Command("system.log", {"level": "loud"})).status is Status.REFUSED
+        assert surface.submit(Command("system.log", {"limit": 0})).status is Status.REFUSED
+        assert surface.submit(Command("system.log", {"since": "yesterday"})).status is Status.REFUSED
