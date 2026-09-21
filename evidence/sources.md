@@ -2196,3 +2196,27 @@ Recorded so that nothing silently depends on them:
   no error. Not measured: a share on another machine, a mapped drive letter, the desktop shell's
   file dialogs with a UNC path
 - justifies: XC-285
+
+### E-214 - This product's numbers against the toolkit's own filters, measured here
+- tier: T1
+- url: spike/measure_cross_check.py, its record spike/cross_check.json, and tests/test_cross_check.py
+  which repeats it on every run; taken on the development machine on 2026-09-21 (VTK 9.5.2)
+- verified: 2026-09-21
+- says: on the same files, the same quantities and the same units, against `vtkIntegrateAttributes`
+  (ParaView's Integrate Variables), `vtkCellDataToPointData` (Cell Data to Point Data),
+  `vtkTensorPrincipalInvariants` (Principal Invariants) and `vtkArrayCalculator` (the Calculator):
+  **agrees exactly** - the maximum and the dual-volume mean of a trilinear field on a box (4.5), the
+  volume-weighted mean of element values on the bar of E-144 (52.0), the nodal average at every node
+  of that bar and its extrema (110 and 10), the magnitude of a vector at every point, the three
+  principal values, the von Mises stress and the maximum shear of a symmetric tensor at every point
+  (the component formula against the toolkit's eigenvalue route, largest difference 0.0), and the
+  nodal average of each of two parts taken alone. **Differs, with the reason**: a surface mesh's mean
+  is refused here (no volume, no area weighting built, INV-017) and integrated over area there
+  (23.33); the nodal average across two parts' shared face is 200 here and 110 after Merge Blocks
+  (INV-022, E-074); and on a hexahedron with one corner pulled from (1,1,1) to (2,2,2) the volume
+  average of the linear field f = x is **0.625** by this product's V/8 node shares, **0.75** by the
+  integrator's tetrahedra and **0.714286** by 2 x 2 x 2 Gauss quadrature of the trilinear
+  interpolant - the exact value, which neither reaches; on a box all three are 0.5. **No reference**:
+  the spread at an averaged peak (180 on the bar), which the toolkit does not compute. Not measured:
+  ParaView itself, which is not installed on this machine; its filters are the classes above
+- justifies: XC-287
