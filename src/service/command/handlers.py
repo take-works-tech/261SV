@@ -341,7 +341,7 @@ class Session:
         if self.handles is None:
             self.handles = HandleStore(self.clock)
         if self.gate is None:
-            self.gate = Gate(clock=self.clock)
+            self.gate = Gate(clock=self.clock, log=self.log)
 
     def offscreen(self) -> tuple[bool, str]:
         """The offscreen probe's answer, asked once per session: a child process is not free."""
@@ -457,6 +457,13 @@ def log_entry(session: Session, entry: LogEntry) -> None:
         undoId=entry.undo_id,
         dryRun=entry.dry_run,
     )
+    # What the answer warned about is a notice a person may dismiss, and the log is where a
+    # dismissed notice is found again (XC-286): one warning line each, the sentence as said.
+    for warning in entry.warnings:
+        session.log.record(
+            diagnostics.Level.WARNING, "warning", operation=entry.operation, origin=entry.origin.value,
+            text=warning[:200],
+        )
 
 
 def build_surface(session: Session, *, clock: Callable[[], datetime] | None = None) -> Surface:
@@ -499,6 +506,7 @@ def handlers(session: Session) -> tuple[Handler, ...]:
         Handler("report.provenance", lambda p, t: report_provenance(session, p)),
         Handler("system.capabilities", lambda p, t: system_capabilities(session)),
         Handler("system.audit", lambda p, t: system_audit(session, p)),
+        Handler("system.log", lambda p, t: system_log(session, p)),
         Handler("output.list", lambda p, t: output_list(session, p)),
         Handler("output.plan", lambda p, t: output_plan(session, p)),
         # Deleting files is destructive and needs the caller's say-so on the envelope (CT-002);
@@ -2043,6 +2051,50 @@ def system_audit(session: Session, parameters: Mapping[str, Any]) -> Effect | Re
         "外部に出た要求はありません" if not recorded else f"外部要求の記録 {len(entries)} 件",
         value={"entries": entries},
     )
+
+
+def system_log(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
+    """The diagnostic log read back (XC-286): commands with their outcomes and reasons, the warnings
+    beside answers, and the egress decisions - from the files where there are files, which is how a
+    person reads what happened after the window that showed it has closed. Never a field value: the
+    log refused one at every write (XC-126)."""
+    stated = str(parameters.get("level", diagnostics.Level.WARNING.value))
+    try:
+        level = diagnostics.Level(stated)
+    except ValueError:
+        return refused(f"level は {[one.value for one in diagnostics.Level]} のどれかです：{stated!r}")
+    since = parameters.get("since")
+    floor: str | None = None
+    if since is not None:
+        try:
+            floor = RecordedTime(str(since), None).utc
+        except ValueError:
+            return refused(f"since は UTC の時刻（{STORED_FORMAT}）で指定してください：{since!r}")
+    limit = int(parameters.get("limit", LOG_READ_LIMIT))
+    if limit < 1 or limit > LOG_READ_LIMIT:
+        return refused(f"limit は 1〜{LOG_READ_LIMIT} です（{limit} が求められました）")
+    reading = session.log.read(level=level, since=floor, limit=limit)
+    location = session.log.describe_location()
+    return Effect(
+        f"診断ログ {len(reading.lines)} 件" + (f"（さらに {reading.omitted} 件は上限で省略）" if reading.omitted else ""),
+        value={
+            "entries": [
+                {"at": one.at.as_stored(), "level": one.level.value, "event": one.event, "context": dict(one.context)}
+                for one in reading.lines
+            ],
+            "source": session.log.source,
+            "logDirectory": location["logDirectory"],
+            "files": location["files"],
+            "retainDays": location["retainDays"],
+            "omitted": reading.omitted,
+            "unreadable": reading.unreadable,
+        },
+    )
+
+
+#: The most lines one read of the log answers. A day of a busy session is a few thousand; a person
+#: reads the newest, and `since` narrows the rest.
+LOG_READ_LIMIT = 2000
 
 
 def system_operations(surface: Surface) -> Effect:

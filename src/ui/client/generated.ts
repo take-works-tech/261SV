@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "3.10.0";
+export const PROTOCOL_VERSION = "3.11.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -76,6 +76,7 @@ export type Operation =
   | "script.run"
   | "report.provenance"
   | "system.audit"
+  | "system.log"
   | "system.supportBundle"
   | "workspace.pack"
   | "output.prune"
@@ -147,6 +148,7 @@ export const OPERATIONS: readonly Operation[] = [
   "script.run",
   "report.provenance",
   "system.audit",
+  "system.log",
   "system.supportBundle",
   "workspace.pack",
   "output.prune",
@@ -228,6 +230,7 @@ export const OPERATION_FACTS: Readonly<Record<Operation, OperationFacts>> = {
   "script.run": { writes: true, required: ["authorisation"], optional: ["scriptText", "path"], answers: ["undoId", "commandCount"] },
   "report.provenance": { writes: false, required: [], optional: ["exportedPath", "reportId"], answers: ["workspaceId", "caseIds", "sources", "declaredUnits", "productVersion", "produced"] },
   "system.audit": { writes: false, required: [], optional: ["since"], answers: ["entries"] },
+  "system.log": { writes: false, required: [], optional: ["level", "since", "limit"], answers: ["entries", "source", "logDirectory", "files", "retainDays", "omitted", "unreadable"] },
   "system.supportBundle": { writes: true, required: ["consent", "path"], optional: [], answers: ["path", "contents"] },
   "workspace.pack": { writes: true, required: ["includeData", "path", "workspaceId"], optional: [], answers: ["path", "bytes", "omitted"] },
   "output.prune": { writes: true, required: ["runsToRemove", "workspaceId"], optional: ["expectedFiles"], answers: ["removedRunIds", "freedBytes", "deletedFiles"] },
@@ -495,6 +498,11 @@ export interface Parameters {
   };
   "system.audit": {
     since?: string;
+  };
+  "system.log": {
+    level?: "debug" | "info" | "warning" | "error";
+    since?: string;
+    limit?: number;
   };
   "system.supportBundle": {
     path: string;
@@ -1008,6 +1016,20 @@ export interface Results {
       reason?: string;
       withheld?: readonly (string)[];
     })[];
+  };
+  "system.log": {
+    entries: readonly ({
+      at: RecordedTime;
+      level: "debug" | "info" | "warning" | "error";
+      event: string;
+      context: Record<string, unknown>;
+    })[];
+    source: "file" | "memory";
+    logDirectory: string | null;
+    files: number;
+    retainDays: number;
+    omitted: number;
+    unreadable: number;
   };
   "system.supportBundle": {
     path: string;

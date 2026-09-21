@@ -349,7 +349,7 @@ describe("the prototype thread from the interface's side", () => {
 
     const s = snapshot();
     expect(s.operations?.registered).toContain("system.operations");
-    expect(s.operations?.registered.length).toBe(28);
+    expect(s.operations?.registered.length).toBe(29);
     expect([...(s.operations?.registered ?? []), ...(s.operations?.unimplemented ?? [])].sort()).toEqual([...OPERATIONS].sort());
     const rows = commandGroups(s.operations, "").flatMap((group) => group.rows);
     expect(rows).toHaveLength(OPERATIONS.length);
@@ -584,6 +584,35 @@ describe("the prototype thread from the interface's side", () => {
       step: 0, count: 1, kind: "none", value: null, unit: null, stated: "定常（結果軸なし・ステップ 1/1）",
     });
     expect(viewFooter(s, "単位未宣言")?.showing).not.toContain("ステップ");
+  });
+});
+
+describe("the log area (XC-286)", () => {
+  test("a refusal is a notice kept after dismissal, and the engine's log reads it back with where it lives", async () => {
+    expect(await engineState.loadDataset("case:1", fieldsPath)).toBe(true);
+    expect(await engineState.derive("stress6", "invariants")).toBe(false);
+    let s = snapshot();
+    const raised = s.notices.find((one) => one.severity === "refusal" && one.operation === "field.derive");
+    expect(raised?.detail).toContain("二乗");
+    expect(raised?.dismissedAt).toBeUndefined();
+
+    engineState.dismissNotice(raised?.id ?? "");
+    s = snapshot();
+    const dismissed = s.notices.find((one) => one.id === raised?.id);
+    expect(dismissed?.dismissedAt?.utc).toBeTruthy();
+    expect(s.notices.length).toBeGreaterThanOrEqual(1);
+
+    const log = await engineState.log({ level: "warning" });
+    expect(log?.source).toBe("memory");
+    expect(log?.logDirectory).toBeNull();
+    const refused = log?.entries.find((one) => one.event === "command" && one.context.operation === "field.derive" && one.context.status === "refused");
+    expect(refused?.level).toBe("warning");
+    expect(String(refused?.context.reason)).toContain("二乗");
+
+    // The thread goes on with the cube.
+    expect(await engineState.loadDataset("case:1", cubePath)).toBe(true);
+    await engineState.refresh();
+    expect(snapshot().refusal).toBeNull();
   });
 });
 

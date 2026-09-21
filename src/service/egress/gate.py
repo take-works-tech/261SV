@@ -31,6 +31,7 @@ from enum import Enum
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from domain_core.recorded_time import RecordedTime, record as record_time
+from service.egress.diagnostics import Level, Log
 
 
 class Purpose(str, Enum):
@@ -204,11 +205,16 @@ class Gate:
         offline: bool = False,
         clock: Callable[[], datetime] | None = None,
         send: Callable[[Purpose, str, str], None] | None = None,
+        log: Log | None = None,
     ) -> None:
         self.offline = offline
         self._permissions: dict[str, Permission] = {}
         self._audit: list[Record] = []
         self._clock = clock or (lambda: datetime.now().astimezone())
+        #: The diagnostic log the audit is also written to, so what left the machine is readable after
+        #: the process that sent it has ended (XC-286). Names and outcomes: the host, the purpose, the
+        #: decision and its reason - never the content, which the audit keeps and the log may not (XC-126).
+        self._log = log
         #: What actually performs a request. Injected, and absent by default: a gate with no transport
         #: refuses to send rather than pretending to, which is what a test wants and what an offline
         #: build is.
@@ -413,4 +419,10 @@ class Gate:
             record_time(self._clock()), purpose, host, outcome, sent, reason, tuple(withheld)
         )
         self._audit.append(record)
+        if self._log is not None:
+            self._log.record(
+                Level.INFO if outcome is Outcome.SENT else Level.WARNING, "egress",
+                purpose=purpose.value, host=host, outcome=outcome.value,
+                reason=(reason[:200] if reason else None), withheld=len(record.withheld),
+            )
         return Result(outcome, record, unanswered if outcome is not Outcome.SENT else None)

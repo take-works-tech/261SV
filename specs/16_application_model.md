@@ -114,7 +114,7 @@ that column against `mockups/ui/lib/screen-catalog.json` in both directions.
 | `find` | a data selection built as a query, and what it resolved to | main, header, footer | **no** | - |
 | `library` | the Asset organiser: import, metadata, revisions, scope, bulk management | main, header, navigator, properties, footer | named as future in 11_ui.md | - |
 | `script` | the Python surface of [13_scripting.md](13_scripting.md): editor, console, and the log of what was just done | main, header, footer | a copyable popover, and a command palette that runs one operation by name (XC-278) | - |
-| `log` | notifications, run records and the communication audit, kept after dismissal | main, header, footer | popovers only | - |
+| `log` | notifications, run records and the communication audit, kept after dismissal | main, header, footer | popovers only - one popover from the top bar with the three kinds and the diagnostic log, live from the engine (XC-286) | - |
 | `chat` | the full-height rendering of the one conversation (XC-150) | main, header, navigator | yes | `chat` |
 | `simulation` | one @Simulation flow: conditions for external solver executions | main, header, properties, composer, footer | yes, definition only (XC-091) | `simulation` |
 | `settings` | application and workspace preferences, and the command list | main, header, navigator | yes, as a page | `settings` |
@@ -435,6 +435,12 @@ refer to the same one rather than each carrying a copy of the condition.
 In the production interface the console half of `script` is the command palette in the top bar
 (XC-278): every operation by name, run with parameters the interface holds, the answer shown as the
 engine gave it. The editor, and running a script, wait on the area.
+
+The `log` area is the top bar's log popover (XC-286): the notices this window raised, kept after
+dismissal with the time they were dismissed; the engine's operation record (`history.list`); the
+communication audit (`system.audit`) with its export as rows; and the diagnostic log read back
+(`system.log`) - the one of the four that outlives the window, and the popover says whether this
+engine writes it to a file or holds it in memory only. @Pipeline run records wait on the pipeline.
 
 ### 7.13 `chat`, `simulation`, `settings`, `network`
 

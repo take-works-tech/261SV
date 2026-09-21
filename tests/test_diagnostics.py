@@ -284,3 +284,82 @@ class TestTheLogOnDisk:
         where = Log().describe_location()
 
         assert where["logDirectory"] is None and where["files"] == 0
+
+
+class TestTheLogReadsItselfBack:
+    """XC-286: what a process wrote is read by the next one, from the files, oldest first; what the
+    read left out is counted; a line a crash cut short is counted and never guessed at."""
+
+    @staticmethod
+    def _at(hour: int):
+        from datetime import datetime, timedelta, timezone
+
+        base = datetime(2026, 9, 21, hour, 0, tzinfo=timezone(timedelta(hours=9)))
+        return lambda: base
+
+    def test_a_later_process_reads_what_an_earlier_one_wrote(self, tmp_path: Path) -> None:
+        from service.egress.diagnostics import Level, Log
+
+        first = Log(directory=tmp_path / "logs", clock=self._at(9))
+        first.record(Level.INFO, "command", operation="workspace.open", status="applied")
+        first.record(Level.WARNING, "command", operation="dataset.describe", status="refused", reason="ない")
+        del first
+
+        later = Log(directory=tmp_path / "logs", clock=self._at(10))
+        reading = later.read(level=Level.DEBUG)
+
+        assert later.source == "file"
+        assert [one.event for one in reading.lines] == ["command", "command"]
+        assert reading.lines[1].level is Level.WARNING and reading.lines[1].context["reason"] == "ない"
+        assert reading.lines[0].at.utc == "2026-09-21T00:00:00Z"
+        assert reading.omitted == 0 and reading.unreadable == 0
+
+    def test_rotated_files_are_read_first_and_the_limit_keeps_the_newest(self, tmp_path: Path) -> None:
+        from service.egress.diagnostics import LOG_FILE, Level, Log
+
+        log = Log(directory=tmp_path / "logs", clock=self._at(9))
+        log.record(Level.INFO, "command", operation="one")
+        log._rotate()
+        log.record(Level.INFO, "command", operation="two")
+        log.record(Level.INFO, "command", operation="three")
+        assert (tmp_path / "logs" / f"{LOG_FILE}.1").exists()
+
+        whole = log.read(level=Level.INFO)
+        newest = log.read(level=Level.INFO, limit=2)
+
+        assert [one.context["operation"] for one in whole.lines] == ["one", "two", "three"]
+        assert [one.context["operation"] for one in newest.lines] == ["two", "three"] and newest.omitted == 1
+
+    def test_level_and_since_narrow_the_read(self, tmp_path: Path) -> None:
+        from service.egress.diagnostics import Level, Log
+
+        log = Log(directory=tmp_path / "logs", clock=self._at(9))
+        log.record(Level.INFO, "command", operation="fine")
+        log.record(Level.WARNING, "command", operation="refused", status="refused")
+        log.record(Level.ERROR, "command", operation="failed", status="failed")
+
+        assert [one.context["operation"] for one in log.read(level=Level.WARNING).lines] == ["refused", "failed"]
+        assert log.read(level=Level.DEBUG, since="2026-09-21T00:00:01Z").lines == ()
+        assert len(log.read(level=Level.DEBUG, since="2026-09-21T00:00:00Z").lines) == 3
+
+    def test_a_line_a_crash_cut_short_is_counted_not_guessed(self, tmp_path: Path) -> None:
+        from service.egress.diagnostics import Level, Log
+
+        log = Log(directory=tmp_path / "logs", clock=self._at(9))
+        log.record(Level.INFO, "command", operation="whole")
+        with log.path.open("ab") as handle:
+            handle.write(b'{"at": {"utc": "2026-09-21T00:00:01Z", "offsetMinutes": 540}, "level": "info", "ev')
+
+        reading = log.read(level=Level.DEBUG)
+
+        assert [one.context["operation"] for one in reading.lines] == ["whole"]
+        assert reading.unreadable == 1
+
+    def test_memory_only_says_so(self) -> None:
+        from service.egress.diagnostics import Level, Log
+
+        log = Log(clock=self._at(9))
+        log.record(Level.WARNING, "command", operation="x", status="refused")
+
+        assert log.source == "memory"
+        assert [one.context["operation"] for one in log.read().lines] == ["x"]

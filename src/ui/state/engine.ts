@@ -55,6 +55,19 @@ export interface Derivation {
 /** A number the engine reported, carried whole. Never unpacked into a bare value: a value without
  *  its unit, digits and provenance is a value in whatever unit the reader assumed (XC-003). */
 export type Reported = Results["dataset.probe"]["value"];
+
+/** A notice this window raised - a refusal, a failure, a warning beside an answer - kept after
+ *  dismissal with the time it was dismissed (16_application_model §12, XC-286). The engine's log
+ *  holds the same facts; this is the window's own list of what it showed. */
+export interface Notice {
+  readonly id: string;
+  readonly at: RecordedTime;
+  readonly severity: "info" | "warning" | "error" | "refusal";
+  readonly title: string;
+  readonly detail: string;
+  readonly operation?: string;
+  readonly dismissedAt?: RecordedTime;
+}
 /** Which step a number is of, as the engine states it beside every number (CT-003 3.10.0). */
 export type StatedPosition = Results["field.statistics"]["resultPosition"];
 
@@ -161,6 +174,8 @@ export interface EngineState {
   /** What the engine's last answer warned about, in its own words, until dismissed. Dropped until
    *  2026-09-20, which is how a document lifted, a dataset closed or a lock held went unsaid. */
   readonly warnings: readonly string[];
+  /** Every notice this window raised, in order, dismissed ones included (XC-286). */
+  readonly notices: readonly Notice[];
   readonly unresolvedCases: readonly string[];
   readonly caseId: string | null;
   readonly datasetId: string | null;
@@ -279,6 +294,7 @@ const EMPTY: EngineState = {
   readOnly: false,
   lock: null,
   warnings: [],
+  notices: [],
   unresolvedCases: [],
   caseId: null,
   datasetId: null,
@@ -316,6 +332,14 @@ const SCREEN_GROUND: readonly [number, number, number] = [0.039, 0.047, 0.051];
 
 let state: EngineState = EMPTY;
 let engine: Engine | null = null;
+let noticeCount = 0;
+
+/** Keep what a person is about to be shown, so it can be found again after looking away (§12). */
+function notice(severity: Notice["severity"], title: string, detail: string, operation?: string) {
+  noticeCount += 1;
+  const one: Notice = { id: `notice:${noticeCount}`, at: recordNow(), severity, title, detail, ...(operation ? { operation } : {}) };
+  setState({ notices: [...state.notices, one].slice(-200) });
+}
 const listeners = new Set<() => void>();
 
 function emit() {
@@ -359,11 +383,14 @@ async function ask<O extends Operation>(
   } catch (failure) {
     const because = failure instanceof TransportFailure ? failure.message : String(failure);
     setState({ busy: false, refusal: because, reachability: { kind: "absent", because } });
+    notice("error", `'${operation}' に答えがありません`, because, operation);
     return null;
   }
   setState({ busy: false });
   if (answer.status === "refused" || answer.status === "failed") {
-    setState({ refusal: reasonText(answer.reason) || `'${operation}' は行えませんでした` });
+    const reason = reasonText(answer.reason) || `'${operation}' は行えませんでした`;
+    setState({ refusal: reason });
+    notice(answer.status === "failed" ? "error" : "refusal", `'${operation}' は${answer.status === "failed" ? "失敗しました" : "拒まれました"}`, reason, operation);
     return null;
   }
   // What the engine had to say beside its answer is shown, not dropped: a document lifted to a
@@ -373,6 +400,7 @@ async function ask<O extends Operation>(
     // a lock held is followed at once by a load and a render, and the lock is still held.
     const fresh = answer.warnings.filter((one) => !state.warnings.includes(one));
     setState({ warnings: [...state.warnings, ...fresh].slice(-20) });
+    for (const one of fresh) notice("warning", `'${operation}' の注意`, one, operation);
   }
   if (answer.status === "applied" && !NOT_UNSAVED_WORK.has(operation)) {
     setState({
@@ -1003,6 +1031,19 @@ export const engineState = {
   /** What has left the machine, as the gate recorded it (XC-106, XC-267): read, never kept here. */
   async audit(since?: string): Promise<Results["system.audit"] | null> {
     return ask("system.audit", since ? { since } : {});
+  },
+
+  /** The diagnostic log read back from the engine (XC-263, XC-286): what was refused, warned and
+   *  sent, from the files where the engine writes them - which the answer says. Read, never kept. */
+  async log(parameters: Parameters["system.log"] = {}): Promise<Results["system.log"] | null> {
+    return ask("system.log", parameters);
+  },
+
+  /** Class 1: a dismissed notice is hidden, never deleted (16_application_model §12). */
+  dismissNotice(id: string) {
+    setState({
+      notices: state.notices.map((one) => (one.id === id && !one.dismissedAt ? { ...one, dismissedAt: recordNow() } : one)),
+    });
   },
 
   /** What the runs left behind, run by run, against LIM-012 (XC-141). */

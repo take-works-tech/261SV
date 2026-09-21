@@ -6271,3 +6271,39 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a platform where a mandatory lock is not visible to a read of the first bytes,
   which would need a second probe; and a share whose metadata lies about size or time, which the
   fingerprint would then miss and a checksum would not
+
+### XC-286 - The log area is one popover over one log, and the log outlives the window
+- decided: 2026-09-21
+- status: active
+- decision: the three kinds the `log` area names - notifications, the run record and the
+  communication audit - are one place in the interface, the top bar's log popover, and one record in
+  the engine: the diagnostic log of XC-263. Every answer's warnings and every egress decision are
+  written to that log beside the commands already there - names and outcomes, never a value and
+  never the content an outbound request carried (XC-126) - and `system.log` reads it back, from the
+  files where the engine was started with a directory, so what a person dismissed, what ran and what
+  left the machine are read again after the window that showed them has closed. The popover shows
+  the notices this window raised, kept after dismissal with the time they were dismissed; the
+  operation record; the audit with its export as rows; and the log itself at a level a person
+  chooses, with the statement of whether this engine writes it to a file - and for how long it is
+  kept - or holds it in memory only
+- decided_by: engineering judgement, from #292's condition, 16_application_model §7.12 and §12,
+  XC-126 and XC-263
+- rationale: a notice that is dismissed and gone has made the failure it announced disappear, which
+  is the question "why did nothing happen" with no answer (§12). The engine already kept one feed for
+  the file and for `history.list` (XC-263); the warnings beside answers and the egress decisions
+  were the two kinds that reached a screen and never the file, so a person who closed the window
+  lost exactly the two that matter for trust. Writing them to the same log, and reading that log
+  back through the contract, is one mechanism rather than three stores; the popover reading the
+  engine's answers rather than its own memory is the same rule the information area follows
+  (XC-273)
+- alternatives: **a notification store in the interface persisted by the shell** - a second record
+  that can disagree with the engine's, and one the engine's own refusals never reach. **Sending
+  the audit's content to the log** - the log may not hold what a request carried (XC-126); the
+  audit keeps it, the log keeps that it happened. **A `log` screen** - 16_application_model gives
+  r1 the area as popovers, and a screen for four lists is a screen with nothing to edit
+- basis: E-001 (T1)
+- affects: MOD-012, MOD-014, MOD-016, CT-003, 16_application_model
+- decidedness: Fixed
+- reversal_trigger: @Pipeline run records, which the area also names and which wait on the
+  pipeline; and a support case where the log's level or limit was not enough to find what happened,
+  at which point both become the popover's own controls with a range

@@ -30,7 +30,7 @@ from pathlib import Path
 from enum import Enum
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
-from domain_core.recorded_time import RecordedTime, record as record_time
+from domain_core.recorded_time import RecordedTime, from_stored, record as record_time
 
 
 class Level(str, Enum):
@@ -90,6 +90,23 @@ class Line:
             "event": self.event,
             **self.context,
         }
+
+
+def line_from_stored(stored: Mapping[str, Any]) -> Line:
+    """One line as `as_json` wrote it, read back: the time as the pair, the level, the event, and
+    everything else as the context it was."""
+    context = {key: value for key, value in stored.items() if key not in ("at", "level", "event")}
+    return Line(from_stored(stored["at"]), Level(str(stored["level"])), str(stored["event"]), context)
+
+
+@dataclass(frozen=True, slots=True)
+class Reading:
+    """What a read of the log answered: the lines, and what was left out - by the limit, and by
+    not being readable at all."""
+
+    lines: tuple[Line, ...]
+    omitted: int = 0
+    unreadable: int = 0
 
 
 #: The file the log is written to, in the directory the shell names (XC-263).
@@ -187,6 +204,51 @@ class Log:
 
     def lines(self) -> tuple[Line, ...]:
         return tuple(self._lines)
+
+    @property
+    def source(self) -> str:
+        """Where a read comes from: `file` outlives the process, `memory` ends with it (XC-286)."""
+        return "file" if self.directory is not None else "memory"
+
+    def _files_oldest_first(self) -> list[Path]:
+        assert self.directory is not None
+        rotated = [self.directory / f"{LOG_FILE}.{index}" for index in range(KEEP_ROTATED, 0, -1)]
+        return [one for one in [*rotated, self.path] if one.exists()]
+
+    def read(self, *, level: Level = Level.DEBUG, since: str | None = None, limit: int = 500) -> "Reading":
+        """The log as a person reads it back: the newest `limit` lines at `level` or above, from
+        `since` (a UTC instant) on, and what was left out said in numbers (XC-286).
+
+        From the files where there are files - the rotated ones oldest first, then the live one - so
+        a session started after the last one closed reads what that one wrote; from memory where
+        the log is memory only, which the answer says. A line the parser cannot read (a write cut
+        short by a crash) is counted, never guessed at.
+        """
+        found: list[Line] = []
+        unreadable = 0
+        if self.directory is None:
+            found = list(self._lines)
+        else:
+            for one in self._files_oldest_first():
+                try:
+                    raw = one.read_text(encoding="utf-8").splitlines()
+                except OSError:
+                    unreadable += 1
+                    continue
+                for text in raw:
+                    if not text.strip():
+                        continue
+                    try:
+                        found.append(line_from_stored(json.loads(text)))
+                    except (ValueError, KeyError, TypeError, DiagnosticsError):
+                        unreadable += 1
+        floor = LEVEL_ORDER.index(level)
+        kept = [
+            one for one in found
+            if LEVEL_ORDER.index(one.level) >= floor and (since is None or one.at.utc >= since)
+        ]
+        omitted = max(0, len(kept) - limit)
+        return Reading(tuple(kept[len(kept) - limit:] if omitted else kept), omitted=omitted, unreadable=unreadable)
 
     def as_text(self) -> str:
         return "\n".join(one.describe() for one in self._lines)
