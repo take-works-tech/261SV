@@ -115,14 +115,24 @@ applies the matching row; the class it chose is visible in settings, and can be 
 - basis: E-021 (T1), E-051 (T1)
 
 ### LIM-005 - Cases in one Workspace
-- value: 500
+- value: 2000
 - unit: cases
 - source_of_truth: src/engine/limits.py:MAX_CASES_PER_WORKSPACE
-- rationale: a parameter sweep of a few hundred runs is the shape this product is for; beyond that the
-  case tree stops being navigable and the answer is filtering, not a bigger tree
-- on_exceed: the import is refused with the count and the limit; the user is offered a filtered import
-- decidedness: Open
-- open: OPEN-008
+- rationale: a parameter sweep of a few hundred runs is the shape this product is for, and a sweep of
+  a thousand has to fit with room. Measured here (E-225): the document's cost is linear in cases -
+  about 445 bytes on disk, 36 µs to open through the command surface with each recorded source
+  resolved, and 230 bytes of open answer per case - so two thousand cases open in about 75 ms with
+  a 0.46 MB answer, and twenty thousand in 0.82 s with 4.6 MB; adding one case walks the tree at
+  0.75 ms at two thousand. The interface's tree builder was quadratic (152 ms at five thousand,
+  2.4 s at twenty thousand) and is linear now (1.7 ms and 7.7 ms). The number sits where every
+  measured cost is a small fraction of LIM-011 and the one unmeasured cost - the drawn tree, one
+  row per case - stays a few thousand rows
+- on_exceed: a document holding more opens whole, says so in `workspace.open`'s warnings with the
+  count and the limit, and still saves; adding a case is refused by the limit's name until the count
+  is under it - refusing to read a person's work over a limit on what this build adds is losing it
+  (XC-011, XC-265, XC-306)
+- decidedness: Bounded
+- basis: E-225 (T1)
 
 ### LIM-006 - Report file size
 - value: 20971520
@@ -176,7 +186,6 @@ applies the matching row; the class it chose is visible in settings, and can be 
 - on_exceed: the background is offered with its cost stated and is not applied until accepted; the
   result geometry is never reduced to make room for it
 - decidedness: Bounded
-- open: OPEN-008
 - basis: E-063 (T1)
 
 ### LIM-010 - Time to first rendered result
@@ -227,7 +236,6 @@ applies the matching row; the class it chose is visible in settings, and can be 
 - on_exceed: the workspace reports its output size and offers pruning, oldest run first, naming what
   would be deleted; nothing is removed without the user choosing it
 - decidedness: Bounded
-- open: OPEN-008
 - basis: E-001 (T1)
 
 ### LIM-013 - Imported MaterialX expansion and decoded-resource ceilings

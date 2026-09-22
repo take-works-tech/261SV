@@ -307,5 +307,104 @@
     },
     "fixtures": "the demo cube and the bar, both small; every area settled, the View area's picture and numbers of the other dataset included",
     "not_measured": "a dataset near LIM-001, and any machine but this one"
+  },
+  "workspace_cases": {
+    "measured": "2026-09-22",
+    "script": "spike/measure_workspace_cases.py",
+    "machine": "Windows 10, Python 3.11.9, warm cache",
+    "case_shape": "a two-level tree of sweeps, ten cases each; every case named, tagged, and carrying one recorded source whose file is absent, so `workspace.open` resolves it by one stat of an absent path",
+    "sizes": [
+      {
+        "cases": 100,
+        "file_bytes": 44761,
+        "save_ms": 2.6,
+        "load_ms": 1.4,
+        "load_peak_mb": 0.3,
+        "open_command_ms": 4.5,
+        "open_cases_answer_bytes": 22940,
+        "open_warnings": [],
+        "save_command_ms": 2.9,
+        "add_one_more_ms": 0.0
+      },
+      {
+        "cases": 500,
+        "file_bytes": 222921,
+        "save_ms": 8.3,
+        "load_ms": 5.1,
+        "load_peak_mb": 1.7,
+        "open_command_ms": 18.0,
+        "open_cases_answer_bytes": 114700,
+        "open_warnings": [],
+        "save_command_ms": 8.8,
+        "add_one_more_ms": 0.0
+      },
+      {
+        "cases": 1000,
+        "file_bytes": 445721,
+        "save_ms": 15.4,
+        "load_ms": 10.7,
+        "load_peak_mb": 3.3,
+        "open_command_ms": 35.8,
+        "open_cases_answer_bytes": 229500,
+        "open_warnings": [],
+        "save_command_ms": 16.5,
+        "add_one_more_ms": 0.5
+      },
+      {
+        "cases": 5000,
+        "file_bytes": 2231321,
+        "save_ms": 73.7,
+        "load_ms": 56.4,
+        "load_peak_mb": 16.7,
+        "open_command_ms": 195.9,
+        "open_cases_answer_bytes": 1151100,
+        "open_warnings": [
+          "ケースが 5,000 件あり、上限 2,000 件（LIM-005）を超えています。開いて読み書きすることはできますが、"
+        ],
+        "save_command_ms": 72.6,
+        "add_one_more_ms": 0.3
+      },
+      {
+        "cases": 20000,
+        "file_bytes": 8937421,
+        "save_ms": 292.2,
+        "load_ms": 290.1,
+        "load_peak_mb": 66.7,
+        "open_command_ms": 823.8,
+        "open_cases_answer_bytes": 4617200,
+        "open_warnings": [
+          "ケースが 20,000 件あり、上限 2,000 件（LIM-005）を超えています。開いて読み書きすることはできますが"
+        ],
+        "save_command_ms": 293.2,
+        "add_one_more_ms": 11.4
+      }
+    ],
+    "sequential_add": [
+      {
+        "cases": 500,
+        "total_s": 0.05,
+        "last_add_ms": 0.215,
+        "refused_past_limit": 0
+      },
+      {
+        "cases": 1000,
+        "total_s": 0.19,
+        "last_add_ms": 0.349,
+        "refused_past_limit": 0
+      },
+      {
+        "cases": 2000,
+        "total_s": 0.76,
+        "last_add_ms": 0.745,
+        "refused_past_limit": 0
+      },
+      {
+        "cases": 5000,
+        "total_s": 3.01,
+        "last_add_ms": 0.735,
+        "refused_past_limit": 3000
+      }
+    ],
+    "not_measured": "a first open from a cold disk; recorded files that are present (a stat each, as here, plus the size and time compared); the interface drawing the tree, measured on its own side in src/ui/logic/subject.scale.test.ts"
   }
 }

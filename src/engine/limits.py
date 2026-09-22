@@ -54,8 +54,12 @@ def dataset_budget_bytes(machine: MachineClass) -> int:
 # specs/05_limits.md LIM-002: measured on integrated graphics with every frame verified distinct
 MAX_INTERACTIVE_TRIANGLES = 10000000
 
-# specs/05_limits.md LIM-005: cases in one workspace, still an assumption
-MAX_CASES_PER_WORKSPACE = 500
+# specs/05_limits.md LIM-005: cases in one Workspace. Measured (E-225): the document's cost is linear
+# in cases - about 445 bytes on disk, 36 µs to open and 230 bytes of open answer per case, so 2,000
+# open in about 75 ms with a 0.46 MB answer - and the interface's tree, once linear, builds them in
+# about a millisecond. The number sits where a sweep of a thousand runs fits with room and the one
+# unmeasured cost, the drawn tree, stays a few thousand rows.
+MAX_CASES_PER_WORKSPACE = 2000
 
 #: LIM-016. Concrete items - views, graphs, reports and simulations together - in one workspace
 #: document. Measured (E-209): at ten thousand a save and a load each take about 0.3 s, the parsed

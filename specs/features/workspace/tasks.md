@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-21
+updated: 2026-09-22
 ---
 
 # Tasks: workspace, cases and variables
@@ -739,3 +739,16 @@ updated: 2026-09-21
   the shell's alone, in no diagnostics and never off the machine. The engine is untouched: its
   bundle is assembled from named items (`src/service/egress/diagnostics.py`) and the shell hands
   it none.
+
+### TASK-074 - Cases bounded, measured
+- satisfies: AC-078
+- depends_on: TASK-072
+- done_when: the case limit is measured and set from the measurement, a crowded document opens whole
+  with the warning and saves, and adding a case past the limit is refused by name
+- done: 2026-09-22 (XC-306, E-225, #238). `spike/measure_workspace_cases.py` measures the document
+  at 100 to 20,000 cases and records `spike/results.json` `workspace_cases`; `MAX_CASES_PER_WORKSPACE`
+  is 2,000 on that basis; `hierarchy.capacity_warning` is said by `workspace.open` and
+  `hierarchy.add` refuses past the limit; the interface's `caseTree` groups children once instead of
+  filtering every case for every case. Proven by
+  `tests/test_workspace_hierarchy.py::TestTheTreeIsBoundedInCases`,
+  `tests/test_handlers.py::TestAWorkspaceIsBoundedInCases` and `src/ui/logic/subject.scale.test.ts`.

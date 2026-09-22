@@ -2409,3 +2409,20 @@ Recorded so that nothing silently depends on them:
   keeping the user's attention focused on the dialogue". An analysis that names its sources; the
   budgets here are set against it and measured here, never taken from it alone
 - justifies: LIM-010, LIM-011, XC-305
+
+### E-225 - What a workspace document costs as its cases grow, measured here
+- tier: T1
+- url: spike/measure_workspace_cases.py (record: spike/results.json `workspace_cases`); src/ui/logic/subject.scale.test.ts for the tree
+- verified: 2026-09-22
+- says: on this machine (Windows 11, Python 3.11.9, warm cache), a document of cases in a two-level
+  tree of sweeps, each case tagged and carrying one recorded source whose file is absent, costs per
+  case about 445 bytes on disk and 230 bytes in the `cases` answer of `workspace.open`. 500 cases:
+  223 KB, 8 ms to save, 5 ms to load, 18 ms to open through the command surface (each source
+  resolved by one stat), a 115 KB answer, 0.1 ms to add one more. 1,000: 446 KB, 16 / 11 / 36 ms,
+  230 KB. 5,000: 2.2 MB, 74 / 56 / 196 ms, 1.15 MB, 1.1 ms. 20,000: 8.9 MB, 297 / 293 / 824 ms,
+  4.6 MB, 6.3 ms. Adding one at a time is linear per add and quadratic over the run: 2,000 adds in
+  0.34 s, the last at 0.75 ms. The interface's tree builder took 2.1 ms for 500 cases, 24 ms for
+  2,000, 152 ms for 5,000 and 2,409 ms for 20,000 - a filter over every case for every case - and
+  after grouping children once takes 0.3, 1.3, 1.7 and 7.7 ms. Not measured: a first open from a
+  cold disk; sources whose files are present; the interface drawing one row per case
+- justifies: LIM-005, XC-306

@@ -19,6 +19,8 @@ from __future__ import annotations
 
 from typing import Any, Iterator
 
+from engine.limits import MAX_CASES_PER_WORKSPACE
+
 Case = dict[str, Any]
 
 
@@ -57,6 +59,28 @@ def descendant_count(case: Case) -> int:
     return sum(1 for _ in walk(children_of(case)))
 
 
+def count(cases: list[Case]) -> int:
+    """Every case in the tree, at every depth."""
+    return sum(1 for _ in walk(cases))
+
+
+def capacity_warning(cases: list[Case]) -> str | None:
+    """What to say about a document holding more cases than LIM-005 allows, or None.
+
+    Said rather than enforced at open, as LIM-016 is (XC-265): a document written by another version,
+    by a script or by hand is the person's work, and refusing to read it over a limit on what this
+    build will add is losing it. Opening keeps every case and saving is never refused; adding one is,
+    until the count is under the limit.
+    """
+    held = count(cases)
+    if held <= MAX_CASES_PER_WORKSPACE:
+        return None
+    return (
+        f"ケースが {held:,} 件あり、上限 {MAX_CASES_PER_WORKSPACE:,} 件（LIM-005）を超えています。"
+        "開いて読み書きすることはできますが、ケースを増やすことは上限を下回るまで拒みます"
+    )
+
+
 def new_case(case_id: str, name: str) -> Case:
     """A case with the fields CT-001 requires, and nothing invented beyond them."""
     return {"id": case_id, "name": name, "children": [], "sources": []}
@@ -69,6 +93,13 @@ def add(cases: list[Case], case: Case, *, beneath: str | None = None) -> Case:
         raise HierarchyError("ケースには id が必要です")
     if find(cases, case_id) is not None:
         raise HierarchyError(f"ケース '{case_id}' はすでにあります")
+    # The limit is on what this build adds, checked before anything is attached (LIM-005). The walk
+    # that counts is the walk that found the identifier free: the same cost twice, measured (E-225).
+    if count(cases) >= MAX_CASES_PER_WORKSPACE:
+        raise HierarchyError(
+            f"ワークスペースのケースが上限 {MAX_CASES_PER_WORKSPACE:,} 件（LIM-005）に達しています。"
+            "増やすには、別のワークスペースに分けるか、要らないケースを削除してください"
+        )
     if beneath is None:
         cases.append(case)
         return case

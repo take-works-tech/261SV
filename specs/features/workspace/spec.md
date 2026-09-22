@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-21
+updated: 2026-09-22
 ---
 
 # Feature: workspace, cases and variables
@@ -41,6 +41,9 @@ updated: 2026-09-21
     descendants will be deleted with it
   - AC-003: If a hierarchy operation would make a @Case its own ancestor, then the system shall refuse
     it and leave the hierarchy unchanged
+  - AC-078: When a document holds a @Case count beyond LIM-005, the system shall open it whole,
+    warn with the count and the limit, and still save; and it shall refuse to add a @Case by the
+    limit's name until the count is under it (XC-306)
 
 ### REQ-002 - Inheritance is chosen per variable, and an inherited variable is read-only
 - priority: MUST
