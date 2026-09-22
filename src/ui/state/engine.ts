@@ -22,6 +22,7 @@ import { OPERATION_FACTS, type CameraDefinition, type RecordedTime } from "../cl
 import { recordNow } from "../client/time";
 import { shellApi } from "../client/shell";
 import { FIRST_PATH, withKeyframe, withoutKeyframe, type CameraPathDefinition, type Interpolation } from "../logic/cameraPath";
+import { describeReflection } from "../logic/budgets";
 import { dropPlan, fileName, inspectionAllowsLoad, LOAD_REASON_WORD, type CaseRecord } from "../logic/drop";
 import { areaSubject, reportItemCases, workingView, type Area, type AreaSubject, type CaseSummary } from "../logic/subject";
 import { session } from "./session";
@@ -178,6 +179,9 @@ export type Inspection = Results["dataset.inspect"] & { readonly path: string };
 
 export interface EngineState {
   readonly reachability: Reachability;
+  /** How long the last selection took to be reflected in every area, and whether that was over
+   *  LIM-011 (XC-305); null until a selection moved something. */
+  readonly reflection: { readonly ms: number; readonly overBudget: boolean } | null;
   readonly opened: Opened | null;
   /** The file under review before loading, or null. Cleared by loading it or by cancelling. */
   readonly inspection: Inspection | null;
@@ -342,6 +346,7 @@ function stepCount(described: Results["dataset.describe"] | null): number {
 
 const EMPTY: EngineState = {
   reachability: { kind: "unknown" },
+  reflection: null,
   opened: null,
   inspection: null,
   savedViews: [],
@@ -1598,7 +1603,16 @@ export const engineState = {
     const view = engineState.subjectOf("view");
     if (view.caseId !== state.caseId) steps.push(showCase(view.caseId));
     if (state.graphId && engineState.subjectOf("graph").caseId !== graphContext) steps.push(engineState.refreshGraph());
-    if (steps.length > 0) moving = Promise.all(steps);
+    if (steps.length > 0) {
+      // Measured every time (LIM-011): a switch over the budget is said in the work-area bar, and
+      // a shared runner's number is that runner's, never asserted against the budget in a test.
+      const started = performance.now();
+      moving = Promise.all(steps).then((done) => {
+        const ms = performance.now() - started;
+        setState({ reflection: { ms, overBudget: describeReflection(ms) !== null } });
+        return done;
+      });
+    }
   },
 
   /** Everything the last subject change set in motion, finished - for a test that drives the tree. */

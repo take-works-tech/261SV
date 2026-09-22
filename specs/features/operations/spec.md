@@ -117,8 +117,8 @@ updated: 2026-09-22
 ### REQ-007 - Latency has budgets, measured before they are promised
 - priority: SHOULD
 - phase: r1
-- decidedness: Open
-- open: OPEN-017
+- decidedness: Bounded
+- basis: E-222 (T1), E-223 (T1), E-224 (T2)
 - acceptance:
   - AC-020: When the product launches on the sample @Workspace, the system shall reach a rendered result
     within LIM-010
@@ -128,6 +128,9 @@ updated: 2026-09-22
     can take the time, promising no time; if the start ended without an engine it shall show the
     reason and offer a restart; and it shall never show a design state in that interval. The shell
     shall record the launch timeline in its own notes at every launch (XC-304)
+  - AC-033: When a launch exceeds LIM-010 or a selection exceeds LIM-011, the interface shall say so
+    where it happens - the starting page for the launch, the work-area bar for the selection - with
+    the measured time and the budget named, and shall never absorb the overrun into silence (XC-305)
 
 ### REQ-008 - A shared component has one implementation
 - priority: MUST

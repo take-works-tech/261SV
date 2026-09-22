@@ -10,6 +10,7 @@ import { connectionFromEnvironment, engineState, useEngine } from "../state/engi
 import { shellApi } from "../client/shell";
 import { EngineLost, EngineRefusal, EngineWarnings, OrphanNotice } from "../shared/EngineStatus";
 import { EngineStarting } from "../shared/EngineStarting";
+import { describeReflection } from "../logic/budgets";
 import { InstructionBar } from "../shared/InstructionBar";
 import { SubjectBadge } from "../shared/SubjectBadge";
 import { MaterialLibraryShelf, type ShelfAsset, type ShelfState } from "../shared/MaterialLibraryShelf";
@@ -232,6 +233,7 @@ export function App() {
             <div className="work-area-bar">
               <span className="title">{TITLES[s.screen]}</span>
               {s.screen === "view" || s.screen === "graph" || s.screen === "report" ? <SubjectBadge area={s.screen} /> : null}
+              {e.reflection?.overBudget ? <span className="reflection-note" role="status">{describeReflection(e.reflection.ms)}</span> : null}
               {s.screen === "view" ? (
                 <span className="cluster" role="group" aria-label="分割">
                   {([1, 2, 3, 4] as const).map((count) => (
