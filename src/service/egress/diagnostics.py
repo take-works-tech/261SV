@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import os
+import zipfile
 from dataclasses import dataclass, field as dataclass_field
 from datetime import datetime
 from pathlib import Path
@@ -273,12 +274,47 @@ class Log:
 class Item:
     """One thing a bundle would contain, in the words the user is shown."""
 
-    kind: str      # log, workspace, case, file
+    kind: str      # log, shell, product, environment, workspace, case, file
     name: str
     detail: str = ""
 
+    @property
+    def customer(self) -> bool:
+        """A case name or a file path is the customer's information (XC-126, XC-302)."""
+        return self.kind in ("case", "file")
+
     def describe(self) -> str:
         return f"{self.kind}：{self.name}" + (f"（{self.detail}）" if self.detail else "")
+
+
+@dataclass(frozen=True, slots=True)
+class Include:
+    """What the person chose to include of their own information (XC-302). Both default to no."""
+
+    case_names: bool = False
+    file_paths: bool = False
+
+    @property
+    def free_text(self) -> bool:
+        """Whether the log's free text - a refusal's reason, a warning's sentence - goes in as it is.
+        Either can carry a case name or a path, and nothing here guesses which words are which, so
+        the text goes in only when both were included and is replaced otherwise (XC-302, #419)."""
+        return self.case_names and self.file_paths
+
+    def as_answer(self) -> dict[str, bool]:
+        return {"caseNames": self.case_names, "filePaths": self.file_paths}
+
+
+#: What stands in for a log line's free text when it is not included (XC-302).
+REDACTED = "（伏せました：ケース名やパスを含みうるため）"
+#: The context keys that hold free text: a refusal's reason and a warning's sentence (handlers.log_entry).
+FREE_TEXT_KEYS = ("reason", "text")
+#: Every line the files hold goes in; this is the ceiling the read is asked for - above what the
+#: rotated files can hold at a hundred bytes a line, so nothing is left out by it.
+BUNDLE_LINE_LIMIT = 1_000_000
+#: The shell's own notes, beside the engine's log (XC-263); free text throughout, so it goes in
+#: only when the log's free text does.
+SHELL_LOG_FILE = "shell.log"
 
 
 @dataclass(frozen=True, slots=True)
@@ -292,6 +328,8 @@ class Manifest:
 
     items: tuple[Item, ...]
     produced: RecordedTime | None = None
+    #: What the person chose to include (XC-302); None where the caller decided by what it passed.
+    include: Include | None = None
 
     @property
     def case_names(self) -> tuple[str, ...]:
@@ -300,6 +338,15 @@ class Manifest:
     @property
     def paths(self) -> tuple[str, ...]:
         return tuple(one.name for one in self.items if one.kind == "file")
+
+    @property
+    def free_text_kept(self) -> bool:
+        return self.include.free_text if self.include is not None else True
+
+    @property
+    def fixed_items(self) -> tuple[Item, ...]:
+        """The items that do not move with the log: what must still hold when the bundle is made."""
+        return tuple(one for one in self.items if one.kind not in ("log", "shell"))
 
     def describe(self) -> str:
         if not self.items:
@@ -314,6 +361,19 @@ class Manifest:
             )
         return "\n".join(lines)
 
+    def as_answer(self) -> dict[str, Any]:
+        """The list as the interface shows it (CT-003 `system.supportManifest`)."""
+        return {
+            "items": [
+                {"kind": one.kind, "name": one.name, "detail": one.detail, "customer": one.customer}
+                for one in self.items
+            ],
+            "text": self.describe(),
+            "customerItems": len(self.case_names) + len(self.paths),
+            "producedAt": self.produced.as_stored() if self.produced is not None else None,
+            "freeTextKept": self.free_text_kept,
+        }
+
 
 def manifest_for(
     log: Log,
@@ -322,15 +382,38 @@ def manifest_for(
     case_names: Iterable[str] = (),
     paths: Iterable[str] = (),
     clock: Callable[[], datetime] | None = None,
+    include: Include | None = None,
+    product_version: str | None = None,
+    environment: Mapping[str, Any] | None = None,
+    shell_lines: int | None = None,
 ) -> Manifest:
-    """What a bundle would contain, assembled without creating one."""
-    items = [Item("log", "診断ログ", f"{len(log.lines())} 行")]
+    """What a bundle would contain, assembled without creating one.
+
+    The log is always in it, counted as the bundle would carry it, and its line says whether its
+    free text goes in as it is (XC-302). The product's version and the environment are in it when
+    given - never a path and never a user name. Case names and file paths are listed as given: the
+    caller passes what the person chose, and the manifest lists what it was passed.
+    """
+    free_text = include.free_text if include is not None else True
+    reading = log.read(level=Level.DEBUG, limit=BUNDLE_LINE_LIMIT)
+    detail = f"{len(reading.lines)} 行" + (
+        "・拒否理由と警告文はそのまま" if free_text else "・拒否理由と警告文は伏せます（ケース名やパスを含みうるため）"
+    )
+    if reading.unreadable:
+        detail += f"・読めない行 {reading.unreadable}"
+    items = [Item("log", "診断ログ", detail)]
+    if shell_lines is not None:
+        items.append(Item("shell", "シェルの記録", f"{shell_lines} 行"))
+    if product_version is not None:
+        items.append(Item("product", "製品の版", product_version))
+    if environment is not None:
+        items.append(Item("environment", "環境", "OS・Python・VTK の版と機械クラス。パスも利用者名も含みません"))
     if workspace_id:
         items.append(Item("workspace", workspace_id))
     items += [Item("case", name) for name in case_names]
     items += [Item("file", path) for path in paths]
     at = record_time((clock or (lambda: datetime.now().astimezone()))())
-    return Manifest(tuple(items), at)
+    return Manifest(tuple(items), at, include)
 
 
 @dataclass(frozen=True, slots=True)
@@ -366,3 +449,86 @@ def contents_for_egress(bundle: Bundle) -> Sequence[str]:
     produced separately - two descriptions of one bundle is one description too many.
     """
     return bundle.contents
+
+
+@dataclass(frozen=True, slots=True)
+class Written:
+    """An archive on disk, whole: where, how big, and what is in it."""
+
+    path: Path
+    bytes: int
+    entries: tuple[str, ...]
+
+
+def bundle_lines(log: Log, *, free_text: bool) -> tuple[list[dict[str, Any]], int]:
+    """Every line the log holds, oldest first, as the bundle carries it: the free text as it is, or
+    replaced by `REDACTED` where it was not included (XC-302). The count left unreadable comes too."""
+    reading = log.read(level=Level.DEBUG, limit=BUNDLE_LINE_LIMIT)
+    carried: list[dict[str, Any]] = []
+    for one in reading.lines:
+        stored = one.as_json()
+        if not free_text:
+            for key in FREE_TEXT_KEYS:
+                if stored.get(key):
+                    stored[key] = REDACTED
+        carried.append(stored)
+    return carried, reading.unreadable
+
+
+def write_bundle(
+    bundle: Bundle,
+    *,
+    path: Path,
+    log: Log,
+    product_version: str,
+    environment: Mapping[str, Any],
+    cases: Sequence[Mapping[str, Any]] = (),
+    sources: Sequence[Mapping[str, Any]] = (),
+    shell_log: Path | None = None,
+) -> Written:
+    """The archive, from a bundle whose manifest was accepted: written beside its target and moved
+    into place, so it is whole or absent (XC-262), and never over a file that is there.
+
+    What goes in is what the manifest lists and nothing else: the log's lines with their free text
+    kept only where the manifest says so, the shell's notes where listed, the product and the
+    environment, and the case names and recorded paths **only where the manifest lists them** - the
+    caller may pass more, and the manifest decides, because what was accepted is what is written
+    (AC-008).
+    """
+    if path.exists():
+        raise DiagnosticsError(f"{path.name} はすでにあります。上書きしません — 別の場所を指定してください")
+    manifest = bundle.manifest
+    kinds = {one.kind for one in manifest.items}
+    lines, unreadable = bundle_lines(log, free_text=manifest.free_text_kept)
+    entries: list[str] = []
+    temporary = path.with_name(path.name + ".writing")
+
+    def put(archive: zipfile.ZipFile, name: str, text: str) -> None:
+        archive.writestr(name, text)
+        entries.append(name)
+
+    try:
+        with zipfile.ZipFile(temporary, "w", zipfile.ZIP_DEFLATED) as archive:
+            put(archive, "manifest.txt", manifest.describe() + "\n")
+            put(archive, "manifest.json", json.dumps({
+                "items": manifest.as_answer()["items"],
+                "producedAt": manifest.produced.as_stored() if manifest.produced is not None else None,
+                "include": manifest.include.as_answer() if manifest.include is not None else None,
+                "freeTextKept": manifest.free_text_kept,
+                "logLinesWritten": len(lines),
+                "logLinesUnreadable": unreadable,
+                "productVersion": product_version,
+            }, ensure_ascii=False, indent=2) + "\n")
+            put(archive, "environment.json", json.dumps({"productVersion": product_version, **dict(environment)}, ensure_ascii=False, indent=2) + "\n")
+            put(archive, "log/solvia.jsonl", "".join(json.dumps(one, ensure_ascii=False) + "\n" for one in lines))
+            if "shell" in kinds and shell_log is not None and shell_log.exists():
+                put(archive, "log/shell.log", shell_log.read_text(encoding="utf-8", errors="replace"))
+            if "case" in kinds:
+                put(archive, "cases.json", json.dumps(list(cases), ensure_ascii=False, indent=2) + "\n")
+            if "file" in kinds:
+                put(archive, "sources.json", json.dumps(list(sources), ensure_ascii=False, indent=2) + "\n")
+        os.replace(temporary, path)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+    return Written(path, path.stat().st_size, tuple(entries))

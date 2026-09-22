@@ -51,6 +51,7 @@ const api: ShellApi = {
     openResult: () => ipcRenderer.invoke("dialog:openResult"),
     saveReport: (suggestedName: string) => ipcRenderer.invoke("dialog:saveReport", suggestedName),
     saveWorkspace: (suggestedName: string) => ipcRenderer.invoke("dialog:saveWorkspace", suggestedName),
+    saveSupportBundle: (suggestedName: string) => ipcRenderer.invoke("dialog:saveSupportBundle", suggestedName),
   },
   recent: {
     list: () => ipcRenderer.invoke("recent:list"),

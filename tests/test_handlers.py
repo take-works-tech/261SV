@@ -16,6 +16,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -218,9 +219,10 @@ class TestWhatThisBuildRegisters:
             "report.export", "report.provenance",
             "workspace.save", "dataset.inspect", "history.list",
             "system.capabilities", "system.protocols", "system.audit", "system.operations", "system.log",
+            "system.supportManifest", "system.supportBundle",
             "output.list", "output.plan", "output.prune",
         }
-        assert len(surface.unimplemented()) == len(OPERATIONS) - 35
+        assert len(surface.unimplemented()) == len(OPERATIONS) - 37
 
     def test_operations_list_what_this_build_answers_and_what_it_does_not(self) -> None:
         """XC-277: the list is the surface's own registry, and the two halves are the whole catalogue."""
@@ -2448,3 +2450,97 @@ class TestTheOpenAnswerNamesTheCases:
 
         assert result.status is Status.APPLIED, result.reason
         assert result.value["cases"] == [{"id": "case:1", "name": "study", "sources": []}, {"id": "case:1a", "name": "variant", "parentId": "case:1", "sources": []}]
+
+
+class TestASupportBundle:
+    """XC-302, operations/AC-008: listed before it exists, the person's own information by their
+    choice, the log's free text only with both, and the archive whole or absent."""
+
+    @staticmethod
+    def _opened_with_a_file_log(tmp_path: Path) -> tuple[Surface, Session, Path]:
+        from service.egress import diagnostics
+
+        session = Session(clock=at(9), issue=counting_issuer(), log=diagnostics.Log(directory=tmp_path / "logs"))
+        surface = build_surface(session)
+        workspace = a_workspace(tmp_path)
+        opened = surface.submit(Command("workspace.open", {"path": str(workspace)}))
+        assert opened.status is Status.APPLIED, opened.reason
+        source = workspace.parent / "case.vtu"
+        write_grid(source)
+        loaded = surface.submit(Command("dataset.load", {"caseId": "case:1", "filePaths": [str(source)]}))
+        assert loaded.status is Status.APPLIED, loaded.reason
+        # A refusal whose reason names a path, so the log holds free text the bundle must not leak.
+        missing = surface.submit(Command("workspace.open", {"path": str(tmp_path / "ない.svw")}))
+        assert missing.status is Status.REFUSED
+        return surface, session, source
+
+    def test_the_list_holds_the_log_product_and_environment_and_the_customer_s_information_only_when_chosen(self, tmp_path: Path) -> None:
+        surface, _, source = self._opened_with_a_file_log(tmp_path)
+
+        plain = surface.submit(Command("system.supportManifest", {}))
+        chosen = surface.submit(Command("system.supportManifest", {"include": {"caseNames": True, "filePaths": True}}))
+
+        assert plain.status is Status.ANSWERED, plain.reason
+        kinds = [one["kind"] for one in plain.value["items"]]
+        assert kinds == ["log", "product", "environment", "workspace"]
+        assert plain.value["freeTextKept"] is False and "伏せます" in plain.value["items"][0]["detail"]
+        assert plain.value["customerItems"] == 0
+        assert chosen.status is Status.ANSWERED, chosen.reason
+        items = chosen.value["items"]
+        assert [one["name"] for one in items if one["kind"] == "case"] == ["baseline"]
+        assert [one["name"] for one in items if one["kind"] == "file"] == [str(source)]
+        assert all(one["customer"] for one in items if one["kind"] in ("case", "file"))
+        assert not any(one["customer"] for one in items if one["kind"] not in ("case", "file"))
+        assert chosen.value["customerItems"] == 2 and chosen.value["freeTextKept"] is True
+        assert "お客さまの情報です" in chosen.value["text"] and "そのまま" in items[0]["detail"]
+
+    def test_the_bundle_needs_consent_and_the_list_shown_with_the_same_choice(self, tmp_path: Path) -> None:
+        surface, _, _ = self._opened_with_a_file_log(tmp_path)
+        target = tmp_path / "診断.zip"
+
+        unseen = surface.submit(Command("system.supportBundle", {"consent": True, "path": str(target)}))
+        shown = surface.submit(Command("system.supportManifest", {"include": {"caseNames": True}}))
+        other = surface.submit(Command("system.supportBundle", {"consent": True, "path": str(target), "include": {"filePaths": True}}))
+        unconsented = surface.submit(Command("system.supportBundle", {"consent": False, "path": str(target), "include": {"caseNames": True}}))
+
+        assert shown.status is Status.ANSWERED
+        assert unseen.status is Status.REFUSED and "一覧" in (unseen.reason or "")
+        assert other.status is Status.REFUSED and "同じ選択" in (other.reason or "")
+        assert unconsented.status is Status.REFUSED and "同意" in (unconsented.reason or "")
+        assert not target.exists() and not (tmp_path / "診断.zip.writing").exists()
+
+    def test_what_is_written_is_what_was_listed_and_the_free_text_goes_in_only_with_both(self, tmp_path: Path) -> None:
+        from service.egress import diagnostics
+
+        surface, session, source = self._opened_with_a_file_log(tmp_path)
+        names_only = tmp_path / "名前だけ.zip"
+        everything = tmp_path / "全部.zip"
+
+        surface.submit(Command("system.supportManifest", {"include": {"caseNames": True}}))
+        made = surface.submit(Command("system.supportBundle", {"consent": True, "path": str(names_only), "include": {"caseNames": True}}))
+        surface.submit(Command("system.supportManifest", {"include": {"caseNames": True, "filePaths": True}}))
+        made_all = surface.submit(Command("system.supportBundle", {"consent": True, "path": str(everything), "include": {"caseNames": True, "filePaths": True}}))
+        again = surface.submit(Command("system.supportBundle", {"consent": True, "path": str(everything), "include": {"caseNames": True, "filePaths": True}}))
+
+        assert made.status is Status.APPLIED, made.reason
+        with zipfile.ZipFile(names_only) as archive:
+            names = archive.namelist()
+            assert names == ["manifest.txt", "manifest.json", "environment.json", "log/solvia.jsonl", "cases.json"]
+            log_text = archive.read("log/solvia.jsonl").decode("utf-8")
+            assert diagnostics.REDACTED in log_text and "ない.svw" not in log_text and str(source) not in log_text
+            assert "baseline" in archive.read("manifest.txt").decode("utf-8")
+            environment = json.loads(archive.read("environment.json"))
+            assert environment["python"] and "productVersion" in environment and "logDirectory" not in environment
+        assert made.value["entries"] == ["manifest.txt", "manifest.json", "environment.json", "log/solvia.jsonl", "cases.json"]
+        assert made.value["bytes"] == names_only.stat().st_size and made.value["path"] == str(names_only)
+        assert made.value["contents"] and any("baseline" in line for line in made.value["contents"])
+        assert made_all.status is Status.APPLIED, made_all.reason
+        with zipfile.ZipFile(everything) as archive:
+            assert "sources.json" in archive.namelist()
+            log_text = archive.read("log/solvia.jsonl").decode("utf-8")
+            assert "ない.svw" in log_text and diagnostics.REDACTED not in log_text
+            recorded = json.loads(archive.read("sources.json"))
+            assert recorded == [{"caseId": "case:1", "path": str(source), "present": True}]
+        assert again.status is Status.REFUSED and "すでにあります" in (again.reason or "")
+        assert any(line.event == "supportBundle" for line in session.log.lines())
+        assert not any(name.endswith(".writing") for name in os.listdir(tmp_path))

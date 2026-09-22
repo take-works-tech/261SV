@@ -352,7 +352,7 @@ describe("the prototype thread from the interface's side", () => {
 
     const s = snapshot();
     expect(s.operations?.registered).toContain("system.operations");
-    expect(s.operations?.registered.length).toBe(35);
+    expect(s.operations?.registered.length).toBe(37);
     expect([...(s.operations?.registered ?? []), ...(s.operations?.unimplemented ?? [])].sort()).toEqual([...OPERATIONS].sort());
     const rows = commandGroups(s.operations, "").flatMap((group) => group.rows);
     expect(rows).toHaveLength(OPERATIONS.length);
@@ -912,6 +912,27 @@ describe("the shipped sample (XC-298)", () => {
     expect(alone).toEqual({ kind: "loaded", path: path150, caseId: second.id });
     expect(snapshot().caseId).toBe(second.id);
     expect(snapshot().statistics?.maximum?.value).toBeCloseTo(1.8e6, 0);
+    engineState.clearRefusal();
+
+    // The support bundle (XC-302): listed before it exists, the case names and paths only by
+    // choice, and written whole where asked - from the list that was shown, and no other.
+    const plain = await engineState.supportManifest({ caseNames: false, filePaths: false });
+    expect(plain?.items.map((one) => one.kind)).toEqual(["log", "product", "environment", "workspace"]);
+    expect(plain?.freeTextKept).toBe(false);
+    const full = await engineState.supportManifest({ caseNames: true, filePaths: true });
+    expect(full?.items.filter((one) => one.kind === "case").map((one) => one.name)).toEqual(["荷重 100 N", "荷重 150 N"]);
+    expect(full?.items.filter((one) => one.kind === "file").map((one) => one.name)).toEqual([path100, path150]);
+    expect(full?.customerItems).toBe(4);
+    expect(full?.freeTextKept).toBe(true);
+    const bundlePath = join(folder, "診断.zip");
+    const made = await engineState.createSupportBundle(bundlePath, { caseNames: true, filePaths: true });
+    expect(made?.path).toBe(bundlePath);
+    expect(made?.entries).toContain("sources.json");
+    expect(existsSync(bundlePath)).toBe(true);
+    expect(statSync(bundlePath).size).toBe(made?.bytes);
+    expect(await engineState.createSupportBundle(join(folder, "二つ目.zip"), { caseNames: false, filePaths: false })).toBeNull();
+    expect(snapshot().refusal).toContain("一覧");
+    expect(existsSync(join(folder, "二つ目.zip"))).toBe(false);
     engineState.clearRefusal();
     // Asked again at the same place, nothing is written over.
     expect(await engineState.openSample(join(folder, "片持ち梁.svw"))).toBe(false);

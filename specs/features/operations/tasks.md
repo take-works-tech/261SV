@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-21
+updated: 2026-09-22
 ---
 
 # Tasks: running the product
@@ -228,3 +228,21 @@ updated: 2026-09-21
   `src/ui/shared/SubjectBadge.tsx` is the header badge with its one control. Proven by
   `src/ui/logic/subject.test.ts` and the two-case thread in `src/ui/state/engine.connected.test.ts`.
   The LIM-011 budget itself stays TASK-021: it is unmeasured, and this task does not claim it.
+
+### TASK-032 - The support bundle, listed and written
+- satisfies: AC-031
+- depends_on: TASK-012
+- done_when: the list can be read before anything exists, the case names and paths are the person's
+  choice, the free text of the log goes in only with both, the archive is whole or absent, and a
+  bundle whose list was not shown is refused
+- done: 2026-09-22 (XC-302, CT-003 3.19.0, #231, #419). `system.supportManifest` answers the list
+  from `src/service/egress/diagnostics.py` (`manifest_for` with `Include`), the session keeps it as
+  shown, and `system.supportBundle` writes the archive (`write_bundle`: `manifest.txt`,
+  `manifest.json`, `environment.json`, the log as JSON lines with its free text kept or replaced,
+  `cases.json` and `sources.json` where listed) beside its target and moves it into place. The
+  Settings page's 診断 panel asks the engine for the list whenever the choice changes and creates
+  the file where the shell's save dialogue says; the design state stays for a page with no engine.
+  Proven by `tests/test_diagnostics.py::TestTheBundleOnDisk`,
+  `tests/test_handlers.py::TestASupportBundle` and the sample thread of
+  `src/ui/state/engine.connected.test.ts`. Sending remains the gate's (TASK-013) and this build
+  injects no transport.

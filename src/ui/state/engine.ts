@@ -1338,6 +1338,19 @@ export const engineState = {
     return ask("system.capabilities", {});
   },
 
+  /** Everything a support bundle would contain, listed before it exists (operations/AC-008,
+   *  XC-302): the engine's list, asked with the person's choice of their own information. */
+  async supportManifest(include: { caseNames: boolean; filePaths: boolean }): Promise<Results["system.supportManifest"] | null> {
+    return ask("system.supportManifest", { include });
+  },
+
+  /** Class 3: the archive, written where the person chose from the list they were shown, with the
+   *  same choice - the engine refuses any other (XC-302). Nothing is sent anywhere. */
+  async createSupportBundle(path: string, include: { caseNames: boolean; filePaths: boolean }): Promise<Results["system.supportBundle"] | null> {
+    setState({ refusal: null });
+    return ask("system.supportBundle", { consent: true, path, include });
+  },
+
   /** One operation by name, from the palette (XC-278), through the same `ask` every screen uses:
    *  a write enters the journal and a warning is kept. The refusal comes back as the outcome's
    *  reason rather than as this window's refusal - the palette shows it beside the command. */

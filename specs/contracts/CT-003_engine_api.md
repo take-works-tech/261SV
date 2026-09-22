@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-21
+updated: 2026-09-22
 ---
 
 # Contract: engine API
@@ -10,7 +10,14 @@ updated: 2026-09-21
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 3.18.0
+- version: 3.19.0
+- correction: 2026-09-22, version 3.18.0 to 3.19.0. `system.supportManifest` is added: everything
+  a support bundle would contain, listed before it exists - the log with its line count, the
+  product and the environment, the open workspace, and the case names and recorded file paths the
+  person chose to include (`include`) - and whether the log's free text goes in as it is, which it
+  does only when both are included. `system.supportBundle` takes the same `include`, refuses
+  unless that list was shown in this session, and answers the archive's size and entries beside
+  its path (XC-302). Additive
 - correction: 2026-09-21, version 3.17.0 to 3.18.0. `workspace.sample` is added: the shipped
   sample generated where the person chose - a cantilever beam under two loads, from beam theory,
   its data beside the document, its units declared by its author - then opened, answering what
@@ -272,7 +279,8 @@ no identifier to report.
 | `script.run` | write | script text or path, authorisation | ids changed, grouped as one undo step (XC-102) |
 | `report.provenance` | read | exported path or report id | the inputs it was produced from, and whether any has since changed (INV-027) |
 | `system.audit` | read | since? | outbound requests with host, time and what was sent (XC-106) |
-| `system.supportBundle` | write | path, consent | the manifest, then the bundle - listed before it is written (operations/AC-008) |
+| `system.supportManifest` | read | include? | everything the bundle would contain - the log with its line count, the product and environment, the workspace, and the case names and recorded paths the person chose to include - listed before it exists, and whether the log's free text goes in as it is (operations/AC-008, XC-302) |
+| `system.supportBundle` | write | path, consent, include? | the archive written whole or not at all from the list that was shown - refused without consent or without the list - with its size and entries (operations/AC-008, XC-302) |
 | `workspace.pack` | write | workspace id, path, include data? | path written, size, what it contains, and what could not be included (XC-140) |
 | `output.list` | read | workspace id | the runs under the output folder with their sizes and times - and where each time came from - the total against LIM-012, and which runs pruning oldest-first would take (XC-141) |
 | `output.plan` | read | workspace id, runs to remove | every file that would go, by path, the records that stay and the bytes freed - shown before anything is deleted (workspace/AC-053) |

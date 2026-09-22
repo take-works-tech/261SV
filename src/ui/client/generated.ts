@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "3.18.0";
+export const PROTOCOL_VERSION = "3.19.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -80,6 +80,7 @@ export type Operation =
   | "report.provenance"
   | "system.audit"
   | "system.log"
+  | "system.supportManifest"
   | "system.supportBundle"
   | "workspace.pack"
   | "output.prune"
@@ -155,6 +156,7 @@ export const OPERATIONS: readonly Operation[] = [
   "report.provenance",
   "system.audit",
   "system.log",
+  "system.supportManifest",
   "system.supportBundle",
   "workspace.pack",
   "output.prune",
@@ -240,7 +242,8 @@ export const OPERATION_FACTS: Readonly<Record<Operation, OperationFacts>> = {
   "report.provenance": { writes: false, required: [], optional: ["exportedPath", "reportId"], answers: ["workspaceId", "caseIds", "sources", "declaredUnits", "productVersion", "produced"] },
   "system.audit": { writes: false, required: [], optional: ["since"], answers: ["entries"] },
   "system.log": { writes: false, required: [], optional: ["level", "since", "limit"], answers: ["entries", "source", "logDirectory", "files", "retainDays", "omitted", "unreadable"] },
-  "system.supportBundle": { writes: true, required: ["consent", "path"], optional: [], answers: ["path", "contents"] },
+  "system.supportManifest": { writes: false, required: [], optional: ["include"], answers: ["items", "text", "customerItems", "producedAt", "freeTextKept"] },
+  "system.supportBundle": { writes: true, required: ["consent", "path"], optional: ["include"], answers: ["path", "contents", "bytes", "entries"] },
   "workspace.pack": { writes: true, required: ["includeData", "path", "workspaceId"], optional: [], answers: ["path", "bytes", "omitted"] },
   "output.prune": { writes: true, required: ["runsToRemove", "workspaceId"], optional: ["expectedFiles"], answers: ["removedRunIds", "freedBytes", "deletedFiles"] },
   "view.pick": { writes: false, required: ["viewId", "width", "height", "x", "y"], optional: ["camera", "cameraPath"], answers: ["value", "association", "part", "resultPosition", "cameraPath"] },
@@ -529,9 +532,19 @@ export interface Parameters {
     since?: string;
     limit?: number;
   };
+  "system.supportManifest": {
+    include?: {
+      caseNames?: boolean;
+      filePaths?: boolean;
+    };
+  };
   "system.supportBundle": {
     path: string;
     consent: boolean;
+    include?: {
+      caseNames?: boolean;
+      filePaths?: boolean;
+    };
   };
   "workspace.pack": {
     workspaceId: string;
@@ -1194,9 +1207,23 @@ export interface Results {
     omitted: number;
     unreadable: number;
   };
+  "system.supportManifest": {
+    items: readonly ({
+      kind: "log" | "shell" | "product" | "environment" | "workspace" | "case" | "file";
+      name: string;
+      detail: string;
+      customer: boolean;
+    })[];
+    text: string;
+    customerItems: number;
+    producedAt: RecordedTime;
+    freeTextKept: boolean;
+  };
   "system.supportBundle": {
     path: string;
     contents: readonly (string)[];
+    bytes: number;
+    entries: readonly (string)[];
   };
   "workspace.pack": {
     path: string;

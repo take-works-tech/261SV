@@ -110,6 +110,8 @@ export interface ShellApi {
     saveReport(suggestedName: string): Promise<string | null>;
     /** Where a new workspace document goes, or null if they cancelled (XC-297). */
     saveWorkspace(suggestedName: string): Promise<string | null>;
+    /** Where a support bundle goes, or null if they cancelled (XC-302). The list was shown first. */
+    saveSupportBundle(suggestedName: string): Promise<string | null>;
   };
   /** The workspaces this shell opened, newest first (XC-297). `remember` is called by the store
    *  after an open the engine accepted; `forget` and `clear` only when a person asks - the list is
