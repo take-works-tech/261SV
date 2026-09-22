@@ -88,6 +88,7 @@ READS = frozenset({
     "pipeline.dryRun",
     "report.provenance",
     "system.audit",
+    "system.supportManifest",
     "output.list",
     "output.plan",
 })
@@ -161,6 +162,7 @@ OPERATIONS = (
     "script.run",
     "report.provenance",
     "system.audit",
+    "system.supportManifest",
     "system.supportBundle",
     "workspace.pack",
     "output.list",
@@ -239,7 +241,8 @@ PARAMETERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "script.run": (frozenset(['authorisation', 'path', 'scriptText']), frozenset(['authorisation'])),
     "report.provenance": (frozenset(['exportedPath', 'reportId']), frozenset([])),
     "system.audit": (frozenset(['since']), frozenset([])),
-    "system.supportBundle": (frozenset(['consent', 'path']), frozenset(['consent', 'path'])),
+    "system.supportManifest": (frozenset(['include']), frozenset([])),
+    "system.supportBundle": (frozenset(['consent', 'include', 'path']), frozenset(['consent', 'path'])),
     "workspace.pack": (frozenset(['includeData', 'path', 'workspaceId']), frozenset(['includeData', 'path', 'workspaceId'])),
     "output.list": (frozenset(['workspaceId']), frozenset(['workspaceId'])),
     "output.plan": (frozenset(['runsToRemove', 'workspaceId']), frozenset(['runsToRemove', 'workspaceId'])),
@@ -318,7 +321,8 @@ RESULT_FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "script.run": (frozenset(['commandCount', 'undoId']), frozenset(['commandCount', 'undoId'])),
     "report.provenance": (frozenset(['caseIds', 'declaredUnits', 'produced', 'productVersion', 'sources', 'workspaceId']), frozenset(['caseIds', 'declaredUnits', 'produced', 'productVersion', 'sources', 'workspaceId'])),
     "system.audit": (frozenset(['entries']), frozenset(['entries'])),
-    "system.supportBundle": (frozenset(['contents', 'path']), frozenset(['contents', 'path'])),
+    "system.supportManifest": (frozenset(['customerItems', 'freeTextKept', 'items', 'producedAt', 'text']), frozenset(['customerItems', 'freeTextKept', 'items', 'producedAt', 'text'])),
+    "system.supportBundle": (frozenset(['bytes', 'contents', 'entries', 'path']), frozenset(['bytes', 'contents', 'entries', 'path'])),
     "workspace.pack": (frozenset(['bytes', 'omitted', 'path']), frozenset(['bytes', 'path'])),
     "output.list": (frozenset(['limitBytes', 'outputDirectory', 'overLimit', 'runs', 'suggestedRunIds', 'totalBytes']), frozenset(['limitBytes', 'outputDirectory', 'overLimit', 'runs', 'suggestedRunIds', 'totalBytes'])),
     "output.plan": (frozenset(['files', 'freedBytes', 'keptRecords', 'runIds']), frozenset(['files', 'freedBytes', 'keptRecords', 'runIds'])),
@@ -398,6 +402,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
     "script.run": {},
     "report.provenance": {},
     "system.audit": {},
+    "system.supportManifest": {},
     "system.supportBundle": {},
     "workspace.pack": {},
     "output.list": {},
@@ -407,7 +412,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
 
 #: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below
 #: the engine's floor is refused politely rather than answered in a shape it cannot read.
-PROTOCOL_VERSION = "3.18.0"
+PROTOCOL_VERSION = "3.19.0"
 
 #: The wire's own names, from CT-003's `$defs.transport` (XC-258). The interface generates
 #: the same values from the same place; neither side is derived from the other (XC-252).

@@ -363,3 +363,64 @@ class TestTheLogReadsItselfBack:
 
         assert log.source == "memory"
         assert [one.context["operation"] for one in log.read().lines] == ["x"]
+
+
+class TestTheBundleOnDisk:
+    """XC-302: the archive holds what the manifest lists and nothing else, the log's free text only
+    when both kinds of the customer's information were included, and it is whole or absent."""
+
+    def test_it_holds_what_the_manifest_lists_and_replaces_the_free_text_unless_both_were_included(self, tmp_path: Path) -> None:
+        import zipfile
+
+        from service.egress import diagnostics
+
+        log = a_log()
+        log.record(diagnostics.Level.WARNING, "command", operation="workspace.open", status="refused", reason="D:/顧客/部品.svw がありません")
+        include = diagnostics.Include(case_names=True, file_paths=False)
+        manifest = manifest_for(
+            log, workspace_id="ws:1", case_names=["部品 A"], clock=WHEN, include=include,
+            product_version="0.0.1", environment={"platform": "test"},
+        )
+        bundle = create(manifest, accepted=True)
+        shared = {"log": log, "product_version": "0.0.1", "environment": {"platform": "test"}}
+        written = diagnostics.write_bundle(
+            bundle, path=tmp_path / "b.zip", cases=[{"id": "case:1", "name": "部品 A"}],
+            sources=[{"caseId": "case:1", "path": "D:/顧客/部品.vtu", "present": True}], **shared,
+        )
+
+        assert written.entries == ("manifest.txt", "manifest.json", "environment.json", "log/solvia.jsonl", "cases.json")
+        assert written.bytes == (tmp_path / "b.zip").stat().st_size
+        with zipfile.ZipFile(tmp_path / "b.zip") as archive:
+            assert "sources.json" not in archive.namelist()
+            text = archive.read("log/solvia.jsonl").decode("utf-8")
+            assert diagnostics.REDACTED in text and "部品.svw" not in text
+            assert "部品 A" in archive.read("manifest.txt").decode("utf-8")
+            assert json.loads(archive.read("manifest.json"))["freeTextKept"] is False
+        with pytest.raises(DiagnosticsError):
+            diagnostics.write_bundle(bundle, path=tmp_path / "b.zip", **shared)
+        assert not (tmp_path / "b.zip.writing").exists()
+        # With both included the sentence goes in as it was said, and so does the shell's record.
+        both = manifest_for(
+            log, case_names=["部品 A"], paths=["D:/顧客/部品.vtu"], clock=WHEN,
+            include=diagnostics.Include(True, True), product_version="0.0.1", environment={}, shell_lines=1,
+        )
+        (tmp_path / "shell.log").write_text("shell: started\n", encoding="utf-8")
+        written_both = diagnostics.write_bundle(
+            create(both, accepted=True), path=tmp_path / "both.zip", shell_log=tmp_path / "shell.log",
+            sources=[{"caseId": "case:1", "path": "D:/顧客/部品.vtu", "present": True}], **shared,
+        )
+        assert "log/shell.log" in written_both.entries and "sources.json" in written_both.entries
+        with zipfile.ZipFile(tmp_path / "both.zip") as archive:
+            assert "部品.svw がありません" in archive.read("log/solvia.jsonl").decode("utf-8")
+
+    def test_the_manifest_says_whether_the_free_text_goes_in(self) -> None:
+        from service.egress import diagnostics
+
+        kept = manifest_for(a_log(), clock=WHEN, include=diagnostics.Include(True, True))
+        replaced = manifest_for(a_log(), clock=WHEN, include=diagnostics.Include(True, False))
+        legacy = manifest_for(a_log(), clock=WHEN)
+
+        assert kept.free_text_kept and "そのまま" in kept.items[0].detail
+        assert not replaced.free_text_kept and "伏せます" in replaced.items[0].detail
+        assert legacy.free_text_kept and legacy.include is None
+        assert kept.as_answer()["freeTextKept"] is True and kept.as_answer()["items"][0]["customer"] is False

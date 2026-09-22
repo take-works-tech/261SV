@@ -289,6 +289,15 @@ function registerBridge(): void {
   ipcMain.handle("recent:forget", (_event, path: unknown) => (typeof path === "string" ? forget(recentFile(), path) : readRecent(recentFile())));
   // The whole list, on the person's word (XC-300): the interface asks twice, the shell empties once.
   ipcMain.handle("recent:clear", () => clear(recentFile()));
+  ipcMain.handle("dialog:saveSupportBundle", async (_event, suggestedName: unknown) => {
+    const name = typeof suggestedName === "string" && suggestedName ? suggestedName : "solvia-support.zip";
+    const chosen = await dialog.showSaveDialog({
+      title: "診断情報を保存する",
+      defaultPath: name.endsWith(".zip") ? name : `${name}.zip`,
+      filters: [{ name: "診断情報（zip）", extensions: ["zip"] }],
+    });
+    return chosen.canceled ? null : chosen.filePath ?? null;
+  });
   ipcMain.handle("dialog:saveReport", async (_event, suggestedName: unknown) => {
     const name = typeof suggestedName === "string" && suggestedName ? suggestedName : "report.html";
     const chosen = await dialog.showSaveDialog({

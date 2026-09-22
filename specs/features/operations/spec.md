@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-20
+updated: 2026-09-22
 ---
 
 # Feature: running the product
@@ -61,6 +61,10 @@ updated: 2026-09-20
     including case names and file paths - before creating it
   - AC-009: If a support bundle would leave the machine, then the system shall require explicit consent
     and shall record the transfer in the outbound audit (XC-106)
+  - AC-031: When a support bundle is created, the system shall include case names, recorded file paths
+    and the free text of log lines only when the person chose to include them, shall say in the list
+    whether that text goes in as it is, shall write the archive whole or not at all and never over a
+    file that is there, and shall refuse to create one from a list that was not shown (XC-302)
 
 ### REQ-004 - Every command is reachable, and that is checked rather than claimed
 - priority: MUST

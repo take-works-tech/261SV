@@ -22,7 +22,8 @@ import { commandGroups, describeAnswering, NO_KEY, STATUS_LABEL } from "../../lo
 import { describePlan, describeTotal, runLines, type OutputListing, type OutputPlan } from "../../logic/output";
 import { submit } from "../../client/operations";
 import { session } from "../../state/session";
-import { engineState, useEngine } from "../../state/engine";
+import { engineState, snapshot, useEngine } from "../../state/engine";
+import { shellApi } from "../../client/shell";
 import type { Results } from "../../client/engine";
 import { useEffect } from "react";
 import { NoticesPanel } from "./NoticesPanel";
@@ -885,6 +886,13 @@ const BUNDLE_EXCLUDED = ["形状・メッシュ", "フィールド値・測定�
 
 const LOG_DIR = "%LOCALAPPDATA%\\SOLVIA\\logs";
 
+/** The date for a suggested file name, in the reader's own calendar rather than UTC's. */
+function todayForAName(): string {
+  const now = new Date();
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 function DiagnosticsPanel({ openBundle }: { openBundle: boolean }) {
   const [bundleOpen, setBundleOpen] = useState(openBundle);
   // With an engine: where its log actually is, from `system.capabilities` (XC-263). Without one, the
@@ -897,7 +905,46 @@ function DiagnosticsPanel({ openBundle }: { openBundle: boolean }) {
   }, [reachable]);
   const [includeCaseNames, setIncludeCaseNames] = useState(false);
   const [includeInputPaths, setIncludeInputPaths] = useState(false);
-  const [createdTo, setCreatedTo] = useState<string | null>(null);
+  const [created, setCreated] = useState<{ path: string; bytes: number; entries: number } | null>(null);
+  const [manifest, setManifest] = useState<Results["system.supportManifest"] | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [pathInWords, setPathInWords] = useState("");
+  // With an engine the list is the engine's, asked again whenever the choice changes, so what is
+  // shown is what would be written (operations/AC-008, XC-302). The design's illustration stays
+  // for a page with no engine, labelled as design.
+  useEffect(() => {
+    if (!reachable || !bundleOpen) return;
+    let stale = false;
+    void engineState.supportManifest({ caseNames: includeCaseNames, filePaths: includeInputPaths }).then((answer) => {
+      if (!stale) setManifest(answer);
+    });
+    return () => {
+      stale = true;
+    };
+  }, [reachable, bundleOpen, includeCaseNames, includeInputPaths]);
+  const shell = shellApi();
+  const include = { caseNames: includeCaseNames, filePaths: includeInputPaths };
+
+  const create = async () => {
+    setProblem(null);
+    const suggested = `solvia-support-${todayForAName()}.zip`;
+    const path = shell ? await shell.dialog.saveSupportBundle(suggested) : pathInWords.trim() || null;
+    if (!path) {
+      if (!shell) setProblem("保存先の経路を書いてください（ブラウザ実行には保存ダイアログがありません）");
+      return;
+    }
+    const made = await engineState.createSupportBundle(path, include);
+    if (!made) {
+      setProblem(snapshot().refusal ?? "診断情報を作成できませんでした");
+      return;
+    }
+    setCreated({ path: made.path, bytes: made.bytes, entries: made.entries.length });
+    setBundleOpen(false);
+  };
+
+  const always = manifest?.items.filter((one) => !one.customer) ?? [];
+  const caseItems = manifest?.items.filter((one) => one.kind === "case") ?? [];
+  const fileItems = manifest?.items.filter((one) => one.kind === "file") ?? [];
 
   return (
     <>
@@ -906,12 +953,18 @@ function DiagnosticsPanel({ openBundle }: { openBundle: boolean }) {
         端末を離れるのは明示的な送信操作だけです（XC-055b）。
       </p>
 
-      {createdTo !== null ? (
+      {created !== null ? (
         <p className="notice good">
           <b>サポートバンドルを作成しました</b>
           <span className="why">
-            保存先：{createdTo} - 送信していません。送信は別操作で、送信先と内容を監査に記録します（XC-126）。
+            保存先：{created.path}（{formatBytes(created.bytes)}・{created.entries} ファイル）- 送信していません。この版は何も送れず、送るかどうかはあなたが別に決めます（XC-126）。
           </span>
+        </p>
+      ) : null}
+      {problem !== null ? (
+        <p className="notice error" role="alert">
+          <b>診断情報を作成できませんでした</b>
+          <span className="why">{problem}</span>
         </p>
       ) : null}
 
@@ -954,38 +1007,78 @@ function DiagnosticsPanel({ openBundle }: { openBundle: boolean }) {
             <div className="body">
               <p className="se-group-label">含める（常に）</p>
               <div className="se-manifest">
-                {BUNDLE_INCLUDED.map((item) => (
-                  <div className="se-manifest-row" key={item.name}>
-                    <b>{item.name}</b>
-                    {item.bytes === null ? (
-                      <span className="se-loading"><span className="se-spinner" aria-hidden="true" />収集中…</span>
-                    ) : (
-                      <span className="se-manifest-size">{formatBytes(item.bytes)}</span>
-                    )}
-                    <small>{item.detail}</small>
-                  </div>
-                ))}
+                {reachable ? (
+                  manifest === null ? (
+                    <div className="se-manifest-row"><span className="se-loading"><span className="se-spinner" aria-hidden="true" />エンジンに一覧を問い合わせています…</span></div>
+                  ) : (
+                    always.map((item) => (
+                      <div className="se-manifest-row" key={`${item.kind}:${item.name}`}>
+                        <b>{item.name}</b>
+                        <span className="se-manifest-size">{item.kind}</span>
+                        <small>{item.detail}</small>
+                      </div>
+                    ))
+                  )
+                ) : (
+                  BUNDLE_INCLUDED.map((item) => (
+                    <div className="se-manifest-row" key={item.name}>
+                      <b>{item.name}</b>
+                      {item.bytes === null ? (
+                        <span className="se-loading"><span className="se-spinner" aria-hidden="true" />収集中…</span>
+                      ) : (
+                        <span className="se-manifest-size">{formatBytes(item.bytes)}</span>
+                      )}
+                      <small>{item.detail}</small>
+                    </div>
+                  ))
+                )}
               </div>
 
               <p className="se-group-label">確認が必要（既定では含めません）</p>
               <div>
-                {BUNDLE_REVIEW.map((item) => (
-                  <label className="se-check-row" key={item.id}>
-                    <input
-                      type="checkbox"
-                      checked={item.id === "case-names" ? includeCaseNames : includeInputPaths}
-                      onChange={(event) => {
-                        if (item.id === "case-names") setIncludeCaseNames(event.target.checked);
-                        else setIncludeInputPaths(event.target.checked);
-                      }}
-                    />
-                    <span className="se-check-body">
-                      <b>{item.name}</b>
-                      <small>{item.detail}</small>
-                      <span className="se-path" title={item.sample}>{item.sample}</span>
-                    </span>
-                  </label>
-                ))}
+                {reachable ? (
+                  <>
+                    <label className="se-check-row">
+                      <input type="checkbox" checked={includeCaseNames} onChange={(event) => setIncludeCaseNames(event.target.checked)} />
+                      <span className="se-check-body">
+                        <b>ケース名{caseItems.length > 0 ? `（${caseItems.length} 件）` : ""}</b>
+                        <small>名称に案件・顧客情報が含まれる場合があります</small>
+                        {caseItems.map((item) => <span className="se-path" key={item.name} title={item.name}>{item.name}</span>)}
+                      </span>
+                    </label>
+                    <label className="se-check-row">
+                      <input type="checkbox" checked={includeInputPaths} onChange={(event) => setIncludeInputPaths(event.target.checked)} />
+                      <span className="se-check-body">
+                        <b>記録されたファイルのパス{fileItems.length > 0 ? `（${fileItems.length} 件）` : ""}</b>
+                        <small>ディレクトリ名に案件名が含まれる場合があります</small>
+                        {fileItems.map((item) => <span className="se-path" key={item.name} title={item.name}>{item.name}</span>)}
+                      </span>
+                    </label>
+                    <p className="prop-note">
+                      {manifest?.freeTextKept
+                        ? "ログの拒否理由と警告文はそのまま入ります（ケース名とパスの両方を含めるため）。"
+                        : "ログの拒否理由と警告文は伏せます（ケース名やパスを含みうるため）。そのまま入れるには両方を含めてください。"}
+                    </p>
+                  </>
+                ) : (
+                  BUNDLE_REVIEW.map((item) => (
+                    <label className="se-check-row" key={item.id}>
+                      <input
+                        type="checkbox"
+                        checked={item.id === "case-names" ? includeCaseNames : includeInputPaths}
+                        onChange={(event) => {
+                          if (item.id === "case-names") setIncludeCaseNames(event.target.checked);
+                          else setIncludeInputPaths(event.target.checked);
+                        }}
+                      />
+                      <span className="se-check-body">
+                        <b>{item.name}</b>
+                        <small>{item.detail}</small>
+                        <span className="se-path" title={item.sample}>{item.sample}</span>
+                      </span>
+                    </label>
+                  ))
+                )}
               </div>
 
               <p className="se-group-label">含めない（顧客データ）</p>
@@ -998,25 +1091,37 @@ function DiagnosticsPanel({ openBundle }: { openBundle: boolean }) {
                 ))}
               </div>
 
+              {reachable && !shell ? (
+                <label className="se-check-row">
+                  <span className="se-check-body">
+                    <b>保存先の経路</b>
+                    <input value={pathInWords} onChange={(event) => setPathInWords(event.target.value)} placeholder="D:\\studies\\solvia-support.zip" aria-label="診断情報の保存先" />
+                  </span>
+                </label>
+              ) : null}
+
               <p className="prop-note">
                 作成先はローカルです。送信は別操作で、送信先と内容を再確認し、ローカル監査に記録します（XC-126）。
               </p>
             </div>
             <footer>
               <button className="btn ghost" onClick={() => setBundleOpen(false)}>キャンセル - 何も作成しません</button>
-              <button
-                className="btn primary"
-                onClick={() => {
-                  submit({
-                    operation: "system.supportBundle",
-                    parameters: { consent: { caseNames: includeCaseNames, inputPaths: includeInputPaths }, path: "C:\\Users\\eng-04\\Documents\\solvia-support-2026-08-29.zip" },
-                  });
-                  setCreatedTo("C:\\Users\\eng-04\\Documents\\solvia-support-2026-08-29.zip");
-                  setBundleOpen(false);
-                }}
-              >
-                ローカルに作成
-              </button>
+              {reachable ? (
+                <button className="btn primary" onClick={() => void create()} disabled={manifest === null}>
+                  ローカルに作成
+                </button>
+              ) : (
+                <button
+                  className="btn primary"
+                  onClick={() => {
+                    submit({ operation: "system.supportBundle", parameters: { consent: true, include, path: "C:\\Users\\eng-04\\Documents\\solvia-support-2026-08-29.zip" } });
+                    setCreated({ path: "C:\\Users\\eng-04\\Documents\\solvia-support-2026-08-29.zip", bytes: 2540000, entries: 5 });
+                    setBundleOpen(false);
+                  }}
+                >
+                  ローカルに作成
+                </button>
+              )}
             </footer>
           </div>
         </div>

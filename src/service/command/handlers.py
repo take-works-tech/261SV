@@ -42,6 +42,7 @@ from domain_core.recorded_time import STORED_FORMAT, RecordedTime, from_stored, 
 from domain_core.reported_value import DIMENSIONLESS, Caveat, Provenance, ReportedValue
 from domain_core.units import UndeclaredUnitError, unit as known_unit
 from engine import reader, sample
+from engine.code_page import active_code_page
 from domain_core.os_paths import for_os, for_people
 from engine.analysis import derived, nodal
 from engine.completeness import FileIncomplete, ResultsLost
@@ -340,6 +341,9 @@ class Session:
     #: The lock on the open document and the document it is for; None until one is open.
     lock: LockStatus | None = None
     lock_path: Path | None = None
+    #: The support bundle's list as last shown in this session (AC-008, XC-302): a bundle is made
+    #: from it, and from nothing that was not shown.
+    support_manifest: diagnostics.Manifest | None = None
 
     _offscreen: tuple[bool, str] | None = None
 
@@ -519,6 +523,8 @@ def handlers(session: Session) -> tuple[Handler, ...]:
         Handler("system.capabilities", lambda p, t: system_capabilities(session)),
         Handler("system.audit", lambda p, t: system_audit(session, p)),
         Handler("system.log", lambda p, t: system_log(session, p)),
+        Handler("system.supportManifest", lambda p, t: system_support_manifest(session, p)),
+        Handler("system.supportBundle", lambda p, t: system_support_bundle(session, p)),
         Handler("output.list", lambda p, t: output_list(session, p)),
         Handler("output.plan", lambda p, t: output_plan(session, p)),
         # Deleting files is destructive and needs the caller's say-so on the envelope (CT-002);
@@ -2511,6 +2517,149 @@ def system_operations(surface: Surface) -> Effect:
     return Effect(
         "この版が答える操作です",
         value={"registered": list(surface.registered()), "unimplemented": list(surface.unimplemented())},
+    )
+
+
+def _include_from(parameters: Mapping[str, Any]) -> diagnostics.Include | Result:
+    raw = parameters.get("include") or {}
+    if not isinstance(raw, Mapping):
+        return refused("include は caseNames と filePaths を持つオブジェクトです")
+    return diagnostics.Include(case_names=bool(raw.get("caseNames", False)), file_paths=bool(raw.get("filePaths", False)))
+
+
+def _environment(session: Session) -> dict[str, Any]:
+    """The facts a support case needs about where the engine ran - never a path, never a user name."""
+    try:
+        from vtkmodules.vtkCommonCore import vtkVersion
+
+        vtk_version: str | None = str(vtkVersion.GetVTKVersion())
+    except ImportError:
+        vtk_version = None
+    offscreen, _ = session.offscreen()
+    return {
+        "platform": platform.platform(),
+        "python": platform.python_version(),
+        "vtk": vtk_version,
+        "machineClass": session.machine_class.value,
+        "offscreen": offscreen,
+        "codePage": active_code_page(),
+    }
+
+
+def _support_manifest(session: Session, include: diagnostics.Include) -> diagnostics.Manifest:
+    """What a bundle would contain now, for the person to read before it exists (AC-008, XC-302):
+    the case names and the recorded paths only where they chose them."""
+    workspace = session.workspace
+    case_names: list[str] = []
+    paths: list[str] = []
+    if workspace is not None and session.workspace_path is not None:
+        base = for_people(session.workspace_path.parent)
+        for case, _ in walk_cases(workspace.cases):
+            if include.case_names:
+                case_names.append(str(case.get("name") or case.get("id", "")))
+            if include.file_paths:
+                resolution = sources.resolve_case(case, relative_to=session.workspace_path.parent)
+                paths += [str(base / one.path_relative) for one in resolution.sources]
+    shell_lines: int | None = None
+    if include.free_text and session.log.directory is not None:
+        shell = session.log.directory / diagnostics.SHELL_LOG_FILE
+        if shell.exists():
+            with shell.open(encoding="utf-8", errors="replace") as handle:
+                shell_lines = sum(1 for _ in handle)
+    return diagnostics.manifest_for(
+        session.log,
+        workspace_id=workspace.identifier if workspace is not None else None,
+        case_names=case_names,
+        paths=paths,
+        clock=session.clock,
+        include=include,
+        product_version=product_version(),
+        environment=_environment(session),
+        shell_lines=shell_lines,
+    )
+
+
+def system_support_manifest(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
+    """Everything a support bundle would contain, listed before it exists (operations/AC-008, XC-302).
+    The list is kept as the one shown, and the bundle is made from it and from nothing else."""
+    include = _include_from(parameters)
+    if isinstance(include, Result):
+        return include
+    manifest = _support_manifest(session, include)
+    session.support_manifest = manifest
+    return Effect(f"診断情報の一覧 {len(manifest.items)} 件", value=manifest.as_answer())
+
+
+def system_support_bundle(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
+    """The archive, from the list that was shown and consented to (XC-126, AC-008, XC-302): written
+    whole or not at all, never over a file that is there, and recorded in the log. Nothing here
+    sends it anywhere - leaving the machine is the gate's, with a consent of its own (AC-009)."""
+    if parameters.get("consent") is not True:
+        return refused("同意がありません。診断情報は、何が入るかの一覧に同意してから作ります（XC-126、operations/AC-008）")
+    include = _include_from(parameters)
+    if isinstance(include, Result):
+        return include
+    shown = session.support_manifest
+    if shown is None or shown.include != include:
+        return refused(
+            "一覧をまだ見ていません。system.supportManifest で同じ選択の一覧を見てから作ります（operations/AC-008）"
+        )
+    current = _support_manifest(session, include)
+    if current.fixed_items != shown.fixed_items:
+        session.support_manifest = current
+        return refused("一覧を見てから、開いている文書やケースが変わりました。一覧を見直してから作ってください（operations/AC-008）")
+    path = for_os(Path(str(parameters["path"])))
+    if path.exists():
+        return refused(f"{for_people(path)} はすでにあります。この版は上書きしません — 別の場所を指定してください")
+    if not path.parent.is_dir():
+        return refused(f"{for_people(path.parent)} というフォルダがありません")
+    workspace = session.workspace
+    cases: list[dict[str, Any]] = []
+    recorded: list[dict[str, Any]] = []
+    if workspace is not None and session.workspace_path is not None:
+        base = for_people(session.workspace_path.parent)
+        for case, _ in walk_cases(workspace.cases):
+            cases.append({"id": str(case.get("id", "")), "name": str(case.get("name") or "")})
+            resolution = sources.resolve_case(case, relative_to=session.workspace_path.parent)
+            recorded += [
+                {"caseId": resolution.case_id, "path": str(base / one.path_relative), "present": one.is_resolved}
+                for one in resolution.sources
+            ]
+    bundle = diagnostics.create(shown, accepted=True)
+    try:
+        written = diagnostics.write_bundle(
+            bundle,
+            path=path,
+            log=session.log,
+            product_version=product_version(),
+            environment=_environment(session),
+            cases=cases,
+            sources=recorded,
+            shell_log=(session.log.directory / diagnostics.SHELL_LOG_FILE) if session.log.directory is not None else None,
+        )
+    except diagnostics.DiagnosticsError as error:
+        return refused(str(error))
+    except OSError as error:
+        return refused(f"診断情報を書けませんでした：{error}")
+    session.log.record(
+        diagnostics.Level.INFO, "supportBundle",
+        items=len(shown.items), customerItems=len(shown.case_names) + len(shown.paths),
+        freeText=shown.free_text_kept, bytes=written.bytes, entries=len(written.entries),
+    )
+
+    def undo() -> None:
+        if path.exists():
+            path.unlink()
+
+    return Effect(
+        f"診断情報を作成しました（{len(written.entries)} ファイル、{written.bytes} バイト）",
+        value={
+            "path": str(for_people(path)),
+            "contents": list(bundle.contents),
+            "bytes": written.bytes,
+            "entries": list(written.entries),
+        },
+        undo=undo,
     )
 
 

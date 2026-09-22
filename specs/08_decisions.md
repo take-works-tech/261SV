@@ -6852,3 +6852,46 @@ model or the prompt, never in a description that quietly went stale.
   dropped file whose name a case records at a missing path is offered for relinking rather than
   refused; or a case made of several files (`dataset.load` with several paths), at which point
   several files may be one load
+
+### XC-302 - A support bundle is listed before it exists, carries the person's own information only by their choice, keeps the log's free text only with both, and is written whole or not at all
+- decided: 2026-09-22
+- status: active
+- decision: `system.supportManifest` lists everything a bundle would contain before it exists - the
+  diagnostic log with its line count, the shell's notes where they go in, the product's version,
+  the environment (the OS, Python and VTK versions and the machine class; never a path, never a
+  user name), the open workspace's id, and the case names and recorded file paths **only where the
+  person chose to include them** (`include`, both off by default) - and `system.supportBundle`
+  writes the archive from that list and from nothing else: it refuses without consent, refuses
+  when no list with the same choice was shown in this session or the document changed since,
+  refuses a path that holds a file, and writes beside its target and moves into place so the
+  archive is whole or absent (XC-262). **The log's free text - a refusal's reason, a warning's
+  sentence - goes in as it is only when both case names and file paths were included**, because
+  either can be in it and nothing guesses which words are which; otherwise each such field is
+  replaced by one fixed sentence, and the list says which it will be (#419). The archive holds
+  `manifest.txt` (the list as shown), `manifest.json`, `environment.json`, the log as JSON lines,
+  the shell's notes where listed, and `cases.json` and `sources.json` where listed. Nothing here
+  sends it: leaving the machine is the gate's, with a consent of its own (XC-126,
+  operations/AC-009), and this build injects no transport, so the interface says the file is the
+  person's to hand over
+- decided_by: engineering judgement, from #231's condition, XC-126, the design state
+  `settings.support-bundle` (11_ui.md) and the principles' order (XC-011)
+- rationale: the design state already drew the three groups - always, by choice, never - and the
+  choice is the right shape: a support engineer needs the log, the versions and the environment,
+  and needs a case name or a path only sometimes, while the person always knows whether their
+  names may travel. The free-text rule is what settles #419 without a guess: a rule that hides
+  what looks like a path leaves in the path that does not look like one, and a bundle that leaks
+  by accident is what XC-126 exists to prevent; the person who wants the reasons ticks both boxes
+  and reads that sentence in the list. Refusing a bundle whose list was not shown is operations/AC-008 as a
+  mechanism rather than a habit
+- alternatives: **hiding path-like text in the log** - the guess above. **Leaving the free text
+  out always** - the reasons are what a support case is about. **One operation with a dry run for
+  the list** - a dry run executes the handler and discards the effect, so a list that must exist
+  before any write cannot be one. **Including the document itself** - it carries everything the
+  person can and cannot choose about; the list carries what it lists
+- basis: E-001 (T1)
+- affects: MOD-009, MOD-012, MOD-014, MOD-016, MOD-017, MOD-018, CT-003, operations/REQ-003
+- decidedness: Fixed
+- reversal_trigger: a transport that can send the bundle (XC-271's hosted form), at which point the
+  gate's consent and audit are exercised and the interface gains the sending step with the list
+  shown again; or a settings store, at which point its contents less every secret join the
+  always-included group
