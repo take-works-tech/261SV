@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-21
+updated: 2026-09-22
 ---
 
 # Tasks: view
@@ -469,3 +469,15 @@ updated: 2026-09-21
   `engine/analysis/nodal.py`, which had produced the numbers since 2026-08-25 with nothing calling
   it. The bar of E-144 is a file fixture now (`tests/demo_case.py`), read by the engine tests and
   the interface's connected thread
+
+### TASK-069 - Missing entries through the View's numbers
+- satisfies: AC-094
+- depends_on: TASK-068
+- done_when: the statistics over a holed field carry the caveat and the count on every value, the
+  rail and the copied rows show them, and a probe at a missing place says why
+- done: 2026-09-22 (XC-303, #215). The dataset's aggregate leaves missing entries out and counts
+  them instead of refusing, `ReportedValue` carries `missing_count` beside `MISSING_VALUES`, the
+  summary's `skipped` becomes that on the way to an answer, the nodal-averaged numbers carry the
+  cells the averaging left out, and a value read at a missing place states why. The rail shows
+  「欠測 N 件を除く」 beside each number and the probe readout its reason. Proven by
+  `tests/test_missing_values.py` and the holed thread of `src/ui/state/engine.connected.test.ts`.

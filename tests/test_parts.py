@@ -112,17 +112,29 @@ class TestWhatIsAggregatedAcrossParts:
         assert value.is_missing
         assert "temperature" in (value.missing_because or "")
 
-    def test_parts_that_cannot_report_are_named_rather_than_skipped(self) -> None:
-        """If every part refuses its own maximum, the case says why rather than saying nothing."""
+    def test_a_part_with_a_hole_reports_over_the_rest_and_a_part_with_nothing_is_named(self) -> None:
+        """XC-303, reversing what this test pinned until 2026-09-22 (a part with one missing entry
+        refused its maximum): the number is over the entries that are there and carries the caveat
+        and the count; only a part whose field is missing everywhere cannot report, and then the case
+        says which part and why rather than saying nothing."""
+        from domain_core.reported_value import Caveat
+
         holed = LoadedCase(
             parts=(Part("a", ("a",), mesh(1.0, np.nan, 3.0)),),
             contents=CaseContents(steps=1, parts=1, axis=ResultAxis(AxisKind.NONE)),
         )
+        gone = LoadedCase(
+            parts=(Part("a", ("a",), mesh(np.nan, np.nan, np.nan)),),
+            contents=CaseContents(steps=1, parts=1, axis=ResultAxis(AxisKind.NONE)),
+        )
 
         value = holed.maximum("stress")
+        absent = gone.maximum("stress")
 
-        assert value.is_missing
-        assert "欠損" in (value.missing_because or "")
+        assert value.value == pytest.approx(3.0)
+        assert Caveat.MISSING_VALUES in value.caveats and value.missing_count == 1
+        assert absent.is_missing
+        assert "a：" in (absent.missing_because or "") and "すべてが欠損" in (absent.missing_because or "")
 
     def test_nothing_offers_a_sum_across_parts(self) -> None:
         """XC-234. Adding a flange's values to a gasket's is arithmetically fine and means nothing, so
@@ -201,9 +213,10 @@ class TestTheCaseWideExtremumSaysWhereItIs:
         assert Part("asm", ("asm",), None).parent_label is None
 
     def test_a_part_that_cannot_report_is_named_in_the_reason(self) -> None:
-        holed = LoadedCase(
-            parts=(Part("a", ("a",), mesh(1.0, np.nan, 3.0)),),
+        # Cannot report: nothing there at all. One missing entry no longer stops the part (XC-303).
+        gone = LoadedCase(
+            parts=(Part("a", ("a",), mesh(np.nan, np.nan, np.nan)),),
             contents=CaseContents(steps=1, parts=1, axis=ResultAxis(AxisKind.NONE)),
         )
 
-        assert "a：" in (holed.maximum("stress").missing_because or "")
+        assert "a：" in (gone.maximum("stress").missing_because or "")

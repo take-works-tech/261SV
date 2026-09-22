@@ -186,6 +186,59 @@ def write_two_blocks(path: Path) -> None:
     writer.Write()
 
 
+def write_holed(path: Path) -> None:
+    """`holed.vtu`: a 4x2x2 hexahedral bar of 45 points and 16 cells whose fields have holes (XC-303).
+    `temperature` is 300 + 100 x at the points and missing at three of them - the corner (0, 0, 0),
+    an inner point and the far corner (1, 0.5, 0.5) - so its maximum over the rest is 400 and the
+    corner probe is an absence; `flux` is (1, 2, 2) everywhere, magnitude 3, with one component
+    missing at the point (0.25, 0, 0); `load` is 10 on every cell but two."""
+    nx, ny, nz = 4, 2, 2
+    xs = np.linspace(0.0, 1.0, nx + 1)
+    ys = np.linspace(0.0, 0.5, ny + 1)
+    zs = np.linspace(0.0, 0.5, nz + 1)
+    grid_x, grid_y, grid_z = np.meshgrid(xs, ys, zs, indexing="ij")
+    coordinates = np.column_stack([grid_x.ravel(order="F"), grid_y.ravel(order="F"), grid_z.ravel(order="F")])
+
+    def index(i: int, j: int, k: int) -> int:
+        return i + (nx + 1) * (j + (ny + 1) * k)
+
+    cells = vtkCellArray()
+    for k in range(nz):
+        for j in range(ny):
+            for i in range(nx):
+                cells.InsertNextCell(8)
+                for corner in (
+                    index(i, j, k), index(i + 1, j, k), index(i + 1, j + 1, k), index(i, j + 1, k),
+                    index(i, j, k + 1), index(i + 1, j, k + 1), index(i + 1, j + 1, k + 1), index(i, j + 1, k + 1),
+                ):
+                    cells.InsertCellPoint(corner)
+    points = vtkPoints()
+    points.SetData(numpy_to_vtk(np.ascontiguousarray(coordinates, dtype=np.float64), deep=True))
+    grid = vtkUnstructuredGrid()
+    grid.SetPoints(points)
+    grid.SetCells(VTK_HEXAHEDRON, cells)
+    temperature = (300.0 + 100.0 * coordinates[:, 0]).astype(np.float32)
+    temperature[[index(0, 0, 0), index(2, 1, 1), index(4, 2, 2)]] = np.nan
+    held = numpy_to_vtk(temperature, deep=True)
+    held.SetName("temperature")
+    grid.GetPointData().AddArray(held)
+    flux = np.zeros((len(coordinates), 3), dtype=np.float32)
+    flux[:, 0], flux[:, 1], flux[:, 2] = 1.0, 2.0, 2.0
+    flux[index(1, 0, 0), 1] = np.nan
+    vector = numpy_to_vtk(np.ascontiguousarray(flux), deep=True)
+    vector.SetName("flux")
+    grid.GetPointData().AddArray(vector)
+    load = np.full(nx * ny * nz, 10.0, dtype=np.float32)
+    load[[0, 5]] = np.nan
+    per_cell = numpy_to_vtk(load, deep=True)
+    per_cell.SetName("load")
+    grid.GetCellData().AddArray(per_cell)
+    writer = vtkXMLUnstructuredGridWriter()
+    writer.SetFileName(str(path))
+    writer.SetInputData(grid)
+    writer.Write()
+
+
 def write_workspace(path: Path) -> Path:
     """A workspace document with one case and nothing in it yet."""
     path.write_text(
@@ -253,9 +306,12 @@ def main(argv: list[str]) -> int:
     fields = Path(argv[0]) / "fields.vtu"
     write_fields(fields)
     transient = write_transient_case(Path(argv[0]))
+    holed = Path(argv[0]) / "holed.vtu"
+    write_holed(holed)
     print(json.dumps({
         "workspace": str(workspace), "cube": str(cube), "partial": str(partial) if partial else None,
         "bar": str(bar), "fields": str(fields), "transient": str(transient) if transient else None,
+        "holed": str(holed),
     }))
     return 0
 

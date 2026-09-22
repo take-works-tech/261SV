@@ -6895,3 +6895,42 @@ model or the prompt, never in a description that quietly went stale.
   gate's consent and audit are exercised and the interface gains the sending step with the list
   shown again; or a settings store, at which point its contents less every secret join the
   always-included group
+
+### XC-303 - A number over a field with missing entries is computed over the present ones and says how many it left out wherever it goes, a place with no value says why, and nothing is withheld for a hole that is counted
+- decided: 2026-09-22
+- status: active
+- decision: wherever this product reduces a field to a number - the extremum, the total, the mean
+  and the weighted mean of a dataset, the analysis module's summary, the nodal average, the
+  case-wide maximum over parts, a graph's reduction - entries that are missing are left out and
+  **counted**, and the number carries `missing-values` with the count at every layer: the reported
+  value in the engine, CT-003's reported value (`missingCount`, 3.20.0), a graph point (`caveats`,
+  `missingCount`), a deliverable's value table and a copied row (欠測 N 件を除いて計算した値です),
+  and the View rail. A field missing everywhere is a stated absence with the count, never a zero. A
+  value read at one place - a probe, a pick - that is missing is a stated absence with its reason
+  (the file has no value there), and the load answer says per field how many entries are missing,
+  so the information area shows it before anyone reads a number. A graph point carries the union
+  of the caveats of the reductions its value came from, less the undeclared unit that the series
+  states once; a case with no number stays a gap with its reason. **This corrects the dataset's
+  aggregate of 2026-08-25**, which refused any aggregate over a field with one missing entry and
+  was pinned as INV-011 and XC-001: it stood alone - the nodal average (INV-011's own test), the
+  summary and the case-wide maximum over parts all left the missing out and said so - and it made
+  the three statistics of one field obey two rules, which is the inconsistency #215 found
+- decided_by: engineering judgement, from #215's condition, XC-001, INV-011 and XC-015
+- rationale: XC-001's condition is that a value this product could not compute correctly is
+  distinguishable from a real result at every layer. A maximum over the 42 entries that are there,
+  carrying "欠測 3 件を除く" wherever it is shown, is distinguishable; a maximum withheld for three
+  holes among a hundred thousand values makes the product silent about every solver output with a
+  deactivated element, which is most nonlinear runs. INV-011 says what to do in so many words -
+  the missing are excluded from every derived number and absent from the reported extrema - and
+  the rest of the product had been doing it. What the refusal feared, a number read as the whole
+  field's, is what the caveat and the count exist to prevent, and they now travel through every
+  path a person reads a number by, which the test module holds
+- alternatives: **refusing everywhere** - one rule, and a product that cannot report a stress
+  field with one failed element. **The count in the statistics answer alone** - the number travels
+  without it into a graph and a table. **Filling with a neighbour or a zero** - what XC-001 forbids
+- basis: E-001 (T1)
+- affects: MOD-001, MOD-004, MOD-005, MOD-006, MOD-009, MOD-012, MOD-015, MOD-016, MOD-017, CT-003, INV-011, view/REQ-010, graph/REQ-004, report/REQ-001, ingest/REQ-010
+- decidedness: Fixed
+- reversal_trigger: a source that says why an entry is missing - a validity mask with reasons - at
+  which point the count becomes a list of reasons and a deactivated element is told apart from a
+  failed one

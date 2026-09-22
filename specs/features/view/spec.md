@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-21
+updated: 2026-09-22
 ---
 
 # Feature: view
@@ -175,6 +175,11 @@ updated: 2026-09-21
     and shall not interpolate it to a point value (INV-003)
   - AC-029: If a probed point has no value - outside the mesh, or a missing entry - then the system
     shall report it as missing rather than as zero (INV-011)
+  - AC-094: When a field has missing entries, the system shall compute each statistic over the
+    entries that are there and shall carry the caveat and the count of what it left out on the value
+    itself, into the rail, a copied row and a document; a field missing everywhere shall be a stated
+    absence with the count; and a probed or picked place with no value shall be a stated absence
+    with its reason, never a neighbour's value (XC-303)
   - AC-030: Where a probed value is kept, the system shall make it a @Variable carrying the case, the
     position and the time it was taken at
   - AC-092: When a shown value is copied, the clipboard shall carry it as a spreadsheet takes it - the

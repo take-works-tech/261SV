@@ -35,7 +35,7 @@ from typing import Any, Iterable, Sequence
 
 from domain_core.precision import format_value
 from domain_core.recorded_time import RecordedTime
-from domain_core.reported_value import CAVEAT_TEXT, UNDECLARED_MARKER, Caveat, ReportedValue
+from domain_core.reported_value import Caveat, caveat_text, ReportedValue, UNDECLARED_MARKER
 
 #: Anything matching this in a produced document would need the network to render (AC-001).
 EXTERNAL = re.compile(r"https?://|//[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/")
@@ -231,7 +231,7 @@ class ValueRow:
         for caveat in sorted(self.value.caveats, key=lambda one: one.value):
             if caveat is Caveat.UNDECLARED_UNIT:
                 continue  # already said by the unit column; saying it twice reads as two problems
-            line += f"・{CAVEAT_TEXT[caveat]}"
+            line += f"・{caveat_text(caveat, self.value)}"
         if self.coverage:
             line += f"（対象範囲：{self.coverage}）"
         return line

@@ -233,6 +233,12 @@ class Dataset:
             digits=field.significant_digits,
             provenance=Provenance.DATASET,
             caveats=caveats,
+            # A place the file has no value for says so on the element itself (XC-001, XC-303): the
+            # reader otherwise supplies an explanation, usually a wrong one.
+            missing_because=(
+                "この位置の値はファイルにありません（欠測）。近くの値で埋めることはしません（XC-001）"
+                if missing else None
+            ),
         )
 
     def __post_init__(self) -> None:
@@ -332,18 +338,28 @@ class Dataset:
         values = field.values if mask is None else field.values[mask]
         if values.size == 0:
             return refuse("計算対象の要素が 1 件もありません")
+        # Missing entries are left out and counted, never averaged in as zero and never a reason to
+        # withhold the number: the number carries the caveat and the count wherever it goes, which is
+        # what makes it distinguishable from the whole field's (XC-001, INV-011, XC-303). Before
+        # XC-303 this refused instead, alone against the nodal average, the summary and the
+        # case-wide maximum over parts, which all left the missing out and said so.
         missing = int(np.count_nonzero(np.isnan(values)))
-        if missing and aggregate is not Aggregate.COUNT:
+        present = values[~np.isnan(values)] if missing else values
+        if missing and present.size == 0 and aggregate is not Aggregate.COUNT:
             return refuse(
-                f"{values.size} 件のうち {missing} 件が欠損しています。"
-                "残りだけで計算した値は、全体の値として読まれます（INV-011, XC-001）。"
+                f"{values.size} 件すべてが欠損しています。0 は返しません — 0 は読み手が上限と比べる数値で、"
+                "欠測は小さな値ではありません（XC-001, XC-303）"
             )
+        if missing and aggregate is not Aggregate.COUNT:
+            caveats = caveats | {Caveat.MISSING_VALUES}
 
         # Where the extremum is, in the source's own words. Taken against the **unmasked** field so
-        # that the index is the dataset's own, not a position within the filtered view.
+        # that the index is the dataset's own, not a position within the filtered view; a missing
+        # entry is not a candidate.
         location: str | None = None
         if aggregate is Aggregate.EXTREMUM:
-            position = int(np.argmax(field.values if mask is None else np.where(mask, field.values, -np.inf)))
+            candidates = field.values if mask is None else np.where(mask, field.values, -np.inf)
+            position = int(np.nanargmax(candidates))
             location = location_of(self.identifiers.get(field.association), position, field.association)
 
         # Accumulated in double whatever the field is stored in (INV-031, XC-246). The extremum and
@@ -351,14 +367,16 @@ class Dataset:
         # of 300 ± 0.001 in float32 returns exactly 300.0 with the variation gone (E-143). The
         # storage stays what the file gave - only the accumulator is widened.
         result = {
-            Aggregate.EXTREMUM: lambda: float(np.max(values)),
-            Aggregate.TOTAL: lambda: float(np.sum(values, dtype=np.float64)),
-            Aggregate.MEAN: lambda: float(np.mean(values, dtype=np.float64)),
-            Aggregate.COUNT: lambda: float(values.size),
+            Aggregate.EXTREMUM: lambda: float(np.max(present)),
+            Aggregate.TOTAL: lambda: float(np.sum(present, dtype=np.float64)),
+            Aggregate.MEAN: lambda: float(np.mean(present, dtype=np.float64)),
+            # How many entries a number is computed over: the ones that are there.
+            Aggregate.COUNT: lambda: float(present.size),
         }[aggregate]()
         return ReportedValue(
             value=result, unit=unit, digits=field.significant_digits,
             provenance=Provenance.COMPUTED, caveats=caveats, formula=formula, location=location,
+            missing_count=missing if aggregate is not Aggregate.COUNT else 0,
         )
 
     def counted_entries(self, name: str) -> ReportedValue:

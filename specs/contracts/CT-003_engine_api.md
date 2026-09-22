@@ -10,7 +10,16 @@ updated: 2026-09-22
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 3.19.0
+- version: 3.20.0
+- correction: 2026-09-22, version 3.19.0 to 3.20.0. A reported value that was computed with
+  missing entries left out now says how many (`missingCount`, present when at least one) beside
+  the caveat `missing-values`; a graph point carries the same two (`caveats`, `missingCount`) so a
+  chart can mark it; and each field in the `dataset.load` answer carries its `missingCount`, so
+  the information area can show it. One rule at every layer: a number over a field with missing
+  entries is computed over the present ones and says so wherever it goes (XC-303). The seven
+  places in the schema that spelled the reported value's shape out again - the three
+  statistics, a probe's and a pick's value, a kept variable, a round-trip error - now reference
+  the one definition, which is how the new key reached them all at once (XC-015). Additive
 - correction: 2026-09-22, version 3.18.0 to 3.19.0. `system.supportManifest` is added: everything
   a support bundle would contain, listed before it exists - the log with its line count, the
   product and the environment, the open workspace, and the case names and recorded file paths the

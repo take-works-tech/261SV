@@ -495,3 +495,11 @@ is either missing a requirement or is not work this specification asked for.
   `src/ui/logic/drop.test.ts` and the sample thread of `src/ui/state/engine.connected.test.ts`
   against a real engine, where the two recorded files dropped in reverse order load into their
   own cases and the variant reports its own maximum.
+
+### TASK-040 - How many entries are missing, said at load
+- satisfies: AC-050
+- depends_on: TASK-007
+- done_when: the load answer carries each field's missing count and the information area shows it
+- done: 2026-09-22 (XC-303, CT-003 3.20.0, #215). `dataset.load` answers `missingCount` per field
+  and the information area's field table gained a 欠測 column. Proven by
+  `tests/test_missing_values.py::TestTheLoadAnswer` and the connected thread.

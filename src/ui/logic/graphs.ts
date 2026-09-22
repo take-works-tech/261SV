@@ -23,7 +23,9 @@ export function legendLine(series: GraphSeries, undeclared: string): string {
   const weighting = series.weighting ? `・${WEIGHTING_LABEL[series.weighting] ?? series.weighting}` : "";
   const scope = series.scope ? `・${series.scope}` : "";
   const missing = series.points.filter((one) => one.value === null).length;
-  return `${series.label}［${unit}${declared}］${reduction}${weighting}${scope}・${PROVENANCE_LABEL[series.provenance] ?? series.provenance}` + (missing > 0 ? `・データなし ${missing} 点` : "");
+  // Entries the plotted numbers left out because they were missing, over the series (XC-303).
+  const leftOut = series.points.reduce((sum, one) => sum + (one.missingCount ?? 0), 0);
+  return `${series.label}［${unit}${declared}］${reduction}${weighting}${scope}・${PROVENANCE_LABEL[series.provenance] ?? series.provenance}` + (missing > 0 ? `・データなし ${missing} 点` : "") + (leftOut > 0 ? `・欠測 ${leftOut} 件を除いた値` : "");
 }
 
 /** Where a point sits on the horizontal axis: the result position for a graph over the axis, and
@@ -45,6 +47,13 @@ export interface ChartPoint {
   y: number | null;
   label: string;
   reason: string | null;
+  /** What the drawn number left out, when it left anything out (XC-303). */
+  note: string | null;
+}
+
+/** The point's own note: the entries its number left out, in the words the rail and the table use. */
+export function pointNote(point: { missingCount?: number }): string | null {
+  return point.missingCount ? `欠測 ${point.missingCount} 件を除く` : null;
 }
 
 /** One series as chart points in the order the engine gave them. */
@@ -55,6 +64,7 @@ export function chartPoints(data: GraphData, series: GraphSeries): ChartPoint[] 
     y: point.value === null || point.value === undefined ? null : point.value,
     label: axis.tick(point, index),
     reason: point.reason ?? null,
+    note: pointNote(point),
   }));
 }
 
@@ -90,7 +100,7 @@ export function graphCopyRows(data: GraphData, undeclared: string): string[][] {
         series.scope ?? "",
         series.weighting ? WEIGHTING_LABEL[series.weighting] ?? series.weighting : "",
         PROVENANCE_LABEL[series.provenance] ?? series.provenance,
-        point.reason ?? "",
+        [point.reason ?? null, pointNote(point)].filter((one): one is string => one !== null).join("；"),
       ]);
     });
   }

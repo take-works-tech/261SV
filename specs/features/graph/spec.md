@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-21
+updated: 2026-09-22
 ---
 
 # Feature: graph
@@ -78,6 +78,9 @@ updated: 2026-09-21
     combining repeats, and shall state which was used
   - AC-013: If a case in the set lacks the plotted quantity, then the system shall draw it as no data
     and keep it in the legend, so the gap is visible
+  - AC-028: When a plotted number was computed with missing entries left out, the point shall carry
+    the caveat and the count, the series' description and the copied rows shall say it, and a case
+    whose field is missing everywhere shall stay a gap with its reason (XC-303)
 
 ### REQ-005 - Recommendations are offered, never applied
 - priority: SHOULD

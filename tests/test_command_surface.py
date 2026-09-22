@@ -579,8 +579,12 @@ class TestEveryOperationSaysWhatItAnswers:
         minimum = schema["$defs"]["operationResults"]["properties"]["field.statistics"][
             "properties"
         ]["minimum"]
+        # Since 3.20.0 the statistics reference the one definition rather than spelling it out
+        # (XC-303, XC-015); the requirement is the definition's.
+        shape = schema["$defs"]["reportedValue"] if "$ref" in minimum else minimum
 
-        assert set(minimum["required"]) >= {"value", "unit", "digits", "provenance"}
+        assert minimum.get("$ref", "").endswith("/reportedValue") or "required" in minimum
+        assert set(shape["required"]) >= {"value", "unit", "digits", "provenance"}
 
     def test_a_reduction_says_how_it_weighted(self) -> None:
         """INV-017: an average over elements of different sizes is not the average of its values, and a

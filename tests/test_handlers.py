@@ -449,7 +449,7 @@ class TestLoadingADataset:
         assert result.value["supportLevel"] == "verified"
         assert result.value["gaps"] == []
         fields = {one["name"]: one for one in result.value["fields"]}
-        assert fields["stress"] == {"name": "stress", "association": "point", "unit": None, "components": 1}
+        assert fields["stress"] == {"name": "stress", "association": "point", "unit": None, "components": 1, "missingCount": 0}
         assert fields["element_stress"]["association"] == "cell"
         assert "dataset:0001" in session.datasets
 
@@ -1398,7 +1398,7 @@ class TestWhatWasSavedIsIntact:
         assert entry["declaredUnits"] == {"temperature": "K"}
         assert entry["pathRelative"] == "cube.vtu"
         _, reloaded = self._second_session(tmp_path, workspace, workspace.parent / "cube.vtu")
-        assert reloaded["fields"] == [{"name": "temperature", "association": "point", "unit": "K", "components": 1}]
+        assert reloaded["fields"] == [{"name": "temperature", "association": "point", "unit": "K", "components": 1, "missingCount": 0}]
 
     def test_a_declaration_never_saved_is_not_found_and_the_field_is_undeclared_again(self, tmp_path: Path) -> None:
         """The other half of the sentence. Nothing rebuilds it: the next session sees what the file
@@ -1412,7 +1412,7 @@ class TestWhatWasSavedIsIntact:
 
         _, reloaded = self._second_session(tmp_path, workspace, workspace.parent / "cube.vtu")
 
-        assert reloaded["fields"] == [{"name": "temperature", "association": "point", "unit": None, "components": 1}]
+        assert reloaded["fields"] == [{"name": "temperature", "association": "point", "unit": None, "components": 1, "missingCount": 0}]
 
     def test_saving_keeps_the_previous_version_beside_the_file(self, tmp_path: Path) -> None:
         surface, session, dataset_id = loaded(tmp_path, write=write_cube, name="cube.vtu")

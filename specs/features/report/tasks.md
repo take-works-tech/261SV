@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-21
+updated: 2026-09-22
 ---
 
 # Tasks: report generation
@@ -337,3 +337,12 @@ updated: 2026-09-21
 - done_when: printing from the application exports the report to the directory the shell owns
   (XC-262) and prints that file, and the screen's own print stylesheet says the screen is not the
   document rather than printing the workbench
+
+### TASK-049 - What a table's number left out
+- satisfies: AC-045
+- depends_on: TASK-047
+- done_when: the value table of a holed field says beside each number how many entries it left
+  out, and no cell is a blank, a zero for a missing value or "nan"
+- done: 2026-09-22 (XC-303, #215). `caveat_text` renders the missing-values caveat with its
+  count in the HTML document and its text form, from the count the value carries. Proven by
+  `tests/test_missing_values.py::TestAGraphAndADeliverable::test_the_deliverable_s_table_says_what_a_number_left_out_and_states_an_absence`.

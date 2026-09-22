@@ -47,6 +47,8 @@ updated: 2026-09-22
     document's order, and shall otherwise load nothing and name each file that does not qualify
     with the reason; a single dropped file shall go to the @Case whose record holds that very file,
     and never to a @Case on the strength of a matching name (XC-301)
+  - AC-050: When a file is loaded, the system shall say for each @Field how many entries have no
+    value, so the information area can show it before any number is read (XC-303)
   - AC-022: If a supported file is unreadable or truncated, then the system shall report the failure
     with the file name and shall leave the @Workspace unchanged
   - AC-046: If a file changes while it is being read, or has changed since the @Dataset was loaded from

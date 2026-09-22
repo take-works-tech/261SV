@@ -127,6 +127,8 @@ def reported(value: ReportedValue) -> dict[str, Any]:
         answer["missingBecause"] = value.missing_because
     if value.location:
         answer["location"] = value.location
+    if value.missing_count:
+        answer["missingCount"] = value.missing_count
     return answer
 
 
@@ -138,17 +140,19 @@ def as_reported(summary: Summary, *, digits: int, formula: str, caveats: frozens
     named as missing - until it existed, no reduction reached a document except by hand.
     """
     if summary.value is None:
-        return ReportedValue.unavailable(
+        absent = ReportedValue.unavailable(
             summary.unavailable or "求められません",
             unit=summary.unit, digits=digits, provenance=Provenance.COMPUTED,
             caveats=caveats, formula=formula,
         )
+        return replace(absent, missing_count=summary.skipped) if summary.skipped else absent
     if summary.unit is None:
         caveats = caveats | {Caveat.UNDECLARED_UNIT}
+    # What the summary left out travels with the number (XC-303).
     return ReportedValue(
         value=summary.value, unit=summary.unit, digits=digits,
         provenance=Provenance.COMPUTED, caveats=caveats, formula=formula,
-    )
+    ).with_missing(summary.skipped)
 
 
 def bounds_m(datasets: list[Dataset]) -> dict[str, list[float]]:
@@ -919,6 +923,9 @@ def dataset_load(session: Session, parameters: Mapping[str, Any]) -> Effect | Re
             # How many numbers each entry is: a vector or a tensor is coloured, probed and summarised
             # only through a derived quantity, and the interface has to know which fields those are.
             "components": field.components,
+            # How many entries the file has no value for, so the information area can say it before
+            # anyone reads a number (XC-303).
+            "missingCount": field.missing_count,
         }
         for name, field in seen.items()
     ]
@@ -1294,10 +1301,15 @@ def field_statistics(session: Session, parameters: Mapping[str, Any]) -> Effect 
                 "minimum": reported(both.minimum),
                 "spreadAtMaximum": reported(both.spread),
                 "spreadFraction": reported(both.fraction),
-                "disagreement": nodal.disagreement(
-                    nodal.Extremum(float(maximum.value), nodal.Averaging.UNAVERAGED, 0, unit)
-                    if maximum.value is not None else nodal.Extremum(float(both.maximum.value or 0.0), nodal.Averaging.UNAVERAGED, 0, unit),
-                    nodal.Extremum(float(both.maximum.value or 0.0), nodal.Averaging.AVERAGED, 0, unit),
+                # The two figures compared only where both exist: a zero standing in for either
+                # would be the substituted value XC-001 forbids, in a sentence rather than a cell.
+                "disagreement": (
+                    nodal.disagreement(
+                        nodal.Extremum(float(maximum.value), nodal.Averaging.UNAVERAGED, 0, unit),
+                        nodal.Extremum(float(both.maximum.value), nodal.Averaging.AVERAGED, 0, unit),
+                    )
+                    if maximum.value is not None and both.maximum.value is not None
+                    else "比較できません：どちらかの最大が値なしです"
                 ),
             }
     return Effect(f"'{name}' の統計です", value=answer)
@@ -1340,6 +1352,12 @@ def averaged_extrema(
     top_part, top, _ = max(found, key=lambda one: one[1].value)
     bottom_part, _, bottom = min(found, key=lambda one: one[2].value)
     marked = caveats | {Caveat.AVERAGED} | (frozenset({Caveat.UNDECLARED_UNIT}) if unit is None else frozenset())
+    # The cells the averaging left out because they had no value (INV-011): counted on every one of
+    # the four numbers, because each is computed without them (XC-303).
+    left_out = sum(
+        int(np.count_nonzero(np.isnan(part.dataset.fields[name].values)))
+        for part in holders if part.dataset is not None and name in part.dataset.fields
+    )
 
     def where(part: Part, at: int) -> str:
         assert part.dataset is not None
@@ -1361,18 +1379,18 @@ def averaged_extrema(
         maximum=ReportedValue(
             value=top.value, unit=unit, digits=digits, provenance=Provenance.COMPUTED, caveats=marked,
             formula=f"max(nodal-average({name}))", location=where(top_part, top.at),
-        ),
+        ).with_missing(left_out),
         minimum=ReportedValue(
             value=bottom.value, unit=unit, digits=digits, provenance=Provenance.COMPUTED, caveats=marked,
             formula=f"min(nodal-average({name}))", location=where(bottom_part, bottom.at),
-        ),
+        ).with_missing(left_out),
         spread=ReportedValue(
             value=top.spread, unit=unit, digits=digits, provenance=Provenance.COMPUTED,
             caveats=caveats | (frozenset({Caveat.UNDECLARED_UNIT}) if unit is None else frozenset()),
             formula=f"max(contributing {name}) - min(contributing {name}) at the node of max(nodal-average({name}))",
             location=where(top_part, top.at),
-        ),
-        fraction=fraction,
+        ).with_missing(left_out),
+        fraction=fraction.with_missing(left_out),
     )
 
 
@@ -1932,6 +1950,31 @@ class CaseQuantities(Mapping[str, "Value | graph_series.Absent"]):
     def __len__(self) -> int:
         return len(self._keys)
 
+    def touched(self) -> list[Reduced]:
+        """Every reduction computed so far: after a series is plotted over this case, exactly the
+        numbers its value came from, so a point can carry their caveats (XC-303)."""
+        return list(self._reduced.values())
+
+
+def point_caveats(value: float | None, touched: list[Reduced]) -> dict[str, Any]:
+    """What a plotted point must say beside its number (XC-303): the union of the caveats of every
+    reduction its value came from, and the missing entries they left out, added up. A point with no
+    value already says why in its reason."""
+    if value is None or not touched:
+        return {}
+    answer: dict[str, Any] = {}
+    # The undeclared unit is the series' fact, said once by its `unit`; a point carries what varies
+    # from point to point - a partial dataset, an average, a reduced geometry, missing entries.
+    caveats = sorted({
+        one.value for reduced in touched for one in reduced.value.caveats if one is not Caveat.UNDECLARED_UNIT
+    })
+    if caveats:
+        answer["caveats"] = caveats
+    left_out = sum(reduced.value.missing_count for reduced in touched)
+    if left_out:
+        answer["missingCount"] = left_out
+    return answer
+
 
 def graph_data(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
     """The graph's series as numbers (graph/AC-001, AC-002, AC-008, AC-013, INV-017, XC-290).
@@ -2023,6 +2066,7 @@ def graph_data(session: Session, parameters: Mapping[str, Any]) -> Effect | Resu
                 entry: dict[str, Any] = {"caseId": loaded.case_id, "x": position.value if position.value is not None else float(step), "value": point.value, "resultPosition": stated_position(position)}
                 if point.reason:
                     entry["reason"] = point.reason
+                entry.update(point_caveats(point.value, quantities.touched()))
                 points.append(entry)
         else:
             for case_id in cases:
@@ -2039,6 +2083,7 @@ def graph_data(session: Session, parameters: Mapping[str, Any]) -> Effect | Resu
                 entry = {"caseId": case_id, "x": None, "value": point.value}
                 if point.reason:
                     entry["reason"] = point.reason
+                entry.update(point_caveats(point.value, quantities.touched()))
                 points.append(entry)
         series_answer: dict[str, Any] = {
             "label": one.label,

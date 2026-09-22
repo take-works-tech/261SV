@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "3.19.0";
+export const PROTOCOL_VERSION = "3.20.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -747,6 +747,7 @@ export interface Results {
       association: "point" | "cell" | "integrationPoint" | "field";
       unit?: string | null;
       components?: number;
+      missingCount: number;
     })[];
     supportLevel: "verified" | "offered";
     gaps: readonly (string)[];
@@ -768,36 +769,9 @@ export interface Results {
   };
   "field.declareUnit": Record<string, unknown>;
   "field.statistics": {
-    minimum: {
-      value: number | null;
-      unit: string | null;
-      digits: number;
-      provenance: "declared" | "dataset" | "computed" | "measured" | "reference";
-      formula?: string;
-      caveats?: readonly (string)[];
-      missingBecause?: string;
-      location?: string;
-    };
-    maximum: {
-      value: number | null;
-      unit: string | null;
-      digits: number;
-      provenance: "declared" | "dataset" | "computed" | "measured" | "reference";
-      formula?: string;
-      caveats?: readonly (string)[];
-      missingBecause?: string;
-      location?: string;
-    };
-    mean: {
-      value: number | null;
-      unit: string | null;
-      digits: number;
-      provenance: "declared" | "dataset" | "computed" | "measured" | "reference";
-      formula?: string;
-      caveats?: readonly (string)[];
-      missingBecause?: string;
-      location?: string;
-    };
+    minimum: ReportedValue;
+    maximum: ReportedValue;
+    mean: ReportedValue;
     missingCount: number;
     association: "point" | "cell";
     reduction: string;
@@ -828,16 +802,7 @@ export interface Results {
     changedIds: readonly (string)[];
   };
   "variable.detach": {
-    keptValue: {
-      value: number | null;
-      unit: string | null;
-      digits: number;
-      provenance: "declared" | "dataset" | "computed" | "measured" | "reference";
-      formula?: string;
-      caveats?: readonly (string)[];
-      missingBecause?: string;
-      location?: string;
-    };
+    keptValue: ReportedValue;
   };
   "view.create": {
     id: string;
@@ -917,6 +882,8 @@ export interface Results {
           unit: string | null;
           stated: string;
         };
+        caveats?: readonly (string)[];
+        missingCount?: number;
       })[];
       unit: string | null;
       provenance: "declared" | "dataset" | "computed" | "measured" | "reference";
@@ -937,16 +904,7 @@ export interface Results {
     diffId: string;
     outsideCount: number;
     outsideFraction: number;
-    roundTripError: {
-      value: number | null;
-      unit: string | null;
-      digits: number;
-      provenance: "declared" | "dataset" | "computed" | "measured" | "reference";
-      formula?: string;
-      caveats?: readonly (string)[];
-      missingBecause?: string;
-      location?: string;
-    };
+    roundTripError: ReportedValue;
     disclosure: string;
   };
   "report.create": {
@@ -1029,16 +987,7 @@ export interface Results {
     omitted?: number;
   };
   "dataset.probe": {
-    value: {
-      value: number | null;
-      unit: string | null;
-      digits: number;
-      provenance: "declared" | "dataset" | "computed" | "measured" | "reference";
-      formula?: string;
-      caveats?: readonly (string)[];
-      missingBecause?: string;
-      location?: string;
-    };
+    value: ReportedValue;
     association?: string;
     resultPosition: {
       step: number;
@@ -1236,16 +1185,7 @@ export interface Results {
     deletedFiles: readonly (string)[];
   };
   "view.pick": {
-    value: {
-      value: number | null;
-      unit: string | null;
-      digits: number;
-      provenance: "declared" | "dataset" | "computed" | "measured" | "reference";
-      formula?: string;
-      caveats?: readonly (string)[];
-      missingBecause?: string;
-      location?: string;
-    };
+    value: ReportedValue;
     association?: string;
     part?: string;
     resultPosition: {
@@ -1322,6 +1262,7 @@ export type ReportedValue = {
   caveats?: readonly (string)[];
   missingBecause?: string;
   location?: string;
+  missingCount?: number;
 };
 
 /** A time this product recorded: the UTC instant, and the offset of the zone it was recorded
