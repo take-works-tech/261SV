@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-21
+updated: 2026-09-22
 ---
 
 # Sources
@@ -2387,3 +2387,25 @@ Recorded so that nothing silently depends on them:
   hundreds of megabytes of the frozen engine read from a cold disk - and any machine but this one;
   the launch page (XC-304) is written for that case rather than from a number nobody has
 - justifies: XC-304
+
+### E-223 - Selection to reflected change, measured here
+- tier: T1
+- url: src/ui/state/engine.connected.test.ts (record: spike/results.json `selection`)
+- verified: 2026-09-22
+- says: on this machine (Windows 11, integrated graphics, Python 3.11.9, VTK 9.5.2), with the demo
+  cube and the bar loaded into the two cases of one document, moving the tree between them six
+  times and waiting for every area to settle - the View area's picture and numbers of the other
+  dataset included - took 99 ms at least, 108 ms at the median and 110 ms at most. Both fixtures
+  are small; a dataset near LIM-001 was not measured, nor any machine but this one
+- justifies: LIM-011, XC-305
+
+### E-224 - Nielsen's three response-time limits
+- tier: T2
+- url: https://www.nngroup.com/articles/response-times-3-important-limits/
+- verified: 2026-09-22
+- says: Jakob Nielsen, 1993, citing Miller 1968, Card et al. 1991 and Myers 1985: 0.1 second is
+  "the limit for having the user feel that the system is reacting instantaneously", 1.0 second
+  "the limit for the user's flow of thought to stay uninterrupted", and 10 seconds "the limit for
+  keeping the user's attention focused on the dialogue". An analysis that names its sources; the
+  budgets here are set against it and measured here, never taken from it alone
+- justifies: LIM-010, LIM-011, XC-305

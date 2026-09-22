@@ -793,6 +793,24 @@ describe("each area says which case it shows (XC-292)", () => {
     expect(s.imageUrl).toMatch(/^blob:/);
     expect(s.statistics?.maximum?.value).toBe(8);
 
+    // Selection to reflected change, measured (LIM-011, E-223): both cases loaded, the tree moved
+    // between them six times, and every area settled - the View area's picture and numbers of the
+    // other dataset included. Printed, not asserted: a shared runner's number is not this machine's.
+    const switches: number[] = [];
+    for (const target of ["case:2", "case:1", "case:2", "case:1", "case:2", "case:1"]) {
+      const started = performance.now();
+      session.selectCase(target);
+      await engineState.settled();
+      switches.push(performance.now() - started);
+      expect(snapshot().caseId).toBe(target);
+    }
+    const sorted = [...switches].sort((one, another) => one - another);
+    console.log(`selection: reflected in ${sorted[0]!.toFixed(0)} ms (min), ${sorted[Math.floor(sorted.length / 2)]!.toFixed(0)} ms (median), ${sorted[sorted.length - 1]!.toFixed(0)} ms (max) over ${switches.length} switches with both cases loaded (this machine, not a launch)`);
+    expect(snapshot().datasetId).toBe(cubeDataset);
+    // The store measured it too, for the bar to say when a switch is over LIM-011 (XC-305).
+    expect(typeof snapshot().reflection?.ms).toBe("number");
+    expect(typeof snapshot().reflection?.overBudget).toBe("boolean");
+
     // The Graph area follows again; the variant has no temperature, so its point is no data with
     // the reason, in the legend - never the first case's number under the variant's name.
     session.followArea("graph");

@@ -1377,6 +1377,8 @@ list down first would have been the part with no evidence behind it.
   feels broken, on the hardware class of E-063
 - blocks: nothing today; the budgets exist as limits and are enforced once numbered
 - resolve_by: measurement on the sample workspace, once there is an interface to measure
+- status: superseded
+- superseded_by: XC-305
 - decidedness: Open
 
 ### XC-139 - What the model is told about the product is generated, never written by hand
@@ -6972,3 +6974,41 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a measured cold start on the hardware class of E-063, at which point the slow
   mark and the sentence are set from it; or a budget decided under #243, at which point the page
   says when the start has exceeded it
+
+### XC-305 - The latency budgets are numbers: three seconds from launch to a drawn sample, one second from a selection to every area, set from measurements here against the published limits of attention, said on screen when exceeded, and never raised to fit
+- decided: 2026-09-22
+- status: active
+- decision: LIM-010 is **3 seconds** from launch to a rendered sample result on a warm file cache
+  and the hardware class of E-063, and LIM-011 is **1000 milliseconds** from selecting a case to
+  every area reflecting it; both live in one file (`src/ui/logic/budgets.ts`) that the limits name
+  as their source of truth. The numbers rest on measurements taken here - launch to a drawn sample
+  about 0.63 s packaged and warm and 1.05 s on the first launch after packaging (E-222); a switch
+  with both cases loaded 99-110 ms (E-223) - and on the published limits of attention: one second
+  for the flow of thought, ten for attention itself (E-224). **Exceeding a budget is said where it
+  happens**: the starting page says the launch budget has passed, with the budget named, and the
+  work-area bar says how long a switch took beside the budget; the shell's notes hold every
+  launch's timeline and the store measures every switch. Neither is asserted in a test against the
+  budget - a shared runner's number is the runner's - and neither budget is raised to fit the code:
+  over it, the path is profiled and the cause named (LIM `on_exceed`). This closes OPEN-017. What
+  the numbers do not cover is said: a cold start on a machine that never ran the product, and a
+  switch on a dataset near LIM-001, are unmeasured, and the page that says "over budget" is what
+  makes that visible on the machine where it happens
+- decided_by: engineering judgement, from #243's condition, XC-137, E-222, E-223 and E-224
+- rationale: a budget promised before it is measured is a wish (XC-137), and a budget never
+  promised is a product that cannot say it is slow. With the segments measured, the choice is
+  where to put the line: at the measurement, which fails on the next machine for no fault; or at
+  the published limit of attention, which is where a person calls the product broken. Three
+  seconds sits between the slowest launch measured and the ten-second limit; one second is the
+  flow-of-thought limit itself, and nine times the measured switch. Saying the overrun on screen
+  is what turns the budget from a document into a thing a person can hold the product to
+- alternatives: **budgets at the measured values** - fail on any slower machine and say nothing
+  useful. **Timing assertions in CI** - a shared runner's flake as a product fact. **No numbers
+  until a cold start is measured** - the cold start is the one number this machine cannot give,
+  and the page says "over budget" precisely so that the machine that can, does
+- basis: E-222 (T1), E-223 (T1), E-224 (T2)
+- affects: LIM-010, LIM-011, OPEN-017, MOD-015, MOD-016, MOD-009, operations/REQ-007
+- decidedness: Bounded
+- reversal_trigger: a cold-start measurement on the hardware class of E-063 above three seconds
+  with a warm cache ruled out, at which point LIM-010 is re-set from it and the reason written; or
+  a switch on a LIM-001-sized dataset measured over a second, at which point either the switch is
+  made faster or LIM-011 is re-set from the measurement, and which of the two is written here

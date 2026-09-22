@@ -294,5 +294,18 @@
       "note": "engineReadyMs plus the sample segment, each measured separately; not one measurement"
     },
     "not_measured": "a cold start on a machine that has never run the product, and any machine but this one"
+  },
+  "selection": {
+    "measured": "2026-09-22",
+    "script": "src/ui/state/engine.connected.test.ts (console line in the XC-292 thread)",
+    "machine": "Windows 11 (platform reports 'Windows 10'), Python 3.11.9, VTK 9.5.2; integrated graphics",
+    "both_cases_loaded_switches_ms": {
+      "count": 6,
+      "min": 99,
+      "median": 108,
+      "max": 110
+    },
+    "fixtures": "the demo cube and the bar, both small; every area settled, the View area's picture and numbers of the other dataset included",
+    "not_measured": "a dataset near LIM-001, and any machine but this one"
   }
 }

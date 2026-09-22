@@ -180,24 +180,35 @@ applies the matching row; the class it chose is visible in settings, and can be 
 - basis: E-063 (T1)
 
 ### LIM-010 - Time to first rendered result
-- value: TBD
-- unit: seconds from launch to a rendered sample result
-- rationale: the first impression of a desktop tool is how long it takes to show something. The number
-  is not written here until it is measured on the hardware class of E-063, because a limit nobody
-  measured is a wish (XC-137). E-222 measured the segments on this machine - about 0.63 s to a drawn
-  sample, packaged and warm, as a sum - and the value waits for #243 to decide the budget (XC-304)
-- on_exceed: the launch path is profiled and the cause named; the budget is not raised to fit the code
-- decidedness: Open
-- open: OPEN-017
+- value: 3
+- unit: seconds from launch to a rendered sample result, on a warm file cache and the hardware class of E-063
+- source_of_truth: src/ui/logic/budgets.ts:LAUNCH_BUDGET_SECONDS
+- rationale: the first impression of a desktop tool is how long it takes to show something, and a
+  limit nobody measured is a wish (XC-137). Measured here (E-222): the packaged application reaches
+  a drawn sample in about 0.63 s warm and 1.05 s on the first launch after packaging, as a sum of
+  segments measured separately. Ten seconds is where attention leaves the dialogue and one second
+  where the flow of thought breaks (E-224); three seconds is about three times the slowest launch
+  measured and far from ten. A cold start on a machine that never ran the product is unmeasured,
+  and the starting page counts and says when this budget has passed (XC-304, XC-305)
+- on_exceed: the starting page says the budget was exceeded, the shell's notes hold the timeline,
+  the launch path is profiled and the cause named; the budget is not raised to fit the code
+- decidedness: Bounded
+- basis: E-222 (T1), E-224 (T2)
 
 ### LIM-011 - Selection to reflected change
-- value: TBD
+- value: 1000
 - unit: milliseconds from selecting a @Case to every area showing it
+- source_of_truth: src/ui/logic/budgets.ts:SELECTION_BUDGET_MS
 - rationale: the product's central promise is that switching case changes the subject everywhere at
-  once (11_ui.md). If that takes long enough to notice, the promise is not kept
-- on_exceed: profiled and named, never absorbed by removing the promise
-- decidedness: Open
-- open: OPEN-017
+  once (11_ui.md). Measured here (E-223): 99-110 ms with both cases loaded on the demo fixtures.
+  One second is the published limit for the flow of thought to stay uninterrupted (E-224), which is
+  what "at once" has to mean, and it leaves nine times the measured switch for a dataset nearer
+  the size LIM-001 allows. A switch over the budget says so in the work-area bar with its time
+  (XC-305)
+- on_exceed: the work-area bar names the time and the budget; profiled and named, never absorbed
+  by removing the promise
+- decidedness: Bounded
+- basis: E-223 (T1), E-224 (T2)
 
 ### LIM-012 - Output before the product asks about it
 - value: 21474836480

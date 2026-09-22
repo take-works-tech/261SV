@@ -261,3 +261,14 @@ updated: 2026-09-22
   `spike/measure_launch.py` measures and `spike/results.json` `launch` records. Proven by
   `src/ui/logic/startup.test.ts` and `src/ui/state/reachability.test.ts`; the measurement is the
   evidence's.
+
+### TASK-034 - The budgets as numbers, and the overrun said
+- satisfies: AC-033
+- depends_on: TASK-033
+- done_when: LIM-010 and LIM-011 hold numbers with one source of truth, a launch past the budget
+  says so on the starting page, a switch past the budget says so in the work-area bar, and the
+  selection measurement is recorded as evidence
+- done: 2026-09-22 (XC-305, E-223, E-224, #243). `src/ui/logic/budgets.ts` holds both numbers;
+  `describeStartup` names the launch budget once passed; the store times every subject move and
+  the work-area bar shows `describeReflection` when over. Proven by `src/ui/logic/budgets.test.ts`
+  and the connected thread, which measures six switches and records them; OPEN-017 is closed.
