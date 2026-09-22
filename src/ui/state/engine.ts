@@ -29,6 +29,9 @@ import { session } from "./session";
 /** Whether an engine is reachable, and what it said if it is not. */
 export type Reachability =
   | { kind: "unknown" }
+  /** The shell's engine process is starting (XC-304): nothing is asked of it yet, and every
+   *  screen shows that it is starting rather than a design state. `since` is the shell's word. */
+  | { kind: "starting"; since: RecordedTime | null }
   | { kind: "reachable"; protocols: readonly string[] }
   | { kind: "absent"; because: string }
   /** The shell's engine process was running and ended (XC-259). What is on screen came from it
@@ -633,6 +636,14 @@ export const engineState = {
       setState({ reachability });
       return reachability;
     }
+  },
+
+  /** The shell says the engine process is starting (XC-304). Nothing is connected yet; the page
+   *  shows the wait, counted, and never a design state. */
+  engineStarting(status: { since?: unknown }) {
+    engine = null;
+    const since = status.since && typeof status.since === "object" ? (status.since as RecordedTime) : null;
+    setState({ reachability: { kind: "starting", since }, busy: false });
   },
 
   /** The shell says the engine process ended. The picture, the numbers and the probe stay as they

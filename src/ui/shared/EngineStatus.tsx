@@ -41,7 +41,9 @@ export function EngineStatus(props: {
         ? "エンジン未接続：画面は設計状態です"
         : reachability.kind === "exited"
           ? `エンジン停止（${reachability.because}）：表示は停止前のものです`
-          : "エンジン未確認";
+          : reachability.kind === "starting"
+            ? "エンジン起動中"
+            : "エンジン未確認";
   const detail =
     reachability.kind === "absent" || reachability.kind === "exited" ? reachability.because : undefined;
   return (

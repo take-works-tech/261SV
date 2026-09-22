@@ -123,6 +123,11 @@ updated: 2026-09-22
   - AC-020: When the product launches on the sample @Workspace, the system shall reach a rendered result
     within LIM-010
   - AC-021: When a @Case is selected, the system shall reflect it in every area within LIM-011
+  - AC-032: When the desktop shell has opened its window and the engine has not yet answered, the
+    interface shall show that the engine is starting, the seconds waited, and past the slow mark what
+    can take the time, promising no time; if the start ended without an engine it shall show the
+    reason and offer a restart; and it shall never show a design state in that interval. The shell
+    shall record the launch timeline in its own notes at every launch (XC-304)
 
 ### REQ-008 - A shared component has one implementation
 - priority: MUST

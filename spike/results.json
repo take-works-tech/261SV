@@ -217,5 +217,82 @@
       }
     ],
     "not_measured": "a first open from a cold disk; the interface rendering the lists it is sent; a document with hundreds of cases beside the items (LIM-005 is measured separately when it is)"
+  },
+  "launch": {
+    "measured": "2026-09-22",
+    "script": "spike/measure_launch.py 3 [--packaged]; sample segment from src/ui/state/engine.connected.test.ts (console line)",
+    "machine": "Windows 11 (platform reports 'Windows 10'), Python 3.11.9, VTK 9.5.2, Electron 44.4.3, PyInstaller 6.22.3; integrated graphics; file cache warm",
+    "milliseconds_after_the_shell_process_start": {
+      "development_first_after_build": {
+        "windowCreatedMs": 710,
+        "interfaceLoadedMs": 1027,
+        "engineReadyMs": 1341,
+        "packaged": false
+      },
+      "development_runs": [
+        {
+          "windowCreatedMs": 76,
+          "interfaceLoadedMs": 158,
+          "engineReadyMs": 637,
+          "packaged": false
+        },
+        {
+          "windowCreatedMs": 75,
+          "interfaceLoadedMs": 161,
+          "engineReadyMs": 644,
+          "packaged": false
+        },
+        {
+          "windowCreatedMs": 77,
+          "interfaceLoadedMs": 182,
+          "engineReadyMs": 710,
+          "packaged": false
+        },
+        {
+          "windowCreatedMs": 77,
+          "interfaceLoadedMs": 160,
+          "engineReadyMs": 627,
+          "packaged": false
+        },
+        {
+          "windowCreatedMs": 75,
+          "interfaceLoadedMs": 158,
+          "engineReadyMs": 672,
+          "packaged": false
+        }
+      ],
+      "packaged_first_after_build": {
+        "windowCreatedMs": 292,
+        "interfaceLoadedMs": 405,
+        "engineReadyMs": 919,
+        "packaged": true
+      },
+      "packaged_runs": [
+        {
+          "windowCreatedMs": 79,
+          "interfaceLoadedMs": 176,
+          "engineReadyMs": 542,
+          "packaged": true
+        },
+        {
+          "windowCreatedMs": 77,
+          "interfaceLoadedMs": 161,
+          "engineReadyMs": 498,
+          "packaged": true
+        }
+      ]
+    },
+    "frozen_engine": {
+      "bytes": 277499737,
+      "files": 669,
+      "freeze_seconds": 19.2
+    },
+    "sample_asked_written_opened_loaded_drawn_ms": 128,
+    "launch_to_drawn_sample_as_a_sum_ms": {
+      "packaged_run": 626,
+      "packaged_first_after_build": 1047,
+      "note": "engineReadyMs plus the sample segment, each measured separately; not one measurement"
+    },
+    "not_measured": "a cold start on a machine that has never run the product, and any machine but this one"
   }
 }
