@@ -74,7 +74,7 @@ from service.workspace import lock as workspace_lock
 from service.workspace.lock import LockState, LockStatus
 from service.workspace.document import FORMAT_VERSION, WorkspaceDocument, WorkspaceFileError, fresh as fresh_document, load as load_workspace
 from service.workspace.document import WorkspaceVersionError, save as save_document
-from service.workspace.hierarchy import find as find_case, walk as walk_cases
+from service.workspace.hierarchy import capacity_warning as cases_capacity_warning, find as find_case, walk as walk_cases
 from service.workspace.items import ItemError
 
 #: The distribution this engine ships as. Read from the installed metadata rather than restated, so
@@ -563,6 +563,10 @@ def workspace_open(session: Session, parameters: Mapping[str, Any]) -> Effect | 
     over = items.capacity_warning(loaded.raw)
     if over is not None:
         warnings += (over,)
+    # The same for cases (LIM-005): opened whole and said, never refused (XC-306).
+    crowded = cases_capacity_warning(loaded.cases)
+    if crowded is not None:
+        warnings += (crowded,)
 
     # A version-4 document was lifted to this build's shape on the way in (CT-001 5.0.0, XC-266).
     # Said, because the next save writes it as 5.0.0, and a file that changes version is a thing a

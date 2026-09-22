@@ -98,19 +98,28 @@ export const LOADED_WORD = "読み込み済み";
  *  leaves its child at the root rather than dropped: a case hidden by a broken reference is a case the
  *  reader cannot find (XC-001). */
 export function caseTree(cases: readonly CaseSummary[], loadedCaseIds: readonly string[]): CaseTreeNode[] {
+  // Children grouped by parent once, so the tree costs what the cases count and not its square: the
+  // filter-per-node version took 152 ms for five thousand cases and 2.4 s for twenty thousand on the
+  // development machine (E-225), which is the interface's whole selection budget spent on a list.
   const known = new Set(cases.map((one) => one.id));
+  const byParent = new Map<string | undefined, CaseSummary[]>();
+  for (const one of cases) {
+    const parent = one.parentId !== undefined && known.has(one.parentId) ? one.parentId : undefined;
+    const siblings = byParent.get(parent);
+    if (siblings) siblings.push(one);
+    else byParent.set(parent, [one]);
+  }
+  const loaded = new Set(loadedCaseIds);
   const build = (parent: string | undefined): CaseTreeNode[] =>
-    cases
-      .filter((one) => (parent === undefined ? one.parentId === undefined || !known.has(one.parentId) : one.parentId === parent))
-      .map((one) => {
-        const children = build(one.id);
-        return {
-          id: one.id,
-          name: one.name,
-          ...(loadedCaseIds.includes(one.id) ? { axis: LOADED_WORD } : {}),
-          ...(children.length > 0 ? { children } : {}),
-        };
-      });
+    (byParent.get(parent) ?? []).map((one) => {
+      const children = build(one.id);
+      return {
+        id: one.id,
+        name: one.name,
+        ...(loaded.has(one.id) ? { axis: LOADED_WORD } : {}),
+        ...(children.length > 0 ? { children } : {}),
+      };
+    });
   return build(undefined);
 }
 

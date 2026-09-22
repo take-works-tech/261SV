@@ -293,3 +293,29 @@ class TestDeletingAVariableFromAChild:
 
         assert resolve(document, "a", "local").is_resolved is False
         assert "local" not in find(document["cases"], "a1")[0].get("variableStates", {})
+
+
+class TestTheTreeIsBoundedInCases:
+    """LIM-005 (XC-306): a tree at the limit takes no more, by the limit's name; a tree past it is
+    said, not refused, when it is opened."""
+
+    def test_adding_past_the_limit_is_refused_by_name_and_a_crowded_tree_is_said(self) -> None:
+        from engine.limits import MAX_CASES_PER_WORKSPACE
+        from service.workspace import hierarchy
+
+        cases = [hierarchy.new_case(f"case:{n:05d}", f"c{n}") for n in range(MAX_CASES_PER_WORKSPACE)]
+        assert hierarchy.capacity_warning(cases) is None
+
+        with pytest.raises(hierarchy.HierarchyError) as refusal:
+            hierarchy.add(cases, hierarchy.new_case("case:more", "もう一つ"))
+
+        assert "LIM-005" in str(refusal.value) and f"{MAX_CASES_PER_WORKSPACE:,}" in str(refusal.value)
+        assert len(cases) == MAX_CASES_PER_WORKSPACE
+        crowded = cases + [hierarchy.new_case("case:extra", "extra")]
+        warning = hierarchy.capacity_warning(crowded)
+        assert warning is not None and "LIM-005" in warning and f"{MAX_CASES_PER_WORKSPACE + 1:,} 件" in warning
+        # Depth counts: nine children under one parent are ten cases.
+        nested = [hierarchy.new_case("case:top", "top")]
+        for n in range(9):
+            hierarchy.add(nested, hierarchy.new_case(f"case:child{n}", f"child {n}"), beneath="case:top")
+        assert hierarchy.count(nested) == 10

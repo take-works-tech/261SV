@@ -648,6 +648,8 @@ An Open that survives is not a failure; an Open with no tracking ID is.
 ### OPEN-008 - The capacity limits are placeholders until measured
 - decidedness: Open
 - open: OPEN-008
+- status: superseded
+- superseded_by: XC-306
 - question: **LIM-001, LIM-002, LIM-004 and LIM-006 now carry measured values** (E-051, E-053, E-063).
   What remains unmeasured is LIM-005 (cases per workspace), and the two Bounded budgets that were set
   by argument rather than by measurement: LIM-009 (background primitives) and LIM-012 (output before
@@ -7012,3 +7014,38 @@ model or the prompt, never in a description that quietly went stale.
   with a warm cache ruled out, at which point LIM-010 is re-set from it and the reason written; or
   a switch on a LIM-001-sized dataset measured over a second, at which point either the switch is
   made faster or LIM-011 is re-set from the measurement, and which of the two is written here
+
+### XC-306 - Two thousand cases in one workspace, measured; a crowded document opens whole and says so; and the two limits set by argument stay by argument, with the reason written
+- decided: 2026-09-22
+- status: active
+- decision: LIM-005 is **2000 cases**, set from a measurement here (E-225) rather than the argument
+  it carried: the document's cost is linear in cases, about 445 bytes on disk, 36 µs to open and 230
+  bytes of open answer per case, so two thousand open in about 75 ms with a 0.46 MB answer, and the
+  interface's tree - quadratic until this decision, 152 ms at five thousand and 2.4 s at twenty
+  thousand - is linear now and builds two thousand in about a millisecond. **The limit is enforced
+  where cases enter**, as LIM-016 is (XC-265): `MAX_CASES_PER_WORKSPACE` had been defined and used
+  by nothing; now a document holding more opens whole, says so in `workspace.open`'s warnings with
+  the count and the limit, and still saves, and `hierarchy.add` refuses one more by the limit's name
+  until the count is under it. **OPEN-008 closes**: LIM-005 is measured; LIM-009 (background
+  primitives) cannot be measured until a background kind ships (OPEN-016, deferred) and keeps its
+  number on E-063's frame budget; LIM-012 (output before the product asks) is a threshold for asking
+  and not a capacity, kept by argument as a Bounded choice - both are said to be so here rather
+  than left as a question nobody can answer by measuring
+- decided_by: engineering judgement, from #238's condition, XC-137, XC-265 and E-225
+- rationale: the old five hundred was a wish about navigability (XC-137); the measurement says the
+  engine is not the constraint at any size a sweep reaches, and the interface's tree was - for a
+  reason nobody had measured, a filter over every case for every case. With that fixed, the number
+  is placed where a thousand-run sweep fits with room and the one cost still unmeasured, the drawn
+  tree of one row per case, stays a few thousand rows. A limit defined and enforced by nothing is
+  the same wish in code, and the enforcement follows the shape LIM-016 already has: never refuse
+  to read a person's work over a limit on what this build adds
+- alternatives: **keeping five hundred** - a sweep of a thousand runs refused for no measured
+  reason. **Five thousand** - every measured cost still small, and the drawn tree unmeasured at five
+  thousand rows. **Leaving OPEN-008 open for LIM-009 and LIM-012** - a question that measurement
+  cannot answer is not an open question but a choice, and it is written as one
+- basis: E-225 (T1), E-209 (T1)
+- affects: LIM-005, LIM-009, LIM-012, OPEN-008, MOD-007, MOD-012, MOD-015, workspace/REQ-001
+- decidedness: Bounded
+- reversal_trigger: the drawn tree measured over LIM-011 at two thousand rows, at which point the
+  number comes down or the tree is windowed and the choice written; a sweep that needs more, at
+  which point the number goes up to what the measured curve allows and the tree is windowed first

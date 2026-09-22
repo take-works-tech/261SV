@@ -2544,3 +2544,27 @@ class TestASupportBundle:
         assert again.status is Status.REFUSED and "すでにあります" in (again.reason or "")
         assert any(line.event == "supportBundle" for line in session.log.lines())
         assert not any(name.endswith(".writing") for name in os.listdir(tmp_path))
+
+
+class TestAWorkspaceIsBoundedInCases:
+    """LIM-005 (XC-306): a document past the ceiling opens whole and says so, lists every case to the
+    interface, and saves. Nothing it holds is dropped for the sake of a number."""
+
+    def test_a_document_past_the_limit_opens_whole_says_so_and_saves(self, tmp_path: Path) -> None:
+        from engine.limits import MAX_CASES_PER_WORKSPACE
+
+        surface, session = a_surface()
+        path = a_workspace(tmp_path, cases=[{"id": f"case:{n:05d}", "name": f"c{n}"} for n in range(MAX_CASES_PER_WORKSPACE + 1)])
+
+        result = surface.submit(Command("workspace.open", {"path": str(path)}))
+
+        assert result.status is Status.APPLIED, result.reason
+        assert any("LIM-005" in one and f"{MAX_CASES_PER_WORKSPACE + 1:,} 件" in one for one in result.warnings)
+        assert session.workspace is not None and len(result.value["cases"]) == MAX_CASES_PER_WORKSPACE + 1
+        saved = surface.submit(Command("workspace.save", {"workspaceId": "ws:1"}))
+        assert saved.status is Status.APPLIED, saved.reason
+        # A document at the limit is not crowded: nothing is said of it.
+        within = a_workspace(tmp_path / "within", cases=[{"id": f"case:{n:05d}", "name": f"c{n}"} for n in range(MAX_CASES_PER_WORKSPACE)]) if (tmp_path / "within").mkdir() is None else None
+        opened = surface.submit(Command("workspace.open", {"path": str(within)}))
+        assert opened.status is Status.APPLIED, opened.reason
+        assert not any("LIM-005" in one for one in opened.warnings)
