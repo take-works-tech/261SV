@@ -46,6 +46,8 @@ export interface FieldSummary {
   /** How many numbers each entry is: 1 a scalar, 3 a vector, 6 a symmetric tensor (E-073). A
    *  field of several is coloured and summarised only through a derived quantity (XC-282). */
   readonly components?: number;
+  /** How many entries the file has no value for (XC-303): said before anyone reads a number. */
+  readonly missingCount?: number;
 }
 
 /** What a derived field was made by: the formula and the conventions the engine answered with

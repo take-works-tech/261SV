@@ -394,7 +394,7 @@ function ViewCanvas({ variant }: { variant: string }) {
          * words. Nothing here is formatted twice - `digits` came with the number (INV-014). */
         <ProbeReadout
           field={e.fieldName ?? ""}
-          value={e.probe.value === null ? "値なし" : formatValue(e.probe.value, e.probe.digits)}
+          value={e.probe.value === null ? `値なし（${e.probe.missingBecause ?? "理由未記録"}）` : formatValue(e.probe.value, e.probe.digits)}
           unit={e.probe.unit}
           origin={e.probe.provenance}
           location={probeWhere(e.probeLocation, e.probePosition)}
@@ -1755,6 +1755,7 @@ function LivePartSection() {
                     <span>
                       {one.value === null ? `値なし（${one.missingBecause ?? "理由不明"}）` : `${formatValue(one.value, one.digits)} ${one.unit ?? UNDECLARED}`}
                       {one.location ? <small className="type-caption" style={{ color: "var(--ink-muted)" }}>（{one.location}）</small> : null}
+                      {one.missingCount ? <small className="type-caption" style={{ color: "var(--ink-muted)" }}>（欠測 {one.missingCount} 件を除く）</small> : null}
                     </span>
                   </div>
                 );
@@ -1768,7 +1769,7 @@ function LivePartSection() {
                   <div className="prop-row">
                     <label>最大（節点平均）</label>
                     <span>
-                      {e.partStatistics.averaged.maximum.value === null ? "値なし" : `${formatValue(e.partStatistics.averaged.maximum.value, e.partStatistics.averaged.maximum.digits)} ${e.partStatistics.averaged.maximum.unit ?? UNDECLARED}`}
+                      {e.partStatistics.averaged.maximum.value === null ? `値なし（${e.partStatistics.averaged.maximum.missingBecause ?? "理由未記録"}）` : `${formatValue(e.partStatistics.averaged.maximum.value, e.partStatistics.averaged.maximum.digits)} ${e.partStatistics.averaged.maximum.unit ?? UNDECLARED}`}
                       {e.partStatistics.averaged.maximum.location ? <small className="type-caption" style={{ color: "var(--ink-muted)" }}>（{e.partStatistics.averaged.maximum.location}）</small> : null}
                     </span>
                   </div>

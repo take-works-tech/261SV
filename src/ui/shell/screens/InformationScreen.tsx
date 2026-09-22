@@ -674,7 +674,7 @@ function LiveInformation({ view, caseId }: { view: InformationView; caseId: stri
             <div className="table-scroll">
               <table className="value-table in-fields">
                 <thead>
-                  <tr><th>名称（原資料のまま）</th><th>関連</th><th>宣言単位</th></tr>
+                  <tr><th>名称（原資料のまま）</th><th>関連</th><th>宣言単位</th><th>欠測</th></tr>
                 </thead>
                 <tbody>
                   {view.fields.map((f) => (
@@ -686,6 +686,7 @@ function LiveInformation({ view, caseId }: { view: InformationView; caseId: stri
                           ? <><UnitLabel unit={f.unit} /> <ProvenanceBadge origin="declared" /></>
                           : <UnitLabel unit={null} />}
                       </td>
+                      <td>{f.missing === null ? "未回答" : `${f.missing} 件`}</td>
                     </tr>
                   ))}
                 </tbody>

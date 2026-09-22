@@ -37,6 +37,9 @@ export interface FieldFacts {
   association: FieldSummary["association"];
   associationLabel: string;
   unit: string | null;
+  /** How many entries the file has no value for, as the engine counted them; null where the answer
+   *  did not say (XC-303). */
+  missing: number | null;
 }
 
 export interface AxisFacts {
@@ -141,6 +144,7 @@ export function informationOf(state: EngineState): InformationView | null {
       association: field.association,
       associationLabel: ASSOCIATION_LABEL[field.association] ?? field.association,
       unit: field.unit,
+      missing: field.missingCount ?? null,
     })),
     axis: axis
       ? {

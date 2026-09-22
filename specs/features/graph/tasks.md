@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-21
+updated: 2026-09-22
 ---
 
 # Tasks: graph
@@ -270,3 +270,13 @@ updated: 2026-09-21
   computed when asked for, and a number a field cannot give is an `Absent` with the reason. The
   interface's graph screen draws the engine's series with an SVG of its own and copies the points
   as rows. Templates, styles, expressions over cases and the export wait as before
+
+### TASK-025 - What a point left out
+- satisfies: AC-028
+- depends_on: TASK-024
+- done_when: a graph point over a holed field carries the caveat and the count, the description
+  and the copied rows say it, and an all-missing case is a gap with its reason
+- done: 2026-09-22 (XC-303, CT-003 3.20.0, #215). `graph.data` points carry `caveats` and
+  `missingCount` from the reductions the value came from (`point_caveats`, the undeclared unit
+  left to the series); `src/ui/logic/graphs.ts` adds the point's note and the series' total.
+  Proven by `tests/test_missing_values.py::TestAGraphAndADeliverable` and the connected thread.

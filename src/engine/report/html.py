@@ -60,7 +60,7 @@ from dataclasses import dataclass, field as dataclass_field
 from pathlib import Path
 
 from domain_core.precision import format_value
-from domain_core.reported_value import CAVEAT_TEXT, UNDECLARED_MARKER, Caveat
+from domain_core.reported_value import Caveat, caveat_text, UNDECLARED_MARKER
 from engine.report.document import (
     EXTERNAL,
     Block,
@@ -460,7 +460,7 @@ def _row(row: ValueRow) -> str:
         f"<td>{_text(row.value.unit or '')}</td>"
     )
     notes = [
-        CAVEAT_TEXT[caveat]
+        caveat_text(caveat, row.value)
         for caveat in sorted(row.value.caveats, key=lambda one: one.value)
         # Already said by the unit column; saying it twice reads as two problems.
         if caveat is not Caveat.UNDECLARED_UNIT

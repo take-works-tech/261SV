@@ -142,6 +142,8 @@ class LoadedCase:
             provenance=Provenance.COMPUTED,
             caveats=caveats,
             formula=f"extremum({field}) over {len(usable)} parts",
+            # Every part's missing entries, added up: the caveat came with the union above (XC-303).
+            missing_count=sum(value.missing_count for _, value in usable),
             # Which part, then where in it. A location naming only the node is unusable in an assembly
             # where every part numbers its own nodes from one.
             location=f"{holder.label}：{largest.location}" if largest.location else holder.label,

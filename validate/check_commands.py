@@ -106,8 +106,9 @@ def check_parameters_are_stated(findings: list[Finding]) -> None:
 
 
 #: What makes a result field a reported value: the four keys XC-253 requires of `$defs.reportedValue`.
-#: Read from each field's own `required` rather than from a `$ref`, because CT-003 inlines the shape
-#: into every result that carries it, and a check keyed on the definition alone would find none.
+#: A field that references the definition is one; so is a field that still spells the shape out, by
+#: its own `required`. Until CT-003 3.20.0 every such field spelled it out, and a key added to the
+#: definition reached none of them (XC-303); the references are what make one definition one.
 REPORTED_VALUE_KEYS = frozenset({"value", "unit", "digits", "provenance"})
 
 
@@ -135,13 +136,16 @@ def render() -> str:
     def reported(name: str) -> dict[str, list[str]]:
         """The result fields of one operation that are reported values, with the keys each must hold."""
         one = answers.get(name, {})
-        return {
-            field: sorted(node.get("required") or [])
-            for field, node in sorted((one.get("properties") or {}).items())
-            if isinstance(node, dict)
-            and node.get("type") == "object"
-            and REPORTED_VALUE_KEYS <= set(node.get("required") or [])
-        }
+        definition = json.loads(SCHEMA.read_text(encoding="utf-8"))["$defs"]["reportedValue"]
+        found: dict[str, list[str]] = {}
+        for field, node in sorted((one.get("properties") or {}).items()):
+            if not isinstance(node, dict):
+                continue
+            if str(node.get("$ref", "")).endswith("/reportedValue"):
+                found[field] = sorted(definition.get("required") or [])
+            elif node.get("type") == "object" and REPORTED_VALUE_KEYS <= set(node.get("required") or []):
+                found[field] = sorted(node.get("required") or [])
+        return found
 
     def reported_row(name: str) -> str:
         inner = ", ".join(f"{field!r}: frozenset({keys!r})" for field, keys in reported(name).items())

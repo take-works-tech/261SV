@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-21
+updated: 2026-09-22
 ---
 
 # Feature: report generation
@@ -58,6 +58,10 @@ updated: 2026-09-21
     from the full data
   - AC-004: If any exported number came from a partial @Dataset, then the report shall state the
     coverage it was computed over
+  - AC-045: When an exported number was computed with missing entries left out, the document shall
+    say beside it how many (欠測 N 件を除いて計算した値です), and a value that is missing shall be a
+    stated absence with its reason - never a blank cell, a zero or the toolkit's own word for a
+    non-number (XC-303)
   - AC-036: When an exported document is opened from a local file, from the same file marked as
     downloaded (the Windows Internet-zone mark) or through a network share, in a supported
     browser, the document shall render the same and its embedded style, images and script shall

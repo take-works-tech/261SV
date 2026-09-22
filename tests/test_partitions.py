@@ -184,13 +184,22 @@ class TestARefusalIsNotAnAbsentValue:
         assert total.formula == "total(stress)"
         assert total.missing_because
 
-    def test_a_field_with_a_missing_entry_refuses_rather_than_averaging_the_rest(self) -> None:
-        """INV-011 and XC-001. A mean over the entries that happened to be there is read as the mean of
-        the field, and nothing in the digits says otherwise."""
-        holed = bar(np.array([10.0, np.nan, 30.0]))
+    def test_a_field_with_a_missing_entry_is_averaged_over_the_rest_and_says_so(self) -> None:
+        """XC-303, reversing what this test pinned until 2026-09-22: the mean was refused because a
+        mean over the entries that happened to be there reads as the mean of the field. It does not,
+        once the number carries the caveat and the count - and the nodal average, the summary and the
+        case-wide maximum over parts had all been leaving the missing out and saying so."""
+        from domain_core.reported_value import Caveat
 
-        assert holed.mean("stress").is_missing
-        assert "3 件のうち 1 件が欠損" in (holed.mean("stress").missing_because or "")
+        holed = bar(np.array([10.0, np.nan, 30.0]))
+        mean = holed.mean("stress")
+        gone = bar(np.array([np.nan, np.nan]))
+
+        assert mean.value == pytest.approx(20.0)
+        assert Caveat.MISSING_VALUES in mean.caveats and mean.missing_count == 1
+        assert holed.maximum("stress").value == pytest.approx(30.0) and holed.maximum("stress").missing_count == 1
+        assert holed.counted_entries("stress").value == 2
+        assert gone.mean("stress").is_missing and "2 件すべてが欠損" in (gone.mean("stress").missing_because or "")
 
     def test_a_count_is_dimensionless_even_when_the_field_has_no_unit(self) -> None:
         undeclared = bar(WHOLE_VALUES, unit=None)

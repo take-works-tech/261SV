@@ -44,6 +44,7 @@ class Caveat(str, Enum):
     AVERAGED = "averaged"                      # averaged across cells sharing a point (INV-003)
     FROM_REDUCED_GEOMETRY = "from-reduced"     # measured on display geometry, not the full dataset
     UNDECLARED_UNIT = "undeclared-unit"        # the quantity has no unit and none was inferred (XC-003)
+    MISSING_VALUES = "missing-values"          # entries that were missing were left out of this number (XC-303)
 
 
 # A quantity that genuinely has no unit - a ratio, a safety factor, a count - is **dimensionless**, and
@@ -64,6 +65,7 @@ CAVEAT_TEXT: dict[Caveat, str] = {
     Caveat.AVERAGED: "セル間で平均した値です",
     Caveat.FROM_REDUCED_GEOMETRY: "縮退した表示形状から測った値です",
     Caveat.UNDECLARED_UNIT: UNDECLARED_MARKER,
+    Caveat.MISSING_VALUES: "欠測を除いて計算した値です",
 }
 
 
@@ -83,8 +85,18 @@ class ReportedValue:
     # Where the value is, in the source's own words - "GlobalNodeId 1003". Never an array index: an
     # index is a number a reader takes to the solver and fails to find (INV-023, GL-034).
     location: str | None = None
+    # How many entries were missing and left out when this number was computed (XC-303). Beside a
+    # number it comes with MISSING_VALUES; beside an absence it says how many there were.
+    missing_count: int = 0
 
     def __post_init__(self) -> None:
+        if self.missing_count < 0:
+            raise ValueError("a count of missing entries is not negative")
+        if self.missing_count and self.value is not None and Caveat.MISSING_VALUES not in self.caveats:
+            raise ValueError(
+                "a number computed with missing entries left out carries MISSING_VALUES; the count alone "
+                "is a footnote nobody reads (XC-303)"
+            )
         if self.provenance is Provenance.COMPUTED and not self.formula:
             raise ValueError(
                 "a computed value carries the formula that produced it (GL-032); without it the number "
@@ -128,6 +140,13 @@ class ReportedValue:
     def with_caveat(self, *caveats: Caveat) -> "ReportedValue":
         return replace(self, caveats=self.caveats | frozenset(caveats))
 
+    def with_missing(self, count: int) -> "ReportedValue":
+        """This value as one computed with `count` missing entries left out: the caveat and the count
+        together, or unchanged where nothing was missing (XC-303)."""
+        if count <= 0:
+            return self
+        return replace(self, caveats=self.caveats | {Caveat.MISSING_VALUES}, missing_count=count)
+
     def derive(
         self,
         value: float | None,
@@ -154,9 +173,19 @@ class ReportedValue:
             provenance=Provenance.COMPUTED,
             caveats=frozenset().union(*(item.caveats for item in inputs)),
             formula=formula,
+            # What every input left out, added up: a ratio of a maximum over 42 of 45 entries to a
+            # declared allowable is still about the 3 that were not there (XC-303).
+            missing_count=sum(item.missing_count for item in inputs),
         )
+
+
+def caveat_text(caveat: Caveat, value: ReportedValue) -> str:
+    """One caveat's sentence beside this value: the fixed text, with the count where there is one."""
+    if caveat is Caveat.MISSING_VALUES and value.missing_count:
+        return f"欠測 {value.missing_count} 件を除いて計算した値です"
+    return CAVEAT_TEXT[caveat]
 
 
 def caveat_notes(value: ReportedValue) -> list[str]:
     """The caveats as lines to show beside the number, in a fixed order so two reports agree."""
-    return [CAVEAT_TEXT[caveat] for caveat in Caveat if caveat in value.caveats]
+    return [caveat_text(caveat, value) for caveat in Caveat if caveat in value.caveats]

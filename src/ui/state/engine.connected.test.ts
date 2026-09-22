@@ -40,6 +40,7 @@ let workspacePath: string;
 let cubePath: string;
 let partialPath: string | null = null;
 let barPath: string;
+let holedPath: string;
 let fieldsPath: string;
 let transientPath: string | null = null;
 let engineOutput = "";
@@ -65,12 +66,13 @@ beforeAll(async () => {
   });
   if (written.status !== 0) throw new Error(`demo case not written:\n${written.stderr}`);
   const paths = JSON.parse(written.stdout.trim()) as {
-    workspace: string; cube: string; partial: string | null; bar: string; fields: string; transient: string | null;
+    workspace: string; cube: string; partial: string | null; bar: string; fields: string; transient: string | null; holed: string;
   };
   workspacePath = paths.workspace;
   cubePath = paths.cube;
   partialPath = paths.partial;
   barPath = paths.bar;
+  holedPath = paths.holed;
   fieldsPath = paths.fields;
   transientPath = paths.transient;
 
@@ -140,7 +142,7 @@ describe("the prototype thread from the interface's side", () => {
     const s = snapshot();
     expect(s.refusal).toBeNull();
     expect(s.sourceName).toBe("cube.vtu");
-    expect(s.fields).toEqual([{ name: "temperature", association: "point", unit: null, components: 1 }]);
+    expect(s.fields).toEqual([{ name: "temperature", association: "point", unit: null, components: 1, missingCount: 0 }]);
     expect(s.fieldName).toBe("temperature");
     expect(s.bounds).toEqual([
       [0, 0, 0],
@@ -855,6 +857,33 @@ describe("a new workspace (XC-297)", () => {
     expect(await engineState.loadDataset("case:1", cubePath)).toBe(true);
     await engineState.refresh();
     expect(snapshot().imageUrl).toMatch(/^blob:/);
+  });
+});
+
+describe("a field with missing entries (XC-303)", () => {
+  test("every number says what it left out, a place with no value says why, and a graph point carries the same", async () => {
+    expect(await engineState.loadDataset("case:1", holedPath)).toBe(true);
+    await engineState.refresh();
+    let s = snapshot();
+    expect(s.fields.find((one) => one.name === "temperature")?.missingCount).toBe(3);
+    expect(s.statistics?.missingCount).toBe(3);
+    expect(s.statistics?.maximum?.value).toBe(400);
+    expect(s.statistics?.maximum?.caveats).toContain("missing-values");
+    expect(s.statistics?.maximum?.missingCount).toBe(3);
+    expect(s.statistics?.mean?.missingCount).toBe(3);
+    // The rows a person copies say it too, and never write a blank for the probe below.
+    await engineState.probe([0, 0, 0]);
+    s = snapshot();
+    expect(s.probe?.value).toBeNull();
+    expect(s.probe?.missingBecause).toContain("欠測");
+    expect(await engineState.showGraph({ fieldName: "temperature", reduction: "max", kind: "line" })).toBe(true);
+    const point = snapshot().graphData?.series[0]?.points[0];
+    expect(point?.value).toBe(400);
+    expect(point?.caveats).toContain("missing-values");
+    expect(point?.missingCount).toBe(3);
+    // The thread goes on with the cube.
+    expect(await engineState.loadDataset("case:1", cubePath)).toBe(true);
+    await engineState.refresh();
   });
 });
 

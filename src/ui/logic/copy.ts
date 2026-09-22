@@ -20,6 +20,8 @@ export const HEADER: readonly string[] = ["項目", "値", "単位", "有効桁"
 export function reportedRow(label: string, reported: Reported, labels: CopyLabels, scope?: string): string[] {
   const notes = [
     ...(reported.caveats ?? []),
+    // What the number left out travels with it into the spreadsheet (XC-303).
+    ...(reported.missingCount ? [`欠測 ${reported.missingCount} 件を除く`] : []),
     ...(reported.formula ? [`式：${reported.formula}`] : []),
     ...(scope ? [`範囲：${scope}`] : []),
   ];
