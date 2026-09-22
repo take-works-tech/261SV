@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-20
+updated: 2026-09-22
 ---
 
 # Capacity limits
@@ -184,7 +184,8 @@ applies the matching row; the class it chose is visible in settings, and can be 
 - unit: seconds from launch to a rendered sample result
 - rationale: the first impression of a desktop tool is how long it takes to show something. The number
   is not written here until it is measured on the hardware class of E-063, because a limit nobody
-  measured is a wish (XC-137)
+  measured is a wish (XC-137). E-222 measured the segments on this machine - about 0.63 s to a drawn
+  sample, packaged and warm, as a sum - and the value waits for #243 to decide the budget (XC-304)
 - on_exceed: the launch path is profiled and the cause named; the budget is not raised to fit the code
 - decidedness: Open
 - open: OPEN-017

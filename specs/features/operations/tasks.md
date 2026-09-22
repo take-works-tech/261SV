@@ -246,3 +246,18 @@ updated: 2026-09-22
   `tests/test_handlers.py::TestASupportBundle` and the sample thread of
   `src/ui/state/engine.connected.test.ts`. Sending remains the gate's (TASK-013) and this build
   injects no transport.
+
+### TASK-033 - What is on screen while the engine starts, and how long it took
+- satisfies: AC-032
+- depends_on: TASK-012
+- done_when: under the shell the page shows the engine starting, counted, until the engine answers,
+  and the reason with a restart if it failed; the shell's notes record the launch timeline; the
+  launch is measured and recorded as evidence
+- done: 2026-09-22 (XC-304, E-222, #307). `src/ui/shared/EngineStarting.tsx` replaces every screen
+  under the shell until `/health` answers, with `src/ui/logic/startup.ts` choosing the words; the
+  store gained the `starting` reachability the shell already reported; `src/shell/main.ts` records
+  the window, the interface and the engine in milliseconds after its start, prints them under
+  `--measure-launch` and keeps a `--profile` launch out of the person's profile;
+  `spike/measure_launch.py` measures and `spike/results.json` `launch` records. Proven by
+  `src/ui/logic/startup.test.ts` and `src/ui/state/reachability.test.ts`; the measurement is the
+  evidence's.

@@ -6934,3 +6934,41 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a source that says why an entry is missing - a validity mask with reasons - at
   which point the count becomes a list of reasons and a deactivated element is told apart from a
   failed one
+
+### XC-304 - The window opens at once and says the engine is starting, for how long and why it can take a while, never a design state; the launch is measured at every launch and recorded here
+- decided: 2026-09-22
+- status: active
+- decision: under the desktop shell the window opens before the engine is started, and until the
+  engine answers `/health` every screen shows one page: that the engine is starting, the seconds
+  counted from the page's own load, and - past the slow mark of five seconds - what can take the
+  time (the first start after installing reads the bundled toolkit, hundreds of megabytes, from
+  disk), in words that promise no time; if the start ends without an engine, the reason in the
+  shell's words and a restart. **Never a design state**: until this decision the first half-second
+  of every launch showed the Home page's invented cards, and a slow machine showed them for as long
+  as its engine took. The shell records the launch at every launch in its own notes - the window
+  created, the interface loaded, the engine reachable, in milliseconds after its own start - so a
+  slow machine's number is on that machine; `--measure-launch` prints the same line and quits, and
+  `--profile` keeps such a launch out of the person's profile. **Measured here** (E-222): the
+  development shell reaches a window, a loaded interface and a reachable engine in the times
+  E-222 gives, on a warm cache; a cold start on a machine that has never run the product remains
+  unmeasured and is said to be, not estimated. LIM-010 keeps its `TBD`: the launch-to-rendered-sample
+  figure is the sum of segments measured separately (E-222) and is stated as that sum, and a limit
+  is written when #243 decides the budget
+- decided_by: engineering judgement, from #307's condition, XC-001 (a design state beside a live
+  engine is a plausible picture in place of a missing one), XC-259 and E-197/E-202
+- rationale: an unresponsive first second reads as a fault, and a page of invented workspaces reads
+  as the product having lost the person's work. Saying what is being waited for, and counting, is
+  the honest version of a splash screen; the slow-mark sentence exists because the number that
+  matters - a cold start with a several-hundred-megabyte toolkit - is the one this machine cannot
+  measure, and the page must be right on the machine that can. Recording the timeline in the
+  shell's notes at every launch is what makes that number available from a support bundle
+  (XC-302) instead of from a guess
+- alternatives: **a splash image** - a picture in place of a state. **Starting the engine before
+  the window** - a blank desktop for as long as the engine takes, which is the fault the issue
+  names. **Telemetry of launch times** - what XC-126 forbids; the notes stay on the machine
+- basis: E-222 (T1), E-197 (T1), E-202 (T1)
+- affects: MOD-009, MOD-016, MOD-018, operations/REQ-007, LIM-010
+- decidedness: Fixed
+- reversal_trigger: a measured cold start on the hardware class of E-063, at which point the slow
+  mark and the sentence are set from it; or a budget decided under #243, at which point the page
+  says when the start has exceeded it

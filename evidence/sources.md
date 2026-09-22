@@ -2368,3 +2368,22 @@ Recorded so that nothing silently depends on them:
   not a seventh digit. The prediction the mean rests on was checked on the same grid without the
   product: the trapezoid rule over the nodes gives the predicted value to a part in a trillion
 - justifies: XC-299
+
+### E-222 - The launch of the desktop shell, measured here: window, interface, engine, and a drawn sample
+- tier: T1
+- url: spike/measure_launch.py (record: spike/results.json `launch`)
+- verified: 2026-09-22
+- says: on this machine (Windows 11, Python 3.11.9, VTK 9.5.2, Electron 44.4.3, PyInstaller 6.22.3,
+  integrated graphics, warm file cache), in milliseconds after the shell process's own start: the
+  development shell reaches a created window in 75-77, a loaded interface in 158-182 and a reachable
+  engine in 627-710 across five launches, and 710 / 1027 / 1341 on the first launch after a build;
+  the packaged application (frozen engine 277,499,737 bytes in 669 files, 19.2 s to freeze) reaches
+  them in 77-79 / 161-176 / 498-542 across two launches after the first, and 292 / 405 / 919 on the
+  first launch after packaging. Asking the engine for the sample, writing it, opening it, loading
+  its first case and drawing it takes 128 ms on this machine from a running engine (the connected
+  test's own line). Launch to a drawn sample is therefore about 0.63 s packaged and warm, 1.05 s on
+  the first launch after packaging, as a sum of segments measured separately and not as one
+  measurement. Not measured: a cold start on a machine that has never run the product - the
+  hundreds of megabytes of the frozen engine read from a cold disk - and any machine but this one;
+  the launch page (XC-304) is written for that case rather than from a number nobody has
+- justifies: XC-304

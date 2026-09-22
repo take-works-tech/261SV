@@ -52,6 +52,13 @@ const routeIndex = argv.indexOf("--route");
 const ROUTE = routeIndex >= 0 ? argv[routeIndex + 1] ?? "" : "";
 const levelIndex = argv.indexOf("--log-level");
 const LOG_LEVEL = (levelIndex >= 0 ? argv[levelIndex + 1] : undefined) as "debug" | "info" | "warning" | "error" | undefined;
+// `--measure-launch` prints the launch timeline as one JSON line once the engine is running and the
+// interface has loaded, then quits: what spike/measure_launch.py reads (#307). `--profile <dir>`
+// keeps a launch out of the person's profile, for that measurement and for a test.
+const MEASURE_LAUNCH = argv.includes("--measure-launch");
+const profileIndex = argv.indexOf("--profile");
+const PROFILE = profileIndex >= 0 ? argv[profileIndex + 1] ?? null : null;
+if (PROFILE) app.setPath("userData", resolve(PROFILE));
 
 // ---- one instance, one engine (E-195) ---------------------------------------------------------
 
@@ -93,6 +100,27 @@ function note(line: string): void {
 
 function broadcast(status: EngineProcessStatus): void {
   for (const each of BrowserWindow.getAllWindows()) each.webContents.send("engine:status", status);
+}
+
+/** The launch as this process saw it, in milliseconds after its own start (#307, XC-304): the
+ *  window created, the interface loaded, the engine reachable - or the start failed, and why.
+ *  Written to the shell's notes at every launch, so a slow machine's number is on that machine;
+ *  and, under `--measure-launch`, printed as one JSON line before the shell quits itself. */
+const launch: { windowCreatedMs?: number; interfaceLoadedMs?: number; engineReadyMs?: number; engineFailed?: string } = {};
+
+function uptimeMs(): number {
+  return Math.round(process.uptime() * 1000);
+}
+
+function launchSettled(): void {
+  if (launch.windowCreatedMs === undefined || launch.interfaceLoadedMs === undefined) return;
+  if (launch.engineReadyMs === undefined && launch.engineFailed === undefined) return;
+  const engine = launch.engineReadyMs !== undefined ? `engine ${launch.engineReadyMs} ms` : `engine failed (${launch.engineFailed})`;
+  note(`startup: window ${launch.windowCreatedMs} ms, interface ${launch.interfaceLoadedMs} ms, ${engine} after the shell's start`);
+  if (MEASURE_LAUNCH) {
+    process.stdout.write(JSON.stringify({ ...launch, packaged: PACKAGED }) + "\n");
+    setTimeout(() => app.quit(), 200);
+  }
 }
 
 /** What the shell keeps under its profile, laid out by `profile.ts` so the arrangement is one a
@@ -451,12 +479,22 @@ void app.whenReady().then(async () => {
   serveInterface();
   registerBridge();
   orphans = findOrphans(transientRoot());
+  // The window first, so the person sees the product and what it is waiting for (XC-304); the
+  // interface shows the engine starting until the status says it is running.
   window = createWindow();
+  launch.windowCreatedMs = uptimeMs();
+  window.webContents.once("did-finish-load", () => {
+    launch.interfaceLoadedMs = uptimeMs();
+    launchSettled();
+  });
   try {
     await start(engineDirectory());
+    launch.engineReadyMs = uptimeMs();
   } catch (error) {
     // The interface hears about it through the status the failure set; nothing is thrown at a
-    // person. The window is already open and says "エンジン停止" with the reason.
-    note(`shell: ${error instanceof Error ? error.message : String(error)}`);
+    // person. The window is already open and says why, with a way to start again.
+    launch.engineFailed = error instanceof Error ? error.message : String(error);
+    note(`shell: ${launch.engineFailed}`);
   }
+  launchSettled();
 });

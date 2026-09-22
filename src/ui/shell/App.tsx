@@ -9,6 +9,7 @@ import { session, useSession, type ScreenId } from "../state/session";
 import { connectionFromEnvironment, engineState, useEngine } from "../state/engine";
 import { shellApi } from "../client/shell";
 import { EngineLost, EngineRefusal, EngineWarnings, OrphanNotice } from "../shared/EngineStatus";
+import { EngineStarting } from "../shared/EngineStarting";
 import { InstructionBar } from "../shared/InstructionBar";
 import { SubjectBadge } from "../shared/SubjectBadge";
 import { MaterialLibraryShelf, type ShelfAsset, type ShelfState } from "../shared/MaterialLibraryShelf";
@@ -94,7 +95,7 @@ export function App() {
       return;
     }
     let hadExited = false;
-    const apply = (status: { state: string; reason: string | null; exitCode: number | null; signal: string | null }) => {
+    const apply = (status: { state: string; reason: string | null; exitCode: number | null; signal: string | null; since?: unknown }) => {
       if (status.state === "running") {
         void shell.engine.connection().then((connection) => {
           if (!connection) return;
@@ -105,6 +106,8 @@ export function App() {
       } else if (status.state === "exited") {
         hadExited = true;
         engineState.engineExited(status);
+      } else if (status.state === "starting") {
+        engineState.engineStarting(status);
       }
     };
     const unsubscribe = shell.engine.onStatus(apply);
@@ -120,6 +123,10 @@ export function App() {
   }, []);
 
   const canvas = ((): ReactNode => {
+    // Under the shell, no screen is shown until the engine answers: the page says the engine is
+    // starting, for how long, and why if it failed (XC-304). A lost engine keeps its last screen,
+    // labelled; a browser build with no engine keeps the design states it has always shown.
+    if (shellApi() && e.reachability.kind !== "reachable" && e.reachability.kind !== "exited") return <EngineStarting />;
     switch (s.screen) {
       case "home": return <HomeScreen variant={s.variant} />;
       case "view": return <ViewScreen variant={s.variant} />;
