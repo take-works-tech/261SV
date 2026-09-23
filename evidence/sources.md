@@ -2494,6 +2494,9 @@ Recorded so that nothing silently depends on them:
   size given, honoured the document's `@page`: **596 x 842 pt** (Firefox rounds 210 mm up where
   Chromium rounds down to 595), the short document on one sheet and the whole report on four, the
   count Edge and Chrome gave it; its PDF keeps the page tree and page boxes inside compressed
-  object streams, which the reading inflates before it looks. Not measured, and said so: Safari,
-  mobile browsers, the preview panes of mail clients, Internet Explorer mode; Firefox on Windows
+  object streams, which the reading inflates before it looks. On the run that merged (#429,
+  main `5a94612`) Firefox printed the file's other documents as 2, 3, 2 and 3 sheets - one page
+  break, two, a figure at page width, a long text then a figure - the counts Edge and Chrome give
+  them (E-219), and is held to them since. Not measured, and said so: Safari, mobile browsers,
+  the preview panes of mail clients, Internet Explorer mode; Firefox on Windows
 - justifies: XC-309, report/AC-046
