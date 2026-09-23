@@ -257,6 +257,12 @@ jobs:
         working-directory: src/shell
         env:
           SIM_VIEWER_REQUIRE_VTK: "1"
+      # The smoke opens the interface on the sample and measures the picture through a zoom and a
+      # resume (XC-310), so the interface is built beside the shell here as it is in a package.
+      - run: npm ci
+        working-directory: src/ui
+      - run: npm run build
+        working-directory: src/ui
       - run: xvfb-run -a npx electron . --smoke --no-sandbox
         working-directory: src/shell
         env:

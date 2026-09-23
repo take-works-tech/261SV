@@ -7173,3 +7173,46 @@ model or the prompt, never in a description that quietly went stale.
   the gap is named in the footer's sentence and here rather than the browser dropped silently; a
   machine that measures Safari or a mobile browser, at which point its name is added from the
   measurement
+
+### XC-310 - What a laptop does to a window - sleep and resume, a display change, a GPU reset - is survived by construction and measured: the renderer holds no context across frames, an empty frame is drawn once more then refused by name, a resume re-checks and redraws, and an engine that dies is a restart with what was saved reopened
+- decided: 2026-09-23
+- status: active
+- decision: the product's picture is a frame the engine drew offscreen and the interface shows as
+  an image; nothing in the interface holds a GPU context, so sleep, a display added or removed, a
+  scale change and a GPU reset leave the shown picture where it is, scaled by the page as any
+  image is, with a pick still mapped through the image's own box. The engine makes a window - a
+  context - for every frame and keeps none, so a context the driver lost is nobody's to recover;
+  the frame drawn while the driver is resetting comes back all background, is drawn once more
+  after `RETRY_AFTER_EMPTY_SECONDS`, and the second empty frame is refused naming both causes -
+  nothing in view, or a context lost on a resume, a display change or a driver reset - and the
+  action (`EMPTY_FRAME_REFUSAL`, `src/engine/visualization/render.py`). The shell notes suspend,
+  resume, every display event and every Chromium child process gone, and on resume announces the
+  engine's status again; the interface takes a status announced while connected as the machine
+  resumed, checks the connection and draws again without a click (`engineState.resume`). An
+  engine process that ends - a driver fault inside the renderer among the causes - is the exit
+  the shell already reports: the interface offers the restart, reopens what was saved and names
+  what was applied and not saved (XC-259); nothing saved is lost. The shell's smoke measures the
+  picture through the sample opened, a zoom - Chromium's devicePixelRatio, what a display of
+  another scale changes - and a resume announced, and fails if the picture goes (E-229)
+- decided_by: engineering judgement, from #261's and #260's conditions, XC-087, XC-259, E-194, E-200 and E-229
+- rationale: a laptop sleeps every day and a display is unplugged every week; a GPU reset is the
+  most frequent field fault of a rendering product. The architecture already decided most of the
+  answer - a picture that is an image and a context that lives for one frame have nothing to lose
+  - and what remained was the one frame drawn during a reset and the resume nobody announces to a
+  page. One retry because the reset takes a moment and a person should not see a blank; a named
+  refusal after it because a blank frame shown as a picture is a wrong picture shown confidently,
+  and "nothing drawn" has a cause the person can act on. The measurement is by zoom and by an
+  announced resume, because an actual sleep, an actual monitor change and an actual reset are not
+  things a gate may do to the machine it runs on
+- alternatives: **a long-lived render window with context-loss recovery** - more to lose and more
+  to recover, for a renderer that is asked one frame at a time. **Retry until a frame draws** - a
+  camera pointed at nothing would wait forever. **Silence on resume** - the person finds out at
+  the next click that the connection or the picture went. **An automatic engine restart** - a
+  loop that quietly reattaches hides an engine that keeps dying (XC-259)
+- basis: E-229 (T1), E-200 (T1), E-194 (T1), E-191 (T1)
+- affects: MOD-003, MOD-018, operations/REQ-010, XC-259
+- decidedness: Bounded
+- reversal_trigger: a measured sleep, display change or reset on a real machine that loses the
+  picture or the engine - at which point the retry count, the wait or the shell's part is changed
+  from that measurement and the reason written; or a renderer reached through ANARI (XC-251) that
+  holds a context across frames, which brings context-loss recovery with it

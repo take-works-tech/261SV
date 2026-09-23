@@ -6,7 +6,7 @@
  * is workspace-wide. */
 import { useEffect, useState, type ReactNode } from "react";
 import { session, useSession, type ScreenId } from "../state/session";
-import { connectionFromEnvironment, engineState, useEngine } from "../state/engine";
+import { connectionFromEnvironment, engineState, snapshot, useEngine } from "../state/engine";
 import { shellApi } from "../client/shell";
 import { EngineLost, EngineRefusal, EngineWarnings, OrphanNotice } from "../shared/EngineStatus";
 import { EngineStarting } from "../shared/EngineStarting";
@@ -101,8 +101,16 @@ export function App() {
         void shell.engine.connection().then((connection) => {
           if (!connection) return;
           // After an exit, what was saved is opened again; the first time, there is nothing to reopen.
-          if (hadExited) void engineState.recover(connection);
-          else void engineState.connect(connection);
+          // A status announced again while connected is the shell saying the machine resumed
+          // (XC-310): the connection is checked and the picture drawn again.
+          if (hadExited) {
+            hadExited = false;
+            void engineState.recover(connection);
+          } else if (snapshot().reachability.kind === "reachable") {
+            void engineState.resume(connection);
+          } else {
+            void engineState.connect(connection);
+          }
         });
       } else if (status.state === "exited") {
         hadExited = true;

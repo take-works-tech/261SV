@@ -643,6 +643,16 @@ export const engineState = {
     }
   },
 
+  /** The machine came back - from sleep, from a display change - and the shell said so by
+   *  announcing the engine's status again (XC-310). The connection is checked rather than assumed,
+   *  and the picture is drawn again: a frame that failed while the GPU was resetting is retried by
+   *  the engine, and the one that comes back is what the person sees, without a click. */
+  async resume(connection: Connection): Promise<Reachability> {
+    const reachability = await engineState.connect(connection);
+    if (reachability.kind === "reachable" && state.viewId) await engineState.draw();
+    return reachability;
+  },
+
   /** The shell says the engine process is starting (XC-304). Nothing is connected yet; the page
    *  shows the wait, counted, and never a design state. */
   engineStarting(status: { since?: unknown }) {

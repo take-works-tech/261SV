@@ -2500,3 +2500,24 @@ Recorded so that nothing silently depends on them:
   them (E-219), and is held to them since. Not measured, and said so: Safari, mobile browsers,
   the preview panes of mail clients, Internet Explorer mode; Firefox on Windows
 - justifies: XC-309, report/AC-046
+
+### E-229 - The picture through a zoom and an announced resume, and a frame refused while the GPU resets, measured here
+- tier: T1
+- url: src/shell/main.ts `--smoke` (summary.display), tests/test_render_recovery.py and the resume step of src/ui/state/engine.connected.test.ts, run on the development machine on 2026-09-23 (Windows 11, Electron 44.4.3, VTK 9.5.2, NVIDIA)
+- verified: 2026-09-23
+- says: the shell's smoke, in a hidden 1440 x 900 window against a real engine, pressed the home
+  screen's 「サンプルを開く」, and the sample's frame arrived: **1,280 x 960 pixels of its own, shown at
+  912 x 428** at devicePixelRatio 1. With the zoom factor raised to 1.5 - Chromium's
+  devicePixelRatio, what a display of another scale changes - the frame was still there, still
+  1,280 x 960, shown at 437 x 126: the showing scales, the frame does not, and a pick maps through
+  the image's own box as before. A resume announced through the power monitor was noted in the
+  shell's log as "power: resume", re-announced the engine's status, and the frame was still there
+  after; the connected thread's resume against a real engine kept the store reachable and brought a
+  new frame (a different object URL) with no click. Frames stubbed in the renderer: one empty frame
+  then a drawn one gave two draws and a PNG; two empty frames gave two draws and the refusal that
+  names both causes and the action; a frame that draws is drawn once. Not measured, and said so: an
+  actual sleep and resume, an actual monitor change, an actual driver reset - `dxcap -forcetdr`
+  (Windows SDK) would force one and is not installed here; the toolkit's behaviour when the driver
+  refuses a context is unmeasured beyond the empty frame. The runner (Linux, xvfb, Mesa) runs the
+  same smoke at every merge, and its numbers are in its log
+- justifies: XC-310, operations/AC-034, operations/AC-035

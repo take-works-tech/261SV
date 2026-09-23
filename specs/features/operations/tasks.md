@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-22
+updated: 2026-09-23
 ---
 
 # Tasks: running the product
@@ -272,3 +272,19 @@ updated: 2026-09-22
   `describeStartup` names the launch budget once passed; the store times every subject move and
   the work-area bar shows `describeReflection` when over. Proven by `src/ui/logic/budgets.test.ts`
   and the connected thread, which measures six switches and records them; OPEN-017 is closed.
+
+### TASK-035 - The picture through sleep, a display change and a GPU reset
+- satisfies: AC-034, AC-035, AC-036
+- depends_on: TASK-033
+- done_when: an empty frame is drawn once more and the second refused by name; the shell notes
+  power and display events and re-announces the engine on resume; the interface checks and
+  redraws on a resume; the smoke opens the sample and keeps the picture through a zoom and an
+  announced resume; an engine that ends is reported, restartable and reopened with what was saved
+- done: 2026-09-23 (XC-310, E-229, #261, #260). `_draw_frame` makes the window per frame and
+  `render_view` retries an empty frame once after `RETRY_AFTER_EMPTY_SECONDS`, then refuses with
+  `EMPTY_FRAME_REFUSAL` (`tests/test_render_recovery.py`, frames stubbed); `watchTheMachine` in
+  `src/shell/main.ts` notes suspend, resume, display events and a child process gone and
+  re-broadcasts the engine's status on resume; `engineState.resume` checks the connection and draws
+  (the connected thread's resume step); the smoke's `pictureThrough` opens the sample by its
+  button, raises the zoom, announces a resume and fails if the picture goes. The exit path is
+  XC-259's as it was. Not measured, said so: an actual sleep, monitor change or reset.
