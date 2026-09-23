@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-22
+updated: 2026-09-23
 ---
 
 # Sources
@@ -2426,3 +2426,18 @@ Recorded so that nothing silently depends on them:
   after grouping children once takes 0.3, 1.3, 1.7 and 7.7 ms. Not measured: a first open from a
   cold disk; sources whose files are present; the interface drawing one row per case
 - justifies: LIM-005, XC-306
+
+### E-226 - The regression set's fixtures, measured here: a million-cell grid, and what each reader does with random bytes and an empty file
+- tier: T1
+- url: tests/regression_catalogue.py and tests/test_regression_catalogue.py; the probe of 2026-09-23 recorded in this entry
+- verified: 2026-09-23
+- says: on this machine (Windows 11, Python 3.11.9, VTK 9.5.2), a grid of 100^3 hexahedra -
+  1,030,301 points, 1,000,000 cells, one float32 point field - is 21.2 MB as the toolkit's XML
+  writer writes it and reads whole in 0.25 s; a 60^3 grid (226,981 points, 216,000 cells, 4.4 MB)
+  writes in 0.44 s and reads in 0.06 s. Handed 4,096 random bytes under each reader's extension and
+  an empty file, `.vtu`, `.pvtu`, `.vtp`, `.cgns` and `.ex2` refused both - an XML parse error, or
+  "no part this build can read" - and **`.stl` read the random bytes as 80 triangles, 240 points,
+  with no complaint**, refusing only the empty file. A binary STL's header states its triangle
+  count, and 84 + 50 × count equals 4,096 for no count but 80; that agreement is what the reader
+  now requires before it reads
+- justifies: XC-307, ingest/AC-051

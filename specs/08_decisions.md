@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-22
+updated: 2026-09-23
 ---
 
 # Decisions and open questions
@@ -7049,3 +7049,40 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: the drawn tree measured over LIM-011 at two thousand rows, at which point the
   number comes down or the tree is windowed and the choice written; a sweep that needs more, at
   which point the number goes up to what the measured curve allows and the tree is windowed first
+
+### XC-307 - The regression set is one table of generated fixtures - whole, partial, broken and large - and a gate holds every reader to it; a binary STL is checked against its own header before it is read
+- decided: 2026-09-23
+- status: active
+- decision: the fixtures this product's tests generate are listed in one table
+  (`tests/regression_catalogue.py`): each with its format, its kind - normal, partial, broken and
+  large, with the transient and missing-values fixtures beside them - the writer that produces it,
+  and what a test built on it may claim. Generated at test time (XC-085), never committed. A gate
+  (`tests/test_regression_catalogue.py`) holds every reader in this build to a whole fixture and a
+  broken one, holds the set to the four required kinds, writes every fixture and reads it as its
+  kind says - a whole file with points, a partial case that names what is missing, a broken file
+  refused by name, a million-cell grid read whole - and names the Verified formats of XC-049 this
+  build has no reader for (EnSight Gold and VTKHDF, #426), so the table cannot imply a regression
+  test that does not exist. The broken kind gained two classes every reader is held to, random
+  bytes under the reader's own extension and an empty file, and that is where the measurement found
+  the defect: **four kilobytes of random bytes under `.stl` read as eighty triangles with no
+  complaint** (E-226). A binary STL is now checked against its own header before the reader is
+  asked for anything, as the NetCDF container is (E-212): a file shorter than the header declares,
+  or longer by a whole triangle or more, is refused with the sizes named; an ASCII STL states no
+  length and is left to the reader's parse
+- decided_by: engineering judgement, from #203's condition, XC-049, XC-085, XC-284 and E-226
+- rationale: the broken file is the body of the test (#203): a reader that takes anything turns a
+  wrong file into a dataset of wrong numbers, and the only way to know which reader does is to hand
+  every reader every kind of wrong file, every run. One table is what makes "every reader, every
+  kind" checkable rather than remembered, and what lets the next format's author see at once what
+  a Verified promise costs. The STL defect is the case in point: five readers refused random bytes
+  and one read them, and nothing but the table's gate would have asked
+- alternatives: **committed fixture files** - provenance to record and licences to carry (XC-085).
+  **A test per format written by hand** - the six that existed missed the one that mattered.
+  **Refusing every binary STL whose size differs at all** - refuses a file a real writer padded;
+  a whole triangle's worth is the line
+- basis: E-226 (T1), E-212 (T1), E-137 (T1)
+- affects: MOD-002, ingest/REQ-010, XC-049
+- decidedness: Fixed
+- reversal_trigger: a reader added without its fixture pair, which the gate refuses; or a binary
+  STL from a real writer padded by a whole triangle or more, at which point the slack is measured
+  from it and the reason written

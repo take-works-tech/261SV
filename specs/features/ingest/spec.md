@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-22
+updated: 2026-09-23
 ---
 
 # Feature: result ingest
@@ -49,6 +49,11 @@ updated: 2026-09-22
     and never to a @Case on the strength of a matching name (XC-301)
   - AC-050: When a file is loaded, the system shall say for each @Field how many entries have no
     value, so the information area can show it before any number is read (XC-303)
+  - AC-051: When the readers of this build are held to regression fixtures, every reader shall have
+    a generated whole fixture and a generated broken one, the set shall hold a partial fixture and a
+    large one, every fixture shall read as its kind says, and a Verified format without a reader
+    shall be named rather than implied; a binary STL shall be refused before it is read where its
+    size is not what its own header declares (XC-307)
   - AC-022: If a supported file is unreadable or truncated, then the system shall report the failure
     with the file name and shall leave the @Workspace unchanged
   - AC-046: If a file changes while it is being read, or has changed since the @Dataset was loaded from

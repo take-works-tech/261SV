@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-22
+updated: 2026-09-23
 ---
 
 # Tasks: result ingest
@@ -503,3 +503,17 @@ is either missing a requirement or is not work this specification asked for.
 - done: 2026-09-22 (XC-303, CT-003 3.20.0, #215). `dataset.load` answers `missingCount` per field
   and the information area's field table gained a 欠測 column. Proven by
   `tests/test_missing_values.py::TestTheLoadAnswer` and the connected thread.
+
+### TASK-041 - The regression set as one table, with a gate
+- satisfies: AC-051
+- depends_on: TASK-008
+- done_when: one table lists every generated fixture with its kind and what it proves, a gate holds
+  every reader to a whole fixture and a broken one and reads every fixture as its kind says, and the
+  Verified formats without a reader are named
+- done: 2026-09-23 (XC-307, E-226, #203). `tests/regression_catalogue.py` lists 32 fixtures over
+  the six reader families - normal, partial, broken (cut, random bytes, empty, an unread extension),
+  large (a million cells), transient and missing-values - and `tests/test_regression_catalogue.py`
+  writes and reads each as its kind says. The gate found random bytes under `.stl` read as eighty
+  triangles; `engine.completeness.check_stl_before_read` now holds a binary STL to its own header
+  (`tests/test_incomplete_files.py::TestABinarySTLIsHeldToItsHeader`). EnSight Gold and VTKHDF are
+  named as Verified without a reader (#426).

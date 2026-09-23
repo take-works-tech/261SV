@@ -66,6 +66,7 @@ from engine.conversion import to_unstructured
 from engine import cgns, exodus
 from engine.result_axis import axis_of, delivered_position
 from engine.survey import _pieces as survey_pieces
+from engine.completeness import check_stl_before_read
 from engine.exodus import BLOCK_ID_ARRAY
 
 class UnsupportedFormatError(Exception):
@@ -263,7 +264,10 @@ _READERS: dict[str, ReaderChoice] = {
     ".pvtu": ReaderChoice(".pvtu", vtkXMLPUnstructuredGridReader, "Verified",
                           "pieces are concatenated; points on partition boundaries appear more than once"),
     ".vtp": ReaderChoice(".vtp", vtkXMLPolyDataReader, "Verified"),
-    ".stl": ReaderChoice(".stl", vtkSTLReader, "Verified", "carries geometry only; no fields"),
+    ".stl": ReaderChoice(
+        ".stl", vtkSTLReader, "Verified", "carries geometry only; no fields",
+        prepare=check_stl_before_read,
+    ),
     ".cgns": _CGNS,
     ".e": _EXODUS,
     ".ex2": _EXODUS,

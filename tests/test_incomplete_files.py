@@ -249,3 +249,50 @@ class TestAFileMustHoldStill:
         assert set(fingerprint) == {"run.pvtu", "run_0.vtu", "run_1.vtu"}
         # The toolkit's parallel reader concatenates the pieces itself: two of four points each.
         assert reader.read_case(manifest, expected=fingerprint).present[0].dataset.point_count == 8
+
+
+class TestABinarySTLIsHeldToItsHeader:
+    """E-226: random bytes under `.stl` read as eighty triangles until the container was checked; a
+    binary STL now has to be as long as its header says, and no longer by a whole triangle."""
+
+    def test_random_bytes_and_a_cut_binary_stl_are_refused_and_a_whole_one_reads(self, tmp_path: Path) -> None:
+        import random
+
+        from vtkmodules.vtkIOGeometry import vtkSTLWriter as _Writer
+
+        from engine.completeness import STL_HEADER_BYTES, STL_TRIANGLE_BYTES, stl_declared_length
+
+        junk = tmp_path / "junk.stl"
+        junk.write_bytes(random.Random(203).randbytes(4096))
+        with pytest.raises(FileIncomplete) as refusal:
+            reader.read_case(junk)
+        assert "junk.stl" in str(refusal.value) and "E-226" in str(refusal.value)
+
+        # A whole binary STL: written by the toolkit, read whole, and its header agrees with its size.
+        sheet = tmp_path / "sheet.stl"
+        write_polydata(sheet, xml=False)
+        polydata_reader = vtkXMLUnstructuredGridReader  # keep the XML reader import used
+        del polydata_reader
+        binary = tmp_path / "binary.stl"
+        from vtkmodules.vtkIOGeometry import vtkSTLReader
+
+        source = vtkSTLReader()
+        source.SetFileName(str(sheet))
+        source.Update()
+        writer = _Writer()
+        writer.SetFileName(str(binary))
+        writer.SetFileTypeToBinary()
+        writer.SetInputData(source.GetOutput())
+        assert writer.Write()
+        body = binary.read_bytes()
+        assert stl_declared_length(body[:STL_HEADER_BYTES]) == len(body)
+        whole = reader.read_case(binary)
+        assert sum(part.dataset.point_count for part in whole.present if part.dataset is not None) > 0
+        cut = tmp_path / "cut.stl"
+        cut.write_bytes(body[: len(body) - STL_TRIANGLE_BYTES // 2])
+        with pytest.raises(FileIncomplete):
+            reader.read_case(cut)
+        longer = tmp_path / "longer.stl"
+        longer.write_bytes(body + bytes(STL_TRIANGLE_BYTES))
+        with pytest.raises(FileIncomplete):
+            reader.read_case(longer)
