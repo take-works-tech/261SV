@@ -201,13 +201,14 @@ class TestThePagesOfAPrintedDocument:
         assert min(counts.values()) >= 2
 
 
-class TestFirefoxIsMeasuredBeforeItIsClaimed:
-    """The first pass of Gecko: what WebDriver's print gives for the same documents - the sheet size
-    the document's own `@page` asks for, and the page counts beside Chromium's - is said in the
-    run's summary as a warning, so the machine that has Firefox reports it and the claim in the
-    document's footer can follow the measurement (XC-309, E-228)."""
+class TestFirefoxPrintsWhatWasMeasured:
+    """Gecko through WebDriver's print, on the machine that has it (the runner, E-228): the document's
+    own `@page` gives an A4 sheet - 596 x 842 pt, Firefox rounding 210 mm up where Chromium rounds
+    down - the short document is one sheet, and the whole report has the count Chromium gives it.
+    Those three are held; the other documents of this file are measured beside them and said in the
+    run's summary, so that a claim follows a measurement (XC-309)."""
 
-    def test_what_firefox_printed(self, tmp_path: Path, firefox: Browser) -> None:
+    def test_the_sheet_the_short_document_and_the_whole_report(self, tmp_path: Path, firefox: Browser) -> None:
         (tmp_path / "short").mkdir()
         (tmp_path / "whole").mkdir()
         short = a_document((a_text_block("所見", sentences=3), a_table_block("応力", rows=2)), tmp_path / "short")
@@ -219,16 +220,22 @@ class TestFirefoxIsMeasuredBeforeItIsClaimed:
         whole_pdf = printed(firefox, whole.resolve().as_uri(), "whole-Firefox.pdf")
         chromium = {browser.name: page_count(printed(browser, whole.resolve().as_uri(), f"whole-{browser.name}.pdf")) for browser in installed() if browser.is_chromium}
 
-        def read(what: str, pdf: bytes) -> str:
-            try:
-                width, height = page_size(pdf)
-                return f"{what}: {round(width)} x {round(height)} pt, {page_count(pdf)} page(s)"
-            except AssertionError as error:
-                return f"{what}: {error}; {len(pdf)} bytes, header {pdf[:16]!r}, object streams {pdf.count(b'/ObjStm')}"
+        width, height = page_size(short_pdf)
+        assert (round(width), round(height)) in ((595, 842), (596, 842)), f"Firefox: the sheet is {width} x {height} pt, not A4 (XC-296)"
+        assert page_count(short_pdf) == 1
+        assert set(chromium.values()) == {page_count(whole_pdf)}, f"Firefox {page_count(whole_pdf)} page(s) against Chromium's {chromium}"
 
-        warnings.warn(
-            f"Firefox {firefox.version()} measured - {read('short document', short_pdf)}; {read('whole report', whole_pdf)}; "
-            f"Chromium's whole report {chromium} (E-228)",
-            stacklevel=1,
-        )
-        assert short_pdf.startswith(b"%PDF") and whole_pdf.startswith(b"%PDF")
+    def test_the_other_documents_are_measured_and_said(self, tmp_path: Path, firefox: Browser) -> None:
+        documents = {
+            "one-break": (a_text_block("前半"), Block(BlockKind.PAGE_BREAK), a_text_block("後半")),
+            "two-breaks": (a_text_block("一"), Block(BlockKind.PAGE_BREAK), a_text_block("二"), Block(BlockKind.PAGE_BREAK), a_text_block("三")),
+            "figure": (a_figure_block("全体外観", 800, 600),),
+            "text-then-figure": (a_text_block("所見", paragraphs=5), a_figure_block("全体外観"), a_table_block("応力", rows=6)),
+        }
+        counts: dict[str, int] = {}
+        for label, blocks in documents.items():
+            (tmp_path / label).mkdir()
+            target = a_document(blocks, tmp_path / label)
+            counts[label] = page_count(printed(firefox, target.resolve().as_uri(), f"{label}-Firefox.pdf"))
+        warnings.warn(f"Firefox {firefox.version()} measured - pages per document: {counts} (E-228)", stacklevel=1)
+        assert counts["one-break"] >= 2 and counts["two-breaks"] >= 3, "a page-break block starts a sheet"

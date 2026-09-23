@@ -2484,12 +2484,16 @@ Recorded so that nothing silently depends on them:
   both. The footer naming the browsers, first styled as on screen (2.5 rem above, .85 rem type),
   pushed the short document to a second sheet in Edge; at 1 rem and .75 rem on paper it prints on
   one, measured. Firefox is not on this machine and geckodriver is not either; both are looked for
-  and skipped by name, and the runner's own set is what its run measures: on the first run of the
-  gate on the runner (ubuntu-latest, 2026-09-23, PR #429) it found Edge, Chrome, Firefox and
-  geckodriver, Firefox reported every marker and every feature of the probe, and **the runner's
-  Edge was 152**, older than the 153 the document claimed from this machine - the gate refused
-  the claim, which is now the oldest version measured; Firefox's print came back as a PDF whose
-  page tree and page boxes sit inside compressed object streams, which the reading now inflates.
-  Not measured, and said so: Safari, mobile browsers, the preview panes of mail clients,
-  Internet Explorer mode
+  and skipped by name, and the runner's own set is what its run measures. On the runner
+  (ubuntu-latest, 2026-09-23, the two runs of PR #429): **Microsoft Edge 152.0.4191.66, Google
+  Chrome 152.0.7977.82, Mozilla Firefox 155.0 with geckodriver**. Firefox reported every marker and
+  every feature of the probe and the data-URI face tried, the same as the two Chromium browsers.
+  **The runner's Edge and Chrome were 152**, older than the 153 the document claimed from this
+  machine, and the gate refused the claim on each - first Edge, then Chrome on the next run - so
+  the claim is 152, the oldest version measured. Firefox's print through WebDriver, with no page
+  size given, honoured the document's `@page`: **596 x 842 pt** (Firefox rounds 210 mm up where
+  Chromium rounds down to 595), the short document on one sheet and the whole report on four, the
+  count Edge and Chrome gave it; its PDF keeps the page tree and page boxes inside compressed
+  object streams, which the reading inflates before it looks. Not measured, and said so: Safari,
+  mobile browsers, the preview panes of mail clients, Internet Explorer mode; Firefox on Windows
 - justifies: XC-309, report/AC-046
