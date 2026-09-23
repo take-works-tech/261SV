@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-22
+updated: 2026-09-23
 ---
 
 # Feature: report generation
@@ -70,6 +70,10 @@ updated: 2026-09-22
     sheets with a page-break block starting a new sheet, a figure whole with its heading, legend
     and values, a table row and each trust section whole, and a long table's header repeated on
     every sheet; the application's screen is not the print surface (XC-296)
+  - AC-046: When an exported document is opened or printed, the browsers its own footer names as
+    verified shall be exactly the ones the gate opened and printed it in, each with the oldest
+    version measured; a browser the gate measured shall not be older than the version named, and
+    a browser not measured shall be named nowhere (XC-309)
 
 ### REQ-002 - Office formats carry the same content
 - priority: MUST

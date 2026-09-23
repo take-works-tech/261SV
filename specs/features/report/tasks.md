@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-22
+updated: 2026-09-23
 ---
 
 # Tasks: report generation
@@ -346,3 +346,21 @@ updated: 2026-09-22
 - done: 2026-09-22 (XC-303, #215). `caveat_text` renders the missing-values caveat with its
   count in the HTML document and its text form, from the count the value carries. Proven by
   `tests/test_missing_values.py::TestAGraphAndADeliverable::test_the_deliverable_s_table_says_what_a_number_left_out_and_states_an_absence`.
+
+### TASK-050 - The document names the browsers it was verified in
+- satisfies: AC-046
+- depends_on: TASK-047
+- done_when: the exported document's footer names each browser the gate opened and printed it in
+  with the oldest version measured and says that older versions and other browsers are unverified;
+  the gate fails where a browser it measured is older than the version named and warns where it
+  measured one the list does not name; the probe reports every CSS feature the stylesheet relies
+  on, per browser
+- done: 2026-09-23 (XC-309, E-228, #256). `VERIFIED_BROWSERS` in `src/engine/report/html.py` is the
+  one place, printed by the footer; `tests/browsers.py` holds what the two browser tests share -
+  Edge and Chrome through their command line, Firefox through geckodriver's WebDriver endpoint
+  where a machine has both; the probe in `tests/test_exported_document_opens.py` reports each
+  feature and the data-URI face, and `TestTheDocumentClaimsWhatWasMeasured` holds the footer to the
+  measurement. Measured here with Edge 153 and Chrome 153, and on the runner with Edge 152,
+  Chrome 152 and Firefox 155 - the gate refused the claim of 153 against the runner's 152, so the
+  claim is 152; Firefox printed A4 with the counts Chromium gave, so it is claimed at 155, its
+  remaining documents measured and said in the run's summary before they are held.

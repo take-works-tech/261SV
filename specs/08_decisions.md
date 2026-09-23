@@ -7132,3 +7132,44 @@ model or the prompt, never in a description that quietly went stale.
   reads whole - measured, the check's rule is widened from that file and the reason written; or a
   toolkit release whose reader refuses a cut file itself, at which point the check before the read
   is measured against it and kept or dropped
+
+### XC-309 - A supported browser for the exported document is one the gate opened and printed it in, named with its version in the document's own footer; a browser not measured is not claimed
+- decided: 2026-09-23
+- status: active
+- decision: "supported browser" in report/AC-036 and report/AC-037 means a browser the gate opened the
+  exported document in and printed it from, on a machine that ran the gate:
+  `tests/test_exported_document_opens.py` (a probe of every dependency the document may carry and
+  of every CSS feature its stylesheet relies on, opened from a local file, from a downloaded mark
+  and through a share) and `tests/test_exported_document_prints.py` (A4 sheets, breaks, a figure
+  whole). The set is the union over the machines that run the gate - the development machine's
+  Edge and Chrome, the runner's own - and each browser is named with the oldest major version
+  measured, in one place (`VERIFIED_BROWSERS` in `src/engine/report/html.py`) that the document's
+  own footer prints: 「この文書の表示と印刷は次のブラウザで確認しています」 with the names and
+  versions, and the sentence that older versions and browsers not named are unverified. The gate
+  holds the claim to the measurement both ways: a browser it measured that is older than the
+  version claimed fails the gate, and a browser it measured that the list does not name is said in
+  a warning - so a name is added after a measurement and never before. Firefox is driven through
+  geckodriver's WebDriver endpoint where a machine has both, and its first pass is a measurement
+  said in the run's summary rather than an assertion; Safari, mobile browsers and the preview panes
+  of mail clients are not measured and not claimed
+- decided_by: engineering judgement, from #256's condition, XC-295, XC-296, E-218, E-219 and E-228
+- rationale: "current browser" is a promise nobody can check, and the recipient's browser is not
+  the author's to choose. What can be checked is which browsers the gate opened the document in, so
+  that is the promise, and the document carries it, because the reader who has trouble is the one
+  who needs to know what was verified and has no way to ask. Versions are named as measured rather
+  than as a range, because a range claims versions nobody ran; evergreen browsers move, and the
+  gate moves the claim with them. The footer's line cost the short document a second sheet on paper
+  at the screen's spacing (E-228), which is why it is small print close under the provenance there
+- alternatives: **"current browsers"** - unfalsifiable. **A range from the vendors' support
+  policies** - T3 statements cannot justify a Fixed value and say nothing about this document.
+  **Compatibility tables** - T2 and T3, about features in general and not about this stylesheet;
+  the probe asks the browser itself. **A polyfill or a fallback stylesheet** - for a document of
+  plain HTML and CSS with no script there is nothing to polyfill, and a fallback is a second layout
+  nobody measured
+- basis: E-228 (T1), E-218 (T1), E-219 (T1)
+- affects: MOD-006, report/REQ-001, XC-295, XC-296
+- decidedness: Bounded
+- reversal_trigger: a browser measured that fails the probe or prints differently, at which point
+  the gap is named in the footer's sentence and here rather than the browser dropped silently; a
+  machine that measures Safari or a mobile browser, at which point its name is added from the
+  measurement

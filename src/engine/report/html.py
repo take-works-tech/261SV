@@ -100,6 +100,14 @@ VIEW_FORM_REASONS: dict[ViewForm | None, str] = {
 BASIC_LATIN = frozenset(chr(code) for code in range(0x20, 0x7F)) | frozenset("\n\r\t")
 
 
+#: The browsers the gate opened and printed this document form in (`tests/test_exported_document_opens.py`,
+#: `tests/test_exported_document_prints.py`), each with the oldest major version measured on any
+#: machine that ran the gate (XC-309, E-228). Named in the document's own footer, so a reader knows
+#: what was verified; a browser not here was not measured and is not claimed. The gate fails where
+#: a browser it measured is older than the version claimed here.
+VERIFIED_BROWSERS: tuple[tuple[str, int], ...] = (("Microsoft Edge", 152), ("Google Chrome", 152), ("Mozilla Firefox", 155))
+
+
 @dataclass(frozen=True, slots=True)
 class EmbeddedFont:
     """A font subset carried inside the document (AC-015).
@@ -349,6 +357,7 @@ def render(
     parts += [_block(block, index) for index, block in enumerate(document.blocks)]
     parts.append(_limitations(document, stated))
     parts.append(_provenance(document))
+    parts.append(_verified())
     parts += ["</body>", "</html>", ""]
     return "\n".join(parts)
 
@@ -525,6 +534,17 @@ def _provenance(document: Document) -> str:
     return f'<section class="provenance"><h2>来歴</h2>{"".join(parts)}</section>'
 
 
+def _verified() -> str:
+    """The browsers this document form was opened and printed in by the gate, named with the version
+    measured (XC-309). A recipient's browser is not chosen by the author, so the document says what
+    was verified rather than promising what was not."""
+    named = "、".join(f"{name} {major}" for name, major in VERIFIED_BROWSERS)
+    return (
+        '<footer class="verified"><p>この文書の表示と印刷は次のブラウザで確認しています: '
+        f"{_text(named)}（確認した版。それより古い版や、ここにないブラウザでの表示は確認していません）</p></footer>"
+    )
+
+
 def _stylesheet(font: EmbeddedFont | None) -> str:
     """Inline, and with no external reference of any kind (AC-001).
 
@@ -566,6 +586,7 @@ def _stylesheet(font: EmbeddedFont | None) -> str:
         + ".legend-map{opacity:.85}"
         + "hr.page-break{border:0;border-top:1px solid currentColor;margin:2rem 0}"
         + "section.limitations,section.provenance{margin-top:2.5rem;font-size:.95rem}"
+        + "footer.verified{margin-top:2.5rem;font-size:.85rem;opacity:.85}"
         # On paper (XC-296, E-219): A4, because that is the sheet a Japanese office prints on and a
         # document printed on two sheet sizes is two layouts; a page-break block is a page break; a
         # figure, a table row and each trust section stay whole, and a heading stays with what it
@@ -576,7 +597,9 @@ def _stylesheet(font: EmbeddedFont | None) -> str:
         + "@page{size:A4;margin:18mm 20mm}"
         + "body{max-width:none;margin:0;padding:0}"
         + "hr.page-break{break-after:page;border:0;margin:0}"
-        + "figure.view,table.values tr,section.limitations,section.provenance{break-inside:avoid}"
+        + "figure.view,table.values tr,section.limitations,section.provenance,footer.verified{break-inside:avoid}"
+        # One line of small print, close under the provenance: on paper it earns no sheet of its own.
+        + "footer.verified{margin-top:1rem;font-size:.75rem}"
         + "h1,h2,figure.view figcaption{break-after:avoid}"
         + "table.values thead{display:table-header-group}"
         + "}"

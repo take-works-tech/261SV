@@ -2468,3 +2468,32 @@ Recorded so that nothing silently depends on them:
   with a 512-byte user block before the signature reads. Both readers take a path outside ASCII as
   given, as E-216 found for CGNS
 - justifies: XC-308, ingest/AC-052
+
+### E-228 - The exported document in the browsers present, feature by feature, measured here
+- tier: T1
+- url: tests/browsers.py, tests/test_exported_document_opens.py and tests/test_exported_document_prints.py, run on the development machine on 2026-09-23: Windows 11 (10.0.26200), Microsoft Edge 153.0.4234.48 and Google Chrome 153.0.8010.53, headless
+- verified: 2026-09-23
+- says: opened from a local file, the probe reports in both browsers `script:ran`, `style:applied`,
+  `image:loaded` and `module:ran`, and for each CSS feature the writer's stylesheet relies on -
+  `break-inside: avoid`, `break-after: page`, `break-after: avoid`, `color-scheme: light dark`,
+  `font-variant-numeric: tabular-nums`, `display: table-header-group` - `supported`; the `@page`
+  rule is parsed; the data-URI `@font-face` is tried and ends in `error`, as four bytes that are not
+  a font must (a real subset is report/AC-015's, and its loading is unmeasured until then). Printed, the
+  short document is one A4 sheet (595 x 842 pt) in both browsers, one and two page-break blocks
+  give two and three sheets, a figure at page width two, and the whole report the same count in
+  both. The footer naming the browsers, first styled as on screen (2.5 rem above, .85 rem type),
+  pushed the short document to a second sheet in Edge; at 1 rem and .75 rem on paper it prints on
+  one, measured. Firefox is not on this machine and geckodriver is not either; both are looked for
+  and skipped by name, and the runner's own set is what its run measures. On the runner
+  (ubuntu-latest, 2026-09-23, the two runs of PR #429): **Microsoft Edge 152.0.4191.66, Google
+  Chrome 152.0.7977.82, Mozilla Firefox 155.0 with geckodriver**. Firefox reported every marker and
+  every feature of the probe and the data-URI face tried, the same as the two Chromium browsers.
+  **The runner's Edge and Chrome were 152**, older than the 153 the document claimed from this
+  machine, and the gate refused the claim on each - first Edge, then Chrome on the next run - so
+  the claim is 152, the oldest version measured. Firefox's print through WebDriver, with no page
+  size given, honoured the document's `@page`: **596 x 842 pt** (Firefox rounds 210 mm up where
+  Chromium rounds down to 595), the short document on one sheet and the whole report on four, the
+  count Edge and Chrome gave it; its PDF keeps the page tree and page boxes inside compressed
+  object streams, which the reading inflates before it looks. Not measured, and said so: Safari,
+  mobile browsers, the preview panes of mail clients, Internet Explorer mode; Firefox on Windows
+- justifies: XC-309, report/AC-046
