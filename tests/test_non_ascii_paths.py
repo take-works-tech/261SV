@@ -27,7 +27,7 @@ requires_vtk()
 
 from engine import reader  # noqa: E402
 from service.command.surface import Command, Status  # noqa: E402
-from demo_case import write_bar, write_cube  # noqa: E402
+from demo_case import write_bar, write_cube, write_ensight, write_vtkhdf  # noqa: E402
 from test_handlers import a_surface, opened  # noqa: E402
 from test_reader import write_exodus  # noqa: E402
 
@@ -45,7 +45,8 @@ def hard(tmp_path: Path) -> Path:
 
 class TestEveryReaderReadsAtSuchAPath:
     """The readers take the path as UTF-8; each format's own library - VTK's XML reader, netCDF under
-    Exodus, HDF5 under CGNS - must turn it into the platform's form (E-216)."""
+    Exodus, HDF5 under CGNS and VTKHDF, the EnSight reader's own file handling - must turn it into the
+    platform's form (E-216, E-227)."""
 
     def test_vtk_xml(self, tmp_path: Path) -> None:
         path = hard(tmp_path) / "立方体 (最終).vtu"
@@ -77,10 +78,37 @@ class TestEveryReaderReadsAtSuchAPath:
         else:
             assert sorted(reader.read_case(path).present[0].dataset.fields) == ["elem_stress", "stress", "temp"]
 
+    def test_ensight_gold(self, tmp_path: Path) -> None:
+        """E-227: the EnSight reader takes the case path as given and finds the geometry and variable
+        files beside it at such a path; the files are written where the toolkit's writer is known to
+        write and copied, so that what is measured is the read."""
+        plain = tmp_path / "plain.case"
+        write_ensight(plain)
+        where = hard(tmp_path)
+        for one in tmp_path.iterdir():
+            if one.is_file() and one.name.startswith("plain."):
+                shutil.copyfile(one, where / one.name.replace("plain.", "板＃２.", 1))
+        path = where / "板＃２.case"
+        path.write_text(plain.read_text(encoding="utf-8").replace("plain.", "板＃２."), encoding="utf-8")
+
+        case = reader.read_case(path)
+
+        assert case.present[0].dataset.fields["temperature_n"].values.tolist() == [300.0, 310.0, 320.0, 330.0]
+        assert set(reader.snapshot(path)) == {"板＃２.case", "板＃２.0.00000.geo", "板＃２.0.00000_n.temperature", "板＃２.0.00000_c.load"}
+
+    def test_vtkhdf_through_hdf5(self, tmp_path: Path) -> None:
+        """E-227: the HDF5 library under the VTKHDF reader takes the path as given, as it does under
+        CGNS (E-216)."""
+        path = hard(tmp_path) / "格子 (最終).vtkhdf"
+        write_vtkhdf(path)
+
+        assert reader.read_case(path).present[0].dataset.fields["load"].values.tolist() == [1.5, 2.5]
+        assert set(reader.snapshot(path)) == {path.name}
+
     def test_the_guard_is_the_exodus_family_s_alone(self, tmp_path: Path) -> None:
         """The readers whose libraries take the path as given are not refused what they can read."""
         where = hard(tmp_path)
-        for name in ("a.vtu", "a.cgns", "a.stl", "a.vtp", "a.unknown"):
+        for name in ("a.vtu", "a.cgns", "a.stl", "a.vtp", "a.case", "a.vtkhdf", "a.unknown"):
             assert reader.load_refusal(where / name) is None, name
         for name in ("a.e", "a.ex2", "a.exo"):
             expected = sys.platform == "win32" and reader.active_code_page() != reader.UTF8_CODE_PAGE

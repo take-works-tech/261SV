@@ -515,5 +515,24 @@ is either missing a requirement or is not work this specification asked for.
   large (a million cells), transient and missing-values - and `tests/test_regression_catalogue.py`
   writes and reads each as its kind says. The gate found random bytes under `.stl` read as eighty
   triangles; `engine.completeness.check_stl_before_read` now holds a binary STL to its own header
-  (`tests/test_incomplete_files.py::TestABinarySTLIsHeldToItsHeader`). EnSight Gold and VTKHDF are
-  named as Verified without a reader (#426).
+  (`tests/test_incomplete_files.py::TestABinarySTLIsHeldToItsHeader`). EnSight Gold and VTKHDF were
+  named as Verified without a reader, and wired the same day (TASK-042, XC-308, #426).
+
+### TASK-042 - EnSight Gold and VTKHDF wired, with the checks before the read
+- satisfies: AC-052
+- depends_on: TASK-041
+- done_when: both suffixes read through the reader entry point as Verified with their gaps named,
+  every file an EnSight case names is checked against its own counts before the reader sees it and
+  every cut is a refusal naming the case and the file, a VTKHDF file is refused before the read
+  where it cannot be opened, and the regression set's list of Verified formats without a reader is
+  empty
+- done: 2026-09-23 (XC-308, E-227, #426). `src/engine/ensight.py` parses the case file, walks binary
+  (either byte order) and ASCII geometry and variable files by their own counts, refuses what it does
+  not follow, hands the reader the case through `SetCaseFileName` (`ReaderChoice.feed_path`) and
+  holds the read to the variables the case listed; `engine.completeness.check_vtkhdf_before_read`
+  holds a VTKHDF file to its signature and the reader's `CanReadFile`. Fixtures in
+  `tests/demo_case.py` (`write_ensight`, `write_ensight_transient`, `write_ensight_ascii`,
+  `write_vtkhdf`) and their cuts join `tests/regression_catalogue.py`; `tests/test_ensight_vtkhdf.py`
+  holds the whole reads, both byte orders, two parts over two steps, every cut, the forms refused by
+  name and the load through the handlers; `tests/test_non_ascii_paths.py` covers both readers at a
+  path outside ASCII.
