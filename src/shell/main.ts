@@ -13,7 +13,7 @@
  * with no token in it. `--capture <png>` additionally opens the window on the built interface and
  * writes what it shows, so a picture of the shell exists that a person can look at.
  */
-import { app, BrowserWindow, dialog, ipcMain, net, protocol } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, net, powerMonitor, protocol, screen } from "electron";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -100,6 +100,28 @@ function note(line: string): void {
 
 function broadcast(status: EngineProcessStatus): void {
   for (const each of BrowserWindow.getAllWindows()) each.webContents.send("engine:status", status);
+}
+
+/** What a laptop does to a window, noted and passed on (XC-310): sleep and resume through the power
+ *  monitor; a display added, removed or changed in its metrics - its scale among them - through the
+ *  screen module; a child process of Chromium's gone, the GPU process among them. A resume
+ *  re-announces the engine's status, so the interface checks its connection and draws again rather
+ *  than waiting for a click to find out. Nothing here restarts anything: the engine's own exit
+ *  arrives as its own status, and the interface offers the restart (XC-259). */
+function watchTheMachine(): void {
+  powerMonitor.on("suspend", () => note("power: suspend"));
+  powerMonitor.on("resume", () => {
+    note("power: resume");
+    if (engine) broadcast(engine.status());
+  });
+  screen.on("display-metrics-changed", (_event, display, changed) => {
+    note(`display ${display.id}: ${changed.join(", ")} changed; scale ${display.scaleFactor}, ${display.size.width}x${display.size.height}`);
+  });
+  screen.on("display-added", (_event, display) => note(`display ${display.id} added: scale ${display.scaleFactor}, ${display.size.width}x${display.size.height}`));
+  screen.on("display-removed", (_event, display) => note(`display ${display.id} removed`));
+  app.on("child-process-gone", (_event, details) => {
+    note(`child process gone: ${details.type} (${details.reason}${details.exitCode === undefined ? "" : `, exit ${details.exitCode}`})`);
+  });
 }
 
 /** The launch as this process saw it, in milliseconds after its own start (#307, XC-304): the
@@ -292,6 +314,12 @@ function registerBridge(): void {
   });
   ipcMain.handle("dialog:saveWorkspace", async (_event, suggestedName: unknown) => {
     const name = typeof suggestedName === "string" && suggestedName ? suggestedName : "workspace.svw";
+    if (SMOKE) {
+      // No person to answer a dialog: the sample goes under the smoke's own root, which goes with it.
+      const chosen = join(transientRoot(), "smoke-sample", name.endsWith(".svw") ? name : `${name}.svw`);
+      mkdirSync(join(transientRoot(), "smoke-sample"), { recursive: true });
+      return chosen;
+    }
     const chosen = await dialog.showSaveDialog({
       title: "新しいワークスペースを作る",
       defaultPath: name.endsWith(".svw") ? name : `${name}.svw`,
@@ -374,6 +402,75 @@ app.on("window-all-closed", () => {
   app.quit();
 });
 
+/** What the interface shows in its viewport: whether a drawn frame is there, its own pixels, the
+ *  size it is shown at, and the page's devicePixelRatio. */
+interface Picture {
+  present: boolean;
+  natural: [number, number];
+  shown: [number, number];
+  dpr: number;
+}
+
+async function picture(contents: Electron.WebContents): Promise<Picture> {
+  return contents.executeJavaScript(`(() => {
+    const img = document.querySelector(".viewport-pane img");
+    const box = img ? img.getBoundingClientRect() : null;
+    return {
+      present: Boolean(img && img.naturalWidth > 0),
+      natural: img ? [img.naturalWidth, img.naturalHeight] : [0, 0],
+      shown: box ? [Math.round(box.width), Math.round(box.height)] : [0, 0],
+      dpr: window.devicePixelRatio,
+    };
+  })()`) as Promise<Picture>;
+}
+
+async function pictureWithin(contents: Electron.WebContents, deadlineMs: number): Promise<Picture> {
+  const started = Date.now();
+  let seen = await picture(contents);
+  while (!seen.present && Date.now() - started < deadlineMs) {
+    await new Promise((r) => setTimeout(r, 500));
+    seen = await picture(contents);
+  }
+  return seen;
+}
+
+/** The home screen's own button, pressed as a person presses it: the sample is written where the
+ *  save dialog answers and opened, and the View draws it. Waited for, because the button is there
+ *  once the engine's status has reached the page. */
+async function openTheSample(contents: Electron.WebContents, deadlineMs: number): Promise<boolean> {
+  const started = Date.now();
+  while (Date.now() - started < deadlineMs) {
+    const pressed = (await contents.executeJavaScript(`(() => {
+      const button = [...document.querySelectorAll("button")].find((one) => (one.textContent || "").trim() === "サンプルを開く");
+      if (!button || button.disabled) return false;
+      button.click();
+      return true;
+    })()`)) as boolean;
+    if (pressed) return true;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return false;
+}
+
+/** The measurement of XC-310 (E-229): the sample opened, a frame drawn, the zoom raised, a resume
+ *  announced, the picture looked for after each. */
+async function pictureThrough(contents: Electron.WebContents): Promise<Record<string, unknown>> {
+  const sampleOpened = await openTheSample(contents, 30_000);
+  const first = await pictureWithin(contents, 60_000);
+  contents.setZoomFactor(1.5);
+  await new Promise((r) => setTimeout(r, 1_500));
+  const zoomed = await pictureWithin(contents, 10_000);
+  powerMonitor.emit("resume");
+  await new Promise((r) => setTimeout(r, 3_000));
+  const resumed = await pictureWithin(contents, 10_000);
+  contents.setZoomFactor(1);
+  const resumeNoted = log.some((line) => line.includes("power: resume"));
+  return {
+    sampleOpened, first, zoomed, resumed, resumeNoted,
+    ok: sampleOpened && first.present && zoomed.present && resumed.present && zoomed.dpr > first.dpr && resumeNoted,
+  };
+}
+
 async function smoke(): Promise<number> {
   const summary: Record<string, unknown> = {
     packaged: PACKAGED,
@@ -423,21 +520,33 @@ async function smoke(): Promise<number> {
     const second = await start(directory);
     summary.restarted = { pid: second.status().pid, differentPid: second.status().pid !== first.status().pid };
 
-    if (CAPTURE) {
-      // So the picture shows the choice: one more dead session, planted after the check above and
-      // left for the window to report. The smoke's root is removed at the end either way.
-      const shown = sessionDirectory(transientRoot(), 2147483645);
-      mkdirSync(shown, { recursive: true });
-      writeFileSync(join(shown, "scratch.bin"), Buffer.alloc(4096));
-      orphans = findOrphans(transientRoot());
+    if (existsSync(join(UI_DIST, "index.html"))) {
+      if (CAPTURE) {
+        // So the picture shows the choice: one more dead session, planted after the check above and
+        // left for the window to report. The smoke's root is removed at the end either way.
+        const shown = sessionDirectory(transientRoot(), 2147483645);
+        mkdirSync(shown, { recursive: true });
+        writeFileSync(join(shown, "scratch.bin"), Buffer.alloc(4096));
+        orphans = findOrphans(transientRoot());
+      }
       serveInterface();
       registerBridge();
       window = createWindow();
       await new Promise<void>((done) => window?.webContents.once("did-finish-load", () => done()));
-      await new Promise((r) => setTimeout(r, 4_000));
-      const image = await window.webContents.capturePage();
-      writeFileSync(CAPTURE, image.toPNG());
-      summary.captured = { path: CAPTURE, size: image.getSize() };
+      // The picture through what a laptop does to a window (XC-310, E-229): the interface opens on
+      // the sample and draws a frame; the zoom factor - Chromium's devicePixelRatio, what a display
+      // of another scale changes - is raised; a resume is announced as the power monitor would; and
+      // the picture is looked for after each. What is recorded is the frame's own size against
+      // the size it is shown at, so a scaled display is seen to scale the showing and not the frame.
+      summary.display = await pictureThrough(window.webContents);
+      if (CAPTURE) {
+        await new Promise((r) => setTimeout(r, 1_000));
+        const image = await window.webContents.capturePage();
+        writeFileSync(CAPTURE, image.toPNG());
+        summary.captured = { path: CAPTURE, size: image.getSize() };
+      }
+    } else {
+      summary.display = "the interface is not built beside this shell; the picture through a zoom and a resume is measured where it is";
     }
 
     const stopped = await second.stop();
@@ -465,12 +574,14 @@ async function smoke(): Promise<number> {
   summary.transientRootRemoved = !existsSync(transientRoot());
   summary.ok = summary.ok === true && summary.transientRootRemoved === true
     && (summary.orphans as { removed: string[]; remaining: number }).removed.length === 1
-    && (summary.orphans as { remaining: number }).remaining === 0;
+    && (summary.orphans as { remaining: number }).remaining === 0
+    && (typeof summary.display === "string" || (summary.display as { ok: boolean }).ok === true);
   process.stdout.write(JSON.stringify(summary, null, 2) + "\n");
   return summary.ok === true ? 0 : 1;
 }
 
 void app.whenReady().then(async () => {
+  watchTheMachine();
   if (SMOKE) {
     const code = await smoke();
     app.exit(code);

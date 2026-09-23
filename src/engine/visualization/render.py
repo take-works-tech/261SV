@@ -25,6 +25,7 @@ Specification: view/AC-007, AC-019, XC-087, XC-111, INV-001, INV-009, XC-001.
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Sequence
@@ -209,18 +210,15 @@ def render_view(
     renderer.ResetCamera()
     _aim(renderer, camera)
 
-    window = vtkRenderWindow()
-    window.SetOffScreenRendering(1)
-    window.AddRenderer(renderer)
-    window.SetSize(width, height)
-    window.Render()
-
-    to_image = vtkWindowToImageFilter()
-    to_image.SetInput(window)
-    to_image.ReadFrontBufferOff()
-    to_image.Update()
-    frame = to_image.GetOutput()
-    _refuse_an_empty_frame(frame, background)
+    frame = _draw_frame(renderer, width, height)
+    if _is_empty(frame, background):
+        # The driver refuses a context while it is being reset (a resume from sleep, a display
+        # change, a recovery from a fault): the frame comes back all background. Once more, after
+        # the reset has had its moment; the second empty frame is the answer (XC-310).
+        time.sleep(RETRY_AFTER_EMPTY_SECONDS)
+        frame = _draw_frame(renderer, width, height)
+        if _is_empty(frame, background):
+            raise RenderError(EMPTY_FRAME_REFUSAL)
 
     writer = vtkPNGWriter()
     writer.WriteToMemoryOn()
@@ -391,16 +389,42 @@ def _aim(renderer: vtkRenderer, camera: Camera | None) -> None:
     renderer.ResetCameraClippingRange()
 
 
-def _refuse_an_empty_frame(frame: object, background: tuple[float, float, float]) -> None:
-    """A frame that is all background is not a picture of anything, and is not returned as one."""
+#: How long a frame that came back all background waits before it is drawn once more (XC-310). The
+#: context is made afresh for every frame here, so a context the driver lost is nobody's to keep;
+#: what can still happen is the frame drawn while the driver is resetting. One retry: the second
+#: empty frame is an answer, not a wait.
+RETRY_AFTER_EMPTY_SECONDS = 0.5
+
+#: The refusal after the second empty frame: both causes named, because a person can act on one.
+EMPTY_FRAME_REFUSAL = (
+    "何も描かれませんでした：フレームが背景色だけで、少し待ってもう一度描いても同じでした。"
+    "視野に何も入っていないか、GPU の描画コンテキストが失われた直後（スリープからの復帰、ディスプレイの変更、"
+    "ドライバのリセット）です。もう一度描いてください。空の絵を成果物にするより、描けなかったと言います"
+)
+
+
+def _draw_frame(renderer: vtkRenderer, width: int, height: int) -> object:
+    """One frame of the renderer from a window of its own: the context lives for this frame and no
+    longer, which is why a context lost to sleep or a reset never has to be recovered here."""
+    window = vtkRenderWindow()
+    window.SetOffScreenRendering(1)
+    window.AddRenderer(renderer)
+    window.SetSize(width, height)
+    window.Render()
+
+    to_image = vtkWindowToImageFilter()
+    to_image.SetInput(window)
+    to_image.ReadFrontBufferOff()
+    to_image.Update()
+    return to_image.GetOutput()
+
+
+def _is_empty(frame: object, background: tuple[float, float, float]) -> bool:
+    """Whether a frame is all background: not a picture of anything, and not returned as one."""
     pixels = vtk_to_numpy(frame.GetPointData().GetScalars())  # type: ignore[attr-defined]
     expected = np.array([round(channel * 255) for channel in background], dtype=pixels.dtype)
     drawn = np.any(pixels[:, :3] != expected, axis=1)
-    if not bool(drawn.any()):
-        raise RenderError(
-            "何も描かれませんでした：フレームが背景色だけです。"
-            "空の絵を成果物にするより、描けなかったと言います"
-        )
+    return not bool(drawn.any())
 
 
 #: What the probe runs in a process of its own: the smallest render there is. It is a separate

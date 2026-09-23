@@ -262,6 +262,18 @@ describe("the prototype thread from the interface's side", () => {
     expect(s.probe?.missingBecause).toContain("モデル");
   });
 
+  test("resume: the connection is checked and a fresh frame drawn, without a click (XC-310)", async () => {
+    const before = snapshot().imageUrl;
+    expect(before).toMatch(/^blob:/);
+    const reachability = await engineState.resume(connection);
+    expect(reachability.kind).toBe("reachable");
+    const s = snapshot();
+    expect(s.reachability.kind).toBe("reachable");
+    expect(s.imageUrl).toMatch(/^blob:/);
+    expect(s.imageUrl).not.toBe(before);
+    expect(s.refusal).toBeNull();
+  });
+
   test("orbit: a drag is a new camera and a new frame, and not a document write (XC-270)", async () => {
     const before = snapshot().imageUrl;
     const writes = snapshot().journal.length;

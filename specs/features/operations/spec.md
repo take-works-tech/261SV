@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-22
+updated: 2026-09-23
 ---
 
 # Feature: running the product
@@ -131,6 +131,25 @@ updated: 2026-09-22
   - AC-033: When a launch exceeds LIM-010 or a selection exceeds LIM-011, the interface shall say so
     where it happens - the starting page for the launch, the work-area bar for the selection - with
     the measured time and the budget named, and shall never absorb the overrun into silence (XC-305)
+
+### REQ-010 - What a laptop does to a window does not take the picture or the work
+- priority: MUST
+- phase: r1
+- decidedness: Bounded
+- basis: E-229 (T1), E-200 (T1), E-194 (T1)
+- acceptance:
+  - AC-034: When the machine resumes from sleep, or a display is added, removed or changed in its
+    scale, the system shall keep the picture on screen with a pick still mapped to the frame, draw
+    the next frame as before, and on a resume check the engine's connection and draw again without
+    waiting for a click; the shell shall note each such event in its own notes (XC-310)
+  - AC-035: If a frame comes back with nothing drawn, then the system shall draw it once more after
+    a short wait, and if the second is empty too shall refuse it naming both possible causes - nothing
+    in view, or a GPU context lost on a resume, a display change or a driver reset - and the action,
+    rather than show a blank picture (XC-310)
+  - AC-036: If the engine process ends - a driver fault inside the renderer among the causes - then
+    the shell shall report it as it reports any exit, the interface shall offer a restart, reopen
+    what was saved and name what was applied and not saved, and nothing saved shall be lost
+    (XC-259, XC-310)
 
 ### REQ-008 - A shared component has one implementation
 - priority: MUST
