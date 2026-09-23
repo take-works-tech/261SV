@@ -54,6 +54,12 @@ updated: 2026-09-23
     large one, every fixture shall read as its kind says, and a Verified format without a reader
     shall be named rather than implied; a binary STL shall be refused before it is read where its
     size is not what its own header declares (XC-307)
+  - AC-052: When an EnSight Gold case file or a VTKHDF file is loaded, the system shall check every
+    file the case names against the counts written in it, and a VTKHDF file against its signature
+    and the reader's own opening, before the toolkit's reader is given any of them, refusing a cut,
+    missing or unreadable file with the case's name and the file's; shall refuse a read that
+    returned fewer variables than the case names; and shall refuse by name a form the check does
+    not follow, rather than read it (XC-308)
   - AC-022: If a supported file is unreadable or truncated, then the system shall report the failure
     with the file name and shall leave the @Workspace unchanged
   - AC-046: If a file changes while it is being read, or has changed since the @Dataset was loaded from

@@ -1,8 +1,9 @@
 """The regression set is a gate (XC-307; #203): every reader this build has is held to a whole
 fixture and a broken one, every required kind is present, every fixture writes and reads as its kind
 says - a whole file with points, a partial case that says so, a broken file refused by name, a
-million-cell grid read whole - and the Verified formats this build does not read yet are named here,
-so that the table in XC-049 cannot imply a regression test that does not exist."""
+million-cell grid read whole - and every Verified format of XC-049 has a reader here: the list of
+those without one, EnSight Gold and VTKHDF until XC-308, is held empty, so that the table cannot
+imply a regression test that does not exist."""
 
 from __future__ import annotations
 
@@ -43,11 +44,13 @@ class TestTheSetIsComplete:
         assert len(ids) == len(set(ids)), "a fixture id names one fixture"
         assert all(one.proves for one in FIXTURES), "every fixture says what it proves"
 
-    def test_the_verified_tier_names_formats_this_build_does_not_read_yet(self) -> None:
-        """XC-049 lists EnSight Gold and VTKHDF as Verified; no reader here takes their files. Held so
-        that wiring one is the moment this list shrinks and the table becomes true (#426)."""
-        assert VERIFIED_WITHOUT_READER == ("EnSight Gold", "VTKHDF")
-        assert not {".case", ".vtkhdf", ".hdf"} & set(reader._READERS)  # noqa: SLF001
+    def test_every_verified_format_of_the_table_has_a_reader(self) -> None:
+        """XC-049's Verified row - CGNS, EnSight Gold, Exodus, VTK XML, VTKHDF, STL - against the
+        readers this build has: nothing promised without a reader since XC-308 (#426). Held so that a
+        format added to the table without a reader is named here, not implied."""
+        assert VERIFIED_WITHOUT_READER == ()
+        assert {".case", ".vtkhdf", ".cgns", ".ex2", ".vtu", ".stl"} <= set(reader._READERS)  # noqa: SLF001
+        assert ".hdf" not in reader._READERS, "a generic HDF5 suffix is not a VTKHDF promise"  # noqa: SLF001
 
 
 @pytest.mark.parametrize("fixture", FIXTURES, ids=[one.id for one in FIXTURES])

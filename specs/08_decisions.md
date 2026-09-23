@@ -7086,3 +7086,49 @@ model or the prompt, never in a description that quietly went stale.
 - reversal_trigger: a reader added without its fixture pair, which the gate refuses; or a binary
   STL from a real writer padded by a whole triangle or more, at which point the slack is measured
   from it and the reason written
+
+### XC-308 - EnSight Gold and VTKHDF are read; every file an EnSight case names is checked against its own counts before the toolkit's reader sees any of it, a VTKHDF file against its signature and the reader's own opening, and the Verified row of XC-049 is true of this build
+- decided: 2026-09-23
+- status: active
+- decision: this build reads EnSight Gold (`.case`) and VTKHDF (`.vtkhdf`) through the toolkit's own
+  readers (`vtkGenericEnSightReader`, `vtkHDFReader`), wired in `src/engine/reader.py` as Verified
+  with their measured gaps named, and the regression set's list of Verified formats without a reader
+  is empty. **Nothing the EnSight reader is given goes unchecked**: `src/engine/ensight.py` parses
+  the case file itself and refuses anything it cannot place, walks each geometry and variable file
+  the case names by the counts the format writes into it - binary in either byte order, ASCII by
+  lines - and refuses, naming the case, the file and the place, before the reader is asked for
+  anything; after the read, every variable the case listed has to have arrived. A form the check
+  does not follow - a changing geometry, a structured part, an extents line, a partial or undefined
+  variable, a constant, several time sets, an element kind it does not know - is refused by name
+  rather than handed over. The reader is given the case through `SetCaseFileName`
+  (`ReaderChoice.feed_path`); parts are named by the geometry file's descriptions and variables by
+  the case file's names. A VTKHDF file is refused before the read where it carries no HDF5 signature
+  (random bytes, an empty file) and where the reader's own `CanReadFile` fails (a file cut short)
+  (`engine.completeness.check_vtkhdf_before_read`). The fixtures - binary Gold by the toolkit's
+  writer, one part and two parts over two steps; ASCII Gold and binary Gold in both byte orders
+  written by hand; VTKHDF by the toolkit's writer - and every cut of them join the regression set
+  (XC-307)
+- decided_by: engineering judgement, from #426's condition, XC-049, XC-307, E-212 and E-227
+- rationale: the measurement decided the shape. Handed files its own writer produced and cut, the
+  toolkit's EnSight reader took the process down on a geometry cut in half, did not return on a case
+  file cut in half, and read a geometry cut at 99 per cent, a cut variable file and a cut ASCII
+  geometry as whole parts (E-227). Not one of those is a refusal, two are not even a return, and an
+  observer on the reader's error output ends the interpreter, so there is no catching it after the
+  fact. The only place a check can live is before the read, and a check before the read can only be
+  by the format's own counts - the check the NetCDF container (E-212) and a binary STL (E-226)
+  already get. Refusing the forms the check does not follow is XC-001 applied to a reader: an
+  unchecked geometry is a crash waiting, and a plausible read of a cut file is a wrong number shown
+  confidently
+- alternatives: **wire the readers as they are** - the table becomes true and a cut file ends the
+  engine or reads as whole. **Catch the reader's errors** - they do not come; the process ends or the
+  read succeeds. **Write the readers here** - the toolkit's read every variant of the format and are
+  maintained; what was missing was the check, not the reader. **Wait for a real solver's files** - a
+  promise in the table with no reader behind it was XC-307's finding, and the files the toolkit's
+  own writer produces are the format
+- basis: E-227 (T1), E-212 (T1), E-226 (T1), E-034 (T1)
+- affects: MOD-002, ingest/REQ-010, XC-049, XC-307
+- decidedness: Fixed
+- reversal_trigger: an EnSight Gold file from a real solver that the check refuses and the reader
+  reads whole - measured, the check's rule is widened from that file and the reason written; or a
+  toolkit release whose reader refuses a cut file itself, at which point the check before the read
+  is measured against it and kept or dropped

@@ -40,8 +40,10 @@ from vtkmodules.vtkCommonDataModel import (
     vtkUnstructuredGrid,
 )
 from vtkmodules.vtkIOCGNSReader import vtkCGNSReader
+from vtkmodules.vtkIOEnSight import vtkGenericEnSightReader
 from vtkmodules.vtkIOExodus import vtkExodusIIReader
 from vtkmodules.vtkIOGeometry import vtkSTLReader
+from vtkmodules.vtkIOHDF import vtkHDFReader
 from vtkmodules.vtkIOXML import (
     vtkXMLPolyDataReader,
     vtkXMLPUnstructuredGridReader,
@@ -63,10 +65,10 @@ from domain_core.object_compatibility import Disposition, handling
 from domain_core.partitions import Partitioning
 from domain_core.parts import LoadedCase, Part
 from engine.conversion import to_unstructured
-from engine import cgns, exodus
+from engine import cgns, ensight, exodus
 from engine.result_axis import axis_of, delivered_position
 from engine.survey import _pieces as survey_pieces
-from engine.completeness import check_stl_before_read
+from engine.completeness import check_stl_before_read, check_vtkhdf_before_read
 from engine.exodus import BLOCK_ID_ARRAY
 
 class UnsupportedFormatError(Exception):
@@ -99,6 +101,17 @@ def _files_of(location: Path) -> list[Path]:
                 f"{location.name} は XML として読めません（{error}）。書き込み途中か、切り詰められたマニフェストです"
             ) from error
         return [location, *(location.parent / piece for piece in present)]
+    if location.suffix.lower() == ".case":
+        # The case names its geometry and variable files; a case that cannot be parsed is refused
+        # here by name rather than handed to a reader that does not return (E-227), and a file it
+        # names that is not beside it is named with the case, which is the file the person chose.
+        named = ensight.companions(location)
+        for one in named:
+            if not one.exists():
+                raise UnreadableFileError(
+                    f"{location.name} が名指すファイル {one.name} がありません。EnSight の case は形状と変数のファイルと同じ場所に要ります"
+                )
+        return [location, *named]
     return [location]
 
 
@@ -224,6 +237,15 @@ class ReaderChoice:
     # character outside the process's code page it does not fail: it takes the process down
     # (E-216). Such a path is refused here, by name, before the library sees it (XC-293).
     narrow_path: bool = False
+    # How the reader is given its path. None for the toolkit's usual `SetFileName`; a function for a
+    # reader that takes it another way, as the EnSight reader does through `SetCaseFileName` (XC-308).
+    feed_path: "Callable[[object, str], None] | None" = None
+
+    def feed(self, reader: object, path: str) -> None:
+        if self.feed_path is not None:
+            self.feed_path(reader, path)
+        else:
+            reader.SetFileName(path)  # type: ignore[attr-defined]
 
     def __post_init__(self) -> None:
         carried = FORMATS_CARRYING_UNIT_INFORMATION.get(self.suffix)
@@ -272,6 +294,21 @@ _READERS: dict[str, ReaderChoice] = {
     ".e": _EXODUS,
     ".ex2": _EXODUS,
     ".exo": _EXODUS,
+    # EnSight Gold: every file the case names is checked against its own counts before the toolkit's
+    # reader - which crashes on a cut geometry and hangs on a cut case file (E-227) - is given any.
+    ".case": ReaderChoice(
+        ".case", vtkGenericEnSightReader, "Verified", ensight.KNOWN_GAPS,
+        prepare=ensight.prepare, verify=ensight.verify, feed_path=ensight.feed_path,
+    ),
+    # VTKHDF: the toolkit's own HDF5 form. Random bytes, an empty file and a file cut short are
+    # refused before the read, by the signature and by the reader's own `CanReadFile` (E-227).
+    ".vtkhdf": ReaderChoice(
+        ".vtkhdf", vtkHDFReader, "Verified",
+        "verified against files the toolkit's own writer produced - an unstructured grid with point and "
+        "cell fields; a temporal VTKHDF, polydata, an overlapping AMR and an image are read by the same "
+        "reader and are unexercised here",
+        prepare=check_vtkhdf_before_read,
+    ),
 }
 
 
@@ -544,7 +581,7 @@ def read(path: str | Path) -> Dataset:
     _readable(location)
 
     reader = choice.factory()
-    reader.SetFileName(str(location))
+    choice.feed(reader, str(location))
     if choice.prepare is not None:
         choice.prepare(reader)
     reader.Update()
@@ -679,7 +716,7 @@ def read_case(path: str | Path, *, step: int = 0, expected: Fingerprint | None =
     _readable(location)
 
     reader = choice.factory()
-    reader.SetFileName(str(location))
+    choice.feed(reader, str(location))
     if choice.prepare is not None:
         choice.prepare(reader)
     # The sequence the file declared is on the pipeline after the metadata pass alone (E-211), so the

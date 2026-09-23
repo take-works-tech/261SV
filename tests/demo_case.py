@@ -15,13 +15,16 @@ case is, and the two would drift the day one of them was edited.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
 import numpy as np
 from vtkmodules.util.numpy_support import numpy_to_vtk
-from vtkmodules.vtkCommonCore import vtkFloatArray, vtkPoints
+from vtkmodules.vtkCommonCore import vtkFloatArray, vtkIntArray, vtkPoints
 from vtkmodules.vtkCommonDataModel import VTK_HEXAHEDRON, VTK_TRIANGLE, vtkCellArray, vtkUnstructuredGrid
+from vtkmodules.vtkIOHDF import vtkHDFWriter
+from vtkmodules.vtkIOParallel import vtkEnSightWriter
 from vtkmodules.vtkIOXML import vtkXMLUnstructuredGridWriter
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -237,6 +240,106 @@ def write_holed(path: Path) -> None:
     writer.SetFileName(str(path))
     writer.SetInputData(grid)
     writer.Write()
+
+
+def _sheet(step: int = 0, *, two_parts: bool = False, block_ids: bool = True) -> vtkUnstructuredGrid:
+    """Two triangles (one part) or four in two parts, `temperature` 300 + 10 i at the points plus
+    10 a step, `load` 1.5 and 2.5 per cell (then 3.5 and 4.5), and the BlockId the EnSight writer
+    splits parts by - given as cell data alone: `SetBlockIDs` from Python leaves the writer a pointer
+    to a freed list, and it then appends a stub part with a garbage number per block (measured, E-227)."""
+    if two_parts:
+        coordinates = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0], [2.0, 0.0, 0.0], [2.0, 1.0, 0.0]])
+        triangles = ([0, 1, 2], [0, 2, 3], [1, 4, 5], [1, 5, 2])
+    else:
+        coordinates = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]])
+        triangles = ([0, 1, 2], [0, 2, 3])
+    grid = vtkUnstructuredGrid()
+    points = vtkPoints()
+    points.SetData(numpy_to_vtk(np.ascontiguousarray(coordinates, dtype=np.float64), deep=True))
+    grid.SetPoints(points)
+    for triangle in triangles:
+        grid.InsertNextCell(VTK_TRIANGLE, 3, triangle)
+    temperature = numpy_to_vtk((300.0 + 10.0 * np.arange(len(coordinates)) + 10.0 * step).astype(np.float32), deep=True)
+    temperature.SetName("temperature")
+    grid.GetPointData().AddArray(temperature)
+    load = numpy_to_vtk((1.5 + np.arange(len(triangles)) + 2.0 * step).astype(np.float32), deep=True)
+    load.SetName("load")
+    grid.GetCellData().AddArray(load)
+    if block_ids:
+        block = vtkIntArray()
+        block.SetName("BlockId")
+        for value in ((1, 1, 2, 2) if two_parts else (1, 1)):
+            block.InsertNextValue(value)
+        grid.GetCellData().AddArray(block)
+    return grid
+
+
+def write_ensight(path: Path) -> None:
+    """`<stem>.case` beside `<stem>.0.00000.geo` and the variable files, all by the toolkit's own
+    EnSight writer, which names the case `<stem>.0.case` - renamed here to the path asked for. The
+    writer suffixes each variable: `temperature_n`, `load_c` (E-227)."""
+    writer = vtkEnSightWriter()
+    writer.SetPath(str(path.parent) + os.sep)
+    writer.SetBaseName(path.stem)
+    writer.SetFileName(str(path))
+    writer.SetInputData(_sheet())
+    writer.Write()
+    writer.WriteCaseFile(1)
+    (path.parent / f"{path.stem}.0.case").replace(path)
+
+
+def write_ensight_transient(path: Path) -> None:
+    """Two parts and two steps: the toolkit's writer names every part "VTK Part", so the geometry
+    file's two descriptions are rewritten in place to `part 1` and `part 2` - same length, same
+    offsets - because two parts with one name are one name in a tree (E-227)."""
+    writer = vtkEnSightWriter()
+    writer.SetPath(str(path.parent) + os.sep)
+    writer.SetBaseName(path.stem)
+    writer.SetFileName(str(path))
+    writer.SetBlockIDs([1, 2])
+    for step in (0, 1):
+        writer.SetTimeStep(step)
+        writer.SetInputData(_sheet(step, two_parts=True))
+        writer.Write()
+    writer.WriteCaseFile(2)
+    (path.parent / f"{path.stem}.0.case").replace(path)
+    geometry = path.parent / f"{path.stem}.0.00000.geo"
+    data = geometry.read_bytes()
+    stock = b"VTK Part".ljust(80, b"\0")
+    for number in (1, 2):
+        data = data.replace(stock, f"part {number}".encode().ljust(80, b"\0"), 1)
+    geometry.write_bytes(data)
+
+
+def write_ensight_ascii(path: Path) -> None:
+    """The one-part sheet as ASCII Gold, written by hand: the toolkit's writer produces binary only,
+    and the ASCII variant is what several solvers write."""
+    def column(values: list[float]) -> str:
+        return "".join(f"{value:12.5e}\n" for value in values)
+
+    geometry = (
+        "ASCII geometry\nwritten by the tests\nnode id off\nelement id off\npart\n         1\nsheet\ncoordinates\n           4\n"
+        + column([0.0, 1.0, 1.0, 0.0]) + column([0.0, 0.0, 1.0, 1.0]) + column([0.0, 0.0, 0.0, 0.0])
+        + "tria3\n           2\n         1         2         3\n         1         3         4\n"
+    )
+    stem = path.stem
+    (path.parent / f"{stem}.geo").write_text(geometry, encoding="ascii")
+    (path.parent / f"{stem}.temperature").write_text("temperature\npart\n         1\ncoordinates\n" + column([300.0, 310.0, 320.0, 330.0]), encoding="ascii")
+    (path.parent / f"{stem}.load").write_text("load\npart\n         1\ntria3\n" + column([1.5, 2.5]), encoding="ascii")
+    path.write_text(
+        f"FORMAT\ntype: ensight gold\nGEOMETRY\nmodel: {stem}.geo\nVARIABLE\n"
+        f"scalar per node: temperature {stem}.temperature\nscalar per element: load {stem}.load\n",
+        encoding="ascii",
+    )
+
+
+def write_vtkhdf(path: Path) -> None:
+    """The one-part sheet as VTKHDF, by the toolkit's own writer."""
+    writer = vtkHDFWriter()
+    writer.SetFileName(str(path))
+    writer.SetInputData(_sheet(block_ids=False))
+    if not writer.Write():
+        raise OSError(f"{path.name} を書けませんでした")
 
 
 def write_workspace(path: Path) -> Path:

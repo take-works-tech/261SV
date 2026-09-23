@@ -28,7 +28,10 @@ from vtkmodules.vtkCommonCore import vtkPoints  # noqa: E402
 from vtkmodules.vtkCommonDataModel import VTK_HEXAHEDRON, vtkCellArray, vtkUnstructuredGrid  # noqa: E402
 from vtkmodules.vtkIOXML import vtkXMLUnstructuredGridWriter  # noqa: E402
 
-from demo_case import write_bar, write_cube, write_exodus, write_fields, write_holed, write_partial_case, write_transient_case  # noqa: E402
+from demo_case import (  # noqa: E402
+    write_bar, write_cube, write_ensight, write_ensight_ascii, write_ensight_transient, write_exodus, write_fields,
+    write_holed, write_partial_case, write_transient_case, write_vtkhdf,
+)
 from engine import sample  # noqa: E402
 from test_incomplete_files import write_partitioned, write_polydata  # noqa: E402
 from test_reader import write_grid  # noqa: E402
@@ -38,9 +41,9 @@ Writer = Callable[[Path], object]
 KINDS = ("normal", "partial", "broken", "large", "transient", "missing-values")
 #: The kinds every regression set has to hold (#203's condition): whole, partly missing, broken, huge.
 REQUIRED_KINDS = ("normal", "partial", "broken", "large")
-#: XC-049's Verified tier names formats this build has no reader for yet: said here, held by a test,
-#: and tracked as their own work rather than implied by the table.
-VERIFIED_WITHOUT_READER = ("EnSight Gold", "VTKHDF")
+#: XC-049's Verified tier as against the readers this build has: empty since XC-308 wired EnSight
+#: Gold and VTKHDF; held by a test so that a format promised without a reader is named, not implied.
+VERIFIED_WITHOUT_READER: tuple[str, ...] = ()
 #: Random bytes under a reader's own extension: what a wrong file, a download cut off or a disk
 #: fault leaves. Seeded, so the bytes are the same on every run and a refusal is reproducible.
 GARBAGE_SEED = 203
@@ -85,6 +88,19 @@ def truncated(write: Writer, fraction: float) -> Writer:
         write(path)
         body = path.read_bytes()
         path.write_bytes(body[: int(len(body) * fraction)])
+
+    return cut
+
+
+def cut_companion(write: Writer, suffix: str, fraction: float) -> Writer:
+    """The fixture `write` gives, with the companion file whose name ends in `suffix` cut to
+    `fraction` of its bytes: a geometry or a variable file a solver was still writing (E-227)."""
+
+    def cut(path: Path) -> None:
+        write(path)
+        companion = next(one for one in sorted(path.parent.iterdir()) if one.name.startswith(path.stem) and one.name.endswith(suffix))
+        body = companion.read_bytes()
+        companion.write_bytes(body[: int(len(body) * fraction)])
 
     return cut
 
@@ -165,6 +181,9 @@ FIXTURES: tuple[Fixture, ...] = (
     Fixture("stl/sheet", ".stl", "normal", lambda path: write_polydata(path, xml=False), ("ingest/AC-020", "XC-049"), "the same sheet as STL: geometry only"),
     Fixture("ex2/case", ".ex2", "normal", write_exodus, ("ingest/AC-020", "E-136"), "an Exodus file whose every array is switched on by name"),
     Fixture("cgns/minimal", ".cgns", "normal", cgns_minimal, ("ingest/AC-034", "E-137"), "one base, one zone, one solution, a unit declaration the reader cannot read", needs="h5py"),
+    Fixture("case/sheet", ".case", "normal", write_ensight, ("ingest/AC-052", "XC-308"), "EnSight Gold binary by the toolkit's writer: one part, a node scalar and an element scalar"),
+    Fixture("case/ascii-sheet", ".case", "normal", write_ensight_ascii, ("ingest/AC-052", "XC-308"), "EnSight Gold ASCII written by hand: the variant the toolkit does not write"),
+    Fixture("vtkhdf/grid", ".vtkhdf", "normal", write_vtkhdf, ("ingest/AC-052", "XC-308"), "VTKHDF by the toolkit's writer: an unstructured grid with a point and a cell field"),
     # ---- partial: a case with a part the reader cannot give -----------------------------------
     Fixture("cgns/assembly-partial", ".cgns", "partial", renamed(write_partial_case), ("ingest/AC-027", "XC-272"), "one zone read and one the reader cannot: the case opens partial and says so", needs="h5py"),
     # ---- broken: cut, random, empty, or an extension nothing reads ------------------------------
@@ -185,11 +204,22 @@ FIXTURES: tuple[Fixture, ...] = (
     Fixture("stl/empty", ".stl", "broken", empty, ("ingest/AC-022",), "an empty file under .stl"),
     Fixture("cgns/empty", ".cgns", "broken", empty, ("ingest/AC-022",), "an empty file under .cgns"),
     Fixture("ex2/empty", ".ex2", "broken", empty, ("ingest/AC-022",), "an empty file under .ex2"),
+    Fixture("case/cut", ".case", "broken", truncated(write_ensight, 0.5), ("ingest/AC-022", "E-227"), "the case file cut at half: the reader would loop forever"),
+    Fixture("case/cut-geometry", ".case", "broken", cut_companion(write_ensight, ".geo", 0.5), ("ingest/AC-022", "E-227"), "the geometry cut at half: the reader would take the process down"),
+    Fixture("case/cut-geometry-late", ".case", "broken", cut_companion(write_ensight, ".geo", 0.99), ("ingest/AC-022", "E-227"), "the geometry cut at 99 per cent: the reader would read it as whole with the cells gone"),
+    Fixture("case/cut-variable", ".case", "broken", cut_companion(write_ensight, "_n.temperature", 0.5), ("ingest/AC-022", "E-227"), "a variable file cut at half: the reader would drop the variable silently"),
+    Fixture("case/cut-ascii-geometry", ".case", "broken", cut_companion(write_ensight_ascii, ".geo", 0.5), ("ingest/AC-022", "E-227"), "an ASCII geometry cut at half: the reader would read it as whole"),
+    Fixture("case/garbage", ".case", "broken", garbage, ("ingest/AC-022",), "random bytes under .case"),
+    Fixture("case/empty", ".case", "broken", empty, ("ingest/AC-022",), "an empty file under .case"),
+    Fixture("vtkhdf/cut", ".vtkhdf", "broken", truncated(write_vtkhdf, 0.5), ("ingest/AC-022", "E-227"), "the VTKHDF file cut at half"),
+    Fixture("vtkhdf/garbage", ".vtkhdf", "broken", garbage, ("ingest/AC-022",), "random bytes under .vtkhdf"),
+    Fixture("vtkhdf/empty", ".vtkhdf", "broken", empty, ("ingest/AC-022",), "an empty file under .vtkhdf"),
     Fixture("sim/unsupported", ".sim", "broken", lambda path: path.write_bytes(b"not a mesh"), ("ingest/AC-021",), "an extension no reader in this build takes"),
     # ---- large ----------------------------------------------------------------------------------
     Fixture("vtu/large-hexahedra", ".vtu", "large", large_hexahedra, ("LIM-001", "E-226"), f"{LARGE_EDGE}^3 hexahedra: a million cells, 1,030,301 points"),
     # ---- the rest a reader is held to ------------------------------------------------------------
     Fixture("cgns/transient", ".cgns", "transient", cgns_transient, ("XC-240", "XC-283"), "two steps the file declares as 0.0 and 0.5", needs="h5py"),
+    Fixture("case/two-parts-two-steps", ".case", "transient", write_ensight_transient, ("XC-308", "XC-283"), "two parts named in the geometry, two steps of numbered variable files"),
     Fixture("vtu/holed", ".vtu", "missing-values", write_holed, ("XC-303",), "three missing points, one missing component, two missing cells"),
 )
 
@@ -216,7 +246,7 @@ def write_all(directory: Path) -> dict[str, Path | None]:
     return written
 
 
-__all__ = ["FIXTURES", "Fixture", "KINDS", "REQUIRED_KINDS", "VERIFIED_WITHOUT_READER", "by_format", "by_kind", "write_all"]
+__all__ = ["FIXTURES", "Fixture", "KINDS", "REQUIRED_KINDS", "VERIFIED_WITHOUT_READER", "by_format", "by_kind", "cut_companion", "truncated", "write_all"]
 
 # The transient writer is in the table through `cgns_transient`; `write_transient_case` is kept
 # importable for callers that want the demo's own name for it.

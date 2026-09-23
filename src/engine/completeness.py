@@ -172,6 +172,44 @@ def stl_declared_length(head: bytes) -> int | None:
     return STL_HEADER_BYTES + STL_TRIANGLE_BYTES * count
 
 
+#: The eight bytes every HDF5 file starts with, at offset 0 or at 512, 1024, 2048, ... (the HDF5
+#: file format specification, superblock).
+HDF5_SIGNATURE = b"\x89HDF\r\n\x1a\n"
+
+
+def hdf5_signature_present(path: Path) -> bool:
+    size = path.stat().st_size
+    with path.open("rb") as handle:
+        offset = 0
+        while offset + len(HDF5_SIGNATURE) <= size:
+            handle.seek(offset)
+            if handle.read(len(HDF5_SIGNATURE)) == HDF5_SIGNATURE:
+                return True
+            offset = 512 if offset == 0 else offset * 2
+    return False
+
+
+def check_vtkhdf_before_read(reader: object) -> None:
+    """Refuse, before the read, a file the toolkit's HDF5 reader cannot open (E-227, ingest/AC-022).
+
+    Random bytes and an empty file carry no HDF5 signature and are refused here by name, without
+    the library's error stack. A file that carries one is put to the reader's own `CanReadFile`,
+    which is where a file cut short fails (its superblock records the length it had); left to the
+    read, the reader returns nothing and the nothing would be reported as an empty file, which it
+    is not.
+    """
+    location = for_os(Path(reader.GetFileName()))  # type: ignore[attr-defined]
+    if not hdf5_signature_present(location):
+        raise FileIncomplete(
+            f"{location.name} に HDF5 の署名がありません。VTKHDF ファイルではないか、空か、先頭から壊れています"
+        )
+    if not reader.CanReadFile(str(location)):  # type: ignore[attr-defined]
+        raise FileIncomplete(
+            f"{location.name} をツールキットの HDF5 リーダーが開けません。書き込み途中か、切り詰められたファイルか、"
+            "VTKHDF の構造を持たない HDF5 ファイルです（E-227）"
+        )
+
+
 def check_stl_before_read(reader: object) -> None:
     """Refuse a binary STL whose size is not what its own header declares (E-226, ingest/AC-022).
 

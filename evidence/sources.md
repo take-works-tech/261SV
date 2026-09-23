@@ -2441,3 +2441,30 @@ Recorded so that nothing silently depends on them:
   count, and 84 + 50 × count equals 4,096 for no count but 80; that agreement is what the reader
   now requires before it reads
 - justifies: XC-307, ingest/AC-051
+
+### E-227 - EnSight Gold and VTKHDF through the toolkit's readers, measured here: what a cut file does to the reader, what its writer produces, and what the checks cost
+- tier: T1
+- url: src/engine/ensight.py, tests/test_ensight_vtkhdf.py and the probes of 2026-09-23 recorded in this entry
+- verified: 2026-09-23
+- says: on this machine (Windows 11, Python 3.11.9, VTK 9.5.2), with files `vtkEnSightWriter` wrote
+  (one part of two triangles: geometry 828 bytes, node variable 260, element variable 252, case 194;
+  two parts over two steps: geometry 1,256 bytes), `vtkGenericEnSightReader` handed the geometry cut
+  in half **ended the process with a segmentation fault**; handed the geometry cut at 90 or 99 per
+  cent, **returned the part as whole with the cells silently gone**; handed a variable file cut in
+  half, returned the part with the variable silently dropped; handed the case file cut in half,
+  **did not return** and was killed; handed an ASCII geometry cut in half, returned it as whole. A
+  Python observer on the toolkit's output window (`CallDataType` `string0`) ends the interpreter.
+  The writer names every part "VTK Part", suffixes each variable `_n` or `_c`, writes a `BlockId`
+  variable file the case file does not list, and splits parts by a `BlockId` cell array; given
+  `SetBlockIDs` from Python it keeps a pointer to the freed temporary and appends a stub part with an
+  uninitialised number to the geometry and to every variable file (992 bytes where 828 is whole;
+  1,584 where 1,256 is). `GetCaseFileName` returns the name alone and `GetFilePath` the directory
+  with its separator. With the checks in place, every cut above is refused in under ten
+  milliseconds and the whole files read in two to three; a hand-written big-endian geometry is read
+  by the toolkit's reader in its own byte order; a companion whose name holds a space cannot be
+  named by a case file, which the format splits on whitespace. `vtkHDFWriter` writes a four-point
+  grid as 1,254,648 bytes; that file cut in half fails the reader's `CanReadFile` with the library's
+  "truncated file" diagnostic, random bytes and an empty file carry no HDF5 signature, and a file
+  with a 512-byte user block before the signature reads. Both readers take a path outside ASCII as
+  given, as E-216 found for CGNS
+- justifies: XC-308, ingest/AC-052

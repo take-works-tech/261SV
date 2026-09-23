@@ -188,12 +188,13 @@ change the engine's canonical version and any generated MDL stays derived (E-110
   true
 - decidedness: Fixed
 - basis: E-034 (T1), E-035 (T1), E-060 (T1)
-- correction: 2026-09-23. The Verified row names EnSight Gold and VTKHDF, and this build reads
-  neither: `src/engine/reader.py` has no reader for `.case` or `.vtkhdf`, so a file of either opens
-  as Absent - "no reader for this format in this build" - until #426 wires them. The regression
-  set's gate holds that gap by name (XC-307, `tests/test_regression_catalogue.py`), so the table
-  cannot imply a regression test that does not exist; the row stays as the promise, and this line
-  is what is true of it today
+- correction: 2026-09-23. The Verified row named EnSight Gold and VTKHDF while this build read
+  neither: `src/engine/reader.py` had no reader for `.case` or `.vtkhdf`, so a file of either opened
+  as Absent - "no reader for this format in this build". The gap was held by name in the regression
+  set's gate (XC-307, `tests/test_regression_catalogue.py`) and closed the same day: XC-308 wired
+  both, with every file an EnSight case names checked against its own counts before the toolkit's
+  reader sees it, because that reader measured as ending the process, not returning, or reading a
+  cut file as whole (E-227). The row is true of this build; this line is the record that it was not
 
 | Level | First release | What it means |
 |---|---|---|
