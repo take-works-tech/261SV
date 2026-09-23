@@ -105,7 +105,7 @@ BASIC_LATIN = frozenset(chr(code) for code in range(0x20, 0x7F)) | frozenset("\n
 #: machine that ran the gate (XC-309, E-228). Named in the document's own footer, so a reader knows
 #: what was verified; a browser not here was not measured and is not claimed. The gate fails where
 #: a browser it measured is older than the version claimed here.
-VERIFIED_BROWSERS: tuple[tuple[str, int], ...] = (("Microsoft Edge", 153), ("Google Chrome", 153))
+VERIFIED_BROWSERS: tuple[tuple[str, int], ...] = (("Microsoft Edge", 152), ("Google Chrome", 153))
 
 
 @dataclass(frozen=True, slots=True)

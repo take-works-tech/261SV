@@ -198,6 +198,9 @@ class TestTheDocumentClaimsWhatWasMeasured:
 
     def test_every_browser_measured_here_is_claimed_no_newer_than_measured(self, present: list[Browser]) -> None:
         claimed = dict(VERIFIED_BROWSERS)
+        # Said as a warning so that a run's summary carries the versions it measured, whatever else
+        # it prints: the runner's own set is read from there and recorded (E-228).
+        warnings.warn("browsers measured here (E-228): " + "; ".join(f"{one.product} {one.version()}" for one in present), stacklevel=1)
         for browser in present:
             major = browser.major()
             if browser.product not in claimed:

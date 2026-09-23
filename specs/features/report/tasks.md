@@ -360,5 +360,6 @@ updated: 2026-09-23
   Edge and Chrome through their command line, Firefox through geckodriver's WebDriver endpoint
   where a machine has both; the probe in `tests/test_exported_document_opens.py` reports each
   feature and the data-URI face, and `TestTheDocumentClaimsWhatWasMeasured` holds the footer to the
-  measurement. Measured here with Edge 153 and Chrome 153; Firefox's first pass is a measurement
-  said in the runner's summary, not yet a claim.
+  measurement. Measured here with Edge 153 and Chrome 153, and on the runner with Edge 152 - which
+  the gate refused against a claim of 153, so the claim is 152; Firefox's first pass is a
+  measurement said in the runner's summary, not yet a claim.

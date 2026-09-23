@@ -107,9 +107,22 @@ def printed(browser: Browser, url: str, name: str) -> bytes:
     return data
 
 
+def objects_of(pdf: bytes) -> bytes:
+    """The PDF's objects as text to search: the file itself, and every stream it holds inflated -
+    Firefox writes its page tree and page boxes inside compressed object streams, where Chromium
+    writes them in the open (E-228)."""
+    inflated = [pdf]
+    for body in re.findall(rb"stream\r?\n(.*?)\r?\nendstream", pdf, re.S):
+        try:
+            inflated.append(zlib.decompress(body))
+        except zlib.error:
+            continue
+    return b"\n".join(inflated)
+
+
 def page_size(pdf: bytes) -> tuple[float, float]:
     """The first page's box in points: A4 is 595 x 842, US Letter 612 x 792."""
-    box = re.search(rb"/MediaBox\s*\[\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\]", pdf)
+    box = re.search(rb"/MediaBox\s*\[\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\]", objects_of(pdf))
     assert box, "no page box in the PDF"
     return float(box.group(3)) - float(box.group(1)), float(box.group(4)) - float(box.group(2))
 
@@ -117,7 +130,7 @@ def page_size(pdf: bytes) -> tuple[float, float]:
 def page_count(pdf: bytes) -> int:
     """The page tree's own count. Chromium writes one `/Type /Pages` node with `/Count`; where a
     tree has several, the root's is the largest."""
-    counts = [int(one) for one in re.findall(rb"/Type\s*/Pages\b[^>]*?/Count\s+(\d+)", pdf, re.S)]
+    counts = [int(one) for one in re.findall(rb"/Type\s*/Pages\b[^>]*?/Count\s+(\d+)", objects_of(pdf), re.S)]
     assert counts, "no page tree in the PDF"
     return max(counts)
 
@@ -204,11 +217,18 @@ class TestFirefoxIsMeasuredBeforeItIsClaimed:
         ), tmp_path / "whole")
         short_pdf = printed(firefox, short.resolve().as_uri(), "short-Firefox.pdf")
         whole_pdf = printed(firefox, whole.resolve().as_uri(), "whole-Firefox.pdf")
-        width, height = page_size(short_pdf)
         chromium = {browser.name: page_count(printed(browser, whole.resolve().as_uri(), f"whole-{browser.name}.pdf")) for browser in installed() if browser.is_chromium}
+
+        def read(what: str, pdf: bytes) -> str:
+            try:
+                width, height = page_size(pdf)
+                return f"{what}: {round(width)} x {round(height)} pt, {page_count(pdf)} page(s)"
+            except AssertionError as error:
+                return f"{what}: {error}; {len(pdf)} bytes, header {pdf[:16]!r}, object streams {pdf.count(b'/ObjStm')}"
+
         warnings.warn(
-            f"Firefox {firefox.version()} measured: the short document printed {round(width)} x {round(height)} pt in "
-            f"{page_count(short_pdf)} page(s); the whole report {page_count(whole_pdf)} page(s) against Chromium's {chromium} (E-228)",
+            f"Firefox {firefox.version()} measured - {read('short document', short_pdf)}; {read('whole report', whole_pdf)}; "
+            f"Chromium's whole report {chromium} (E-228)",
             stacklevel=1,
         )
         assert short_pdf.startswith(b"%PDF") and whole_pdf.startswith(b"%PDF")

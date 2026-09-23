@@ -2484,6 +2484,12 @@ Recorded so that nothing silently depends on them:
   both. The footer naming the browsers, first styled as on screen (2.5 rem above, .85 rem type),
   pushed the short document to a second sheet in Edge; at 1 rem and .75 rem on paper it prints on
   one, measured. Firefox is not on this machine and geckodriver is not either; both are looked for
-  and skipped by name, and the runner's own set is what its run measures. Not measured, and said
-  so: Safari, mobile browsers, the preview panes of mail clients, Internet Explorer mode
+  and skipped by name, and the runner's own set is what its run measures: on the first run of the
+  gate on the runner (ubuntu-latest, 2026-09-23, PR #429) it found Edge, Chrome, Firefox and
+  geckodriver, Firefox reported every marker and every feature of the probe, and **the runner's
+  Edge was 152**, older than the 153 the document claimed from this machine - the gate refused
+  the claim, which is now the oldest version measured; Firefox's print came back as a PDF whose
+  page tree and page boxes sit inside compressed object streams, which the reading now inflates.
+  Not measured, and said so: Safari, mobile browsers, the preview panes of mail clients,
+  Internet Explorer mode
 - justifies: XC-309, report/AC-046
