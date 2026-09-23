@@ -156,6 +156,47 @@ def check_file_is_whole(path: Path) -> None:
         )
 
 
+#: A binary STL: an 80-byte header, a 4-byte little-endian triangle count, then 50 bytes a triangle.
+#: An ASCII one begins with `solid` and states no length, so nothing is checked for it here and the
+#: reader's own parse decides.
+STL_HEADER_BYTES = 84
+STL_TRIANGLE_BYTES = 50
+
+
+def stl_declared_length(head: bytes) -> int | None:
+    """How long a binary STL must be, from its own header - or None where the file is ASCII, or too
+    short to hold a header at all."""
+    if len(head) < STL_HEADER_BYTES or head[:5].lower() == b"solid":
+        return None
+    count = int.from_bytes(head[80:84], "little", signed=False)
+    return STL_HEADER_BYTES + STL_TRIANGLE_BYTES * count
+
+
+def check_stl_before_read(reader: object) -> None:
+    """Refuse a binary STL whose size is not what its own header declares (E-226, ingest/AC-022).
+
+    The toolkit's reader takes whatever bytes are there as triangles: four kilobytes of random data
+    under `.stl` read as eighty triangles with no complaint, measured here, and a file cut short reads
+    as fewer. Checked before the reader is asked for anything, like the NetCDF container (E-212): a
+    file shorter than it declares is cut, and one longer by a whole triangle or more is not the file
+    it says it is. An ASCII STL states no length and is left to the reader's parse.
+    """
+    location = for_os(Path(reader.GetFileName()))  # type: ignore[attr-defined]
+    size = location.stat().st_size
+    with location.open("rb") as handle:
+        head = handle.read(STL_HEADER_BYTES)
+    declared = stl_declared_length(head)
+    if declared is None:
+        return
+    if size < declared or size - declared >= STL_TRIANGLE_BYTES:
+        triangles = (declared - STL_HEADER_BYTES) // STL_TRIANGLE_BYTES
+        raise FileIncomplete(
+            f"{location.name} は {size} バイトで、ファイル自身のヘッダが宣言する {declared} バイト"
+            f"（三角形 {triangles:,} 個）と一致しません。書き込み途中か、切り詰められたか、STL ではないファイルです。"
+            "読めた分を三角形として返す代わりに拒みます（E-226）"
+        )
+
+
 def enable_selections(*selections: object) -> None:
     """Switch on every array of each `vtkDataArraySelection` given."""
     for selection in selections:
