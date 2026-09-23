@@ -362,5 +362,6 @@ updated: 2026-09-23
   feature and the data-URI face, and `TestTheDocumentClaimsWhatWasMeasured` holds the footer to the
   measurement. Measured here with Edge 153 and Chrome 153, and on the runner with Edge 152,
   Chrome 152 and Firefox 155 - the gate refused the claim of 153 against the runner's 152, so the
-  claim is 152; Firefox printed A4 with the counts Chromium gave, so it is claimed at 155, its
-  remaining documents measured and said in the run's summary before they are held.
+  claim is 152; Firefox printed A4 with the counts Chromium gave, so it is claimed at 155, and
+  after the merged run measured its remaining documents at Chromium's counts it is held to every
+  document of the file.

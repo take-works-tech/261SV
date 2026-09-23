@@ -204,9 +204,8 @@ class TestThePagesOfAPrintedDocument:
 class TestFirefoxPrintsWhatWasMeasured:
     """Gecko through WebDriver's print, on the machine that has it (the runner, E-228): the document's
     own `@page` gives an A4 sheet - 596 x 842 pt, Firefox rounding 210 mm up where Chromium rounds
-    down - the short document is one sheet, and the whole report has the count Chromium gives it.
-    Those three are held; the other documents of this file are measured beside them and said in the
-    run's summary, so that a claim follows a measurement (XC-309)."""
+    down - the short document is one sheet, and every document of this file has the count Chromium
+    gives it, measured on the runner before it was held (XC-309)."""
 
     def test_the_sheet_the_short_document_and_the_whole_report(self, tmp_path: Path, firefox: Browser) -> None:
         (tmp_path / "short").mkdir()
@@ -225,17 +224,21 @@ class TestFirefoxPrintsWhatWasMeasured:
         assert page_count(short_pdf) == 1
         assert set(chromium.values()) == {page_count(whole_pdf)}, f"Firefox {page_count(whole_pdf)} page(s) against Chromium's {chromium}"
 
-    def test_the_other_documents_are_measured_and_said(self, tmp_path: Path, firefox: Browser) -> None:
+    def test_the_other_documents_have_the_counts_chromium_gives(self, tmp_path: Path, firefox: Browser) -> None:
+        """Measured on the runner first (E-228: 2, 3, 2 and 3 sheets, Chromium's own), then held."""
         documents = {
             "one-break": (a_text_block("前半"), Block(BlockKind.PAGE_BREAK), a_text_block("後半")),
             "two-breaks": (a_text_block("一"), Block(BlockKind.PAGE_BREAK), a_text_block("二"), Block(BlockKind.PAGE_BREAK), a_text_block("三")),
             "figure": (a_figure_block("全体外観", 800, 600),),
             "text-then-figure": (a_text_block("所見", paragraphs=5), a_figure_block("全体外観"), a_table_block("応力", rows=6)),
         }
+        chromium = [browser for browser in installed() if browser.is_chromium]
         counts: dict[str, int] = {}
         for label, blocks in documents.items():
             (tmp_path / label).mkdir()
             target = a_document(blocks, tmp_path / label)
             counts[label] = page_count(printed(firefox, target.resolve().as_uri(), f"{label}-Firefox.pdf"))
+            for browser in chromium:
+                assert page_count(printed(browser, target.resolve().as_uri(), f"{label}-{browser.name}.pdf")) == counts[label], f"{label}: {browser.name} disagrees with Firefox's {counts[label]}"
         warnings.warn(f"Firefox {firefox.version()} measured - pages per document: {counts} (E-228)", stacklevel=1)
-        assert counts["one-break"] >= 2 and counts["two-breaks"] >= 3, "a page-break block starts a sheet"
+        assert counts["one-break"] == 2 and counts["two-breaks"] == 3 and counts["figure"] == 2, counts
