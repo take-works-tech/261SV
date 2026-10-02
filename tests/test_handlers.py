@@ -217,12 +217,12 @@ class TestWhatThisBuildRegisters:
             "graph.create", "graph.update", "graph.get", "graph.data",
             "dataset.probe", "view.pick", "report.create", "report.update", "report.get",
             "report.export", "report.provenance",
-            "workspace.save", "dataset.inspect", "history.list",
+            "workspace.save", "workspace.discardRecovery", "dataset.inspect", "history.list",
             "system.capabilities", "system.protocols", "system.audit", "system.operations", "system.log",
             "system.supportManifest", "system.supportBundle",
             "output.list", "output.plan", "output.prune",
         }
-        assert len(surface.unimplemented()) == len(OPERATIONS) - 37
+        assert len(surface.unimplemented()) == len(OPERATIONS) - 38
 
     def test_operations_list_what_this_build_answers_and_what_it_does_not(self) -> None:
         """XC-277: the list is the surface's own registry, and the two halves are the whole catalogue."""

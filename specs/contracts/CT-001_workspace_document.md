@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-21
+updated: 2026-10-03
 ---
 
 # Contract: workspace document
@@ -62,6 +62,23 @@ case, for the same reason as INV-004.
 
 `provenance` was added beside it, because GL-003 requires every variable to carry it and the schema had
 no place for it either.
+
+## Files beside the document
+
+A document keeps company on disk, each file named after it and none of them a document:
+
+| Beside `study.svw` | What it is | Who writes and removes it |
+|---|---|---|
+| `study.svw.writing` | the next save, until it is complete and moved into place (XC-055) | the save; a leftover is removed and said at the next open (#313) |
+| `study.svw.previous` | the version before the last save, for the undo of that save (XC-055) | the save; replaced by the next save |
+| `study.svw.previous.older` | the version before that, for as long as the last save's undo is the newest possible one | the save; removed by the next save |
+| `study.svw.lock` | who has the document open for editing, and from where (XC-241, XC-269) | the open and the close; a stale one is taken over on a person's word |
+| `study.svw.recovery` | the document as it stands after the last applied write of a session that has not saved, with the writes since the last save (workspace/AC-026, workspace/AC-027, XC-311) | every applied write; removed by a save, or by `workspace.discardRecovery` on a person's word |
+
+The recovery file's top level is `recovery` - `of`, `documentId`, `writtenAt`, `baseSize`,
+`baseModifiedNs`, `productVersion`, `count`, `writes` - and `document`, the document itself in this
+contract's shape. It carries no `formatVersion` at its top, so a loader handed it refuses it; it is
+offered when its `documentId` is the opened document's, and said and left alone when it is not.
 
 ## What the document does not contain
 

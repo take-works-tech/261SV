@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-22
+updated: 2026-10-03
 ---
 
 # Tasks: workspace, cases and variables
@@ -752,3 +752,20 @@ updated: 2026-09-22
   filtering every case for every case. Proven by
   `tests/test_workspace_hierarchy.py::TestTheTreeIsBoundedInCases`,
   `tests/test_handlers.py::TestAWorkspaceIsBoundedInCases` and `src/ui/logic/subject.scale.test.ts`.
+
+### TASK-075 - The recovery file beside the document
+- satisfies: AC-026, AC-027
+- depends_on: TASK-072
+- done_when: every applied write to an editable open document leaves the document and the writes
+  since the last save beside the file without rewriting the file; a save removes it; opening a
+  document with one beside it says so and opens the saved document; `recover` takes it unsaved; a
+  read-only open is offered it and does not take it; discarding is undoable; the interface offers
+  it with the writes named
+- done: 2026-10-03 (XC-311, E-230, #431). `src/service/workspace/recovery.py` writes, reads, finds
+  and discards the file; the surface tells the handlers of every applied write
+  (`Surface.after_write`) and `recovery_after_write` writes it; `workspace.open` offers and, on
+  `recover`, takes it; `workspace.save` removes it; `workspace.discardRecovery` removes it on the
+  person's word (CT-003 3.21.0). The interface's `RecoveryOffer` shows it beside what an exit lost,
+  and `engineState.restoreRecovery` / `discardRecovery` act on it. Proven by
+  `tests/test_recovery.py` and the engine-end thread of `src/ui/state/engine.connected.test.ts`,
+  which kills an engine with an unsaved declaration and finds it offered, takes it, and saves.

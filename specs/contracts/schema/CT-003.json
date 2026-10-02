@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CT-003 engine API",
-  "version": "3.20.0",
+  "version": "3.21.0",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -22,6 +22,7 @@
         "workspace.create",
         "workspace.sample",
         "workspace.save",
+        "workspace.discardRecovery",
         "workspace.close",
         "case.create",
         "case.delete",
@@ -242,6 +243,10 @@
             "takeOverStaleLock": {
               "type": "boolean",
               "description": "持ち主のプロセスが見つからない（stale）か読めないロックを、この人の言葉で引き継ぐ。生きている持ち主のロックは決して壊さない（XC-241、XC-269）"
+            },
+            "recover": {
+              "type": "boolean",
+              "description": "文書の隣にある復旧ファイル（保存せずに終わったセッションの作業）の文書を、未保存のまま開く。無指定なら復旧ファイルは答えで知らせるだけで、保存済みの文書を開く。読み取り専用の開き方では復元せず、その旨を警告する（XC-311）"
             }
           }
         },
@@ -295,6 +300,19 @@
             "path": {
               "type": "string",
               "description": "別名で保存する先"
+            }
+          }
+        },
+        "workspace.discardRecovery": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "workspaceId"
+          ],
+          "properties": {
+            "workspaceId": {
+              "type": "string",
+              "description": "開いているワークスペースの識別子（CT-001）。その文書の隣の復旧ファイルを消す"
             }
           }
         },
@@ -1808,6 +1826,66 @@
         }
       }
     },
+    "recoveryOffer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "writtenAt",
+        "count",
+        "writes",
+        "baseChanged",
+        "productVersion",
+        "olderOffer"
+      ],
+      "description": "復旧ファイルの要約：保存せずに終わったセッションが適用した書き込みと、その文書がいつ書かれたか。提案は、受け取ったセッションが上書きすることはなく、そのセッションの最初の書き込みで脇に置かれる。復元か破棄で答えるまで、また保存しても、残る（XC-311）",
+      "properties": {
+        "writtenAt": {
+          "$ref": "CT-001.json#/$defs/recordedTime",
+          "description": "復旧ファイルを最後に書いた時刻"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "最後の保存以降に適用された書き込みの数"
+        },
+        "writes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "summary",
+              "at"
+            ],
+            "properties": {
+              "operation": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "at": {
+                "$ref": "CT-001.json#/$defs/recordedTime"
+              }
+            }
+          },
+          "description": "その書き込み、新しいものから最大 200 件：操作、要約、時刻"
+        },
+        "baseChanged": {
+          "type": "boolean",
+          "description": "復旧ファイルを書いたときの文書ファイルと、いまのファイルが違う（その後に別の保存があった）"
+        },
+        "productVersion": {
+          "type": "string",
+          "description": "復旧ファイルを書いた製品の版"
+        },
+        "olderOffer": {
+          "type": "boolean",
+          "description": "この提案の後ろに、さらに前のセッションの提案がもう一つ控えている（脇に置かれたもの）。この提案を破棄すると次に提案される"
+        }
+      }
+    },
     "reportedValue": {
       "type": "object",
       "additionalProperties": false,
@@ -1887,6 +1965,7 @@
             "lock",
             "name",
             "readOnly",
+            "recovered",
             "tags",
             "unresolvedCases",
             "workspaceId"
@@ -1895,6 +1974,14 @@
             "workspaceId": {
               "type": "string",
               "description": "開いたワークスペース"
+            },
+            "recovered": {
+              "type": "boolean",
+              "description": "復旧ファイルの文書を未保存のまま開いたか：recover を付け、復旧ファイルがあり、編集できる開き方のとき真（XC-311）"
+            },
+            "recovery": {
+              "$ref": "#/$defs/recoveryOffer",
+              "description": "文書の隣にあるこの文書の復旧ファイルの要約 - 保存せずに終わったセッションの作業。無ければこの項目はない（workspace/AC-027、XC-311）"
             },
             "formatVersion": {
               "type": "string",
@@ -2114,6 +2201,7 @@
             "lock",
             "name",
             "readOnly",
+            "recovered",
             "tags",
             "unresolvedCases",
             "workspaceId"
@@ -2122,6 +2210,14 @@
             "workspaceId": {
               "type": "string",
               "description": "開いたワークスペース"
+            },
+            "recovered": {
+              "type": "boolean",
+              "description": "復旧ファイルの文書を未保存のまま開いたか：recover を付け、復旧ファイルがあり、編集できる開き方のとき真（XC-311）"
+            },
+            "recovery": {
+              "$ref": "#/$defs/recoveryOffer",
+              "description": "文書の隣にあるこの文書の復旧ファイルの要約 - 保存せずに終わったセッションの作業。無ければこの項目はない（workspace/AC-027、XC-311）"
             },
             "formatVersion": {
               "type": "string",
@@ -2342,6 +2438,7 @@
             "lock",
             "name",
             "readOnly",
+            "recovered",
             "tags",
             "unresolvedCases",
             "workspaceId"
@@ -2350,6 +2447,14 @@
             "workspaceId": {
               "type": "string",
               "description": "開いたワークスペース"
+            },
+            "recovered": {
+              "type": "boolean",
+              "description": "復旧ファイルの文書を未保存のまま開いたか：recover を付け、復旧ファイルがあり、編集できる開き方のとき真（XC-311）"
+            },
+            "recovery": {
+              "$ref": "#/$defs/recoveryOffer",
+              "description": "文書の隣にあるこの文書の復旧ファイルの要約 - 保存せずに終わったセッションの作業。無ければこの項目はない（workspace/AC-027、XC-311）"
             },
             "formatVersion": {
               "type": "string",
@@ -2575,6 +2680,23 @@
             "previousKept": {
               "type": "boolean",
               "description": "直前の版を残したか"
+            }
+          }
+        },
+        "workspace.discardRecovery": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "discarded"
+          ],
+          "properties": {
+            "discarded": {
+              "type": "boolean",
+              "description": "復旧ファイルがあって消したか。無ければ偽で、何も変わらない"
+            },
+            "nextOffer": {
+              "$ref": "#/$defs/recoveryOffer",
+              "description": "消した提案の後ろに控えていた、さらに前の提案。無ければこの項目はない"
             }
           }
         },

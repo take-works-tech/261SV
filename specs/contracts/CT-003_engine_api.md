@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-22
+updated: 2026-10-03
 ---
 
 # Contract: engine API
@@ -10,7 +10,13 @@ updated: 2026-09-22
   and between a remote client and a hosted engine. The same operations, the same shapes, whether the
   engine is a child process on loopback or a service across a network
 - schema: schema/CT-003.json
-- version: 3.20.0
+- version: 3.21.0
+- correction: 2026-10-03, version 3.20.0 to 3.21.0. `workspace.open` answers `recovered` and, where a
+  recovery file stands beside the document, `recovery` - when it was written, how many writes since
+  the last save it holds and which, whether the file changed since - and takes `recover` to open
+  that file's document unsaved; `workspace.discardRecovery` removes the file on the person's word.
+  The recovery file is what an engine that ended without a save leaves behind, written after every
+  applied write (XC-311, workspace/AC-026, workspace/AC-027)
 - correction: 2026-09-22, version 3.19.0 to 3.20.0. A reported value that was computed with
   missing entries left out now says how many (`missingCount`, present when at least one) beside
   the caveat `missing-values`; a graph point carries the same two (`caveats`, `missingCount`) so a
@@ -221,10 +227,11 @@ no identifier to report.
 
 | Operation | Reads or writes | Parameters | Result |
 |---|---|---|---|
-| `workspace.open` | write | path, take over stale lock? | workspace id, unresolved cases, format version, the items the document holds (views, graphs, reports: id, name, dataset), whether it opened read-only, and what the lock said - state, holder, file (XC-241, XC-269); the cases the document holds, with their parents (XC-291) and each one's recorded files - where each is now and whether it is there (XC-298); the document's name and the tags of its cases as one set (XC-297) |
+| `workspace.open` | write | path, take over stale lock?, recover? | workspace id, unresolved cases, format version, the items the document holds (views, graphs, reports: id, name, dataset), whether it opened read-only, and what the lock said - state, holder, file (XC-241, XC-269); the cases the document holds, with their parents (XC-291) and each one's recorded files - where each is now and whether it is there (XC-298); the document's name and the tags of its cases as one set (XC-297); whether a recovery file stood beside the document - when it was written, the writes since the last save it lists, whether the file changed since - and whether its document was taken (XC-311) |
 | `workspace.create` | write | path, name?, case name? | a new document with one case written at the path - refused where a file is already there or the folder is not - then opened: what `workspace.open` answers (XC-297) |
 | `workspace.sample` | write | path | the shipped sample generated at the path - a cantilever beam under two loads, its data beside the document, its units declared - refused where the document or its data folder already exists, then opened: what `workspace.open` answers (XC-298) |
-| `workspace.save` | write | workspace id, path? | path written, previous version kept |
+| `workspace.save` | write | workspace id, path? | path written, previous version kept; the recovery file beside the document goes with the work it held (XC-311) |
+| `workspace.discardRecovery` | write | workspace id | whether an offered recovery file beside the open document was removed, and the older offer that moves up behind it where there is one; the bytes go to the undo (XC-311) |
 | `workspace.close` | write | workspace id | - |
 | `case.create` | write | workspace id, parent case id?, name | case id |
 | `case.delete` | write | case id | affected descendant ids |
