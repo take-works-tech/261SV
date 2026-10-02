@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-23
+updated: 2026-10-03
 ---
 
 # Decisions and open questions
@@ -7216,3 +7216,55 @@ model or the prompt, never in a description that quietly went stale.
   picture or the engine - at which point the retry count, the wait or the shell's part is changed
   from that measurement and the reason written; or a renderer reached through ANARI (XC-251) that
   holds a context across frames, which brings context-loss recovery with it
+
+### XC-311 - Every applied write leaves the document as it stands in a recovery file beside the saved one; opening offers it, `recover` takes it, a save removes it - so an engine that ends without a save loses nothing a person applied
+- decided: 2026-10-03
+- status: active
+- decision: after every applied write to an open document that is not a read-only one, the engine
+  writes `<name>.recovery` beside the document (`src/service/workspace/recovery.py`, called from
+  the surface after the write is recorded): the document as it now stands, and the list of writes
+  since the last save - operation, summary, when - with the saved file's size and time, so a file
+  saved by somebody else since can be told apart. The saved file itself is not rewritten
+  (workspace/AC-026). Opening a document that has one beside it answers `recovery` - when it was
+  written, how many writes, which, whether the file changed since - and opens the saved document;
+  nothing is taken unless the open says `recover`, which puts that document in memory **unsaved**,
+  its writes the unsaved work again, and leaves the file on disk what it was until the person saves
+  (workspace/AC-027). A read-only open is offered it and does not take it, with the reason said, because work
+  restored into a window that cannot save is lost again. **An offer is never overwritten by the
+  session it was made to**: that session's first write moves the offer to `<name>.recovery.earlier`
+  - one slot, a third unanswered generation replaces the oldest and the log says so - and writes its
+  own file; `recover` takes the newest file that is not this session's, wherever it stands; a save
+  removes this session's files and leaves every offer, and says so; a discard removes the offer and
+  moves an older one up. Each file names the session that wrote it, which is how a session tells
+  its own file from an offer. Otherwise a save
+  removes the file beside the target and beside the path saved from; `workspace.discardRecovery`
+  removes it on the person's word, with its bytes held for the undo. The interface shows the offer where it shows what an exit lost -
+  count, last time, the writes grouped - with 復元する and 捨てる; what XC-259 named as lost is
+  now also what can be taken back. The file is one file rewritten whole and atomically rather than
+  a physical append, and it is never a document: its top level is `recovery` and `document`, so a
+  loader handed it refuses it
+- decided_by: engineering judgement, from #431 (the half of #260 XC-310 left), workspace/REQ-009, XC-055, XC-259 and E-230
+- rationale: workspace/REQ-009's acceptance - the change appended beside the file, the journalled work offered
+  after an abnormal exit and the saved file untouched until accepted - was decided in 2026-08 and
+  implemented by nothing; XC-259 made the loss honest and left it a loss. What restores work is the
+  state, not a replay: a command of a session that is gone names dataset ids and handles that died
+  with it, so the recovery file carries the document and the list of writes is what names the work
+  to the person. One file rewritten whole costs a fraction of a frame per edit at LIM-005's size
+  (E-230) and leaves nothing half-appended; a physical append would need its own reader and its
+  own repair. The read-only rule and the lock rule are one rule: the document is one window's, and
+  so is the file beside it. The offer rule came from the measurement: the connected thread's first
+  write after taking over a dead engine's lock - the reload of the case - overwrote the dead
+  engine's offer before the person could take it, and a first repair that merely held this
+  session's writes back left the thread's own later work unprotected (E-230)
+- alternatives: **a journal of commands replayed on open** - replay needs the dead session's
+  identifiers; **autosave into the document itself** - rewrites the saved file behind the person's
+  back, which workspace/AC-026 forbids and XC-055's previous-version rule is built against; **the interface
+  keeps the writes** - the interface dies with the application, and after an engine crash it is the
+  engine's state that is gone; **recovering automatically on open** - puts unsaved work a person
+  may not want into a document that opens as saved, unasked
+- basis: E-230 (T1), E-200 (T1), E-225 (T1)
+- affects: MOD-007, MOD-004, workspace/REQ-009, operations/REQ-010, XC-259, CT-001, CT-003
+- decidedness: Fixed
+- reversal_trigger: a document whose recovery file takes longer to write than a frame to draw,
+  measured, at which point the write is made less often or smaller from that measurement; or a
+  replay-safe command record, at which point the journal may carry commands rather than the state

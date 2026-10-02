@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-23
+updated: 2026-10-03
 ---
 
 # Sources
@@ -2521,3 +2521,27 @@ Recorded so that nothing silently depends on them:
   refuses a context is unmeasured beyond the empty frame. The runner (Linux, xvfb, Mesa) runs the
   same smoke at every merge, and its numbers are in its log
 - justifies: XC-310, operations/AC-034, operations/AC-035
+
+### E-230 - The recovery file beside a document: what it costs per write and what a killed engine leaves, measured here
+- tier: T1
+- url: tests/test_recovery.py and the engine-end thread of src/ui/state/engine.connected.test.ts, with a cost probe run on the development machine on 2026-10-03 (Windows 11, Python 3.11.9, NVMe disk)
+- verified: 2026-10-03
+- says: writing the recovery file - the whole document and the list of writes since the last save,
+  flushed under a temporary name and moved into place - costs **13.0 ms per write for a document
+  of 2,000 cases (LIM-005's size; the file is 0.198 MB)** and **1.5 ms for a document of two cases
+  (6 KB)**, the mean of ten writes each; a frame of the interactive view costs more than either
+  (E-063), so the file is written after every applied write and nobody waits for it. A session
+  that declared a unit after its last save and ended without saving leaves the file beside the
+  document; the next session's open names the declaration in the offer, opens the saved document
+  (the declaration absent), takes the recovery document on `recover` with the declaration present
+  and the file on disk unchanged, and a save then writes it and removes the recovery file. A
+  second window that opened the same document read-only writes no recovery file and does not take
+  one. In the connected thread, an engine killed with SIGKILL after an unsaved declaration left the
+  file, the restarted engine offered it, and the interface took it on the person's word and saved -
+  **after a first run in which the reload that follows taking over the dead engine's lock, an
+  applied write, overwrote the offer with the saved document before it could be taken**, and a
+  second in which holding this session's writes back while the offer stood left the thread's own
+  later declaration unwritten when the engine was killed; since then the first write sets the offer
+  aside and writes this session's own file, and the thread finds both.
+  Not measured: a recovery file on a network share, and a document far above LIM-005
+- justifies: XC-311, workspace/AC-026, workspace/AC-027

@@ -7,7 +7,7 @@
  * invariants stay in Python and are reached by asking the service, never reimplemented here.
  */
 
-export const PROTOCOL_VERSION = "3.20.0";
+export const PROTOCOL_VERSION = "3.21.0";
 
 /* The wire's own names, from CT-003's $defs.transport (XC-258). The engine generates the
  * same values from the same place; neither side is derived from the other (XC-252). */
@@ -22,6 +22,7 @@ export type Operation =
   | "workspace.create"
   | "workspace.sample"
   | "workspace.save"
+  | "workspace.discardRecovery"
   | "workspace.close"
   | "case.create"
   | "case.delete"
@@ -98,6 +99,7 @@ export const OPERATIONS: readonly Operation[] = [
   "workspace.create",
   "workspace.sample",
   "workspace.save",
+  "workspace.discardRecovery",
   "workspace.close",
   "case.create",
   "case.delete",
@@ -180,10 +182,11 @@ export interface OperationFacts {
 }
 
 export const OPERATION_FACTS: Readonly<Record<Operation, OperationFacts>> = {
-  "workspace.open": { writes: true, required: ["path"], optional: ["takeOverStaleLock"], answers: ["workspaceId", "formatVersion", "unresolvedCases", "items", "readOnly", "lock", "cases", "name", "tags"] },
-  "workspace.create": { writes: true, required: ["path"], optional: ["name", "caseName"], answers: ["workspaceId", "formatVersion", "unresolvedCases", "items", "readOnly", "lock", "cases", "name", "tags"] },
-  "workspace.sample": { writes: true, required: ["path"], optional: [], answers: ["workspaceId", "formatVersion", "unresolvedCases", "items", "readOnly", "lock", "cases", "name", "tags"] },
+  "workspace.open": { writes: true, required: ["path"], optional: ["takeOverStaleLock", "recover"], answers: ["workspaceId", "recovered", "recovery", "formatVersion", "unresolvedCases", "items", "readOnly", "lock", "cases", "name", "tags"] },
+  "workspace.create": { writes: true, required: ["path"], optional: ["name", "caseName"], answers: ["workspaceId", "recovered", "recovery", "formatVersion", "unresolvedCases", "items", "readOnly", "lock", "cases", "name", "tags"] },
+  "workspace.sample": { writes: true, required: ["path"], optional: [], answers: ["workspaceId", "recovered", "recovery", "formatVersion", "unresolvedCases", "items", "readOnly", "lock", "cases", "name", "tags"] },
   "workspace.save": { writes: true, required: ["workspaceId"], optional: ["path"], answers: ["path", "previousKept"] },
+  "workspace.discardRecovery": { writes: true, required: ["workspaceId"], optional: [], answers: ["discarded", "nextOffer"] },
   "workspace.close": { writes: true, required: ["workspaceId"], optional: [], answers: [] },
   "case.create": { writes: true, required: ["name", "workspaceId"], optional: ["parentCaseId"], answers: ["id"] },
   "case.delete": { writes: true, required: ["caseId"], optional: [], answers: ["affectedDescendantIds"] },
@@ -260,6 +263,7 @@ export interface Parameters {
   "workspace.open": {
     path: string;
     takeOverStaleLock?: boolean;
+    recover?: boolean;
   };
   "workspace.create": {
     path: string;
@@ -272,6 +276,9 @@ export interface Parameters {
   "workspace.save": {
     workspaceId: string;
     path?: string;
+  };
+  "workspace.discardRecovery": {
+    workspaceId: string;
   };
   "workspace.close": {
     workspaceId: string;
@@ -591,6 +598,19 @@ export interface Parameters {
 export interface Results {
   "workspace.open": {
     workspaceId: string;
+    recovered: boolean;
+    recovery?: {
+      writtenAt: RecordedTime;
+      count: number;
+      writes: readonly ({
+        operation: string;
+        summary: string;
+        at: RecordedTime;
+      })[];
+      baseChanged: boolean;
+      productVersion: string;
+      olderOffer: boolean;
+    };
     formatVersion: string;
     unresolvedCases: readonly (string)[];
     items?: {
@@ -637,6 +657,19 @@ export interface Results {
   };
   "workspace.create": {
     workspaceId: string;
+    recovered: boolean;
+    recovery?: {
+      writtenAt: RecordedTime;
+      count: number;
+      writes: readonly ({
+        operation: string;
+        summary: string;
+        at: RecordedTime;
+      })[];
+      baseChanged: boolean;
+      productVersion: string;
+      olderOffer: boolean;
+    };
     formatVersion: string;
     unresolvedCases: readonly (string)[];
     items?: {
@@ -683,6 +716,19 @@ export interface Results {
   };
   "workspace.sample": {
     workspaceId: string;
+    recovered: boolean;
+    recovery?: {
+      writtenAt: RecordedTime;
+      count: number;
+      writes: readonly ({
+        operation: string;
+        summary: string;
+        at: RecordedTime;
+      })[];
+      baseChanged: boolean;
+      productVersion: string;
+      olderOffer: boolean;
+    };
     formatVersion: string;
     unresolvedCases: readonly (string)[];
     items?: {
@@ -730,6 +776,21 @@ export interface Results {
   "workspace.save": {
     path: string;
     previousKept?: boolean;
+  };
+  "workspace.discardRecovery": {
+    discarded: boolean;
+    nextOffer?: {
+      writtenAt: RecordedTime;
+      count: number;
+      writes: readonly ({
+        operation: string;
+        summary: string;
+        at: RecordedTime;
+      })[];
+      baseChanged: boolean;
+      productVersion: string;
+      olderOffer: boolean;
+    };
   };
   "workspace.close": Record<string, unknown>;
   "case.create": {

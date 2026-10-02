@@ -216,6 +216,9 @@ export interface EngineState {
   /** What the last exit lost, until a person dismisses it. Null when nothing was lost or nothing
    *  ended. */
   readonly lost: readonly AppliedWrite[] | null;
+  /** A recovery file stood beside the document that was opened - the work of a session that ended
+   *  without saving - and has not been taken or discarded (workspace/AC-027, XC-311). Null otherwise. */
+  readonly recovery: NonNullable<Results["workspace.open"]["recovery"]> | null;
   readonly savedAt: RecordedTime | null;
   /** The engine's own record of what was asked, as `history.list` last answered it, with what
    *  the caps dropped said in numbers (LIM-014, LIM-015). Null until asked. */
@@ -364,6 +367,7 @@ const EMPTY: EngineState = {
   operations: null,
   journal: [],
   lost: null,
+  recovery: null,
   savedAt: null,
   history: null,
   workspaceId: null,
@@ -699,6 +703,26 @@ export const engineState = {
     setState({ lost: null });
   },
 
+  /** Take the recovery file's document on the person's word (workspace/AC-027, XC-311): opened again
+   *  with `recover`, unsaved, and every file read before is read again against it. The file on disk
+   *  is what it was until the person saves. */
+  async restoreRecovery(): Promise<boolean> {
+    const opened = state.opened;
+    if (!opened) return false;
+    if (!(await engineState.openWorkspace(opened.workspacePath, { recover: true, keepSubjects: true }))) return false;
+    return reloadAll(opened.loads);
+  },
+
+  /** Remove the recovery file on the person's word; the document as opened stays as it is. */
+  async discardRecovery(): Promise<boolean> {
+    const workspaceId = state.workspaceId;
+    if (!workspaceId) return false;
+    const discarded = await ask("workspace.discardRecovery", { workspaceId });
+    // An older offer that stood behind the one discarded moves up and is offered next.
+    if (discarded) setState({ recovery: discarded.nextOffer ?? null });
+    return Boolean(discarded);
+  },
+
   clearWarnings() {
     setState({ warnings: [] });
   },
@@ -741,9 +765,13 @@ export const engineState = {
   /** Class 3: open a workspace. Everything loaded from the previous one goes with it. The lock is
    *  taken for this session, or found held and the document opened read-only (XC-269); a stale or
    *  unreadable lock is taken over only when the caller says so - a person's word, never a default. */
-  async openWorkspace(path: string, options: { takeOverStaleLock?: boolean; keepSubjects?: boolean } = {}): Promise<boolean> {
+  async openWorkspace(path: string, options: { takeOverStaleLock?: boolean; keepSubjects?: boolean; recover?: boolean } = {}): Promise<boolean> {
     setState({ refusal: null, warnings: [] });
-    const opened = await ask("workspace.open", options.takeOverStaleLock ? { path, takeOverStaleLock: true } : { path });
+    const opened = await ask("workspace.open", {
+      path,
+      ...(options.takeOverStaleLock ? { takeOverStaleLock: true } : {}),
+      ...(options.recover ? { recover: true } : {}),
+    });
     if (!opened) return false;
     // From here every earlier question was of the previous document.
     generation += 1;
@@ -763,7 +791,11 @@ export const engineState = {
       provenance: null,
       provenanceRefusal: null,
       exported: null,
-      journal: [],
+      // Recovered, the writes the recovery file listed are unsaved work again (XC-311); otherwise
+      // a document just opened has none.
+      journal: opened.recovered ? (opened.recovery?.writes ?? []).map((one) => ({ operation: one.operation, summary: one.summary, at: one.at })) : [],
+      // Offered until taken or discarded; taken, there is nothing left to offer.
+      recovery: opened.recovered ? null : opened.recovery ?? null,
       savedAt: null,
       workspaceId: opened.workspaceId,
       workspaceName: opened.name ?? null,

@@ -8,7 +8,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { session, useSession, type ScreenId } from "../state/session";
 import { connectionFromEnvironment, engineState, snapshot, useEngine } from "../state/engine";
 import { shellApi } from "../client/shell";
-import { EngineLost, EngineRefusal, EngineWarnings, OrphanNotice } from "../shared/EngineStatus";
+import { EngineLost, EngineRefusal, EngineWarnings, OrphanNotice, RecoveryOffer } from "../shared/EngineStatus";
 import { EngineStarting } from "../shared/EngineStarting";
 import { describeReflection } from "../logic/budgets";
 import { InstructionBar } from "../shared/InstructionBar";
@@ -178,6 +178,7 @@ export function App() {
           <EngineRefusal refusal={e.refusal} onDismiss={() => engineState.clearRefusal()} />
           <EngineWarnings warnings={e.warnings} onDismiss={() => engineState.clearWarnings()} />
         <EngineLost lost={e.lost} onDismiss={() => engineState.dismissLost()} />
+        <RecoveryOffer recovery={e.recovery} busy={e.busy} readOnly={e.readOnly} onRestore={() => void engineState.restoreRecovery()} onDiscard={() => void engineState.discardRecovery()} />
         <OrphanNotice />
           {canvas}
         </div>
@@ -275,6 +276,7 @@ export function App() {
             <EngineRefusal refusal={e.refusal} onDismiss={() => engineState.clearRefusal()} />
             <EngineWarnings warnings={e.warnings} onDismiss={() => engineState.clearWarnings()} />
             <EngineLost lost={e.lost} onDismiss={() => engineState.dismissLost()} />
+            <RecoveryOffer recovery={e.recovery} busy={e.busy} readOnly={e.readOnly} onRestore={() => void engineState.restoreRecovery()} onDiscard={() => void engineState.discardRecovery()} />
             {canvas}
           </div>
 

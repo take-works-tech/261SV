@@ -366,7 +366,7 @@ describe("the prototype thread from the interface's side", () => {
 
     const s = snapshot();
     expect(s.operations?.registered).toContain("system.operations");
-    expect(s.operations?.registered.length).toBe(37);
+    expect(s.operations?.registered.length).toBe(38);
     expect([...(s.operations?.registered ?? []), ...(s.operations?.unimplemented ?? [])].sort()).toEqual([...OPERATIONS].sort());
     const rows = commandGroups(s.operations, "").flatMap((group) => group.rows);
     expect(rows).toHaveLength(OPERATIONS.length);
@@ -1076,7 +1076,22 @@ describe("when the engine ends", () => {
     expect(s.lock?.state).toBe("free");
     expect(s.sourceName).toBe("cube.vtu");
     expect(s.imageUrl).toMatch(/^blob:/);
+
+    // The recovery file the killed engine left beside the document (XC-311): offered and not taken,
+    // naming the unsaved declaration; restored on the person's word, the declaration is back as
+    // unsaved work; the save that follows removes the file.
+    expect(s.recovery?.writes.map((one) => one.operation)).toContain("field.declareUnit");
+    expect(s.recovery?.baseChanged).toBe(false);
+    expect(s.fields[0]?.unit).toBe("K");
+    expect(await engineState.restoreRecovery()).toBe(true);
+    s = snapshot();
+    expect(s.recovery).toBeNull();
+    expect(s.fields[0]?.unit).toBe("MPa");
+    expect(s.journal.map((one) => one.operation)).toContain("field.declareUnit");
+    const recoveryFile = `${s.opened?.workspacePath}.recovery`;
+    expect(existsSync(recoveryFile)).toBe(true);
     expect(await engineState.save()).toBe(true);
+    expect(existsSync(recoveryFile)).toBe(false);
 
     engineState.dismissLost();
     expect(snapshot().lost).toBeNull();

@@ -18,6 +18,7 @@ WRITES = frozenset({
     "workspace.create",
     "workspace.sample",
     "workspace.save",
+    "workspace.discardRecovery",
     "workspace.close",
     "case.create",
     "case.delete",
@@ -99,6 +100,7 @@ OPERATIONS = (
     "workspace.create",
     "workspace.sample",
     "workspace.save",
+    "workspace.discardRecovery",
     "workspace.close",
     "case.create",
     "case.delete",
@@ -174,10 +176,11 @@ OPERATIONS = (
 #: schemas, so a handler is checked against the **contract** rather than against its own
 #: declaration - which is what CT-002 promises when it says an unknown parameter is rejected.
 PARAMETERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
-    "workspace.open": (frozenset(['path', 'takeOverStaleLock']), frozenset(['path'])),
+    "workspace.open": (frozenset(['path', 'recover', 'takeOverStaleLock']), frozenset(['path'])),
     "workspace.create": (frozenset(['caseName', 'name', 'path']), frozenset(['path'])),
     "workspace.sample": (frozenset(['path']), frozenset(['path'])),
     "workspace.save": (frozenset(['path', 'workspaceId']), frozenset(['workspaceId'])),
+    "workspace.discardRecovery": (frozenset(['workspaceId']), frozenset(['workspaceId'])),
     "workspace.close": (frozenset(['workspaceId']), frozenset(['workspaceId'])),
     "case.create": (frozenset(['name', 'parentCaseId', 'workspaceId']), frozenset(['name', 'workspaceId'])),
     "case.delete": (frozenset(['caseId']), frozenset(['caseId'])),
@@ -254,10 +257,11 @@ PARAMETERS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
 #: against PARAMETERS: the contract states the answer, so a build cannot return a value the
 #: caller has no type for, nor omit a unit the contract requires beside a number (XC-003).
 RESULT_FIELDS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
-    "workspace.open": (frozenset(['cases', 'formatVersion', 'items', 'lock', 'name', 'readOnly', 'tags', 'unresolvedCases', 'workspaceId']), frozenset(['cases', 'formatVersion', 'lock', 'name', 'readOnly', 'tags', 'unresolvedCases', 'workspaceId'])),
-    "workspace.create": (frozenset(['cases', 'formatVersion', 'items', 'lock', 'name', 'readOnly', 'tags', 'unresolvedCases', 'workspaceId']), frozenset(['cases', 'formatVersion', 'lock', 'name', 'readOnly', 'tags', 'unresolvedCases', 'workspaceId'])),
-    "workspace.sample": (frozenset(['cases', 'formatVersion', 'items', 'lock', 'name', 'readOnly', 'tags', 'unresolvedCases', 'workspaceId']), frozenset(['cases', 'formatVersion', 'lock', 'name', 'readOnly', 'tags', 'unresolvedCases', 'workspaceId'])),
+    "workspace.open": (frozenset(['cases', 'formatVersion', 'items', 'lock', 'name', 'readOnly', 'recovered', 'recovery', 'tags', 'unresolvedCases', 'workspaceId']), frozenset(['cases', 'formatVersion', 'lock', 'name', 'readOnly', 'recovered', 'tags', 'unresolvedCases', 'workspaceId'])),
+    "workspace.create": (frozenset(['cases', 'formatVersion', 'items', 'lock', 'name', 'readOnly', 'recovered', 'recovery', 'tags', 'unresolvedCases', 'workspaceId']), frozenset(['cases', 'formatVersion', 'lock', 'name', 'readOnly', 'recovered', 'tags', 'unresolvedCases', 'workspaceId'])),
+    "workspace.sample": (frozenset(['cases', 'formatVersion', 'items', 'lock', 'name', 'readOnly', 'recovered', 'recovery', 'tags', 'unresolvedCases', 'workspaceId']), frozenset(['cases', 'formatVersion', 'lock', 'name', 'readOnly', 'recovered', 'tags', 'unresolvedCases', 'workspaceId'])),
     "workspace.save": (frozenset(['path', 'previousKept']), frozenset(['path'])),
+    "workspace.discardRecovery": (frozenset(['discarded', 'nextOffer']), frozenset(['discarded'])),
     "workspace.close": (frozenset([]), frozenset([])),
     "case.create": (frozenset(['id']), frozenset(['id'])),
     "case.delete": (frozenset(['affectedDescendantIds']), frozenset(['affectedDescendantIds'])),
@@ -339,6 +343,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
     "workspace.create": {},
     "workspace.sample": {},
     "workspace.save": {},
+    "workspace.discardRecovery": {},
     "workspace.close": {},
     "case.create": {},
     "case.delete": {},
@@ -412,7 +417,7 @@ REPORTED_VALUES: dict[str, dict[str, frozenset[str]]] = {
 
 #: The protocol version CT-003 declares. `system.protocols` answers with it, and a client below
 #: the engine's floor is refused politely rather than answered in a shape it cannot read.
-PROTOCOL_VERSION = "3.20.0"
+PROTOCOL_VERSION = "3.21.0"
 
 #: The wire's own names, from CT-003's `$defs.transport` (XC-258). The interface generates
 #: the same values from the same place; neither side is derived from the other (XC-252).

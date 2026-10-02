@@ -9,7 +9,7 @@
  * topbar, in words, always - not by a coloured dot, which says "something" and not "what".
  */
 import { useEffect, useState } from "react";
-import type { AppliedWrite, Lock, Reachability } from "../state/engine";
+import type { AppliedWrite, EngineState, Lock, Reachability } from "../state/engine";
 import { shellApi, type Orphan } from "../client/shell";
 import type { RecordedTime } from "../client/generated";
 import { formatBytes } from "../logic/format";
@@ -117,6 +117,47 @@ export function EngineLost(props: { lost: readonly AppliedWrite[] | null; onDism
           閉じる
         </button>
       ) : null}
+    </div>
+  );
+}
+
+/** A recovery file stood beside the document that was opened: the work of a session that ended
+ *  without saving, named write by write, offered and never applied unasked (workspace/AC-027,
+ *  XC-311). Restored, that document opens unsaved and the writes are unsaved work again; discarded,
+ *  the file goes and the document stays as it was saved. */
+export function RecoveryOffer(props: { recovery: EngineState["recovery"]; busy?: boolean; readOnly?: boolean; onRestore: () => void; onDiscard: () => void }) {
+  if (!props.recovery) return null;
+  const writes: AppliedWrite[] = props.recovery.writes.map((one) => ({ operation: one.operation, summary: one.summary, at: one.at }));
+  return (
+    <div className="notice warn" role="status">
+      <div>
+        <b>保存していない変更の復旧ファイルがあります：{props.recovery.count} 件</b>
+        <span className="why">
+          前回の作業は保存されずに終わりました（最後は {describeRecorded(props.recovery.writtenAt)}）。復元すると、その時点の文書を未保存として開き直します。保存するまでファイルは変わりません。この窓で作業を続けてもこの提案は脇に残り、復元か破棄で答えるまで、保存しても消えません。
+          {props.recovery.baseChanged ? " 注意：ファイルはその後に別の保存で変わっています。" : ""}
+          {props.recovery.olderOffer ? " さらに前の提案がもう一つ、この後に控えています。" : ""}
+          {props.readOnly ? " 読み取り専用で開いているので、復元するにはまずロックを引き継いでください。" : ""}
+        </span>
+        {writes.length > 0 ? (
+          <ul className="lost-list">
+            {grouped(writes).map((group) => (
+              <li key={group.operation}>
+                {group.lastSummary}
+                <small>
+                  （{group.operation}
+                  {group.count > 1 ? ` ×${group.count}` : ""}、最後は {describeRecorded(group.lastAt)}）
+                </small>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+      <button type="button" className="btn primary" onClick={props.onRestore} disabled={props.busy || props.readOnly}>
+        復元する
+      </button>
+      <button type="button" className="btn ghost" onClick={props.onDiscard} disabled={props.busy}>
+        捨てる
+      </button>
     </div>
   );
 }

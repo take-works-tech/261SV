@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-23
+updated: 2026-10-03
 ---
 
 # Feature: running the product
@@ -148,8 +148,9 @@ updated: 2026-09-23
     rather than show a blank picture (XC-310)
   - AC-036: If the engine process ends - a driver fault inside the renderer among the causes - then
     the shell shall report it as it reports any exit, the interface shall offer a restart, reopen
-    what was saved and name what was applied and not saved, and nothing saved shall be lost
-    (XC-259, XC-310)
+    what was saved and name what was applied and not saved, nothing saved shall be lost, and what
+    was applied and not saved shall be offered back from the recovery file beside the document
+    (XC-259, XC-310, XC-311)
 
 ### REQ-008 - A shared component has one implementation
 - priority: MUST

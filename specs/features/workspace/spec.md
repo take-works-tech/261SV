@@ -1,6 +1,6 @@
 ---
 status: draft
-updated: 2026-09-22
+updated: 2026-10-03
 ---
 
 # Feature: workspace, cases and variables

@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import getpass
 import os
+import uuid
 import platform
 import secrets
 from dataclasses import dataclass, field as dataclass_field, replace
@@ -66,11 +67,12 @@ from engine.visualization import render as render_module
 from engine.visualization.backends import REQUIRES, Backend, probe
 from engine.visualization.render import Camera, Colouring, RenderError, probe_offscreen, render_view
 from service.command.catalogue import PROTOCOL_VERSION
-from service.command.surface import Effect, Handler, LogEntry, Permission, Result, Status, Surface
+from service.command.surface import Command, Effect, Handler, LogEntry, Permission, Result, Status, Surface
 from service.egress import diagnostics
 from service.egress.gate import Gate
 from service.workspace import items, output, sources
 from service.workspace import lock as workspace_lock
+from service.workspace import recovery as workspace_recovery
 from service.workspace.lock import LockState, LockStatus
 from service.workspace.document import FORMAT_VERSION, WorkspaceDocument, WorkspaceFileError, fresh as fresh_document, load as load_workspace
 from service.workspace.document import WorkspaceVersionError, save as save_document
@@ -348,6 +350,15 @@ class Session:
     #: The support bundle's list as last shown in this session (AC-008, XC-302): a bundle is made
     #: from it, and from nothing that was not shown.
     support_manifest: diagnostics.Manifest | None = None
+    #: The writes applied to the open document since it was last saved, as the recovery file beside
+    #: it lists them (XC-311): operation, summary, when. Emptied by an open and by a save; taken over
+    #: from a recovery file when its document is recovered.
+    unsaved_writes: list[dict[str, Any]] = dataclass_field(default_factory=list)
+    #: A recovery file of an earlier session stands beside the open document, offered and not yet
+    #: taken or discarded (XC-311). This session's first write sets it aside rather than over it.
+    recovery_pending: bool = False
+    #: Who wrote a recovery file: this session, or an earlier one whose file is an offer (XC-311).
+    session_id: str = dataclass_field(default_factory=lambda: uuid.uuid4().hex)
 
     _offscreen: tuple[bool, str] | None = None
 
@@ -487,6 +498,7 @@ def build_surface(session: Session, *, clock: Callable[[], datetime] | None = No
     reports, and the report is the truth rather than a placeholder.
     """
     surface = Surface(clock=clock or session.clock, on_entry=lambda entry: log_entry(session, entry))
+    surface.after_write = lambda command, result: recovery_after_write(session, command, result)
     for handler in handlers(session):
         surface.register(handler)
     # The handlers that read the surface itself: what it recorded and what its caps dropped, and
@@ -502,6 +514,7 @@ def handlers(session: Session) -> tuple[Handler, ...]:
         Handler("workspace.create", lambda p, t: workspace_create(session, p)),
         Handler("workspace.sample", lambda p, t: workspace_sample(session, p)),
         Handler("workspace.save", lambda p, t: workspace_save(session, p)),
+        Handler("workspace.discardRecovery", lambda p, t: workspace_discard_recovery(session, p)),
         Handler("dataset.inspect", lambda p, t: dataset_inspect(session, p)),
         Handler("dataset.load", lambda p, t: dataset_load(session, p)),
         Handler("dataset.describe", lambda p, t: dataset_describe(session, p)),
@@ -590,15 +603,46 @@ def workspace_open(session: Session, parameters: Mapping[str, Any]) -> Effect | 
                 "ロックを引き継ぎませんでした：持ち主のプロセスは生きている可能性があります。生きているものは決して壊しません（XC-241）",
             )
 
+    # A recovery file beside the document (workspace/AC-027, XC-311): the document as it stood after
+    # the last applied write of a session that ended without saving, and the writes it holds. Said,
+    # and never taken unless asked: `recover` puts that document in memory, unsaved, and the file on
+    # disk stays what it was until the person saves. Not taken into a read-only open either - the
+    # work would be lost again the moment the window closed, so it is kept where it is and said.
+    offer = workspace_recovery.find_offer(location, loaded.identifier, session.session_id)
+    warnings += offer.warnings
+    found = offer.recovery
+    recovered = False
+    unsaved_writes: list[dict[str, Any]] = []
+    if parameters.get("recover"):
+        if found is None:
+            warnings += (f"{location.name} の隣に復旧ファイルはなく、復元するものがありません。保存済みの文書を開きました",)
+        elif not status.may_edit:
+            warnings += ("読み取り専用で開いたので復旧ファイルは復元していません：保存できない窓に復元しても失われます。ロックを引き継いでから復元してください",)
+        else:
+            loaded = WorkspaceDocument(raw=found.document, origin=location)
+            unsaved_writes = list(found.writes)
+            recovered = True
     # A dataset belongs to a case of a workspace; the one that was open is no longer, so neither are
     # they. They are **not** kept for undo: an undo closure holding every dataset of every workspace
     # a session has opened is the memory #315 is about (LIM-001 per case, times the history). The
     # undo puts the previous document back and says that its datasets need reading again.
     before = (session.workspace, session.workspace_path, dict(session.revisions))
+    before_unsaved = (list(session.unsaved_writes), session.recovery_pending)
     dropped_datasets = len(session.datasets)
     session.workspace, session.workspace_path = loaded, location
     session.datasets = {}
     session.revisions = {}
+    session.unsaved_writes = unsaved_writes
+    session.recovery_pending = found is not None and not recovered
+    if recovered and found is not None:
+        # Taken: this session's own file now holds the recovered state, so a crash before the save
+        # loses nothing again, and the file taken from goes where it was not this one.
+        write_recovery_now(session)
+        if found.path != workspace_recovery.recovery_path(location):
+            try:
+                found.path.unlink()
+            except OSError as error:
+                warnings += (f"{found.path.name} を消せませんでした：{error}",)
 
     resolutions = {
         str(case.get("id", "")): sources.resolve_case(case, relative_to=location.parent)
@@ -620,6 +664,7 @@ def workspace_open(session: Session, parameters: Mapping[str, Any]) -> Effect | 
 
     def undo() -> None:
         session.workspace, session.workspace_path, session.revisions = before
+        session.unsaved_writes, session.recovery_pending = before_unsaved
         session.datasets = {}
         # The previous document's lock goes with it: retaken, or found held and said.
         if session.workspace_path is not None:
@@ -655,6 +700,8 @@ def workspace_open(session: Session, parameters: Mapping[str, Any]) -> Effect | 
             ],
             "readOnly": not status.may_edit,
             "lock": status.as_stored(workspace_lock.lock_for(location)),
+            "recovered": recovered,
+            **({"recovery": found.as_answer(location, older_offer=offer.older_offer)} if found is not None else {}),
         },
         warnings=warnings,
         undo=undo,
@@ -813,10 +860,32 @@ def workspace_save(session: Session, parameters: Mapping[str, Any]) -> Effect | 
         if older.exists():
             os.replace(older, previous)
         return refused(f"保存できません：{error}")
+    saved_from = session.workspace_path
     session.workspace_path = target
+    # The recovery file is the work this save wrote: it goes, beside the target and beside the path
+    # saved from where this was a save-as (XC-311). Its bytes are held for the undo, which puts the
+    # file and the unsaved work back together with the document.
+    recovery_removed: dict[Path, bytes] = {}
+    save_warnings: tuple[str, ...] = ()
+    for beside in {path for path in (saved_from, target) if path is not None}:
+        try:
+            recovery_removed.update(workspace_recovery.remove_own(beside, session.session_id))
+        except OSError:
+            pass
+    # An earlier session's work, offered and not answered, is not this save's to remove: it stays
+    # beside the document and is offered again at the next open.
+    if workspace_recovery.find_offer(target, workspace.identifier, session.session_id).recovery is not None:
+        save_warnings += (
+            "前のセッションの復旧ファイルがまだ復元も破棄もされていないので、残しました。次に開いたときにも提案されます（XC-311）",
+        )
+    unsaved_before = list(session.unsaved_writes)
+    session.unsaved_writes = []
 
     def undo() -> None:
         # The document as it was on disk before this save comes back; what this save wrote goes.
+        session.unsaved_writes = unsaved_before
+        for beside, data in recovery_removed.items():
+            beside.write_bytes(data)
         if kept != target and kept.exists():
             os.replace(kept, target)
             if older.exists():
@@ -833,6 +902,102 @@ def workspace_save(session: Session, parameters: Mapping[str, Any]) -> Effect | 
         f"{target.name} を保存しました" + ("（直前の版を残しました）" if kept != target else ""),
         changed=(workspace.identifier,),
         value={"path": str(for_people(target)), "previousKept": str(for_people(kept)) if kept != target else None},
+        warnings=save_warnings,
+        undo=undo,
+    )
+
+
+#: Writes that are the document file's own business and leave no recovery file: opening, creating
+#: and the sample read or write the file itself and start from a saved state, a save removes the
+#: file, and discarding it is its removal.
+RECOVERY_EXEMPT = frozenset({"workspace.open", "workspace.create", "workspace.sample", "workspace.save", "workspace.discardRecovery"})
+
+
+def recovery_after_write(session: Session, command: Command, result: Result) -> None:
+    """After every applied write to an open document, the document as it stands goes to the recovery
+    file beside it with the writes since the last save (workspace/AC-026, XC-311).
+
+    Never in a read-only session: the document is another window's, and so is the file beside it. A
+    recovery file that cannot be written is a line in the diagnostic log, not a failure of the write it
+    follows - the write was applied, and saying otherwise would be false.
+    """
+    if command.operation in RECOVERY_EXEMPT or command.dry_run:
+        return
+    if session.workspace is None or session.workspace_path is None or session.read_only:
+        return
+    session.unsaved_writes.append({
+        "operation": command.operation,
+        "summary": result.effect_summary or command.operation,
+        "at": record_time(session.clock()).as_stored(),
+    })
+    if session.recovery_pending:
+        # The file beside the document is an earlier session's offer; this session's state goes
+        # beside it, never over it: the offer moves to the earlier slot - replacing an older one
+        # there, which the log says - and stays what `recover` takes until it is answered.
+        try:
+            replaced = workspace_recovery.earlier_path(session.workspace_path).exists()
+            if workspace_recovery.set_aside(session.workspace_path) and replaced:
+                session.log.record(diagnostics.Level.WARNING, "workspace.recovery.oldest_dropped", path=str(session.workspace_path.name))
+        except OSError as error:
+            session.log.record(diagnostics.Level.WARNING, "workspace.recovery.not_set_aside", reason=str(error))
+            return
+        session.recovery_pending = False
+    write_recovery_now(session)
+
+
+def write_recovery_now(session: Session) -> None:
+    """The open document and the writes since the last save, to the file beside it; a file that
+    cannot be written is a line in the diagnostic log."""
+    if session.workspace is None or session.workspace_path is None:
+        return
+    try:
+        workspace_recovery.write_recovery(
+            session.workspace.raw, session.workspace_path,
+            writes=session.unsaved_writes, now=session.clock(), product_version=product_version(),
+            session_id=session.session_id,
+        )
+    except OSError as error:
+        session.log.record(diagnostics.Level.WARNING, "workspace.recovery.unwritten", reason=str(error))
+
+
+def workspace_discard_recovery(session: Session, parameters: Mapping[str, Any]) -> Effect | Result:
+    """Remove the recovery file beside the open document, on the person's word (XC-311).
+
+    The bytes are held for the undo: a file of unsaved work removed by a slip is the loss this file
+    exists to prevent. The document in memory is not touched - what is discarded is what a session
+    that ended left behind, not what this one has done.
+    """
+    workspace = session.open_workspace(str(parameters["workspaceId"]))
+    if isinstance(workspace, Result):
+        return workspace
+    path = session.workspace_path
+    if path is None:
+        return refused("文書のパスがありません：復旧ファイルの置き場が決まりません")
+    offer = workspace_recovery.find_offer(path, workspace.identifier, session.session_id)
+    if offer.recovery is None:
+        return Effect("復旧ファイルはありませんでした", changed=(workspace.identifier,), value={"discarded": False}, undo=lambda: None)
+    try:
+        removed, promoted = workspace_recovery.discard_offer(path, offer.recovery)
+    except OSError as error:
+        return refused(f"復旧ファイルを消せません：{error}")
+    removed_from = offer.recovery.path
+    was_pending = session.recovery_pending
+    remaining = workspace_recovery.find_offer(path, workspace.identifier, session.session_id)
+    session.recovery_pending = remaining.recovery is not None
+
+    def undo() -> None:
+        session.recovery_pending = was_pending
+        if promoted:
+            os.replace(workspace_recovery.recovery_path(path), workspace_recovery.earlier_path(path))
+        removed_from.write_bytes(removed)
+
+    return Effect(
+        f"{removed_from.name} を消しました" + ("（さらに前の提案が次に控えています）" if remaining.recovery is not None else ""),
+        changed=(workspace.identifier,),
+        value={
+            "discarded": True,
+            **({"nextOffer": remaining.recovery.as_answer(path, older_offer=remaining.older_offer)} if remaining.recovery is not None else {}),
+        },
         undo=undo,
     )
 

@@ -210,6 +210,10 @@ class Surface:
         self._undo: dict[str, list[Callable[[], None]]] = {}
         self._next = 0
         self._clock = clock or (lambda: datetime.now(timezone.utc).astimezone())
+        #: Told of every applied write that was not a dry run, as it is recorded: the recovery file
+        #: beside the document is written from there (XC-311). Set by whoever builds the surface; the
+        #: surface itself knows no document.
+        self.after_write: Callable[[Command, Result], None] | None = None
 
     # -- registration ------------------------------------------------------------------------
 
@@ -496,6 +500,8 @@ class Surface:
             dry_run=command.dry_run,
             warnings=tuple(result.warnings),
         )
+        if result.status is Status.APPLIED and not command.dry_run and self.after_write is not None:
+            self.after_write(command, result)
         self._log.append(entry)
         if len(self._log) > MAX_HISTORY_ENTRIES:
             del self._log[0]
